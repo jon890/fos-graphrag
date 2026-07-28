@@ -37,3 +37,27 @@ class Neo4jSettings:
             password=values["NEO4J_PASSWORD"],
             database=values.get("NEO4J_DATABASE", "neo4j").strip() or "neo4j",
         )
+
+
+@dataclass(frozen=True, slots=True)
+class LocalModelSettings:
+    base_url: str = "http://localhost:11434"
+    model: str = "nemotron-3-nano:4b"
+
+    @classmethod
+    def from_env(cls) -> LocalModelSettings:
+        load_dotenv()
+        return cls.from_mapping(os.environ)
+
+    @classmethod
+    def from_mapping(cls, values: Mapping[str, str]) -> LocalModelSettings:
+        default_settings = cls()
+        return cls(
+            base_url=(
+                values.get("OLLAMA_BASE_URL", default_settings.base_url).strip()
+                or default_settings.base_url
+            ),
+            model=(
+                values.get("OLLAMA_MODEL", default_settings.model).strip() or default_settings.model
+            ),
+        )
