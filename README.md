@@ -2,12 +2,13 @@
 
 Python, LangChain, Neo4j로 GraphRAG를 단계적으로 구현하는 학습 프로젝트입니다.
 
-현재는 Docker Compose로 Neo4j를 실행하고 Python 공식 드라이버에서 연결을 확인하는 단계까지만 구현되어 있습니다.
+현재는 Neo4j 연결과 API 키가 필요 없는 로컬 언어 모델 연결까지 구현되어 있습니다.
 
 ## 준비물
 
 - Python 3.11 이상
 - Docker와 Docker Compose
+- Ollama
 - 권장: `uv`
 
 ## 시작하기
@@ -80,19 +81,37 @@ docker compose down --volumes
 ├── src/fos_graphrag/
 │   ├── cli.py
 │   ├── config.py
-│   └── database.py
+│   ├── database.py
+│   ├── model.py
+│   └── model_cli.py
 └── tests/
 ```
 
-LangChain과 `langchain-neo4j`는 이후 GraphRAG 단계를 위해 의존성에 포함했지만, 현재 코드에서는 LLM을 호출하거나 그래프 데이터를 만들지 않습니다.
+현재 코드는 로컬 모델에 짧은 메시지만 보내며 그래프 데이터를 만들거나 GraphRAG 체인을 실행하지 않습니다.
 
-## LLM API 키
+## 로컬 모델 연결
 
-현재 단계는 Neo4j 연결만 확인하므로 LLM API 키가 필요하지 않습니다.
+Ollama를 설치하고 호스트 서비스로 시작합니다.
 
-이후 OpenAI 모델을 연결할 때는 OpenAI Platform에서 발급한 프로젝트 API 키를 `OPENAI_API_KEY`로 설정해야 합니다.
-ChatGPT 계정으로 로그인한 Codex 세션의 인증 정보나 `~/.codex/auth.json`은 애플리케이션 API 키로 사용하지 않습니다.
-Codex도 OpenAI Platform API 키로 로그인했다면 키 형식은 같지만, 비용·폐기 범위를 분리할 수 있도록 이 프로젝트 전용 키를 새로 발급하는 편이 안전합니다.
+```bash
+brew install ollama
+brew services start ollama
+```
+
+학습용 기본 모델을 내려받습니다.
+
+```bash
+ollama pull nemotron-3-nano:4b
+```
+
+LangChain에서 모델 연결과 응답을 확인합니다.
+
+```bash
+uv run graphrag-check-model
+```
+
+이 구성은 OpenAI나 NVIDIA API 키를 사용하지 않습니다.
+모델 파일은 약 2.8GB이며 추론은 로컬 컴퓨터의 메모리와 연산 자원을 사용합니다.
 
 ## 다음 학습 단계
 

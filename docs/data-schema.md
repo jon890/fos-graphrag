@@ -11,6 +11,13 @@
 | `NEO4J_HTTP_PORT` | 아니요 | Neo4j Browser 호스트 포트이며 기본값은 `7475` |
 | `NEO4J_BOLT_PORT` | 아니요 | Bolt 호스트 포트이며 기본값은 `7688` |
 
+## 로컬 모델 설정
+
+| 환경변수 | 필수 | 의미 |
+| --- | --- | --- |
+| `OLLAMA_BASE_URL` | 아니요 | Ollama API 주소이며 기본값은 `http://localhost:11434` |
+| `OLLAMA_MODEL` | 아니요 | 호출할 로컬 모델이며 기본값은 `nemotron-3-nano:4b` |
+
 ## 그래프 저장 모델
 
 현재 단계에서는 노드, 관계, 제약 조건, 인덱스를 생성하지 않는다.
