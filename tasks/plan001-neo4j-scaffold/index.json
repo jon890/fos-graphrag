@@ -1,0 +1,16 @@
+{
+  "name": "plan001-neo4j-scaffold",
+  "description": "GraphRAG 학습의 첫 단계로 로컬 Neo4j 실행과 Python 연결 확인 경계를 만든다.",
+  "status": "completed",
+  "created_at": "2026-07-28",
+  "total_phases": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "title": "Neo4j 실행과 연결 확인 스캐폴딩",
+      "execution_profile": "standard",
+      "status": "completed"
+    }
+  ]
+}
