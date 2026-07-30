@@ -28,7 +28,6 @@ dev = [
 graphrag-check-neo4j = "fos_graphrag.cli:main"
 graphrag-check-model = "fos_graphrag.model_cli:main"
 graphrag-check-movies = "fos_graphrag.movies_cli:main"
-graphrag-query = "fos_graphrag.query_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

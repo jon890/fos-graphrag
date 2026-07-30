@@ -86,10 +86,7 @@ docker compose down --volumes
 │   ├── model_cli.py
 │   ├── movies.py
 │   ├── movies_cli.py
-│   ├── query.py
-│   └── query_cli.py
-├── queries/
-│   └── first_query.cypher
+│   └── first-query.py
 ├── scripts/
 │   └── load-recommendations.sh
 └── tests/
@@ -172,36 +169,18 @@ ORDER BY score DESC
 LIMIT 20;
 ```
 
-### Python에서 Cypher 파일 실행하기
+### Python 파일에서 Cypher 실행하기
 
-[`queries/first_query.cypher`](queries/first_query.cypher)에 실행할 Cypher를 작성합니다.
-한 파일에는 한 문장만 작성하고, 값은 `$movie`처럼 매개변수로 표시합니다.
+[`src/fos_graphrag/first-query.py`](src/fos_graphrag/first-query.py)의
+`CYPHER_QUERY`와 `MOVIE_TITLE`을 수정해 원하는 쿼리를 작성합니다.
 
-Neo4j가 실행 중인 상태에서 쿼리 파일과 매개변수를 전달합니다.
+Neo4j가 실행 중인 상태에서 Python 파일을 실행합니다.
 
 ```bash
-uv run graphrag-query queries/first_query.cypher \
-  --params '{"movie": "Crimson Tide"}'
+uv run python src/fos_graphrag/first-query.py
 ```
 
-조회 결과는 표준 출력에 JSON 한 줄씩 표시되고,
-완료된 행 수는 표준 오류에 표시됩니다.
-매개변수가 없는 쿼리는 `--params`를 생략할 수 있습니다.
-
-코드에서 직접 Driver가 필요하면 다음 팩토리를 사용합니다.
-
-```python
-from fos_graphrag.config import Neo4jSettings
-from fos_graphrag.database import create_neo4j_driver
-
-settings = Neo4jSettings.from_env()
-
-with create_neo4j_driver(settings) as driver:
-    result = driver.execute_query(
-        "RETURN 1 AS value",
-        database_=settings.database,
-    )
-```
+쿼리 결과의 `recommendation` 값이 터미널에 한 줄씩 출력됩니다.
 
 ## 로컬 모델 연결
 
