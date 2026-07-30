@@ -1,5 +1,7 @@
 # Movies 예제 데이터는 APOC Core로 적재한다
 
+상태: `0004-use-recommendations-dump.md`로 대체됨
+
 ## 맥락
 
 Neo4j Sandbox와 공식 Cypher 문서가 사용하는 Movies 그래프를 로컬에서 동일하게 실습해야 한다.

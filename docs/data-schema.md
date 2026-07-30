@@ -20,12 +20,16 @@
 
 ## 그래프 저장 모델
 
-Movies 예제는 다음 노드와 속성을 생성한다.
+영화 추천 예제는 다음 노드 라벨을 사용한다.
 
-| 라벨 | 식별 속성 | 선택 속성 |
+| 라벨 | 역할 |
 | --- | --- | --- |
-| `Person` | `name` | `born` |
-| `Movie` | `title` | `released`, `tagline` |
+| `Movie` | 영화 |
+| `Person` | 배우와 감독의 공통 라벨 |
+| `Actor` | 배우이며 `Person` 라벨을 함께 가짐 |
+| `Director` | 감독이며 `Person` 라벨을 함께 가짐 |
+| `Genre` | 장르 |
+| `User` | 영화 평점 사용자 |
 
 예제 데이터는 다음 관계를 생성한다.
 
@@ -33,12 +37,9 @@ Movies 예제는 다음 노드와 속성을 생성한다.
 | --- | --- | --- |
 | `ACTED_IN` | `Person` → `Movie` | `roles` |
 | `DIRECTED` | `Person` → `Movie` | 없음 |
-| `FOLLOWS` | `Person` → `Person` | 없음 |
-| `PRODUCED` | `Person` → `Movie` | 없음 |
-| `WROTE` | `Person` → `Movie` | 없음 |
-| `REVIEWED` | `Person` → `Movie` | `summary`, `rating` |
+| `IN_GENRE` | `Movie` → `Genre` | 없음 |
+| `RATED` | `User` → `Movie` | `rating`, `timestamp` |
 
-완전한 예제 데이터의 기준은 `Person` 131개, `Movie` 38개다.
-관계는 `ACTED_IN` 172개, `DIRECTED` 44개, `FOLLOWS` 3개,
-`PRODUCED` 14개, `REVIEWED` 8개, `WROTE` 9개다.
+완전한 예제 데이터는 노드 28,863개와 관계 166,261개다.
+`Movie` 9,125개, `User` 671개, `RATED` 관계 100,004개를 포함한다.
 Movies 예제 외의 GraphRAG 저장 모델과 벡터 인덱스는 이후 단계에서 정의한다.
