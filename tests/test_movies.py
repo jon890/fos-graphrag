@@ -6,35 +6,17 @@ import pytest
 from fos_graphrag import movies
 from fos_graphrag.config import Neo4jSettings
 
-EMPTY_STATE = {
-    "nodes": 0,
-    "relationships": 0,
-    "label_counts": {
-        "Person": 0,
-        "Movie": 0,
-    },
-    "relationship_counts": {
-        "ACTED_IN": 0,
-        "DIRECTED": 0,
-        "FOLLOWS": 0,
-        "PRODUCED": 0,
-        "REVIEWED": 0,
-        "WROTE": 0,
-    },
-    "matrix_movies": 0,
-}
 COMPLETE_STATE = {
     "nodes": movies.EXPECTED_MOVIE_NODES,
     "relationships": movies.EXPECTED_MOVIE_RELATIONSHIPS,
     "label_counts": movies.EXPECTED_LABEL_COUNTS,
     "relationship_counts": movies.EXPECTED_RELATIONSHIP_COUNTS,
-    "matrix_movies": 1,
 }
 
 
 class FakeDriver:
-    def __init__(self, records_by_query: list[list[dict[str, Any]]]) -> None:
-        self.records_by_query = records_by_query
+    def __init__(self, records: list[dict[str, Any]]) -> None:
+        self.records = records
         self.queries: list[tuple[str, str]] = []
         self.closed = False
 
@@ -46,7 +28,7 @@ class FakeDriver:
 
     def execute_query(self, query: str, *, database_: str) -> SimpleNamespace:
         self.queries.append((query, database_))
-        return SimpleNamespace(records=self.records_by_query.pop(0))
+        return SimpleNamespace(records=self.records)
 
 
 def settings() -> Neo4jSettings:
@@ -65,93 +47,49 @@ def install_fake_driver(monkeypatch: Any, fake_driver: FakeDriver) -> dict[str, 
         received["auth"] = auth
         return fake_driver
 
-    monkeypatch.setattr(
-        movies.GraphDatabase,
-        "driver",
-        fake_graph_database_driver,
-    )
+    monkeypatch.setattr(movies.GraphDatabase, "driver", fake_graph_database_driver)
     return received
 
 
-def test_load_movies_dataset_seeds_empty_database(monkeypatch: Any) -> None:
-    fake_driver = FakeDriver(
-        [
-            [EMPTY_STATE],
-            [{"done": True}],
-            [COMPLETE_STATE],
-        ]
-    )
+def test_verify_movies_dataset_returns_official_counts(monkeypatch: Any) -> None:
+    fake_driver = FakeDriver([COMPLETE_STATE])
     received = install_fake_driver(monkeypatch, fake_driver)
 
-    result = movies.load_movies_dataset(settings())
+    result = movies.verify_movies_dataset(settings())
 
     assert result == movies.MoviesDatasetStats(
-        nodes=169,
-        relationships=250,
-        already_loaded=False,
+        nodes=28_863,
+        relationships=166_261,
+        movies=9_125,
+        users=671,
+        ratings=100_004,
     )
     assert received == {
         "uri": "bolt://localhost:7688",
         "auth": ("neo4j", "password"),
     }
-    assert [query for query, _ in fake_driver.queries] == [
-        movies.DATASET_STATE_QUERY,
-        movies.LOAD_MOVIES_QUERY,
-        movies.DATASET_STATE_QUERY,
-    ]
+    assert fake_driver.queries == [(movies.DATASET_STATE_QUERY, "neo4j")]
     assert fake_driver.closed
 
 
-def test_load_movies_dataset_reuses_complete_dataset(monkeypatch: Any) -> None:
-    fake_driver = FakeDriver([[COMPLETE_STATE]])
-    install_fake_driver(monkeypatch, fake_driver)
-
-    result = movies.load_movies_dataset(settings())
-
-    assert result.already_loaded
-    assert len(fake_driver.queries) == 1
-
-
-@pytest.mark.parametrize(
-    "current_state",
-    [
-        {
-            **EMPTY_STATE,
-            "nodes": 1,
-        },
-        {
-            **COMPLETE_STATE,
-            "nodes": 100,
-            "relationships": 80,
-        },
-    ],
-)
-def test_load_movies_dataset_rejects_non_empty_or_partial_database(
-    monkeypatch: Any,
-    current_state: dict[str, Any],
-) -> None:
-    fake_driver = FakeDriver([[current_state]])
-    install_fake_driver(monkeypatch, fake_driver)
-
-    with pytest.raises(movies.MoviesDatasetError, match="비어 있지 않거나"):
-        movies.load_movies_dataset(settings())
-
-    assert len(fake_driver.queries) == 1
-
-
-def test_load_movies_dataset_rejects_unexpected_result(monkeypatch: Any) -> None:
+def test_verify_movies_dataset_rejects_unexpected_counts(monkeypatch: Any) -> None:
     unexpected_state = {
         **COMPLETE_STATE,
-        "nodes": 168,
+        "relationship_counts": {
+            **movies.EXPECTED_RELATIONSHIP_COUNTS,
+            "RATED": 0,
+        },
     }
-    fake_driver = FakeDriver(
-        [
-            [EMPTY_STATE],
-            [{"done": True}],
-            [unexpected_state],
-        ]
-    )
+    fake_driver = FakeDriver([unexpected_state])
     install_fake_driver(monkeypatch, fake_driver)
 
-    with pytest.raises(movies.MoviesDatasetError, match="노드 168, 관계 250"):
-        movies.load_movies_dataset(settings())
+    with pytest.raises(movies.MoviesDatasetError, match="RATED 0"):
+        movies.verify_movies_dataset(settings())
+
+
+def test_verify_movies_dataset_rejects_missing_result(monkeypatch: Any) -> None:
+    fake_driver = FakeDriver([])
+    install_fake_driver(monkeypatch, fake_driver)
+
+    with pytest.raises(movies.MoviesDatasetError, match="하나의 행"):
+        movies.verify_movies_dataset(settings())

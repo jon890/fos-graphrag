@@ -15,65 +15,41 @@ def stub_settings(monkeypatch: Any) -> Neo4jSettings:
         username="neo4j",
         password="password",
     )
-    monkeypatch.setattr(
-        movies_cli.Neo4jSettings,
-        "from_env",
-        lambda: settings,
-    )
+    monkeypatch.setattr(movies_cli.Neo4jSettings, "from_env", lambda: settings)
     return settings
 
 
-def test_movies_cli_prints_seeded_stats(monkeypatch: Any, capsys: Any) -> None:
+def test_movies_cli_prints_verified_stats(monkeypatch: Any, capsys: Any) -> None:
     monkeypatch.setattr(
         movies_cli,
-        "load_movies_dataset",
-        lambda _: MoviesDatasetStats(169, 250, False),
+        "verify_movies_dataset",
+        lambda _: MoviesDatasetStats(28_863, 166_261, 9_125, 671, 100_004),
     )
 
     assert movies_cli.main() == 0
     output = capsys.readouterr()
     assert output.err == ""
-    assert "Movies 데이터 적재 완료" in output.out
-    assert "노드: 169, 관계: 250" in output.out
-
-
-def test_movies_cli_prints_already_loaded_state(
-    monkeypatch: Any,
-    capsys: Any,
-) -> None:
-    monkeypatch.setattr(
-        movies_cli,
-        "load_movies_dataset",
-        lambda _: MoviesDatasetStats(169, 250, True),
-    )
-
-    assert movies_cli.main() == 0
-    output = capsys.readouterr()
-    assert output.err == ""
-    assert "Movies 데이터 이미 적재됨" in output.out
+    assert "영화 추천 데이터 확인 성공" in output.out
+    assert "영화: 9125, 사용자: 671, RATED: 100004" in output.out
 
 
 def test_movies_cli_reports_dataset_failure(monkeypatch: Any, capsys: Any) -> None:
     def raise_dataset_error(_: Neo4jSettings) -> MoviesDatasetStats:
-        raise MoviesDatasetError("데이터 존재")
+        raise MoviesDatasetError("데이터 불일치")
 
-    monkeypatch.setattr(
-        movies_cli,
-        "load_movies_dataset",
-        raise_dataset_error,
-    )
+    monkeypatch.setattr(movies_cli, "verify_movies_dataset", raise_dataset_error)
 
     assert movies_cli.main() == 1
     output = capsys.readouterr()
     assert output.out == ""
-    assert output.err == "Movies 데이터 적재 실패: 데이터 존재\n"
+    assert output.err == "영화 추천 데이터 확인 실패: 데이터 불일치\n"
 
 
 @pytest.mark.parametrize(
     "database_error",
     [
         ServiceUnavailable("연결 실패"),
-        Neo4jError("APOC 호출 실패"),
+        Neo4jError("쿼리 실패"),
     ],
 )
 def test_movies_cli_reports_database_failure(
@@ -84,16 +60,12 @@ def test_movies_cli_reports_database_failure(
     def raise_database_error(_: Neo4jSettings) -> MoviesDatasetStats:
         raise database_error
 
-    monkeypatch.setattr(
-        movies_cli,
-        "load_movies_dataset",
-        raise_database_error,
-    )
+    monkeypatch.setattr(movies_cli, "verify_movies_dataset", raise_database_error)
 
     assert movies_cli.main() == 1
     output = capsys.readouterr()
     assert output.out == ""
-    assert output.err == f"Movies 데이터 적재 실패: {database_error}\n"
+    assert output.err == f"영화 추천 데이터 확인 실패: {database_error}\n"
 
 
 def test_movies_cli_reports_configuration_failure(

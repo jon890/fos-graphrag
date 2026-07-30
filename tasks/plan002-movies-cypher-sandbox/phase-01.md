@@ -1,7 +1,7 @@
 # Phase 01 — 영화 추천 데이터와 Cypher 실습 환경 구성
 
 **Execution profile**: standard
-**Status**: in_progress
+**Status**: completed
 
 ---
 

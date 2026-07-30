@@ -86,22 +86,31 @@ docker compose down --volumes
 │   ├── model_cli.py
 │   ├── movies.py
 │   └── movies_cli.py
+├── scripts/
+│   └── load-recommendations.sh
 └── tests/
 ```
 
 현재 코드는 연결 확인과 예제 데이터 적재만 수행하며 GraphRAG 체인은 실행하지 않습니다.
 
-## Movies 데이터와 Cypher 실습
+## 영화 추천 데이터와 Cypher 실습
 
-Neo4j 공식 Movies 예제 데이터를 빈 로컬 데이터베이스에 적재합니다.
+Neo4j 공식 영화 추천 예제 데이터로 기본 데이터베이스를 교체합니다.
+이 명령은 기존 로컬 Neo4j 데이터를 삭제하므로 `--force`를 명시해야 합니다.
 
 ```bash
-uv run graphrag-load-movies
+./scripts/load-recommendations.sh --force
 ```
 
-정상이라면 노드 `169`, 관계 `250`이 출력됩니다.
-같은 명령을 다시 실행해도 데이터를 중복 생성하지 않습니다.
-다른 데이터가 있거나 Movies 데이터가 일부만 적재된 경우에는 기존 데이터를 보호하기 위해 중단합니다.
+스크립트는 고정된 공식 Neo4j 5.26 덤프를 내려받아 SHA-256을 확인하고,
+Neo4j를 중지한 상태에서 기본 데이터베이스를 복원합니다.
+정상이라면 노드 `28,863`, 관계 `166,261`, `RATED` 관계 `100,004`가 출력됩니다.
+
+현재 데이터가 공식 데이터셋과 일치하는지만 다시 확인할 수도 있습니다.
+
+```bash
+uv run graphrag-check-movies
+```
 
 Neo4j Browser <http://localhost:7475>에 접속해 다음 정보를 입력합니다.
 
@@ -119,30 +128,44 @@ RETURN labels(n) AS labels, count(*) AS count
 ORDER BY count DESC;
 ```
 
-영화와 출연 배우를 조회합니다.
+사용자가 평가한 영화와 평점을 조회합니다.
 
 ```cypher
-MATCH (person:Person)-[:ACTED_IN]->(movie:Movie)
-RETURN person.name AS actor, movie.title AS movie
-ORDER BY movie, actor
+MATCH (user:User)-[rated:RATED]->(movie:Movie)
+RETURN user.name AS user, movie.title AS movie, rated.rating AS rating
+ORDER BY rating DESC, movie
 LIMIT 25;
 ```
 
-`The Matrix`와 연결된 사람과 관계를 그래프로 표시합니다.
+한 사용자가 높게 평가한 영화를 그래프로 표시합니다.
 
 ```cypher
-MATCH path = (person:Person)-[relationship]->(movie:Movie {title: 'The Matrix'})
-RETURN path;
+MATCH path = (user:User)-[rated:RATED]->(movie:Movie)
+WHERE rated.rating >= 4.5
+RETURN path
+LIMIT 50;
 ```
 
-두 배우 사이의 최단 경로를 찾습니다.
+같은 영화를 평가한 사용자 수를 집계합니다.
 
 ```cypher
-MATCH
-  (keanu:Person {name: 'Keanu Reeves'}),
-  (tom:Person {name: 'Tom Hanks'}),
-  path = shortestPath((keanu)-[*]-(tom))
-RETURN path;
+MATCH (:User)-[rated:RATED]->(movie:Movie)
+RETURN movie.title AS movie,
+       count(rated) AS ratingCount,
+       round(avg(rated.rating), 2) AS averageRating
+ORDER BY ratingCount DESC
+LIMIT 20;
+```
+
+사용자가 평가한 영화를 바탕으로 다른 영화를 탐색합니다.
+
+```cypher
+MATCH (user:User {name: 'Andrew Freeman'})-[:RATED]->(movie:Movie)
+      <-[:RATED]-(other:User)-[:RATED]->(recommendation:Movie)
+WHERE user <> other AND NOT (user)-[:RATED]->(recommendation)
+RETURN recommendation.title AS movie, count(*) AS score
+ORDER BY score DESC
+LIMIT 20;
 ```
 
 ## 로컬 모델 연결

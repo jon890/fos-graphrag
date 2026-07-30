@@ -7,19 +7,21 @@ from neo4j import GraphDatabase
 
 from fos_graphrag.config import Neo4jSettings
 
-EXPECTED_MOVIE_NODES = 169
-EXPECTED_MOVIE_RELATIONSHIPS = 250
+EXPECTED_MOVIE_NODES = 28_863
+EXPECTED_MOVIE_RELATIONSHIPS = 166_261
 EXPECTED_LABEL_COUNTS = {
-    "Person": 131,
-    "Movie": 38,
+    "Actor": 15_443,
+    "Director": 4_091,
+    "Genre": 20,
+    "Movie": 9_125,
+    "Person": 19_047,
+    "User": 671,
 }
 EXPECTED_RELATIONSHIP_COUNTS = {
-    "ACTED_IN": 172,
-    "DIRECTED": 44,
-    "FOLLOWS": 3,
-    "PRODUCED": 14,
-    "REVIEWED": 8,
-    "WROTE": 9,
+    "ACTED_IN": 35_910,
+    "DIRECTED": 10_007,
+    "IN_GENRE": 20_340,
+    "RATED": 100_004,
 }
 
 DATASET_STATE_QUERY = """
@@ -27,13 +29,12 @@ CALL () {
     MATCH (n)
     RETURN
         count(n) AS nodes,
+        count(CASE WHEN 'Actor' IN labels(n) THEN 1 END) AS actor_nodes,
+        count(CASE WHEN 'Director' IN labels(n) THEN 1 END) AS director_nodes,
+        count(CASE WHEN 'Genre' IN labels(n) THEN 1 END) AS genre_nodes,
         count(CASE WHEN 'Person' IN labels(n) THEN 1 END) AS person_nodes,
         count(CASE WHEN 'Movie' IN labels(n) THEN 1 END) AS movie_nodes,
-        count(
-            CASE
-                WHEN 'Movie' IN labels(n) AND n['title'] = 'The Matrix' THEN 1
-            END
-        ) AS matrix_movies
+        count(CASE WHEN 'User' IN labels(n) THEN 1 END) AS user_nodes
 }
 CALL () {
     MATCH ()-[r]->()
@@ -41,42 +42,40 @@ CALL () {
         count(r) AS relationships,
         count(CASE WHEN type(r) = 'ACTED_IN' THEN 1 END) AS acted_in,
         count(CASE WHEN type(r) = 'DIRECTED' THEN 1 END) AS directed,
-        count(CASE WHEN type(r) = 'FOLLOWS' THEN 1 END) AS follows,
-        count(CASE WHEN type(r) = 'PRODUCED' THEN 1 END) AS produced,
-        count(CASE WHEN type(r) = 'REVIEWED' THEN 1 END) AS reviewed,
-        count(CASE WHEN type(r) = 'WROTE' THEN 1 END) AS wrote
+        count(CASE WHEN type(r) = 'IN_GENRE' THEN 1 END) AS in_genre,
+        count(CASE WHEN type(r) = 'RATED' THEN 1 END) AS rated
 }
 RETURN
     nodes,
     relationships,
-    {Person: person_nodes, Movie: movie_nodes} AS label_counts,
+    {
+        Actor: actor_nodes,
+        Director: director_nodes,
+        Genre: genre_nodes,
+        Movie: movie_nodes,
+        Person: person_nodes,
+        User: user_nodes
+    } AS label_counts,
     {
         ACTED_IN: acted_in,
         DIRECTED: directed,
-        FOLLOWS: follows,
-        PRODUCED: produced,
-        REVIEWED: reviewed,
-        WROTE: wrote
-    } AS relationship_counts,
-    matrix_movies
-"""
-
-LOAD_MOVIES_QUERY = """
-CALL apoc.example.movies()
-YIELD done
-RETURN done
+        IN_GENRE: in_genre,
+        RATED: rated
+    } AS relationship_counts
 """
 
 
 class MoviesDatasetError(RuntimeError):
-    """Movies 예제 데이터를 안전하게 적재할 수 없을 때 발생합니다."""
+    """영화 추천 예제 데이터가 기대한 상태가 아닐 때 발생합니다."""
 
 
 @dataclass(frozen=True, slots=True)
 class MoviesDatasetStats:
     nodes: int
     relationships: int
-    already_loaded: bool
+    movies: int
+    users: int
+    ratings: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,61 +84,37 @@ class _DatasetState:
     relationships: int
     label_counts: dict[str, int]
     relationship_counts: dict[str, int]
-    matrix_movies: int
 
     @property
-    def is_empty(self) -> bool:
-        return self.nodes == 0 and self.relationships == 0
-
-    @property
-    def is_complete_movies_dataset(self) -> bool:
+    def is_complete(self) -> bool:
         return (
             self.nodes == EXPECTED_MOVIE_NODES
             and self.relationships == EXPECTED_MOVIE_RELATIONSHIPS
             and self.label_counts == EXPECTED_LABEL_COUNTS
             and self.relationship_counts == EXPECTED_RELATIONSHIP_COUNTS
-            and self.matrix_movies == 1
         )
 
 
-def load_movies_dataset(settings: Neo4jSettings) -> MoviesDatasetStats:
+def verify_movies_dataset(settings: Neo4jSettings) -> MoviesDatasetStats:
     with GraphDatabase.driver(
         settings.uri,
         auth=(settings.username, settings.password),
     ) as driver:
         current_state = _read_dataset_state(driver, settings.database)
 
-        if current_state.is_complete_movies_dataset:
-            return MoviesDatasetStats(
-                nodes=current_state.nodes,
-                relationships=current_state.relationships,
-                already_loaded=True,
-            )
-
-        if not current_state.is_empty:
+        if not current_state.is_complete:
             raise MoviesDatasetError(
-                "대상 데이터베이스가 비어 있지 않거나 Movies 데이터가 일부만 적재되어 있습니다."
-            )
-
-        load_result = driver.execute_query(
-            LOAD_MOVIES_QUERY,
-            database_=settings.database,
-        )
-        load_record = _single_record(load_result.records, "Movies 적재 결과")
-        if not load_record["done"]:
-            raise MoviesDatasetError("APOC Movies 적재 절차가 완료되지 않았습니다.")
-
-        loaded_state = _read_dataset_state(driver, settings.database)
-        if not loaded_state.is_complete_movies_dataset:
-            raise MoviesDatasetError(
-                "Movies 적재 결과가 기대값과 다릅니다: "
-                f"노드 {loaded_state.nodes}, 관계 {loaded_state.relationships}"
+                "영화 추천 데이터가 기대값과 다릅니다: "
+                f"노드 {current_state.nodes}, 관계 {current_state.relationships}, "
+                f"RATED {current_state.relationship_counts['RATED']}"
             )
 
         return MoviesDatasetStats(
-            nodes=loaded_state.nodes,
-            relationships=loaded_state.relationships,
-            already_loaded=False,
+            nodes=current_state.nodes,
+            relationships=current_state.relationships,
+            movies=current_state.label_counts["Movie"],
+            users=current_state.label_counts["User"],
+            ratings=current_state.relationship_counts["RATED"],
         )
 
 
@@ -151,7 +126,6 @@ def _read_dataset_state(driver: Any, database: str) -> _DatasetState:
         relationships=record["relationships"],
         label_counts=record["label_counts"],
         relationship_counts=record["relationship_counts"],
-        matrix_movies=record["matrix_movies"],
     )
 
 
