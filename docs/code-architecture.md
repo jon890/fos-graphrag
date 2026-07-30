@@ -10,6 +10,8 @@
 | `src/fos_graphrag/cli.py` | 연결 확인 명령과 종료 코드 |
 | `src/fos_graphrag/model.py` | LangChain 로컬 모델 호출 경계 |
 | `src/fos_graphrag/model_cli.py` | 로컬 모델 연결 확인 명령과 종료 코드 |
+| `src/fos_graphrag/movies.py` | Movies 예제 데이터 상태 확인과 APOC 적재 경계 |
+| `src/fos_graphrag/movies_cli.py` | Movies 적재 명령과 종료 코드 |
 | `tests/` | 설정·연결 경계의 회귀 검증 |
 
 ## 의존 방향
@@ -21,4 +23,5 @@
 현재 연결 계층은 Neo4j 공식 드라이버만 사용한다.
 
 모델 연결 계층은 `langchain-ollama`만 사용하며 Neo4j에 의존하지 않는다.
+Movies 적재 계층은 Neo4j 공식 드라이버로 APOC Core의 예제 적재 절차만 호출한다.
 LangChain 기반 그래프 조작은 다음 학습 단계에서 두 연결 경계를 조합해 추가한다.

@@ -20,6 +20,22 @@
 
 ## 그래프 저장 모델
 
-현재 단계에서는 노드, 관계, 제약 조건, 인덱스를 생성하지 않는다.
+Movies 예제는 다음 노드와 속성을 생성한다.
 
-GraphRAG 저장 모델은 문서 수집과 개체·관계 추출 범위를 설계하는 다음 단계에서 정의한다.
+| 라벨 | 식별 속성 | 선택 속성 |
+| --- | --- | --- |
+| `Person` | `name` | `born` |
+| `Movie` | `title` | `released`, `tagline` |
+
+`Person`에서 `Movie` 방향으로 다음 관계를 생성한다.
+
+| 관계 | 속성 |
+| --- | --- |
+| `ACTED_IN` | `roles` |
+| `DIRECTED` | 없음 |
+| `PRODUCED` | 없음 |
+| `WROTE` | 없음 |
+| `REVIEWED` | `summary`, `rating` |
+
+완전한 예제 데이터의 기준은 노드 169개와 관계 250개다.
+Movies 예제 외의 GraphRAG 저장 모델과 벡터 인덱스는 이후 단계에서 정의한다.
