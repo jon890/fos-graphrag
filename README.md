@@ -2,7 +2,7 @@
 
 Python, LangChain, Neo4j로 GraphRAG를 단계적으로 구현하는 학습 프로젝트입니다.
 
-현재는 Neo4j 연결과 API 키가 필요 없는 로컬 언어 모델 연결까지 구현되어 있습니다.
+현재는 Neo4j 연결과 API 키가 필요 없는 로컬 언어 모델·임베딩 모델 연결까지 구현되어 있습니다.
 
 ## 준비물
 
@@ -82,6 +82,8 @@ docker compose down --volumes
 │   ├── cli.py
 │   ├── config.py
 │   ├── database.py
+│   ├── embedding.py
+│   ├── embedding_cli.py
 │   ├── model.py
 │   └── model_cli.py
 └── tests/
@@ -112,6 +114,25 @@ uv run graphrag-check-model
 
 이 구성은 OpenAI나 NVIDIA API 키를 사용하지 않습니다.
 모델 파일은 약 2.8GB이며 추론은 로컬 컴퓨터의 메모리와 연산 자원을 사용합니다.
+
+## 로컬 임베딩 모델 연결
+
+한국어와 다국어 검색 학습에 사용할 임베딩 모델을 내려받습니다.
+`latest`는 더 큰 모델을 가리키므로 학습용 소형 태그를 명시합니다.
+
+```bash
+ollama pull qwen3-embedding:0.6b
+```
+
+LangChain에서 한국어 예문을 임베딩하고 벡터 차원을 확인합니다.
+
+```bash
+uv run graphrag-check-embedding
+```
+
+정상이라면 모델명과 벡터 차원 `1024`가 출력됩니다.
+이 모델은 약 639MB이며 OpenAI나 NVIDIA API 키를 사용하지 않습니다.
+현재 명령은 연결만 확인하며 벡터를 Neo4j에 저장하지 않습니다.
 
 ## 다음 학습 단계
 

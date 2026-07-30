@@ -2,6 +2,7 @@ import pytest
 
 from fos_graphrag.config import (
     ConfigurationError,
+    LocalEmbeddingSettings,
     LocalModelSettings,
     Neo4jSettings,
 )
@@ -58,3 +59,34 @@ def test_local_model_settings_can_be_overridden() -> None:
 
     assert settings.base_url == "http://localhost:21434"
     assert settings.model == "nemotron-mini:4b"
+
+
+def test_local_embedding_settings_use_safe_defaults() -> None:
+    settings = LocalEmbeddingSettings.from_mapping({})
+
+    assert settings.base_url == "http://localhost:11434"
+    assert settings.model == "qwen3-embedding:0.6b"
+    assert settings.dimensions == 1024
+
+
+def test_local_embedding_settings_can_be_overridden() -> None:
+    settings = LocalEmbeddingSettings.from_mapping(
+        {
+            "OLLAMA_BASE_URL": "http://localhost:21434",
+            "OLLAMA_EMBEDDING_MODEL": "qwen3-embedding:4b",
+            "OLLAMA_EMBEDDING_DIMENSIONS": "768",
+        }
+    )
+
+    assert settings.base_url == "http://localhost:21434"
+    assert settings.model == "qwen3-embedding:4b"
+    assert settings.dimensions == 768
+
+
+@pytest.mark.parametrize("dimensions", ["0", "-1", "invalid"])
+def test_local_embedding_settings_reject_invalid_dimensions(dimensions: str) -> None:
+    with pytest.raises(
+        ConfigurationError,
+        match="OLLAMA_EMBEDDING_DIMENSIONS는 양의 정수여야 합니다",
+    ):
+        LocalEmbeddingSettings.from_mapping({"OLLAMA_EMBEDDING_DIMENSIONS": dimensions})

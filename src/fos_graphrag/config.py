@@ -61,3 +61,45 @@ class LocalModelSettings:
                 values.get("OLLAMA_MODEL", default_settings.model).strip() or default_settings.model
             ),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class LocalEmbeddingSettings:
+    base_url: str = "http://localhost:11434"
+    model: str = "qwen3-embedding:0.6b"
+    dimensions: int = 1024
+
+    @classmethod
+    def from_env(cls) -> LocalEmbeddingSettings:
+        load_dotenv()
+        return cls.from_mapping(os.environ)
+
+    @classmethod
+    def from_mapping(cls, values: Mapping[str, str]) -> LocalEmbeddingSettings:
+        default_settings = cls()
+        raw_dimensions = values.get(
+            "OLLAMA_EMBEDDING_DIMENSIONS",
+            str(default_settings.dimensions),
+        ).strip()
+
+        try:
+            dimensions = int(raw_dimensions)
+        except ValueError as error:
+            raise ConfigurationError(
+                "OLLAMA_EMBEDDING_DIMENSIONS는 양의 정수여야 합니다."
+            ) from error
+
+        if dimensions <= 0:
+            raise ConfigurationError("OLLAMA_EMBEDDING_DIMENSIONS는 양의 정수여야 합니다.")
+
+        return cls(
+            base_url=(
+                values.get("OLLAMA_BASE_URL", default_settings.base_url).strip()
+                or default_settings.base_url
+            ),
+            model=(
+                values.get("OLLAMA_EMBEDDING_MODEL", default_settings.model).strip()
+                or default_settings.model
+            ),
+            dimensions=dimensions,
+        )
