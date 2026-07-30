@@ -1,0 +1,16 @@
+{
+  "name": "plan001-3-local-embedding-model",
+  "description": "Ollama의 Qwen3 Embedding 0.6B로 한국어 문장을 임베딩하고 벡터 차원을 확인한다.",
+  "status": "pending",
+  "created_at": "2026-07-30",
+  "total_phases": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "title": "Qwen3 로컬 임베딩 연결",
+      "execution_profile": "standard",
+      "status": "pending"
+    }
+  ]
+}
