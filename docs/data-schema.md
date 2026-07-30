@@ -27,15 +27,18 @@ Movies 예제는 다음 노드와 속성을 생성한다.
 | `Person` | `name` | `born` |
 | `Movie` | `title` | `released`, `tagline` |
 
-`Person`에서 `Movie` 방향으로 다음 관계를 생성한다.
+예제 데이터는 다음 관계를 생성한다.
 
-| 관계 | 속성 |
-| --- | --- |
-| `ACTED_IN` | `roles` |
-| `DIRECTED` | 없음 |
-| `PRODUCED` | 없음 |
-| `WROTE` | 없음 |
-| `REVIEWED` | `summary`, `rating` |
+| 관계 | 방향 | 속성 |
+| --- | --- | --- |
+| `ACTED_IN` | `Person` → `Movie` | `roles` |
+| `DIRECTED` | `Person` → `Movie` | 없음 |
+| `FOLLOWS` | `Person` → `Person` | 없음 |
+| `PRODUCED` | `Person` → `Movie` | 없음 |
+| `WROTE` | `Person` → `Movie` | 없음 |
+| `REVIEWED` | `Person` → `Movie` | `summary`, `rating` |
 
-완전한 예제 데이터의 기준은 노드 169개와 관계 250개다.
+완전한 예제 데이터의 기준은 `Person` 131개, `Movie` 38개다.
+관계는 `ACTED_IN` 172개, `DIRECTED` 44개, `FOLLOWS` 3개,
+`PRODUCED` 14개, `REVIEWED` 8개, `WROTE` 9개다.
 Movies 예제 외의 GraphRAG 저장 모델과 벡터 인덱스는 이후 단계에서 정의한다.

@@ -1,7 +1,7 @@
 {
   "name": "plan002-movies-cypher-sandbox",
   "description": "공식 Movies 예제 그래프를 로컬 Neo4j에 안전하게 적재하고 Browser에서 Cypher를 실습한다.",
-  "status": "pending",
+  "status": "completed",
   "created_at": "2026-07-30",
   "total_phases": 1,
   "phases": [
@@ -10,7 +10,7 @@
       "file": "phase-01.md",
       "title": "Movies 데이터와 Cypher 실습 환경 구성",
       "execution_profile": "standard",
-      "status": "pending"
+      "status": "completed"
     }
   ]
 }

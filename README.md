@@ -2,7 +2,7 @@
 
 Python, LangChain, Neo4j로 GraphRAG를 단계적으로 구현하는 학습 프로젝트입니다.
 
-현재는 Neo4j 연결과 API 키가 필요 없는 로컬 언어 모델 연결까지 구현되어 있습니다.
+현재는 Neo4j 연결, Movies 예제 데이터, API 키가 필요 없는 로컬 언어 모델 연결까지 구현되어 있습니다.
 
 ## 준비물
 
@@ -83,11 +83,67 @@ docker compose down --volumes
 │   ├── config.py
 │   ├── database.py
 │   ├── model.py
-│   └── model_cli.py
+│   ├── model_cli.py
+│   ├── movies.py
+│   └── movies_cli.py
 └── tests/
 ```
 
-현재 코드는 로컬 모델에 짧은 메시지만 보내며 그래프 데이터를 만들거나 GraphRAG 체인을 실행하지 않습니다.
+현재 코드는 연결 확인과 예제 데이터 적재만 수행하며 GraphRAG 체인은 실행하지 않습니다.
+
+## Movies 데이터와 Cypher 실습
+
+Neo4j 공식 Movies 예제 데이터를 빈 로컬 데이터베이스에 적재합니다.
+
+```bash
+uv run graphrag-load-movies
+```
+
+정상이라면 노드 `169`, 관계 `250`이 출력됩니다.
+같은 명령을 다시 실행해도 데이터를 중복 생성하지 않습니다.
+다른 데이터가 있거나 Movies 데이터가 일부만 적재된 경우에는 기존 데이터를 보호하기 위해 중단합니다.
+
+Neo4j Browser <http://localhost:7475>에 접속해 다음 정보를 입력합니다.
+
+- 접속 주소: `bolt://localhost:7688`
+- 사용자명: `neo4j`
+- 비밀번호: `.env`의 `NEO4J_PASSWORD`
+
+Browser의 입력창에서 아래 Cypher를 하나씩 실행할 수 있습니다.
+
+라벨별 노드 수를 확인합니다.
+
+```cypher
+MATCH (n)
+RETURN labels(n) AS labels, count(*) AS count
+ORDER BY count DESC;
+```
+
+영화와 출연 배우를 조회합니다.
+
+```cypher
+MATCH (person:Person)-[:ACTED_IN]->(movie:Movie)
+RETURN person.name AS actor, movie.title AS movie
+ORDER BY movie, actor
+LIMIT 25;
+```
+
+`The Matrix`와 연결된 사람과 관계를 그래프로 표시합니다.
+
+```cypher
+MATCH path = (person:Person)-[relationship]->(movie:Movie {title: 'The Matrix'})
+RETURN path;
+```
+
+두 배우 사이의 최단 경로를 찾습니다.
+
+```cypher
+MATCH
+  (keanu:Person {name: 'Keanu Reeves'}),
+  (tom:Person {name: 'Tom Hanks'}),
+  path = shortestPath((keanu)-[*]-(tom))
+RETURN path;
+```
 
 ## 로컬 모델 연결
 
