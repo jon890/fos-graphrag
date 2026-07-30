@@ -172,7 +172,7 @@ LIMIT 20;
 ### Python 파일에서 Cypher 실행하기
 
 [`src/fos_graphrag/first-query.py`](src/fos_graphrag/first-query.py)의
-`CYPHER_QUERY`와 `MOVIE_TITLE`을 수정해 원하는 쿼리를 작성합니다.
+`CYPHER_QUERY`와 `QUERY_PARAMETERS`를 수정해 원하는 쿼리를 작성합니다.
 
 Neo4j가 실행 중인 상태에서 Python 파일을 실행합니다.
 
@@ -180,7 +180,7 @@ Neo4j가 실행 중인 상태에서 Python 파일을 실행합니다.
 uv run python src/fos_graphrag/first-query.py
 ```
 
-쿼리 결과의 `recommendation` 값이 터미널에 한 줄씩 출력됩니다.
+쿼리 결과는 터미널에 딕셔너리 형태로 한 줄씩 출력됩니다.
 
 ## 로컬 모델 연결
 

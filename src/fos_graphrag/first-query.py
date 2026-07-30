@@ -8,7 +8,7 @@ ORDER BY recommendation
 LIMIT 20
 """
 
-MOVIE_TITLE = "Crimson Tide"
+QUERY_PARAMETERS = {"movie": "Crimson Tide"}
 
 
 def main() -> None:
@@ -17,12 +17,12 @@ def main() -> None:
     with create_neo4j_driver(settings) as driver:
         result = driver.execute_query(
             CYPHER_QUERY,
-            movie=MOVIE_TITLE,
+            parameters_=QUERY_PARAMETERS,
             database_=settings.database,
         )
 
         for record in result.records:
-            print(record["recommendation"])
+            print(record.data())
 
 
 if __name__ == "__main__":
