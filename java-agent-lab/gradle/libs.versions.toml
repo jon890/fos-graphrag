@@ -1,0 +1,16 @@
+[versions]
+spring-boot = "4.1.0"
+spring-ai = "2.0.0"
+langgraph4j = "1.8.20"
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+
+[libraries]
+spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
+spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "spring-ai" }
+langgraph4j-bom = { module = "org.bsc.langgraph4j:langgraph4j-bom", version.ref = "langgraph4j" }
+spring-ai-ollama = { module = "org.springframework.ai:spring-ai-starter-model-ollama" }
+langgraph4j-spring-ai = { module = "org.bsc.langgraph4j:langgraph4j-spring-ai" }
+spring-boot-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }

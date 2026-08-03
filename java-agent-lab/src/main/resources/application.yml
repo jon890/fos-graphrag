@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: java-agent-lab
+  ai:
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      init:
+        pull-model-strategy: never
+      chat:
+        model: ${OLLAMA_MODEL:llama3.2}
