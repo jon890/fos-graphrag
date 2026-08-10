@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>00. LangGraph4j 개념 지도 | LangGraph4j Lab</title>
+  <link rel="stylesheet" href="guide.css">
+  <script src="guide.js" defer></script>
+</head>
+<body data-lesson="00">
+  <div class="layout">
+    <aside class="sidebar" data-sidebar></aside>
+    <main class="content">
+      <p class="eyebrow">Concept Map</p>
+      <h1>LangGraph4j는 무엇을 실행하는가?</h1>
+      <p class="lead">
+        코드를 작성하기 전에 LangGraph4j의 실행 모델을 먼저 이해한다.
+        아래 개념들이 어떤 순서로 협력하는지 설명할 수 있게 된 뒤 Lesson 01을 시작한다.
+      </p>
+
+      <div class="callout">
+        <strong>핵심 관점</strong><br>
+        LangGraph4j는 “여러 객체가 서로 호출하는 프로그램”을 만드는 도구가 아니라,
+        공유 상태가 정해진 그래프를 따라 변화하는 실행 흐름을 만드는 도구다.
+      </div>
+
+      <h2>전체 실행 흐름</h2>
+      <div class="flow">그래프 정의
+  StateGraph에 State, Node, Edge를 등록
+        ↓ compile()
+실행 가능한 그래프
+  CompiledGraph가 구조를 검증하고 실행 준비
+        ↓ 초기 State 입력
+현재 Node 실행
+  State를 읽고 변경할 키만 반환
+        ↓ Channel이 상태 갱신을 병합
+새로운 State 생성
+        ↓ Edge가 다음 Node 결정
+다음 Node 또는 END
+        ↓ 필요하면 Checkpoint 저장
+최종 State 반환</div>
+
+      <h2>핵심 개념의 역할</h2>
+      <div class="card-grid">
+        <section class="card">
+          <h3>State</h3>
+          <p>모든 Node가 읽고 갱신하는 공유 데이터다. 그래프의 현재 실행 상황을 표현한다.</p>
+        </section>
+        <section class="card">
+          <h3>Channel</h3>
+          <p>Node가 반환한 새 값을 기존 State에 어떻게 합칠지 키마다 정하는 병합 정책이다.</p>
+        </section>
+        <section class="card">
+          <h3>Node</h3>
+          <p>현재 State를 읽고 자신의 책임에 해당하는 부분 업데이트를 반환하는 작업 단위다.</p>
+        </section>
+        <section class="card">
+          <h3>Edge</h3>
+          <p>한 Node가 끝난 뒤 어느 Node를 실행할지 표현한다. 고정 경로와 조건부 경로가 있다.</p>
+        </section>
+        <section class="card">
+          <h3>StateGraph</h3>
+          <p>State 스키마, Node, Edge를 조립하는 설계도다. 아직 실행 가능한 객체는 아니다.</p>
+        </section>
+        <section class="card">
+          <h3>CompiledGraph</h3>
+          <p>그래프 구조를 검증한 실행 가능한 결과다. 초기 상태와 실행 설정을 받아 흐름을 진행한다.</p>
+        </section>
+        <section class="card">
+          <h3>Checkpoint</h3>
+          <p>단계별 State를 저장해 실행 이력을 조회하거나 멈춘 지점에서 재개하도록 돕는다.</p>
+        </section>
+        <section class="card">
+          <h3>RunnableConfig</h3>
+          <p>스레드 식별자, Checkpoint, 병렬 실행 설정처럼 한 번의 실행에 필요한 문맥을 전달한다.</p>
+        </section>
+      </div>
+
+      <h2>일반 Java 호출 흐름과 무엇이 다른가?</h2>
+      <div class="card-grid">
+        <section class="card">
+          <h3>일반 서비스 호출</h3>
+          <p>서비스 A가 서비스 B를 직접 호출한다. 실행 순서가 객체 사이 호출 관계에 들어 있다.</p>
+        </section>
+        <section class="card">
+          <h3>LangGraph4j 그래프</h3>
+          <p>Node는 다른 Node를 직접 호출하지 않는다. 실행 순서는 Edge에, 데이터 전달은 State에 드러난다.</p>
+        </section>
+      </div>
+
+      <h2>개발 작업 계획 검토 예제에 대입한다</h2>
+      <div class="flow">State
+  요구사항, 검토 결과, 계획, 평가, 승인 상태
+
+Node
+  요구사항 정리, 아키텍처 검토, 테스트 검토, 계획 작성, 평가
+
+Edge
+  정리 → 검토 → 작성 → 평가
+  평가 실패 → 수정
+  평가 통과 → 승인 대기
+
+Channel
+  요구사항은 최신 값으로 교체
+  여러 검토 결과는 목록에 누적</div>
+
+      <h2>코딩 전에 답해볼 질문</h2>
+      <ul class="question-list">
+        <li>Node끼리 직접 데이터를 전달하지 않는다면 무엇을 통해 전달하는가?</li>
+        <li>Node가 State 전체 대신 부분 업데이트를 반환하는 이유는 무엇인가?</li>
+        <li>Node와 Edge는 각각 “무엇을 한다”와 “어디로 간다” 중 어느 책임을 가지는가?</li>
+        <li>StateGraph와 CompiledGraph는 왜 구분되어 있는가?</li>
+        <li>같은 상태 키를 여러 Node가 갱신하면 어떤 규칙이 필요한가?</li>
+      </ul>
+
+      <div class="callout warning">
+        <strong>다음 단계로 넘어가는 기준</strong><br>
+        위 실행 흐름을 코드 없이 말로 설명할 수 있으면 Lesson 01에서 State와 Channel을 직접 작성한다.
+      </div>
+
+      <footer class="lesson-footer" data-lesson-footer></footer>
+    </main>
+  </div>
+</body>
+</html>

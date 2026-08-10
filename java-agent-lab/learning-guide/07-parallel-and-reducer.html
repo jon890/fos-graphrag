@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>07. 병렬 실행과 Reducer | LangGraph4j Lab</title>
+  <link rel="stylesheet" href="guide.css">
+  <script src="guide.js" defer></script>
+</head>
+<body data-lesson="07">
+  <div class="layout">
+    <aside class="sidebar" data-sidebar></aside>
+    <main class="content">
+      <p class="eyebrow">Lesson 07</p>
+      <h1>병렬 실행과 Reducer</h1>
+      <p class="lead">서로 독립적인 검토를 동시에 실행하고, 같은 상태 키에 들어오는 결과를 안전하게 모은다.</p>
+      <div class="chips"><span class="chip">Parallel Branch</span><span class="chip">Channels.appender</span><span class="chip">Fork-Join</span></div>
+
+      <div class="callout"><strong>오늘의 한 문장</strong><br>병렬 노드가 같은 키를 갱신한다면 실행 순서가 아니라 Reducer가 결과를 결정해야 한다.</div>
+
+      <h2>만들 병렬 구간</h2>
+      <div class="flow">                  ┌─ requirement_review ─┐
+normalize_request ├─ architecture_review ─┼─ merge_reviews
+                  └─ test_review ─────────┘</div>
+
+      <h2>직접 타이핑할 순서</h2>
+      <ol>
+        <li>세 검토 노드가 서로 어떤 데이터를 공유하지 않아도 되는지 확인한다.</li>
+        <li>각 노드가 <code>findings</code>에 구분 가능한 결과 하나를 반환하게 만든다.</li>
+        <li>한 출발 노드에서 세 검토 노드로 병렬 엣지를 연결한다.</li>
+        <li>세 경로를 하나의 병합 노드로 모은다.</li>
+        <li>세 결과가 모두 존재하는지 검증하되 목록 순서에는 의존하지 않는다.</li>
+        <li>필요하면 <code>RunnableConfig</code>에 병렬 실행용 Executor를 지정하고 실제 스레드를 관찰한다.</li>
+      </ol>
+
+      <h2>반드시 비교할 실험</h2>
+      <div class="card-grid">
+        <section class="card"><h3>누적 Channel</h3><p>세 결과가 하나의 목록으로 합쳐지는 정상 동작을 확인한다.</p></section>
+        <section class="card"><h3>기본 Channel</h3><p>같은 키의 여러 업데이트가 왜 안전하지 않은지 실패를 관찰한 뒤 되돌린다.</p></section>
+      </div>
+
+      <h2>완료 조건</h2>
+      <ul class="checklist card">
+        <li>세 검토 결과가 유실되지 않는다.</li>
+        <li>테스트는 비결정적인 실행 순서에 의존하지 않는다.</li>
+        <li>병렬화 전후에 의미상 동일한 최종 상태가 만들어진다.</li>
+        <li>병렬 실행과 비동기 노드의 차이를 설명할 수 있다.</li>
+      </ul>
+
+      <h2>생각할 질문</h2>
+      <ul class="question-list">
+        <li>리듀서가 순서에 민감하면 병렬 실행에서 어떤 문제가 생길까?</li>
+        <li>검토 노드 하나가 여러 단계라면 병렬 분기 안에서 어떻게 표현할까?</li>
+        <li>모든 노드를 병렬화하는 것이 항상 빠를까?</li>
+      </ul>
+
+      <div class="callout warning"><strong>막혔을 때 확인할 것</strong><br>LangGraph4j의 병렬 분기는 Fork-Join 형태다. 동시 실행이 필요하면 병렬 노드의 Executor 설정을 확인한다.</div>
+      <h2>다음 대화에 가져올 것</h2>
+      <p>병렬 그래프, 세 결과 검증 테스트, 누적 채널을 제거했을 때 관찰한 결과를 보여준다.</p>
+      <footer class="lesson-footer" data-lesson-footer></footer>
+    </main>
+  </div>
+</body>
+</html>

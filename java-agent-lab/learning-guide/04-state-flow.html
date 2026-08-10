@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>04. 여러 Node 연결 | LangGraph4j Lab</title>
+  <link rel="stylesheet" href="guide.css">
+  <script src="guide.js" defer></script>
+</head>
+<body data-lesson="04">
+  <div class="layout">
+    <aside class="sidebar" data-sidebar></aside>
+    <main class="content">
+      <p class="eyebrow">Lesson 04</p>
+      <h1>여러 Node에서 State 전달하기</h1>
+      <p class="lead">앞 노드의 부분 업데이트가 채널을 거쳐 다음 노드가 읽는 상태가 되는 과정을 관찰한다.</p>
+      <div class="chips"><span class="chip">상태 전이</span><span class="chip">Node 책임</span><span class="chip">순차 Edge</span></div>
+
+      <div class="callout"><strong>오늘의 한 문장</strong><br>노드는 서로 호출하지 않는다. 앞 노드가 남긴 State를 다음 노드가 읽는다.</div>
+
+      <p class="phase-label">1부 · 개념 학습</p>
+      <h2>Node 사이의 계약은 State다</h2>
+      <p>
+        일반 서비스 코드에서는 첫 번째 서비스가 두 번째 서비스를 직접 호출하고 인자를 넘길 수 있다.
+        LangGraph4j에서는 첫 Node가 부분 업데이트를 반환하고, 그래프 실행기가 이를 State에 병합한 뒤
+        Edge로 연결된 다음 Node에 전달한다.
+      </p>
+      <div class="flow">첫 번째 Node
+  현재 State를 읽고 부분 업데이트 반환
+        ↓ Channel이 병합
+갱신된 State
+        ↓ Edge를 따라 이동
+두 번째 Node
+  갱신된 State를 읽고 다음 작업 수행</div>
+
+      <h2>직접 호출하지 않으면 무엇이 좋아질까?</h2>
+      <div class="card-grid">
+        <section class="card"><h3>느슨한 결합</h3><p>뒤 Node는 앞 Node의 클래스나 메서드를 알 필요가 없다.</p></section>
+        <section class="card"><h3>관찰 가능한 흐름</h3><p>각 단계의 State를 보면 어느 Node가 어떤 값을 남겼는지 추적할 수 있다.</p></section>
+      </div>
+      <p>
+        대신 State 키의 의미가 Node 사이의 계약이 된다. 앞 단계가 필요한 값을 만들지 않으면
+        그래프 구조는 맞아도 실행 결과가 잘못될 수 있으므로 여러 Node를 연결한 테스트가 필요하다.
+      </p>
+
+      <h2>실습 예제에 적용한다</h2>
+      <p>
+        첫 Node가 요구사항 문장을 정리해 <code>request</code>를 갱신하고,
+        다음 Node가 그 값을 읽어 첫 번째 검토 결과를 <code>findings</code>에 추가한다.
+      </p>
+
+      <p class="phase-label">2부 · 실습 가이드</p>
+      <h2>추가할 Node</h2>
+      <p><code>RequirementReviewNode</code>는 정규화된 요구사항을 읽고, 결정적인 규칙으로 발견 사항 하나를 <code>findings</code>에 추가한다.</p>
+      <div class="flow">START → normalize_request → review_requirement → END</div>
+
+      <h2>직접 타이핑할 순서</h2>
+      <ol>
+        <li>검토 노드가 읽을 값과 쓸 값을 먼저 적는다.</li>
+        <li>모델 없이 문자열 길이나 특정 조건을 이용한 검토 규칙을 만든다.</li>
+        <li>검토 노드를 단위 테스트한다.</li>
+        <li>그래프에 노드와 순차 엣지를 추가한다.</li>
+        <li>그래프 테스트에서 정규화된 요청과 누적된 발견 사항을 함께 확인한다.</li>
+      </ol>
+
+      <h2>완료 조건</h2>
+      <ul class="checklist card">
+        <li>검토 노드는 정규화 노드를 직접 참조하지 않는다.</li>
+        <li>두 노드가 동일한 상태 키를 각자의 책임에 따라 읽고 쓴다.</li>
+        <li>최종 상태에는 두 노드의 갱신 결과가 모두 남는다.</li>
+        <li>노드 순서를 바꾸면 테스트가 왜 실패하는지 설명할 수 있다.</li>
+      </ul>
+
+      <h2>생각할 질문</h2>
+      <ul class="question-list">
+        <li>검토 노드가 정규화되지 않은 입력도 처리해야 할까?</li>
+        <li>노드 사이의 전제 조건은 코드와 테스트 중 어디에 드러나는가?</li>
+        <li>두 노드를 하나로 합쳤을 때 잃는 학습 포인트는 무엇인가?</li>
+      </ul>
+
+      <div class="callout warning"><strong>막혔을 때 확인할 것</strong><br>그래프 실행 후 각 단계의 출력 또는 최종 상태를 출력해 어떤 시점에 값이 합쳐졌는지 관찰한다.</div>
+      <h2>다음 대화에 가져올 것</h2>
+      <p>두 노드의 읽기·쓰기 상태 키와 그래프 테스트 결과를 보여준다.</p>
+      <footer class="lesson-footer" data-lesson-footer></footer>
+    </main>
+  </div>
+</body>
+</html>

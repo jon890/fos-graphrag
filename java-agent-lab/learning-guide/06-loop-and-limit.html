@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>06. 반복과 종료 조건 | LangGraph4j Lab</title>
+  <link rel="stylesheet" href="guide.css">
+  <script src="guide.js" defer></script>
+</head>
+<body data-lesson="06">
+  <div class="layout">
+    <aside class="sidebar" data-sidebar></aside>
+    <main class="content">
+      <p class="eyebrow">Lesson 06</p>
+      <h1>반복과 종료 조건</h1>
+      <p class="lead">DAG를 넘어 사이클을 만들고, 상태에 기록된 명시적인 상한으로 반복을 통제한다.</p>
+      <div class="chips"><span class="chip">Cycle</span><span class="chip">revisionCount</span><span class="chip">종료 보장</span></div>
+
+      <div class="callout"><strong>오늘의 한 문장</strong><br>반복 가능한 그래프에는 “언제 다시 도는가”와 “언제 반드시 끝나는가”가 모두 있어야 한다.</div>
+
+      <h2>확장할 상태와 흐름</h2>
+      <p><code>evaluationPassed</code>와 <code>revisionCount</code>를 상태에 추가한다. 평가는 처음 두 번 실패하고, 수정 횟수 상한에 도달하면 종료되도록 결정적인 규칙을 사용한다.</p>
+      <div class="flow">review → evaluate ─┬─ pass → END
+                   └─ fail → revise → evaluate
+                               ↑ 최대 반복 횟수</div>
+
+      <h2>직접 타이핑할 순서</h2>
+      <ol>
+        <li>현재 평가 결과와 수정 횟수의 채널 정책을 정한다.</li>
+        <li>평가 노드와 수정 노드를 각각 단위 테스트한다.</li>
+        <li>평가 결과를 읽어 <code>END</code> 또는 수정 노드를 선택하는 라우터를 만든다.</li>
+        <li>수정 노드에서 평가 노드로 돌아가는 엣지를 연결한다.</li>
+        <li>통과, 한 번 수정, 상한 도달 시나리오를 테스트한다.</li>
+      </ol>
+
+      <h2>완료 조건</h2>
+      <ul class="checklist card">
+        <li>그래프가 어떤 입력에서도 정해진 횟수 안에 끝난다.</li>
+        <li>반복 횟수는 실행 환경의 재귀 제한에만 의존하지 않는다.</li>
+        <li>수정 횟수와 평가 결과가 상태에서 관찰된다.</li>
+        <li>각 반복에서 어떤 키가 바뀌는지 설명할 수 있다.</li>
+      </ul>
+
+      <h2>생각할 질문</h2>
+      <ul class="question-list">
+        <li>상한에 도달한 결과는 성공인가, 실패인가, 별도 상태인가?</li>
+        <li><code>revisionCount</code>를 누적 채널로 만들지 않는 이유는 무엇인가?</li>
+        <li>무한 루프 방지를 테스트로 어떻게 증명할 수 있을까?</li>
+      </ul>
+
+      <div class="callout warning"><strong>막혔을 때 확인할 것</strong><br>그래프 그림에서 각 노드의 나가는 엣지를 하나씩 표시한다. 종료 경로가 없는 노드가 있는지 먼저 찾는다.</div>
+      <h2>다음 대화에 가져올 것</h2>
+      <p>반복 그래프 그림, 종료 정책, 상한에 도달하는 테스트를 보여준다.</p>
+      <footer class="lesson-footer" data-lesson-footer></footer>
+    </main>
+  </div>
+</body>
+</html>

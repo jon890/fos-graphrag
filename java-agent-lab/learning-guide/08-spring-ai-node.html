@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>08. Spring AI Node | LangGraph4j Lab</title>
+  <link rel="stylesheet" href="guide.css">
+  <script src="guide.js" defer></script>
+</head>
+<body data-lesson="08">
+  <div class="layout">
+    <aside class="sidebar" data-sidebar></aside>
+    <main class="content">
+      <p class="eyebrow">Lesson 08</p>
+      <h1>Spring AI Node</h1>
+      <p class="lead">이미 테스트된 그래프 구조를 유지한 채, 결정적인 Java 로직 하나를 실제 모델 호출로 교체한다.</p>
+      <div class="chips"><span class="chip">ChatModel</span><span class="chip">구조화 출력</span><span class="chip">도구 경계</span></div>
+
+      <div class="callout"><strong>오늘의 한 문장</strong><br>LLM은 그래프 자체가 아니라 Node가 사용하는 하나의 의존성이다.</div>
+
+      <h2>교체할 동작</h2>
+      <p>먼저 계획 작성 노드만 Spring AI 기반으로 교체한다. 검토 노드와 평가 규칙은 결정적으로 남겨 문제 발생 지점을 좁힌다.</p>
+
+      <h2>직접 타이핑할 순서</h2>
+      <ol>
+        <li>계획 작성 노드의 입력 상태와 출력 상태 계약을 먼저 고정한다.</li>
+        <li>Spring AI의 모델 인터페이스를 생성자로 주입한다.</li>
+        <li>프롬프트에 요구사항, 제약, 검토 결과만 전달한다.</li>
+        <li>자유로운 문자열 대신 검증 가능한 출력 형태를 선택한다.</li>
+        <li>테스트에서는 모델 의존성을 가짜 구현으로 교체한다.</li>
+        <li>별도의 통합 테스트에서만 Ollama 실제 호출을 확인한다.</li>
+      </ol>
+
+      <h2>도구 호출은 작게 시작한다</h2>
+      <p>두 번째 실험으로 저장소의 지정된 파일을 읽는 읽기 전용 도구를 추가할 수 있다. 임의 명령 실행이나 파일 수정 도구는 아직 연결하지 않는다.</p>
+
+      <h2>완료 조건</h2>
+      <ul class="checklist card">
+        <li>Ollama가 없어도 기본 단위 테스트가 통과한다.</li>
+        <li>모델 응답 오류가 예외로 사라지지 않고 상태 또는 명시적 실패로 드러난다.</li>
+        <li>프롬프트가 그래프의 다음 노드 이름을 직접 결정하지 않는다.</li>
+        <li>모델 교체가 그래프 구조 변경을 요구하지 않는다.</li>
+      </ul>
+
+      <h2>생각할 질문</h2>
+      <ul class="question-list">
+        <li>모델이 반환한 값을 어느 경계에서 검증해야 할까?</li>
+        <li>프롬프트와 Node 책임을 어떻게 분리할까?</li>
+        <li>도구의 실패는 재시도, 대체, 종료 중 어느 경로로 보내야 할까?</li>
+      </ul>
+
+      <div class="callout warning"><strong>막혔을 때 확인할 것</strong><br>먼저 Spring AI 모델을 그래프 밖에서 한 번 호출하고, 그다음 Node 안으로 옮긴다. 두 문제를 동시에 디버깅하지 않는다.</div>
+      <h2>다음 대화에 가져올 것</h2>
+      <p>Node의 입력·출력 계약, 모델을 가짜로 바꾼 테스트, 실제 호출에서 발생한 로그를 보여준다.</p>
+      <footer class="lesson-footer" data-lesson-footer></footer>
+    </main>
+  </div>
+</body>
+</html>

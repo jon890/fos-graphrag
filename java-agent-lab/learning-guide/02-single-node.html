@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>02. 단일 Node | LangGraph4j Lab</title>
+  <link rel="stylesheet" href="guide.css">
+  <script src="guide.js" defer></script>
+</head>
+<body data-lesson="02">
+  <div class="layout">
+    <aside class="sidebar" data-sidebar></aside>
+    <main class="content">
+      <p class="eyebrow">Lesson 02</p>
+      <h1>단일 Node</h1>
+      <p class="lead">상태 전체를 새로 만들지 않고, 한 단계가 변경한 부분만 반환하는 계약을 익힌다.</p>
+      <div class="chips"><span class="chip">NodeAction</span><span class="chip">부분 업데이트</span><span class="chip">순수 함수</span></div>
+
+      <div class="callout"><strong>오늘의 한 문장</strong><br>Node는 현재 State를 읽고, 자신이 바꾼 키만 담은 업데이트를 반환한다.</div>
+
+      <p class="phase-label">1부 · 개념 학습</p>
+      <h2>Node는 그래프의 작업 단위다</h2>
+      <p>
+        Node는 에이전트 전체를 의미하지 않는다. 현재 State를 읽고 하나의 좁은 책임을 수행하는 단계다.
+        일반 Java 메서드와 비슷하지만, 다음 Node를 직접 호출하지 않고 변경할 상태만 반환한다는 점이 다르다.
+      </p>
+      <div class="flow">입력
+  현재 State 전체
+        ↓
+Node가 필요한 값을 읽고 한 가지 작업 수행
+        ↓
+출력
+  변경된 키만 담은 부분 업데이트</div>
+
+      <h2>부분 업데이트를 반환하는 이유</h2>
+      <p>
+        Node가 State 전체를 다시 만들면 자신이 책임지지 않는 값까지 복사하거나 덮어쓸 수 있다.
+        부분 업데이트를 반환하면 LangGraph4j가 각 키의 Channel 규칙으로 기존 State와 합친다.
+      </p>
+      <div class="card-grid">
+        <section class="card"><h3>Node의 책임</h3><p>필요한 상태를 읽고 계산 결과를 부분 업데이트로 반환한다.</p></section>
+        <section class="card"><h3>그래프 실행기의 책임</h3><p>업데이트를 State에 병합하고 Edge를 따라 다음 Node를 실행한다.</p></section>
+      </div>
+
+      <h2>처음에는 결정적인 Node로 연습한다</h2>
+      <p>
+        LLM 호출은 느리고 결과가 달라질 수 있다. 먼저 같은 입력에 항상 같은 결과를 내는 Java 로직으로
+        Node의 입력과 출력 계약을 익히면, 나중에 모델을 연결했을 때 문제의 원인을 분리하기 쉽다.
+      </p>
+
+      <p class="phase-label">2부 · 실습 가이드</p>
+      <h2>만들 동작</h2>
+      <p><code>NormalizeRequestNode</code>는 입력 요구사항의 앞뒤 공백을 정리하고, 비어 있다면 발견 사항 하나를 추가한다. 아직 LLM은 사용하지 않는다.</p>
+
+      <div class="flow">PlanningState 읽기
+  → request 정규화
+  → 변경된 request 또는 findings만 반환</div>
+
+      <h2>직접 타이핑할 순서</h2>
+      <ol>
+        <li>가이드가 제공한 <code>NormalizeRequestNodeTest</code>를 실행해 기대 동작을 확인한다.</li>
+        <li><code>NodeAction&lt;PlanningState&gt;</code> 계약을 구현한다.</li>
+        <li>상태 접근자로 요구사항을 읽는다.</li>
+        <li>정규화 규칙을 작은 Java 로직으로 작성한다.</li>
+        <li>상태 객체를 직접 수정하지 않고 업데이트 맵을 반환한다.</li>
+        <li>제공된 테스트를 다시 실행하고 실패 메시지를 기준으로 운영 코드만 수정한다.</li>
+      </ol>
+
+      <h2>완료 조건</h2>
+      <ul class="checklist card">
+        <li>제공된 <code>NormalizeRequestNodeTest</code>가 모두 통과한다.</li>
+        <li>노드는 자신이 책임지지 않는 상태 키를 반환하지 않는다.</li>
+        <li>같은 상태를 넣으면 항상 같은 업데이트가 나온다.</li>
+        <li>노드가 Spring ApplicationContext 없이 생성된다.</li>
+      </ul>
+
+      <h2>생각할 질문</h2>
+      <ul class="question-list">
+        <li>노드가 <code>PlanningState</code> 전체를 반환하지 않는 이유는 무엇인가?</li>
+        <li>빈 입력을 예외로 던지는 것과 상태에 기록하는 것은 그래프 흐름에 어떤 차이를 만들까?</li>
+        <li>테스트가 그래프 전체를 만들지 않고 Node만 실행해도 되는 이유는 무엇인가?</li>
+      </ul>
+
+      <div class="callout warning"><strong>막혔을 때 확인할 것</strong><br><code>NodeAction.apply(...)</code>의 입력과 반환 타입만 확인한다. 정규화 로직은 직접 결정한다.</div>
+      <h2>다음 대화에 가져올 것</h2>
+      <p>수정한 Node와 테스트 실행 결과를 보여주고, 어떤 키를 반환할지 결정한 근거를 설명한다.</p>
+      <footer class="lesson-footer" data-lesson-footer></footer>
+    </main>
+  </div>
+</body>
+</html>

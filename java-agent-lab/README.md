@@ -45,3 +45,5 @@ Gradle `8.14.3`은 `gradle-wrapper.properties`, Java 21은 `build.gradle.kts`의
 ## 학습 순서
 
 [학습 가이드](ROADMAP.md)를 따라 LangGraph4j 개념을 한 단계씩 구현한다.
+
+코드 창 옆에 띄워 두고 직접 타이핑하려면 [HTML 학습 가이드](learning-guide/index.html)를 사용한다.
