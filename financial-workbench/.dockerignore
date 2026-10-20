@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/build
+**/.gradle
+**/.kotlin
+web/test-results
+web/playwright-report
+backups
+.env
+docs

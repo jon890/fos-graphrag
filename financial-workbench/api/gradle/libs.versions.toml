@@ -1,0 +1,25 @@
+[versions]
+# Kotlin 은 Spring Boot 4.1.0 BOM 의 kotlin.version 과 맞춘다
+kotlin = "2.3.21"
+spring-boot = "4.1.0"
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-spring = { id = "org.jetbrains.kotlin.plugin.spring", version.ref = "kotlin" }
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+
+[libraries]
+spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
+spring-boot-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
+spring-boot-security = { module = "org.springframework.boot:spring-boot-starter-security" }
+spring-boot-oauth2-client = { module = "org.springframework.boot:spring-boot-starter-security-oauth2-client" }
+spring-boot-data-neo4j = { module = "org.springframework.boot:spring-boot-starter-data-neo4j" }
+spring-boot-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
+jackson-kotlin = { module = "tools.jackson.module:jackson-module-kotlin" }
+jackson-yaml = { module = "tools.jackson.dataformat:jackson-dataformat-yaml" }
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect" }
+spring-boot-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
+testcontainers-neo4j = { module = "org.testcontainers:testcontainers-neo4j" }
+testcontainers-junit = { module = "org.testcontainers:testcontainers-junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
