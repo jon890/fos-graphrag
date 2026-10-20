@@ -21,7 +21,7 @@ flowchart LR
 - VPN 안에서 HTTP 로 접속하면 세션 쿠키가 암호화되지 않은 채 VPN 터널 안으로만 오간다.
   VPN 밖으로 공개하거나 reverse proxy 로 HTTPS 를 붙이면 `WORKBENCH_SECURE_COOKIE=true` 로 둔다.
 
-이번 작업에서는 홈서버에 배포하지 않았다. 아래 절차는 로컬 Compose 에서 확인했다.
+이번 작업에서는 홈서버에 배포하지 않았다. 아래 절차는 로컬 Compose 에서 확인했다(2026-10-20, macOS, Colima).
 
 ## 준비
 
@@ -96,9 +96,9 @@ scripts/backup.sh
 스크립트가 하는 일은 다음과 같다.
 
 1. `docker compose stop app neo4j`
-2. `docker compose run --rm --no-deps -v ./backups:/backups neo4j neo4j-admin database dump neo4j --to-path=/backups`
-3. 덤프 파일 이름에 시각을 붙인다(`backups/neo4j-YYYYMMDD-HHMMSS.dump`).
-4. `docker compose start neo4j app` 다음 health 를 기다린다.
+2. 임시 디렉터리 `backups/tmp-<시각>` 을 `/backups` 로 마운트하고 `neo4j-admin database dump neo4j --to-path=/backups` 를 `neo4j` 이미지로 실행한다.
+3. 덤프 파일을 `backups/neo4j-YYYYMMDD-HHMMSS.dump` 로 옮긴다.
+4. 성공하든 실패하든 `docker compose start neo4j app` 다음 `up -d --wait` 로 health 를 기다린다.
 
 중단 시간은 데이터 크기에 비례한다. 첫 버전 규모에서는 수십 초다.
 `backups/` 는 Git 에 넣지 않는다. 홈서버 밖(다른 디스크나 친구 장비)으로 복사해 둔다.
@@ -112,10 +112,13 @@ scripts/restore.sh backups/neo4j-20261020-120000.dump
 
 1. `docker compose stop app neo4j`
 2. 덤프 파일을 `backups/restore/neo4j.dump` 로 복사한다. `load` 는 디렉터리에서 `<데이터베이스 이름>.dump` 를 찾는다.
-3. `docker compose run --rm --no-deps -v ./backups/restore:/backups neo4j neo4j-admin database load neo4j --from-path=/backups --overwrite-destination=true`
+3. `backups/restore` 를 `/backups` 로 마운트하고 `neo4j-admin database load neo4j --from-path=/backups --overwrite-destination=true` 를 실행한다.
 4. `docker compose start neo4j app` 다음 health 를 기다린다.
 
 복원은 현재 데이터베이스를 덮어쓴다. 스크립트는 덮어쓰기 전에 현재 상태를 한 번 더 덤프한다.
+
+로컬에서 확인한 순서는 이렇다. 백업을 만들고, Company 노드 하나를 지워 노드 수를 5 에서 4 로 줄인 뒤 복원했다.
+복원 뒤 노드 수가 5 로 돌아왔고, 같은 스택에서 브라우저 흐름 1~6 이 다시 통과했다.
 
 ## 개발 환경
 

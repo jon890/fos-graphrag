@@ -1,0 +1,22 @@
+# 개발 Compose. Neo4j 만 띄우고 loopback 에만 연다. python-graphrag 의 7475, 7688 과 겹치지 않는다.
+name: fos-workbench-dev
+
+services:
+  neo4j:
+    image: neo4j:5.26.30-community
+    environment:
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD:?Copy .env.example to .env and set NEO4J_PASSWORD}"
+    ports:
+      - "127.0.0.1:7476:7474"
+      - "127.0.0.1:7689:7687"
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$${NEO4J_AUTH#*/}\" 'RETURN 1;' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  neo4j-data:
