@@ -1,4 +1,5 @@
 import type { ClaimView, NodeRef } from '../api/types'
+import { useLabels } from '../context'
 import { formatDateTime, orUnknown, userName } from '../lib/format'
 import { StatusBadge, TypeBadge } from './TypeBadge'
 
@@ -9,7 +10,7 @@ function str(v: unknown): string {
 interface Props {
   claim: ClaimView
   onOpenNode?: (id: string) => void
-  /** 카드 머리에 「Claim 열기」 를 보인다 */
+  /** 카드 머리에 「주장 열기」 를 보인다 */
   showOpen?: boolean
 }
 
@@ -26,16 +27,16 @@ function RefLink({ node, onOpenNode, testId }: { node: NodeRef | null; onOpenNod
 /** Claim 하나의 내용, 근거, 검토 정보를 보인다. */
 export function ClaimCard({ claim, onOpenNode, showOpen }: Props) {
   const p = claim.properties
+  const labels = useLabels()
   return (
     <div className="claim-card" data-testid="claim-card" data-claim-id={claim.id} data-review-status={claim.reviewStatus}>
       <div className="claim-head">
-        <strong data-testid="claim-predicate">{str(p.predicate) || claim.label}</strong>
+        <strong data-testid="claim-predicate">{labels.node(claim)}</strong>
         <StatusBadge status={claim.reviewStatus} />
         {claim.archived && <span className="archived-badge">보관됨</span>}
-        <span className="muted small">rev {claim.revision}</span>
         {showOpen && onOpenNode && (
           <button className="link-button small" data-testid="claim-open" onClick={() => onOpenNode(claim.id)}>
-            Claim 열기
+            주장 열기
           </button>
         )}
       </div>
@@ -45,18 +46,18 @@ export function ClaimCard({ claim, onOpenNode, showOpen }: Props) {
         <RefLink node={claim.object} onOpenNode={onOpenNode} testId="claim-object" />
       </div>
       <dl className="kv">
-        <dt>설명</dt>
+        <dt>{labels.property('Claim', 'description')}</dt>
         <dd data-testid="claim-description-text">{str(p.description)}</dd>
-        <dt>근거 문장</dt>
+        <dt>{labels.property('Claim', 'evidenceText')}</dt>
         <dd>
           <blockquote data-testid="claim-evidence-text">{str(p.evidenceText)}</blockquote>
         </dd>
-        <dt>출처 문서</dt>
+        <dt>{labels.relationship('SUPPORTED_BY')}</dt>
         <dd>
           {claim.documents.length === 0 && <span className="muted">없음</span>}
           {claim.documents.length > 0 && claim.documents.every((d) => d.archived) && (
             <div className="info-box" data-testid="claim-no-active-evidence">
-              근거 문서가 모두 보관되었습니다. 근거 문서를 복원하기 전에는 이 Claim 을 복원하거나 검토 완료할 수 없습니다.
+              근거 문서가 모두 보관되었습니다. 근거 문서를 복원하기 전에는 이 주장을 복원하거나 검토 완료할 수 없습니다.
             </div>
           )}
           <ul className="doc-list">
@@ -68,7 +69,7 @@ export function ClaimCard({ claim, onOpenNode, showOpen }: Props) {
                 {d.archived && <span className="archived-badge">보관됨</span>}
                 <div className="muted small">
                   발행 {orUnknown(d.publisher)} · 공개일 {orUnknown(d.publishedAt)} · 수집 {formatDateTime(d.collectedAt)}
-                  {d.documentType ? ` · ${d.documentType}` : ''}
+                  {d.documentType ? ` · ${labels.value('Document', 'documentType', d.documentType)}` : ''}
                 </div>
               </li>
             ))}
@@ -83,7 +84,7 @@ export function ClaimCard({ claim, onOpenNode, showOpen }: Props) {
           <span data-testid="claim-author">{userName(claim.createdBy, '알 수 없음')}</span>
           <span className="muted small">
             {' '}
-            {formatDateTime(claim.createdAt)} · {str(p.authoringMethod) || 'MANUAL'}
+            {formatDateTime(claim.createdAt)} · {labels.value('Claim', 'authoringMethod', p.authoringMethod || 'MANUAL')}
             {p.extractionConfidence !== undefined && p.extractionConfidence !== null ? ` · 확신도 ${p.extractionConfidence}` : ''}
           </span>
         </dd>

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { api, ApiError, errorMessage } from '../api/client'
 import type { NodeView } from '../api/types'
-import { useApp } from '../context'
+import { useApp, useLabels } from '../context'
 import { buildCreateProperties, initialFormValues, type FormValues } from '../lib/formValues'
 import { fieldErrorsOf, PropertyFields } from './PropertyFields'
 
@@ -15,6 +15,7 @@ interface Props {
 /** 온톨로지 속성 정의로 생성 폼을 만든다. */
 export function NodeCreateForm({ type, onCreated, onCancel, testIdPrefix }: Props) {
   const { ontology } = useApp()
+  const labels = useLabels()
   const defs = ontology.nodeTypes[type]?.properties ?? {}
   const [values, setValues] = useState<FormValues>(() => initialFormValues(defs))
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -58,7 +59,7 @@ export function NodeCreateForm({ type, onCreated, onCancel, testIdPrefix }: Prop
       )}
       <div className="row">
         <button type="submit" className="primary" disabled={busy} data-testid={`${testIdPrefix}-submit`}>
-          {busy ? '저장 중…' : `${type} 만들기`}
+          {busy ? '저장 중…' : `${labels.type(type)} 만들기`}
         </button>
         <button type="button" onClick={onCancel} data-testid={`${testIdPrefix}-cancel`}>
           취소

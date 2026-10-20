@@ -48,7 +48,7 @@ export function NodeEditForm({ node, onSaved, onError }: Props) {
 
   return (
     <form onSubmit={submit} data-testid="node-edit-form">
-      {node.archived && <div className="info-box">보관된 노드는 수정할 수 없습니다. 먼저 복원하세요.</div>}
+      {node.archived && <div className="info-box">보관된 항목은 수정할 수 없습니다. 먼저 복원하세요.</div>}
       <PropertyFields
         defs={defs}
         values={values}

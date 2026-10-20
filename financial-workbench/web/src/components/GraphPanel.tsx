@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react'
 import cytoscape, { type Core, type ElementDefinition } from 'cytoscape'
-import { NODE_TYPES } from '../api/types'
+import { useApp, useLabels } from '../context'
 import { colorForType, type GraphData } from '../lib/graph'
+import type { Ontology } from '../api/types'
+import { nodeDisplayLabel, relationshipLabel } from '../lib/labels'
+import { WelcomeGuide } from './WelcomeGuide'
 
 interface Props {
   data: GraphData
@@ -48,7 +51,7 @@ const STYLE: cytoscape.StylesheetJson = [
       'target-arrow-color': '#94a3b8',
       'target-arrow-shape': 'triangle',
       'curve-style': 'bezier',
-      label: 'data(type)',
+      label: 'data(label)',
       'font-size': 9,
       color: '#475569',
       'text-rotation': 'autorotate',
@@ -59,18 +62,24 @@ const STYLE: cytoscape.StylesheetJson = [
   },
 ]
 
-function toElements(data: GraphData): ElementDefinition[] {
+/** 그래프에 그릴 요소. 노드 이름과 선 이름은 온톨로지 표시 이름으로 바꾸고, 저장된 키는 type 에 남긴다 */
+function toElements(data: GraphData, ontology: Ontology): ElementDefinition[] {
   return [
     ...data.nodes.map((n) => ({
       group: 'nodes' as const,
-      data: { id: n.id, label: n.label, type: n.type, reviewStatus: n.reviewStatus ?? '', color: colorForType(n.type) },
+      data: { id: n.id, label: nodeDisplayLabel(ontology, n), type: n.type, reviewStatus: n.reviewStatus ?? '', color: colorForType(n.type) },
     })),
-    ...data.edges.map((e) => ({ group: 'edges' as const, data: { id: e.id, source: e.source, target: e.target, type: e.type } })),
+    ...data.edges.map((e) => ({
+      group: 'edges' as const,
+      data: { id: e.id, source: e.source, target: e.target, type: e.type, label: relationshipLabel(ontology, e.type) },
+    })),
   ]
 }
 
 export function GraphPanel(props: Props) {
   const { data, centerId, selectedId, loading, error, hops, onHopsChange } = props
+  const { ontology } = useApp()
+  const labels = useLabels()
   const containerRef = useRef<HTMLDivElement>(null)
   const cyRef = useRef<Core | null>(null)
   // Cytoscape 이벤트는 한 번만 등록하고, 최신 콜백은 ref 로 읽는다.
@@ -93,7 +102,7 @@ export function GraphPanel(props: Props) {
   useEffect(() => {
     const cy = cyRef.current
     if (!cy) return
-    const wanted = toElements(data)
+    const wanted = toElements(data, ontology)
     const wantedIds = new Set(wanted.map((el) => el.data.id as string))
     let added = false
     cy.batch(() => {
@@ -120,7 +129,7 @@ export function GraphPanel(props: Props) {
       })
       layout.run()
     }
-  }, [data])
+  }, [data, ontology])
 
   useEffect(() => {
     const cy = cyRef.current
@@ -151,13 +160,13 @@ export function GraphPanel(props: Props) {
           disabled={!selectedId || selectedId === centerId}
           onClick={() => selectedId && props.onRecenter(selectedId)}
         >
-          선택 노드를 중심으로
+          선택한 항목을 중심으로
         </button>
         <button data-testid="graph-fit" disabled={data.nodes.length === 0} onClick={() => cyRef.current?.fit(undefined, 40)}>
           화면 맞춤
         </button>
         <span className="muted small" data-testid="graph-status">
-          노드 {data.nodes.length} · 관계 {data.edges.length}
+          항목 {data.nodes.length} · 관계 {data.edges.length}
         </span>
         {loading && (
           <span className="muted small" data-testid="graph-loading">
@@ -168,7 +177,7 @@ export function GraphPanel(props: Props) {
 
       {data.truncated && (
         <div className="warn-box" data-testid="graph-truncated">
-          결과가 잘렸습니다(최대 노드 {data.limits?.maxNodes ?? '?'}, 관계 {data.limits?.maxRelationships ?? '?'}).
+          결과가 잘렸습니다(최대 항목 {data.limits?.maxNodes ?? '?'}개, 관계 {data.limits?.maxRelationships ?? '?'}개).
         </div>
       )}
       {error && (
@@ -181,34 +190,36 @@ export function GraphPanel(props: Props) {
         <div ref={containerRef} className="graph-canvas" data-testid="graph-canvas" />
         {empty === 'none' && (
           <div className="graph-overlay" data-testid="graph-empty">
-            왼쪽에서 노드를 검색해 선택하면 주변 그래프를 보여 줍니다.
+            <WelcomeGuide />
           </div>
         )}
         {empty === 'no-neighbors' && (
           <div className="graph-overlay subtle" data-testid="graph-no-neighbors">
-            이 노드에 연결된 이웃이 없습니다.
+            이 항목에 연결된 이웃이 없습니다.
           </div>
         )}
       </div>
 
       <div className="legend" data-testid="graph-legend">
-        {NODE_TYPES.map((t) => (
+        {labels.types.map((t) => (
           <span key={t} className="legend-item">
             <span className="legend-dot" style={{ backgroundColor: colorForType(t) }} />
-            {t}
+            {labels.type(t)}
           </span>
         ))}
-        <span className="legend-item muted">점선 테두리: DRAFT · 흐림: REJECTED · 더블클릭: 이웃 확장</span>
+        <span className="legend-item muted">
+          점선 테두리: {labels.status('DRAFT')} · 흐림: {labels.status('REJECTED')} · 더블클릭: 이웃 확장
+        </span>
       </div>
 
       <details className="graph-node-list" open>
-        <summary>그래프 노드 목록 ({data.nodes.length})</summary>
+        <summary>그래프에 나온 항목 ({data.nodes.length})</summary>
         <ul data-testid="graph-node-list">
           {data.nodes.map((n) => (
             <li key={n.id} data-testid="graph-node" data-node-id={n.id} data-node-type={n.type} data-review-status={n.reviewStatus ?? ''}>
               <button className="link-button" onClick={() => props.onSelect(n.id)}>
-                [{n.type}] {n.label}
-                {n.reviewStatus ? ` (${n.reviewStatus})` : ''}
+                [{labels.type(n.type)}] {labels.node(n)}
+                {n.reviewStatus ? ` (${labels.status(n.reviewStatus)})` : ''}
               </button>
             </li>
           ))}

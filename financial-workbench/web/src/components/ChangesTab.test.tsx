@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { ChangeEventView } from '../api/types'
 import { ChangeRows } from './ChangesTab'
+import { withApp } from './testSupport'
 
 function event(overrides: Partial<ChangeEventView>): ChangeEventView {
   return {
@@ -20,7 +21,8 @@ function event(overrides: Partial<ChangeEventView>): ChangeEventView {
   }
 }
 
-const render = (items: ChangeEventView[]) => renderToStaticMarkup(<table><tbody><ChangeRows items={items} onOpen={() => {}} /></tbody></table>)
+const render = (items: ChangeEventView[]) =>
+  renderToStaticMarkup(withApp(<table><tbody><ChangeRows items={items} onOpen={() => {}} /></tbody></table>))
 
 describe('ChangeRows', () => {
   it('작성자가 없는 이력(첫 관리자 생성 등)도 그리고 「시스템」 으로 보인다', () => {
@@ -37,5 +39,26 @@ describe('ChangeRows', () => {
     const html = render([event({})])
     expect(html).toContain('title="alice@example.com"')
     expect(html).not.toContain('시스템')
+  })
+
+  it('작업 이름과 대상 종류, enum 값은 온톨로지 표시 이름으로 보인다', () => {
+    const html = render([
+      event({ action: 'ARCHIVE', targetType: 'Security', targetLabel: '가상전자 보통주', changes: { market: { before: 'KRX_KOSPI', after: 'KRX_KOSDAQ' } } }),
+      event({ id: 'e2', targetType: 'Claim', targetLabel: 'SUPPLIES_TO', changes: { predicate: { before: null, after: 'SUPPLIES_TO' } } }),
+    ])
+    expect(html).toContain('>보관<')
+    expect(html).toContain('종목')
+    expect(html).toContain('상장 시장')
+    expect(html).toContain('코스피 → 코스닥')
+    // Claim 이름은 서버가 키(SUPPLIES_TO)로 준다. 화면은 표시 이름으로 바꾼다.
+    expect(html).toContain('>공급한다<')
+    expect(html).not.toContain('>ARCHIVE<')
+  })
+
+  it('온톨로지에 없는 타입과 작업은 키를 그대로 보인다', () => {
+    const html = render([event({ action: 'UPDATE', targetType: 'Mystery', targetLabel: '??', changes: { archived: { before: false, after: true } } })])
+    expect(html).toContain('>UPDATE<')
+    expect(html).toContain('Mystery')
+    expect(html).toContain('archived')
   })
 })

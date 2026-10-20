@@ -47,6 +47,13 @@ export const TYPE_COLORS: Record<string, string> = {
   Claim: '#dc2626',
 }
 
+/** 온톨로지에 새 타입이 생겨도 겹치지 않게 이름으로 고르는 색. 위 다섯 타입 색과 다른 계열을 쓴다 */
+const FALLBACK_COLORS = ['#0891b2', '#65a30d', '#c026d3', '#ea580c', '#4f46e5', '#be123c', '#0f766e', '#a16207']
+
 export function colorForType(type: string): string {
-  return TYPE_COLORS[type] ?? '#64748b'
+  const known = TYPE_COLORS[type]
+  if (known) return known
+  let hash = 0
+  for (const ch of type) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
+  return FALLBACK_COLORS[hash % FALLBACK_COLORS.length]
 }

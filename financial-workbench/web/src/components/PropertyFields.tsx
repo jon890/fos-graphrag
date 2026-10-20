@@ -1,18 +1,6 @@
 import type { PropertyDef } from '../api/types'
 import type { FormValues } from '../lib/formValues'
 
-const TYPE_HINT: Record<string, string> = {
-  string: '문자열',
-  text: '긴 글',
-  url: 'URL',
-  enum: '선택',
-  date: '날짜',
-  datetime: '날짜와 시각',
-  number: '숫자',
-  integer: '정수',
-  boolean: '참/거짓',
-}
-
 interface Props {
   defs: Record<string, PropertyDef>
   values: FormValues
@@ -50,7 +38,7 @@ export function PropertyFields({ defs, values, errors = {}, onChange, testIdPref
                 <option value="">{def.required ? '선택하세요' : '(없음)'}</option>
                 {(def.values ?? []).map((v) => (
                   <option key={v} value={v}>
-                    {v}
+                    {def.valueLabels?.[v] ?? v}
                   </option>
                 ))}
               </select>
@@ -93,9 +81,8 @@ export function PropertyFields({ defs, values, errors = {}, onChange, testIdPref
         return (
           <div className="field" key={name}>
             <label htmlFor={id}>
-              {name}
+              {def.label ?? name}
               {def.required && <span className="required"> *</span>}
-              <span className="muted small"> {TYPE_HINT[def.type] ?? def.type}</span>
             </label>
             {input}
             {def.description && <div className="hint">{def.description}</div>}

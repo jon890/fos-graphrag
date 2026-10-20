@@ -1,7 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, errorMessage } from '../api/client'
-import type { ChangeEventView, Page } from '../api/types'
+import type { ChangeEventView, Ontology, Page } from '../api/types'
+import { useApp, useLabels } from '../context'
 import { formatDateTime, summarizeValue, userName } from '../lib/format'
+import { enumValueLabel, propertyDef, propertyLabel } from '../lib/labels'
 import { Pager } from './Pager'
 
 interface Props {
@@ -10,7 +12,16 @@ interface Props {
   onOpen: (id: string) => void
 }
 
+/** 변경 내용 한 줄. 속성 이름과 enum 값은 온톨로지 표시 이름으로 바꾸고, 온톨로지에 없는 키(archived 등)는 그대로 둔다 */
+function changeLine(ontology: Ontology, targetType: string, key: string, diff: { before: unknown; after: unknown } | undefined) {
+  const def = propertyDef(ontology, targetType, key)
+  const show = (v: unknown) => (def?.type === 'enum' && typeof v === 'string' ? enumValueLabel(def, v) : summarizeValue(v))
+  return `${show(diff?.before)} → ${show(diff?.after)}`
+}
+
 export function ChangeRows({ items, onOpen }: { items: ChangeEventView[]; onOpen: (id: string) => void }) {
+  const { ontology } = useApp()
+  const labels = useLabels()
   return (
     <>
       {items.map((c) => (
@@ -18,16 +29,16 @@ export function ChangeRows({ items, onOpen }: { items: ChangeEventView[]; onOpen
           <td>{formatDateTime(c.at)}</td>
           <td title={c.actor?.email}>{userName(c.actor)}</td>
           <td data-testid="change-action">
-            <span className={`action-badge action-${c.action.toLowerCase()}`}>{c.action}</span>
+            <span className={`action-badge action-${c.action.toLowerCase()}`}>{labels.action(c.action)}</span>
           </td>
           <td>
-            {c.targetType}
+            {c.targetKind === 'RELATIONSHIP' ? labels.relationship(c.targetType) : labels.type(c.targetType)}
             {c.targetKind === 'RELATIONSHIP' ? ' (관계)' : c.targetKind === 'USER' ? ' (사용자)' : ''}
           </td>
           <td>
             {c.targetKind === 'NODE' ? (
               <button className="link-button" onClick={() => onOpen(c.targetId)}>
-                {c.targetLabel}
+                {labels.node({ type: c.targetType, label: c.targetLabel })}
               </button>
             ) : (
               c.targetLabel
@@ -38,7 +49,8 @@ export function ChangeRows({ items, onOpen }: { items: ChangeEventView[]; onOpen
             <ul className="change-list">
               {Object.entries(c.changes ?? {}).map(([key, diff]) => (
                 <li key={key}>
-                  <span className="mono">{key}</span>: {summarizeValue(diff?.before)} → {summarizeValue(diff?.after)}
+                  <span className={propertyDef(ontology, c.targetType, key) ? undefined : 'mono'}>{propertyLabel(ontology, c.targetType, key)}</span>:{' '}
+                  {changeLine(ontology, c.targetType, key, diff)}
                 </li>
               ))}
             </ul>
@@ -116,10 +128,10 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
           <tr>
             <th>시각</th>
             <th>사용자</th>
-            <th>action</th>
-            <th>대상 타입</th>
+            <th>작업</th>
+            <th>대상 종류</th>
             <th>대상 이름</th>
-            <th>revision</th>
+            <th>수정 번호</th>
             <th>변경 내용</th>
             <th>메모</th>
           </tr>
