@@ -1,6 +1,7 @@
 package dev.fos.workbench.knowledge
 
 import dev.fos.workbench.auth.UserRepository
+import dev.fos.workbench.config.params
 import dev.fos.workbench.history.ChangeAction
 import dev.fos.workbench.history.ChangeEventDraft
 import dev.fos.workbench.history.ChangeEventRecorder
@@ -31,9 +32,10 @@ class RelationshipService(
     @Transactional
     fun create(request: CreateRelationshipRequest, actorId: String): RelationshipView {
         val def = ontology.requireRelationshipType(request.type)
-        // 같은 시작 노드에서 중복 관계가 동시에 생기지 않게 시작 노드를 잠근다
-        val from = guard.lockNode(request.fromId)
-        val to = reader.nodeProps(request.toId)
+        // 중복 관계와 보관 경합을 막으려고 양 끝 노드를 ID 순서로 잠근다
+        val locked = lockEnds(request.fromId, request.toId)
+        val from = locked.getValue(request.fromId)
+        val to = locked.getValue(request.toId)
         if (from["type"] !in def.from || to["type"] !in def.to) {
             throw OntologyViolationException(
                 "relationship-endpoint",
@@ -41,10 +43,7 @@ class RelationshipService(
             )
         }
         if (from["archived"] == true || to["archived"] == true) throw ArchivedException()
-        val duplicate = client.query(
-            "MATCH (:Knowledge {id: \$from})-[r:`${request.type}`]->(:Knowledge {id: \$to}) WHERE r.archived = false RETURN count(r) > 0 AS dup",
-        ).bindAll(mapOf("from" to request.fromId, "to" to request.toId)).fetch().one().map { it["dup"] == true }.orElse(false)
-        if (duplicate) throw DuplicateException("같은 관계가 이미 있습니다.")
+        requireNoActiveDuplicate(request.type, request.fromId, request.toId, exceptId = null)
 
         val id = UUID.randomUUID().toString()
         val now = Instant.now().toString()
@@ -56,7 +55,7 @@ class RelationshipService(
         client.query(
             "MATCH (a:Knowledge {id: \$from}), (b:Knowledge {id: \$to}) CREATE (a)-[r:`${request.type}`]->(b) SET r = \$props",
         ).bindAll(mapOf("from" to request.fromId, "to" to request.toId, "props" to props)).run()
-        guard.unlockNode(request.fromId)
+        unlockEnds(request.fromId, request.toId)
         recorder.record(
             ChangeEventDraft(
                 actorId, ChangeAction.CREATE, id, TargetKind.RELATIONSHIP, request.type, label(from, to), 1L,
@@ -78,7 +77,16 @@ class RelationshipService(
             throw OntologyViolationException("claim-relationship", "Claim 에 딸린 관계는 Claim 을 보관해 정리합니다.")
         }
         guard.requireRevision(locked.props, request.expectedRevision)
-        if (archive) guard.requireActive(locked.props) else if (locked.props["archived"] != true) throw NotArchivedException()
+        if (archive) {
+            guard.requireActive(locked.props)
+        } else {
+            if (locked.props["archived"] != true) throw NotArchivedException()
+            // 복원은 만들기와 같은 규칙을 따른다. 끝 노드가 보관됐거나 같은 활성 관계가 있으면 거절한다
+            val ends = lockEnds(locked.fromId, locked.toId)
+            if (ends.values.any { it["archived"] == true }) throw ArchivedException()
+            requireNoActiveDuplicate(locked.type, locked.fromId, locked.toId, exceptId = id)
+            unlockEnds(locked.fromId, locked.toId)
+        }
         val set = if (archive) mapOf("archived" to true, "archivedAt" to Instant.now().toString()) else mapOf("archived" to false, "archivedAt" to null)
         val after = guard.updateRelationship(id, set, actorId)
         recorder.record(
@@ -116,6 +124,22 @@ class RelationshipService(
                 createdBy = refs[r["createdBy"]],
             )
         }
+    }
+
+    private fun lockEnds(fromId: String, toId: String): Map<String, Map<String, Any?>> =
+        listOf(fromId, toId).distinct().sorted().associateWith { guard.lockNode(it) }
+
+    private fun unlockEnds(fromId: String, toId: String) {
+        listOf(fromId, toId).distinct().forEach { guard.unlockNode(it) }
+    }
+
+    /** 관계 타입은 호출 전에 온톨로지 허용 목록과 대조한 값이다. */
+    private fun requireNoActiveDuplicate(type: String, fromId: String, toId: String, exceptId: String?) {
+        val duplicate = client.query(
+            "MATCH (:Knowledge {id: \$from})-[r:`$type`]->(:Knowledge {id: \$to}) " +
+                "WHERE r.archived = false AND r.id <> coalesce(\$exceptId, '') RETURN count(r) > 0 AS dup",
+        ).bindAll(params("from" to fromId, "to" to toId, "exceptId" to exceptId)).fetch().one().map { it["dup"] == true }.orElse(false)
+        if (duplicate) throw DuplicateException("같은 관계가 이미 있습니다.")
     }
 
     private fun label(from: Map<String, Any?>, to: Map<String, Any?>): String =

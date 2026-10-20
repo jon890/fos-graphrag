@@ -36,10 +36,8 @@ class ClaimService(
         val predicate = ontology.requirePredicate(request.predicate)
         if (request.documentIds.isEmpty()) throw ValidationFailedException(mapOf("documentIds" to "근거 문서를 하나 이상 고르세요."))
         val ids = (listOf(request.subjectId, request.objectId) + request.documentIds).distinct()
-        @Suppress("UNCHECKED_CAST")
-        val found = client.query("MATCH (n:Knowledge) WHERE n.id IN \$ids RETURN properties(n) AS n").bind(ids).to("ids")
-            .fetch().all().map { it["n"] as Map<String, Any?> }.associateBy { it["id"] as String }
-        ids.firstOrNull { it !in found }?.let { throw NotFoundException(it) }
+        // 주어, 목적어, 근거 문서가 그 사이에 보관되지 않게 ID 순서로 잠근다. 없는 ID 는 404 다
+        val found = ids.sorted().associateWith { guard.lockNode(it) }
 
         val subject = found.getValue(request.subjectId)
         val obj = found.getValue(request.objectId)
@@ -66,7 +64,7 @@ class ClaimService(
         val audit = mapOf("revision" to 1L, "archived" to false, "createdAt" to now, "createdBy" to actorId, "updatedAt" to now, "updatedBy" to actorId)
         val props = properties + audit + mapOf(
             "id" to id, "type" to CLAIM, "reviewStatus" to ReviewStatus.DRAFT.name,
-            "searchText" to request.predicate.lowercase(),
+            "searchText" to request.predicate.lowercase(), "contentUpdatedBy" to actorId,
         )
         fun link() = audit + ("id" to UUID.randomUUID().toString())
         client.query(
@@ -88,6 +86,7 @@ class ClaimService(
                 "documents" to request.documentIds.distinct().map { mapOf("documentId" to it, "link" to link()) },
             ),
         ).run()
+        client.query("UNWIND \$ids AS lockedId MATCH (n:Knowledge {id: lockedId}) REMOVE n._lock").bind(ids).to("ids").run()
         recorder.record(
             ChangeEventDraft(
                 actorId, ChangeAction.CREATE, id, TargetKind.NODE, CLAIM, request.predicate, 1L,
@@ -118,12 +117,15 @@ class ClaimService(
         requireValidPeriod((before + changes).filterValues { it != null })
         val contentChanged = diff(before, changes)
         val reset = if (contentChanged.isEmpty()) emptyMap()
-        else mapOf("reviewStatus" to ReviewStatus.DRAFT.name, "reviewedBy" to null, "reviewedAt" to null, "reviewNote" to null)
+        else mapOf(
+            "reviewStatus" to ReviewStatus.DRAFT.name, "reviewedBy" to null, "reviewedAt" to null, "reviewNote" to null,
+            "contentUpdatedBy" to actorId,
+        )
         val after = guard.updateNode(id, changes + reset, actorId)
         recorder.record(
             ChangeEventDraft(
                 actorId, ChangeAction.UPDATE, id, TargetKind.NODE, CLAIM, before["predicate"] as String,
-                (after["revision"] as Number).toLong(), contentChanged + diff(before, reset),
+                (after["revision"] as Number).toLong(), contentChanged + diff(before, reset - "contentUpdatedBy"),
             ),
         )
         return reader.claim(id)
@@ -136,7 +138,8 @@ class ClaimService(
         val before = lockClaim(id)
         guard.requireRevision(before, request.expectedRevision)
         guard.requireActive(before)
-        if (before["createdBy"] == actorId) throw SelfReviewForbiddenException()
+        // 작성자와 마지막으로 내용을 고친 사람은 그 내용을 검토할 수 없다
+        if (before["createdBy"] == actorId || before["contentUpdatedBy"] == actorId) throw SelfReviewForbiddenException()
         val note = request.note?.trim()?.takeIf { it.isNotEmpty() }?.take(2000)
         val set = if (status == ReviewStatus.DRAFT) {
             mapOf("reviewStatus" to status.name, "reviewedBy" to null, "reviewedAt" to null, "reviewNote" to note)
