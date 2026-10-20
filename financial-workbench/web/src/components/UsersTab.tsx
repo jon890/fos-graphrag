@@ -38,14 +38,14 @@ function UserRow({ user, isSelf, onPatch, onOpenHistory }: RowProps) {
           <select data-testid="users-row-role" value={role} disabled={busy} onChange={(e) => setRole(e.target.value as Role)}>
             {ROLES.map((r) => (
               <option key={r} value={r}>
-                {r} · {ROLE_LABEL[r]}
+                {ROLE_LABEL[r]}
               </option>
             ))}
           </select>
           <button
             data-testid="users-row-save"
             disabled={busy || role === user.role}
-            onClick={() => void run({ role }, `${user.email} 의 역할을 ${role} 로 바꿨습니다.`)}
+            onClick={() => void run({ role }, `${user.email} 의 역할을 바꿨습니다. 새 역할: ${ROLE_LABEL[role]}`)}
           >
             저장
           </button>
@@ -53,7 +53,6 @@ function UserRow({ user, isSelf, onPatch, onOpenHistory }: RowProps) {
       </td>
       <td data-testid="users-row-enabled">{user.enabled ? '활성' : '비활성'}</td>
       <td data-testid="users-row-linked">{user.linked ? '로그인함' : '첫 로그인 전'}</td>
-      <td>{user.revision}</td>
       <td>{formatDateTime(user.lastLoginAt)}</td>
       <td className="row">
         {user.enabled ? (
@@ -124,7 +123,7 @@ export function UsersTab({ onOpenHistory }: { onOpenHistory: (id: string) => voi
     setAdding(true)
     try {
       const created = await api.users.create(email.trim(), displayName.trim(), role)
-      setMessage({ kind: 'success', text: `${created.email} 을 ${created.role} 로 추가했습니다. 첫 Google 로그인 때 계정이 묶입니다.` })
+      setMessage({ kind: 'success', text: `${created.email} 을 추가했습니다. 역할: ${ROLE_LABEL[created.role]}. 첫 Google 로그인 때 계정이 묶입니다.` })
       setEmail('')
       setDisplayName('')
       setRole('VIEWER')
@@ -155,7 +154,7 @@ export function UsersTab({ onOpenHistory }: { onOpenHistory: (id: string) => voi
         <select data-testid="users-add-role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
           {ROLES.map((r) => (
             <option key={r} value={r}>
-              {r} · {ROLE_LABEL[r]}
+              {ROLE_LABEL[r]}
             </option>
           ))}
         </select>
@@ -177,8 +176,7 @@ export function UsersTab({ onOpenHistory }: { onOpenHistory: (id: string) => voi
             <th>표시 이름</th>
             <th>역할</th>
             <th>활성</th>
-            <th>linked</th>
-            <th>revision</th>
+            <th>로그인 연결</th>
             <th>마지막 로그인</th>
             <th>관리</th>
           </tr>
@@ -189,7 +187,7 @@ export function UsersTab({ onOpenHistory }: { onOpenHistory: (id: string) => voi
           ))}
           {users && users.length === 0 && (
             <tr>
-              <td colSpan={8} className="muted">
+              <td colSpan={7} className="muted">
                 사용자가 없습니다.
               </td>
             </tr>

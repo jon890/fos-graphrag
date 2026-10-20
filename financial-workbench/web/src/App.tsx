@@ -136,7 +136,7 @@ export default function App() {
             {user.email}
           </span>
           <span className={`role-badge role-${user.role.toLowerCase()}`} data-testid="current-user-role" data-role={user.role}>
-            {user.role} · {ROLE_LABEL[user.role] ?? user.role}
+            {ROLE_LABEL[user.role] ?? user.role}
           </span>
           <button className="link-button" data-testid="logout-button" onClick={logout}>
             로그아웃
