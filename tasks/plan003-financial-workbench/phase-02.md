@@ -31,7 +31,7 @@ revision 충돌은 409 로, 데이터와 이력은 한 트랜잭션으로 처리
 
 ### 2. 노드와 관계
 
-`knowledge/NodeService.kt`, `NodeController.kt`, `RelationshipService.kt`, `RelationshipController.kt`, `knowledge/Dtos.kt`, `knowledge/RevisionGuard.kt`(잠금, 비교, 404, 409 판정).
+`knowledge/NodeService.kt`, `NodeController.kt`, `RelationshipService.kt`, `RelationshipController.kt`, `knowledge/Dtos.kt`, `knowledge/RevisionGuard.kt`(잠금, 비교, 404, 409 판정), `knowledge/NodeQueryService.kt` 의 상세 조회(`GET /api/nodes/{id}`). 테스트가 상세 조회로 결과를 확인한다.
 
 ### 3. Claim
 
@@ -64,6 +64,7 @@ cd financial-workbench/api && ./gradlew build
 | `financial-workbench/api/src/main/kotlin/dev/fos/workbench/knowledge/ClaimController.kt` | 신규 |
 | `financial-workbench/api/src/main/kotlin/dev/fos/workbench/knowledge/Dtos.kt` | 신규 |
 | `financial-workbench/api/src/main/kotlin/dev/fos/workbench/knowledge/RevisionGuard.kt` | 신규 |
+| `financial-workbench/api/src/main/kotlin/dev/fos/workbench/knowledge/NodeQueryService.kt` | 신규 |
 | `financial-workbench/api/src/main/kotlin/dev/fos/workbench/**` | 수정 |
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/knowledge/NodeWriteIntegrationTest.kt` | 신규 |
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/knowledge/TransactionConsistencyIntegrationTest.kt` | 신규 |

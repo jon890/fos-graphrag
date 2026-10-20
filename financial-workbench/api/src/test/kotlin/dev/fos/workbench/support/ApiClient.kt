@@ -17,7 +17,8 @@ class ApiClient(private val baseUrl: String, private val mapper: JsonMapper) {
     }
 
     private val cookies = CookieManager(null, CookiePolicy.ACCEPT_ALL)
-    private val http = HttpClient.newBuilder().cookieHandler(cookies).build()
+    private val http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).cookieHandler(cookies)
+        .connectTimeout(java.time.Duration.ofSeconds(5)).build()
 
     fun get(path: String): Response = send("GET", path, null)
 
@@ -26,7 +27,8 @@ class ApiClient(private val baseUrl: String, private val mapper: JsonMapper) {
     fun patch(path: String, body: Any): Response = send("PATCH", path, body)
 
     fun send(method: String, path: String, body: Any?, withCsrf: Boolean = true): Response {
-        val builder = HttpRequest.newBuilder(URI.create(baseUrl + path)).header("Accept", "application/json")
+        val builder = HttpRequest.newBuilder(URI.create(baseUrl + path)).timeout(java.time.Duration.ofSeconds(30))
+            .header("Accept", "application/json")
         if (body != null) builder.header("Content-Type", "application/json")
         val token = xsrfToken()
         if (withCsrf && method != "GET" && token != null) builder.header("X-XSRF-TOKEN", token)

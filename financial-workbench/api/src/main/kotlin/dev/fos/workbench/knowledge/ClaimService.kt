@@ -1,0 +1,181 @@
+package dev.fos.workbench.knowledge
+
+import dev.fos.workbench.history.ChangeAction
+import dev.fos.workbench.history.ChangeEventDraft
+import dev.fos.workbench.history.ChangeEventRecorder
+import dev.fos.workbench.history.FieldChange
+import dev.fos.workbench.history.TargetKind
+import dev.fos.workbench.history.diff
+import dev.fos.workbench.ontology.Ontology
+import dev.fos.workbench.ontology.OntologyValidator
+import dev.fos.workbench.web.ArchivedException
+import dev.fos.workbench.web.NotFoundException
+import dev.fos.workbench.web.OntologyViolationException
+import dev.fos.workbench.web.SelfReviewForbiddenException
+import dev.fos.workbench.web.ValidationFailedException
+import org.springframework.data.neo4j.core.Neo4jClient
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
+import java.util.UUID
+
+enum class ReviewStatus { DRAFT, REVIEWED, REJECTED }
+
+@Service
+class ClaimService(
+    private val client: Neo4jClient,
+    private val ontology: Ontology,
+    private val validator: OntologyValidator,
+    private val guard: RevisionGuard,
+    private val recorder: ChangeEventRecorder,
+    private val reader: KnowledgeReader,
+) {
+
+    @Transactional
+    fun create(request: CreateClaimRequest, actorId: String): ClaimView {
+        val predicate = ontology.requirePredicate(request.predicate)
+        if (request.documentIds.isEmpty()) throw ValidationFailedException(mapOf("documentIds" to "근거 문서를 하나 이상 고르세요."))
+        val ids = (listOf(request.subjectId, request.objectId) + request.documentIds).distinct()
+        @Suppress("UNCHECKED_CAST")
+        val found = client.query("MATCH (n:Knowledge) WHERE n.id IN \$ids RETURN properties(n) AS n").bind(ids).to("ids")
+            .fetch().all().map { it["n"] as Map<String, Any?> }.associateBy { it["id"] as String }
+        ids.firstOrNull { it !in found }?.let { throw NotFoundException(it) }
+
+        val subject = found.getValue(request.subjectId)
+        val obj = found.getValue(request.objectId)
+        requireType(subject, predicate.subjectTypes, "claim-subject-type", "주어")
+        requireType(obj, predicate.objectTypes, "claim-object-type", "목적어")
+        request.documentIds.forEach { requireType(found.getValue(it), listOf("Document"), "claim-evidence-type", "근거") }
+        if (found.values.any { it["archived"] == true }) throw ArchivedException()
+
+        val properties = validator.validateCreate(
+            CLAIM,
+            mapOf(
+                "predicate" to request.predicate,
+                "description" to request.description,
+                "evidenceText" to request.evidenceText,
+                "validFrom" to request.validFrom,
+                "validTo" to request.validTo,
+                "authoringMethod" to (request.authoringMethod ?: "MANUAL"),
+                "extractionConfidence" to request.extractionConfidence,
+            ),
+        )
+        requireValidPeriod(properties)
+        val id = UUID.randomUUID().toString()
+        val now = Instant.now().toString()
+        val audit = mapOf("revision" to 1L, "archived" to false, "createdAt" to now, "createdBy" to actorId, "updatedAt" to now, "updatedBy" to actorId)
+        val props = properties + audit + mapOf(
+            "id" to id, "type" to CLAIM, "reviewStatus" to ReviewStatus.DRAFT.name,
+            "searchText" to request.predicate.lowercase(),
+        )
+        fun link() = audit + ("id" to UUID.randomUUID().toString())
+        client.query(
+            """
+            CREATE (c:Knowledge:Claim) SET c = ${'$'}props
+            WITH c
+            MATCH (s:Knowledge {id: ${'$'}subjectId}), (o:Knowledge {id: ${'$'}objectId})
+            CREATE (c)-[subj:SUBJECT]->(s) SET subj = ${'$'}subjectLink
+            CREATE (c)-[obj:OBJECT]->(o) SET obj = ${'$'}objectLink
+            WITH c
+            UNWIND ${'$'}documents AS d
+            MATCH (doc:Knowledge {id: d.documentId})
+            CREATE (c)-[e:SUPPORTED_BY]->(doc) SET e = d.link
+            """,
+        ).bindAll(
+            mapOf(
+                "props" to props, "subjectId" to request.subjectId, "objectId" to request.objectId,
+                "subjectLink" to link(), "objectLink" to link(),
+                "documents" to request.documentIds.distinct().map { mapOf("documentId" to it, "link" to link()) },
+            ),
+        ).run()
+        recorder.record(
+            ChangeEventDraft(
+                actorId, ChangeAction.CREATE, id, TargetKind.NODE, CLAIM, request.predicate, 1L,
+                properties.mapValues { (_, v) -> FieldChange(null, v) } + mapOf(
+                    "subjectId" to FieldChange(null, request.subjectId),
+                    "objectId" to FieldChange(null, request.objectId),
+                    "documentIds" to FieldChange(null, request.documentIds.distinct()),
+                ),
+            ),
+        )
+        return reader.claim(id)
+    }
+
+    /** 본문은 바꿀 필드만 담는다. 키가 있고 값이 null 이면 그 값을 지운다(유효 기간은 미상으로 돌아간다). */
+    @Transactional
+    fun patch(id: String, body: Map<String, Any?>, actorId: String): ClaimView {
+        val expected = (body["expectedRevision"] as? Number)?.toLong()
+            ?: throw ValidationFailedException(mapOf("expectedRevision" to "필수 값입니다."))
+        val requested = body - "expectedRevision"
+        val immutable = requested.keys.filter { it in IMMUTABLE }
+        if (immutable.isNotEmpty()) {
+            throw OntologyViolationException("claim-immutable-field", "Claim 의 ${immutable.joinToString()} 은 바꿀 수 없습니다. 보관하고 새로 만드세요.")
+        }
+        val before = lockClaim(id)
+        guard.requireRevision(before, expected)
+        guard.requireActive(before)
+        val changes = validator.validatePatch(CLAIM, requested)
+        requireValidPeriod((before + changes).filterValues { it != null })
+        val contentChanged = diff(before, changes)
+        val reset = if (contentChanged.isEmpty()) emptyMap()
+        else mapOf("reviewStatus" to ReviewStatus.DRAFT.name, "reviewedBy" to null, "reviewedAt" to null, "reviewNote" to null)
+        val after = guard.updateNode(id, changes + reset, actorId)
+        recorder.record(
+            ChangeEventDraft(
+                actorId, ChangeAction.UPDATE, id, TargetKind.NODE, CLAIM, before["predicate"] as String,
+                (after["revision"] as Number).toLong(), contentChanged + diff(before, reset),
+            ),
+        )
+        return reader.claim(id)
+    }
+
+    @Transactional
+    fun review(id: String, request: ReviewRequest, actorId: String): ClaimView {
+        val status = ReviewStatus.entries.firstOrNull { it.name == request.status }
+            ?: throw ValidationFailedException(mapOf("status" to "REVIEWED, REJECTED, DRAFT 가운데 하나여야 합니다."))
+        val before = lockClaim(id)
+        guard.requireRevision(before, request.expectedRevision)
+        guard.requireActive(before)
+        if (before["createdBy"] == actorId) throw SelfReviewForbiddenException()
+        val note = request.note?.trim()?.takeIf { it.isNotEmpty() }?.take(2000)
+        val set = if (status == ReviewStatus.DRAFT) {
+            mapOf("reviewStatus" to status.name, "reviewedBy" to null, "reviewedAt" to null, "reviewNote" to note)
+        } else {
+            mapOf("reviewStatus" to status.name, "reviewedBy" to actorId, "reviewedAt" to Instant.now().toString(), "reviewNote" to note)
+        }
+        val after = guard.updateNode(id, set, actorId)
+        recorder.record(
+            ChangeEventDraft(
+                actorId, ChangeAction.REVIEW, id, TargetKind.NODE, CLAIM, before["predicate"] as String,
+                (after["revision"] as Number).toLong(),
+                mapOf("reviewStatus" to FieldChange(before["reviewStatus"], status.name)), note,
+            ),
+        )
+        return reader.claim(id)
+    }
+
+    private fun lockClaim(id: String): Map<String, Any?> {
+        val props = guard.lockNode(id)
+        if (props["type"] != CLAIM) throw NotFoundException(id)
+        return props
+    }
+
+    private fun requireType(node: Map<String, Any?>, allowed: List<String>, rule: String, role: String) {
+        if (node["type"] !in allowed) {
+            throw OntologyViolationException(rule, "$role 는 ${allowed.joinToString()} 타입이어야 합니다. 받은 타입: ${node["type"]}")
+        }
+    }
+
+    private fun requireValidPeriod(props: Map<String, Any?>) {
+        val from = props["validFrom"] as String?
+        val to = props["validTo"] as String?
+        if (from != null && to != null && from > to) {
+            throw ValidationFailedException(mapOf("validTo" to "validFrom 보다 앞설 수 없습니다."))
+        }
+    }
+
+    companion object {
+        const val CLAIM = "Claim"
+        val IMMUTABLE = setOf("predicate", "authoringMethod", "subjectId", "objectId", "documentIds")
+    }
+}

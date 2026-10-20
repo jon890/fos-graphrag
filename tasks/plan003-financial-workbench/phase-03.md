@@ -25,7 +25,7 @@
 
 ### 1. 조회 서비스
 
-`knowledge/NodeQueryService.kt`(검색, 상세), `graph/GraphService.kt`, `graph/GraphController.kt`, `ClaimController.kt` 에 목록 추가.
+`knowledge/NodeQueryService.kt` 에 검색 추가, `graph/GraphService.kt`, `graph/GraphController.kt`, `ClaimController.kt` 에 목록 추가.
 
 ### 2. 테스트 (실제 Neo4j)
 
@@ -42,7 +42,6 @@ cd financial-workbench/api && ./gradlew build
 
 | 파일 | 변경 |
 | --- | --- |
-| `financial-workbench/api/src/main/kotlin/dev/fos/workbench/knowledge/NodeQueryService.kt` | 신규 |
 | `financial-workbench/api/src/main/kotlin/dev/fos/workbench/graph/GraphService.kt` | 신규 |
 | `financial-workbench/api/src/main/kotlin/dev/fos/workbench/graph/GraphController.kt` | 신규 |
 | `financial-workbench/api/src/main/kotlin/dev/fos/workbench/**` | 수정 |
