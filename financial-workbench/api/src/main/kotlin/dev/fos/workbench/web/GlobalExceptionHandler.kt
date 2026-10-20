@@ -55,6 +55,10 @@ class GlobalExceptionHandler {
     @ExceptionHandler(Exception::class)
     fun unexpected(e: Exception): ResponseEntity<ApiError> {
         if (isTimeout(e)) return api(QueryTimeoutException())
+        if (isTransient(e)) {
+            log.info("일시적 충돌: {}", e.javaClass.simpleName)
+            return api(TransientConflictException())
+        }
         if (isUnavailable(e)) {
             log.warn("Neo4j 에 연결할 수 없다: {}", e.javaClass.simpleName)
             return api(DatabaseUnavailableException())
@@ -72,6 +76,14 @@ class GlobalExceptionHandler {
             it is org.neo4j.driver.exceptions.ServiceUnavailableException ||
                 it is org.neo4j.driver.exceptions.SessionExpiredException ||
                 it is org.springframework.dao.DataAccessResourceFailureException
+        }
+
+    /** 교착 감지와 잠금 대기 시간 초과는 다시 시도하면 풀리는 충돌이다. 시간 제한 초과는 isTimeout 이 먼저 잡는다. */
+    private fun isTransient(e: Throwable): Boolean =
+        generateSequence(e) { it.cause }.any {
+            it is org.neo4j.driver.exceptions.TransientException ||
+                it is org.springframework.dao.TransientDataAccessException ||
+                it is org.springframework.dao.PessimisticLockingFailureException
         }
 
     private fun isTimeout(e: Throwable): Boolean =

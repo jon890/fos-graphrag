@@ -60,7 +60,12 @@ data class NodeDetail(
     val claim: ClaimView?,
     val relationships: List<RelationshipView>,
     val claims: List<ClaimView>,
+    val relationshipsTruncated: Boolean,
+    val claimsTruncated: Boolean,
+    val limits: DetailLimits,
 )
+
+data class DetailLimits(val maxRelationships: Int, val maxClaims: Int)
 
 data class CreateNodeRequest(val type: String, val properties: Map<String, Any?> = emptyMap())
 

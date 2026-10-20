@@ -25,6 +25,9 @@ class TestcontainersConfig {
 
         val NEO4J: Neo4jContainer = Neo4jContainer(DockerImageName.parse(NEO4J_IMAGE))
             .withAdminPassword("integration-test-password")
+            // 운영 Compose 와 같은 서버 상한
+            .withNeo4jConfig("db.transaction.timeout", "10s")
+            .withNeo4jConfig("db.lock.acquisition.timeout", "5s")
 
         /** 로그인 폼에 sub 과 claims JSON 을 넣으면 그 값으로 ID 토큰을 발급한다. */
         val MOCK_OIDC: GenericContainer<*> = GenericContainer(DockerImageName.parse(MOCK_OIDC_IMAGE))

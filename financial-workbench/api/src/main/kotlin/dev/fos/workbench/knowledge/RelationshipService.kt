@@ -1,5 +1,7 @@
 package dev.fos.workbench.knowledge
 
+import dev.fos.workbench.config.Limits
+import dev.fos.workbench.config.Timestamps
 import dev.fos.workbench.auth.UserRepository
 import dev.fos.workbench.config.params
 import dev.fos.workbench.history.ChangeAction
@@ -16,7 +18,6 @@ import dev.fos.workbench.web.OntologyViolationException
 import org.springframework.data.neo4j.core.Neo4jClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.Instant
 import java.util.UUID
 
 @Service
@@ -29,7 +30,7 @@ class RelationshipService(
     private val users: UserRepository,
 ) {
 
-    @Transactional
+    @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun create(request: CreateRelationshipRequest, actorId: String): RelationshipView {
         val def = ontology.requireRelationshipType(request.type)
         // 중복 관계와 보관 경합을 막으려고 양 끝 노드를 ID 순서로 잠근다
@@ -46,7 +47,7 @@ class RelationshipService(
         requireNoActiveDuplicate(request.type, request.fromId, request.toId, exceptId = null)
 
         val id = UUID.randomUUID().toString()
-        val now = Instant.now().toString()
+        val now = Timestamps.now()
         val props = mapOf(
             "id" to id, "revision" to 1L, "archived" to false,
             "createdAt" to now, "createdBy" to actorId, "updatedAt" to now, "updatedBy" to actorId,
@@ -65,10 +66,10 @@ class RelationshipService(
         return view(id)
     }
 
-    @Transactional
+    @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun archive(id: String, request: RevisionRequest, actorId: String): RelationshipView = transition(id, request, actorId, archive = true)
 
-    @Transactional
+    @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun restore(id: String, request: RevisionRequest, actorId: String): RelationshipView = transition(id, request, actorId, archive = false)
 
     private fun transition(id: String, request: RevisionRequest, actorId: String, archive: Boolean): RelationshipView {
@@ -87,8 +88,8 @@ class RelationshipService(
             requireNoActiveDuplicate(locked.type, locked.fromId, locked.toId, exceptId = id)
             unlockEnds(locked.fromId, locked.toId)
         }
-        val set = if (archive) mapOf("archived" to true, "archivedAt" to Instant.now().toString()) else mapOf("archived" to false, "archivedAt" to null)
-        val after = guard.updateRelationship(id, set, actorId)
+        val set = if (archive) mapOf("archived" to true, "archivedAt" to Timestamps.now()) else mapOf("archived" to false, "archivedAt" to null)
+        val after = guard.updateRelationship(locked.type, id, set, actorId)
         recorder.record(
             ChangeEventDraft(
                 actorId, if (archive) ChangeAction.ARCHIVE else ChangeAction.RESTORE, id, TargetKind.RELATIONSHIP, locked.type,
@@ -100,12 +101,14 @@ class RelationshipService(
         return view(id)
     }
 
-    @Suppress("UNCHECKED_CAST")
-    fun view(id: String): RelationshipView = views(
-        client.query(
-            "MATCH (a:Knowledge)-[r {id: \$id}]->(b:Knowledge) RETURN type(r) AS type, properties(r) AS r, properties(a) AS a, properties(b) AS b",
-        ).bind(id).to("id").fetch().all().toList(),
-    ).firstOrNull() ?: throw NotFoundException(id)
+    /** 관계 타입마다 id 인덱스가 있어 타입을 넣어 찾는다. */
+    fun view(id: String): RelationshipView = ontology.relationshipTypes.keys.sorted().firstNotNullOfOrNull { type ->
+        views(
+            client.query(
+                "MATCH (a:Knowledge)-[r:`$type` {id: \$id}]->(b:Knowledge) RETURN type(r) AS type, properties(r) AS r, properties(a) AS a, properties(b) AS b",
+            ).bind(id).to("id").fetch().all().toList(),
+        ).firstOrNull()
+    } ?: throw NotFoundException(id)
 
     /** `type`, `r`, `a`, `b` 열을 가진 행을 RelationshipView 로 바꾼다. */
     @Suppress("UNCHECKED_CAST")

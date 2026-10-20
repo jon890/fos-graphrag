@@ -41,7 +41,20 @@ class SelfReviewForbiddenException :
     ApiException(HttpStatus.FORBIDDEN, "SELF_REVIEW_FORBIDDEN", "자기가 작성한 Claim 은 검토할 수 없습니다.")
 
 class QueryTimeoutException :
-    ApiException(HttpStatus.SERVICE_UNAVAILABLE, "QUERY_TIMEOUT", "그래프 조회가 시간 제한을 넘었습니다. 범위를 줄여 다시 시도하세요.")
+    ApiException(HttpStatus.SERVICE_UNAVAILABLE, "QUERY_TIMEOUT", "요청이 시간 제한을 넘었습니다. 그래프 조회면 범위를 줄여 다시 시도하세요.")
 
 class DatabaseUnavailableException :
     ApiException(HttpStatus.SERVICE_UNAVAILABLE, "DATABASE_UNAVAILABLE", "데이터베이스에 연결할 수 없습니다. 백업이나 재시작 중일 수 있으니 잠시 뒤 다시 시도하세요.")
+
+class TransientConflictException :
+    ApiException(HttpStatus.CONFLICT, "TRANSIENT_CONFLICT", "동시에 처리 중인 다른 요청과 겹쳤습니다. 최신 내용을 확인한 뒤 다시 시도하세요.")
+
+class LastEvidenceException(claimIds: List<String>) :
+    ApiException(
+        HttpStatus.CONFLICT, "LAST_EVIDENCE",
+        "이 문서가 유일한 활성 근거인 Claim 이 있어 보관할 수 없습니다. 그 Claim 에 다른 근거를 더하거나 Claim 을 먼저 보관하세요.",
+        mapOf("claimIds" to claimIds),
+    )
+
+class NoActiveEvidenceException :
+    ApiException(HttpStatus.CONFLICT, "NO_ACTIVE_EVIDENCE", "활성 근거 문서가 없는 Claim 입니다. 근거 문서를 먼저 복원하세요.")

@@ -25,12 +25,15 @@ Neo4j 는 온톨로지 규칙을 집행하지 않는다. 아래 제약 조건은
 | `url` | `http`, `https` 절대 URL | String |
 | `enum` | `values` 가운데 하나 | String |
 | `date` | `YYYY-MM-DD` | String (ISO 날짜) |
-| `datetime` | ISO-8601 시각 | String (UTC ISO 시각) |
+| `datetime` | ISO-8601 시각 | String (UTC, 초까지 고정 자릿수 `YYYY-MM-DDTHH:MM:SSZ`) |
 | `number` | 숫자, `min`, `max` 검사 | Float |
 | `integer` | 정수 | Integer |
 | `boolean` | `true`, `false` | Boolean |
 
 날짜와 시각을 문자열로 저장하는 것은 JSON 계약과 같은 표현을 쓰고 정렬을 사전순으로 하기 위해서다.
+그래서 자릿수를 고정한다. 서버가 기록하는 시각은 마이크로초 6자리(`2026-10-20T03:15:00.123456Z`)다.
+`Instant.toString()` 처럼 소수 자릿수가 값마다 다르면 `...00.5Z` 가 `...00Z` 보다 앞에 정렬된다.
+첫 버전으로 만든 개발 데이터의 시각은 그대로 읽힌다. 다만 그 값끼리의 정렬은 어긋날 수 있다.
 온톨로지에 없는 속성 이름은 `400 ONTOLOGY_VIOLATION` 이다. 빈 문자열은 값이 없는 것으로 본다.
 
 ## 노드
@@ -95,6 +98,7 @@ Claim 노드 하나와 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 관계로 저장한�
 `(:User {id, email, displayName, role, enabled, googleSub, revision, createdAt, createdBy, updatedAt, updatedBy, lastLoginAt})`
 
 - `email` 은 소문자로 저장한다. 허용 목록의 키다.
+- 사용자 강등이나 비활성화는 대상과 활성 ADMIN 을 ID 순서로 한 번에 잠근 뒤 마지막 관리자인지 판정한다.
 - `googleSub` 은 첫 Google 로그인 때 묶는다. 그 뒤에는 이 값으로 사용자를 찾는다. 응답에는 담지 않는다.
 - `role` 은 `VIEWER`, `EDITOR`, `ADMIN` 가운데 하나다.
 - 비밀번호는 저장하지 않는다. 로그인은 Google OpenID Connect 로만 한다.
@@ -113,7 +117,7 @@ Claim 노드 하나와 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 관계로 저장한�
 
 ## 제약 조건과 인덱스
 
-API 가 시작할 때 `IF NOT EXISTS` 로 만든다.
+API 가 시작할 때, 웹 서버가 요청을 받기 전에 `IF NOT EXISTS` 로 만든다. 여러 번 돌아도 결과가 같다. 실패하면 API 가 시작하지 않는다.
 
 | 이름 | 정의 | 용도 |
 | --- | --- | --- |
@@ -125,7 +129,8 @@ API 가 시작할 때 `IF NOT EXISTS` 로 만든다.
 | `change_event_id_unique` | `(:ChangeEvent).id` 유일 | 이력 ID |
 | `change_event_target` | `(:ChangeEvent).targetId` 인덱스 | 대상별 이력 조회 |
 | `change_event_at` | `(:ChangeEvent).at` 인덱스 | 최근 이력 조회 |
-| `knowledge_search_text` | `(:Knowledge).searchText` 인덱스 | 검색 |
+| `knowledge_search_text` | `(:Knowledge).searchText` TEXT 인덱스 | 검색어 `CONTAINS`. 첫 버전의 RANGE 인덱스가 있으면 시작할 때 지우고 TEXT 로 다시 만든다 |
+| `rel_<타입>_id` | 관계 타입마다 `()-[r:<타입>]-()` 의 `r.id` 인덱스 | 관계 보관, 복원, 조회. 타입은 온톨로지의 관계와 Claim 관계 전부다 |
 
 `security_listing_unique` 는 보관된 Security 에도 걸린다. 보관한 종목을 다시 쓰려면 새로 만들지 않고 복원한다.
 
@@ -135,6 +140,8 @@ API 가 시작할 때 `IF NOT EXISTS` 로 만든다.
 
 - 보관된 노드와 관계는 기본 검색, 주변 그래프, 검토 대기 목록에서 빠진다.
 - 노드를 보관해도 붙은 관계와 Claim 은 바뀌지 않는다. 복원하면 그대로 다시 보인다.
+- 다만 Claim 의 마지막 활성 근거 Document 는 보관할 수 없다. 활성 근거가 없는 Claim 은 복원하거나 `REVIEWED` 로 검토할 수 없다.
+  Document 를 보관할 때는 그 문서를 근거로 쓰는 활성 Claim 을 ID 순서로 잠근 뒤 판정해, 두 근거를 동시에 보관해도 하나는 거절된다.
 - 보관된 노드는 수정할 수 없다(`409 ARCHIVED`). 복원한 뒤 수정한다.
 
 ## 동시 수정 처리
@@ -148,3 +155,7 @@ API 가 시작할 때 `IF NOT EXISTS` 로 만든다.
 
 조건 검사와 갱신을 한 Cypher 의 `WHERE` 로만 처리하면, 두 트랜잭션이 같은 값을 읽고 잠금 대기 뒤 차례로 덮어쓸 수 있다.
 잠금을 먼저 쥐면 두 번째 트랜잭션은 첫 번째가 커밋한 뒤의 revision 을 읽고 409 를 받는다.
+
+여러 노드를 잠그는 쓰기(관계 생성, Claim 생성, 사용자 강등)는 ID 순서로 잠가 교착을 줄인다.
+그래도 교착이 감지되거나 잠금 대기(5초)를 넘으면 `409 TRANSIENT_CONFLICT` 로 다시 시도하게 한다.
+바뀐 값이 없는 수정은 잠금만 풀고 revision 과 이력을 그대로 둔다.

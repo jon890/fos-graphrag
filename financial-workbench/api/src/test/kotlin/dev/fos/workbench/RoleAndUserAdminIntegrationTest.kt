@@ -76,6 +76,8 @@ class RoleAndUserAdminIntegrationTest : IntegrationTest() {
 
     @Test
     fun `마지막 활성 ADMIN 은 강등하거나 비활성화할 수 없다`() {
+        // 테스트끼리 DB 를 함께 쓰므로 활성 ADMIN 이 admin@example.com 하나뿐인 상태를 먼저 만든다
+        neo4j.query("MATCH (u:User {role: 'ADMIN'}) WHERE u.email <> \$email SET u.enabled = false").bind(ADMIN).to("email").run()
         val admin = loggedIn(ADMIN)
         val me = admin.get("/api/users").body.toList().single { it["email"].asString() == ADMIN }
         val revision = me["revision"].asLong()

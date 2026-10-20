@@ -1,5 +1,6 @@
 package dev.fos.workbench.ontology
 
+import dev.fos.workbench.config.Timestamps
 import dev.fos.workbench.web.OntologyViolationException
 import dev.fos.workbench.web.ValidationFailedException
 import org.springframework.stereotype.Component
@@ -66,7 +67,7 @@ class OntologyValidator(private val ontology: Ontology) {
             PropertyType.URL -> (raw as? String)?.trim()?.takeIf(::isHttpUrl)
             PropertyType.ENUM -> (raw as? String)?.trim()?.takeIf { it in p.values.orEmpty() }
             PropertyType.DATE -> (raw as? String)?.let { parseOrNull { LocalDate.parse(it.trim()).toString() } }
-            PropertyType.DATETIME -> (raw as? String)?.let { parseOrNull { parseInstant(it.trim()).toString() } }
+            PropertyType.DATETIME -> (raw as? String)?.let { parseOrNull { Timestamps.user(parseInstant(it.trim())) } }
             PropertyType.NUMBER -> (raw as? Number)?.toDouble()?.takeIf { it.isFinite() }
             PropertyType.INTEGER -> (raw as? Number)?.takeIf { it.toDouble() % 1.0 == 0.0 }?.toLong()
             PropertyType.BOOLEAN -> raw as? Boolean

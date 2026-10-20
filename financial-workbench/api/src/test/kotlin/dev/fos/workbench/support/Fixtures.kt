@@ -41,3 +41,16 @@ class Fixtures(private val client: ApiClient) {
 
 val JsonNode.id: String get() = this["id"].asString()
 val JsonNode.revision: Long get() = this["revision"].asLong()
+
+/** 같은 요청 여러 개를 동시에 출발시키고 HTTP 상태를 돌려준다. */
+fun race(vararg calls: () -> ApiClient.Response): List<ApiClient.Response> {
+    val start = java.util.concurrent.CountDownLatch(1)
+    val pool = java.util.concurrent.Executors.newFixedThreadPool(calls.size)
+    try {
+        val futures = calls.map { call -> pool.submit<ApiClient.Response> { start.await(); call() } }
+        start.countDown()
+        return futures.map { it.get(60, java.util.concurrent.TimeUnit.SECONDS) }
+    } finally {
+        pool.shutdown()
+    }
+}

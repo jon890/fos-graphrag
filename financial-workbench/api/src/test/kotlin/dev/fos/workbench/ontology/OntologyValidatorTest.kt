@@ -73,6 +73,27 @@ class OntologyValidatorTest {
         assertThatThrownBy { ontology.requireRelationshipType("OWNS_ACCOUNT") }.isInstanceOf(OntologyViolationException::class.java)
     }
 
+    @Test
+    fun `시스템 속성 이름을 정의한 온톨로지는 읽지 않는다`() {
+        val yaml = """
+            schemaVersion: "9"
+            nodeTypes:
+              Company:
+                description: x
+                labelProperty: name
+                properties:
+                  name: { type: string, required: true }
+                  revision: { type: integer }
+            relationshipTypes: {}
+            claimRelationships: {}
+            claimPredicates: {}
+        """.trimIndent()
+        assertThatThrownBy { OntologyLoader.load(yaml.byteInputStream()) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("revision")
+        val underscore = yaml.replace("revision: { type: integer }", "_lock: { type: boolean }")
+        assertThatThrownBy { OntologyLoader.load(underscore.byteInputStream()) }.hasMessageContaining("_lock")
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun fieldErrors(e: ValidationFailedException) = e.details["fieldErrors"] as Map<String, String>
 }

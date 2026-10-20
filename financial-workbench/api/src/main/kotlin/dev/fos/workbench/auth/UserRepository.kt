@@ -1,9 +1,9 @@
 package dev.fos.workbench.auth
 
+import dev.fos.workbench.config.Timestamps
 import dev.fos.workbench.config.params
 import org.springframework.data.neo4j.core.Neo4jClient
 import org.springframework.stereotype.Repository
-import java.time.Instant
 import java.util.UUID
 
 data class UserRef(val id: String, val email: String, val displayName: String)
@@ -68,7 +68,7 @@ class UserRepository(private val client: Neo4jClient) {
     }
 
     fun create(email: String, displayName: String, role: Role, actorId: String): UserRecord {
-        val now = Instant.now().toString()
+        val now = Timestamps.now()
         val props = mapOf(
             "id" to UUID.randomUUID().toString(), "email" to email.trim().lowercase(), "displayName" to displayName.trim(),
             "role" to role.name, "enabled" to true, "revision" to 1L,
@@ -86,7 +86,7 @@ class UserRepository(private val client: Neo4jClient) {
         )
 
     fun touchLogin(id: String) {
-        client.query("MATCH (u:User {id: \$id}) SET u.lastLoginAt = \$now").bindAll(mapOf("id" to id, "now" to Instant.now().toString())).run()
+        client.query("MATCH (u:User {id: \$id}) SET u.lastLoginAt = \$now").bindAll(mapOf("id" to id, "now" to Timestamps.now())).run()
     }
 
     @Suppress("UNCHECKED_CAST")

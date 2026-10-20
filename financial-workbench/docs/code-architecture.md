@@ -92,15 +92,29 @@ flowchart LR
 | `workbench.graph.max-nodes` | | 150 | |
 | `workbench.graph.max-relationships` | | 300 | |
 | `workbench.graph.timeout` | | `5s` | 그래프 조회 트랜잭션 시간 제한 |
-| `server.servlet.session.cookie.secure`, `workbench.security.secure-cookies` | `WORKBENCH_SECURE_COOKIE` | `false` (운영 Compose 는 `true`) | 세션 쿠키와 CSRF 쿠키의 Secure |
+| `server.servlet.session.cookie.secure`, `workbench.security.secure-cookies` | `WORKBENCH_SECURE_COOKIE` | `prod` 는 `true`, 그 밖은 `false` | 세션 쿠키와 CSRF 쿠키의 Secure |
 | `server.forward-headers-strategy` | `WORKBENCH_FORWARD_HEADERS_STRATEGY` | `none` (운영 Compose 는 `native`) | 앞단의 `X-Forwarded-*` 로 redirect URI 와 scheme 을 만든다 |
 | `server.servlet.session.timeout` | `WORKBENCH_SESSION_TIMEOUT` | `8h` | 유휴 세션 만료 |
 | `workbench.security.hsts` | `WORKBENCH_HSTS` | `false` | 앞단이 HSTS 를 붙이지 않을 때만 켠다 |
+| `server.tomcat.remoteip.internal-proxies` | `WORKBENCH_TRUSTED_PROXIES` | loopback 과 `172.16.0.0/12` | X-Forwarded-* 를 믿을 프록시 주소(정규식) |
+| `workbench.detail.max-relationships`, `max-claims` | | 100, 50 | 노드 상세 목록 상한 |
 | `workbench.bootstrap.admin-email` | `WORKBENCH_BOOTSTRAP_ADMIN_EMAIL` | 없음 | 사용자가 없을 때 만들 첫 ADMIN |
 | `spring.security.oauth2.client.registration.google.client-id`, `client-secret` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 없음 | 운영 프로필에서 비어 있으면 시작에 실패한다 |
 
-운영 이미지는 `prod` 프로필로 실행한다. 이 프로필은 Neo4j 비밀번호와 Google client 값의 기본값이 없고, 비어 있으면 시작을 멈춘다.
-`mockoidc` 프로필은 가짜 OIDC 공급자(`ghcr.io/navikt/mock-oauth2-server`)를 쓴다. 개발 실행과 자동 테스트, 브라우저 테스트용이고 운영 Compose 는 이 프로필을 켜지 않는다.
+프로필은 아래와 같다.
+
+| 프로필 | 들어 있는 것 | 쓰는 곳 |
+| --- | --- | --- |
+| `prod` | `container`, 실제 Google 등록, Secure 쿠키 기본값 true | 운영 이미지 기본값 |
+| `e2e` | `container`, `mockoidc` | 브라우저 테스트(`compose.e2e.yml`) |
+| `container` | 이미지 안의 정적 파일 위치 | prod, e2e 공통 |
+| `mockoidc` | 가짜 OIDC 공급자(`ghcr.io/navikt/mock-oauth2-server`) | 개발 실행, 자동 테스트, e2e |
+
+`prod` 는 시작할 때 `ProdStartupGuard` 가 아래를 확인하고 하나라도 어기면 멈춘다.
+
+- `mockoidc` 가 함께 켜지지 않았다. 가짜 공급자는 아무 이메일이나 확인된 것으로 발급하기 때문이다.
+- Neo4j 비밀번호와 Google client id, secret 이 비어 있지 않다.
+- `google` 등록의 발급자가 `https://accounts.google.com` 이고 인가 주소가 Google 이다.
 
 ## 보안 기본값
 
@@ -146,6 +160,12 @@ mock 으로 Neo4j 를 대신한 테스트는 없다. 트랜잭션 일관성 테�
 | [006](adr/006-google-oidc-allowlist-roles.md) | Google OpenID Connect 로 로그인하고 허용 사용자와 역할로 권한을 나눈다. ADR 004 의 비밀번호 로그인을 대체한다 |
 
 ADR 로 남기지 않은 작은 결정은 다음과 같다.
+
+- 브라우저 테스트는 `prod` 를 켜지 않고 `e2e` 프로필(= `container` + `mockoidc`)로 돈다. `prod` 와 `mockoidc` 를 함께 켜면 시작을 막는다.
+  e2e 스택은 운영 Compose 위에 override 만 겹치므로 이미지, 보안 헤더, cap_drop, 메모리 상한, 포트 규칙이 운영과 같다. Secure 쿠키와 forward headers 만 끈다.
+  `prod` 에 가짜 공급자를 허용하는 안은 버렸다. 설정 실수 하나로 아무나 첫 관리자로 로그인할 수 있게 되기 때문이다.
+- 시각은 고정 자릿수 문자열로 저장한다. Neo4j `datetime` 타입으로 바꾸는 안은 JSON 계약과 기존 개발 데이터를 함께 바꿔야 해서 버렸다.
+- 백업은 `neo4j-admin database dump --to-stdout` 으로 받아 호스트 파일(600)에 쓴다. 호스트 디렉터리를 컨테이너에 마운트하지 않아 권한을 넓힐 필요가 없다.
 
 - 작성자와 마지막으로 내용을 고친 사람은 그 Claim 을 검토할 수 없다. 다른 사람이 확인하는 것이 검토의 목적이다.
 - Claim 내용을 고치면 검토 상태가 `DRAFT` 로 돌아간다. 검토한 내용과 다른 내용이 검토 완료로 남지 않게 한다.

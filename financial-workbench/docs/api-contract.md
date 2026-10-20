@@ -2,7 +2,14 @@
 
 모든 경로는 `/api` 아래에 있다. 요청과 응답 본문은 `application/json` 이고 문자 집합은 UTF-8 이다.
 식별자는 서버가 만든 UUID 문자열이다. Neo4j 내부 ID 는 응답에 나오지 않는다.
-시각은 UTC ISO-8601 문자열(`2026-10-20T03:15:00Z`)이고, 날짜는 `YYYY-MM-DD` 다.
+시각은 자릿수가 고정된 UTC ISO-8601 문자열이다. 날짜는 `YYYY-MM-DD` 다.
+
+| 시각 | 형식 | 예 |
+| --- | --- | --- |
+| 서버가 기록하는 시각(`createdAt`, `updatedAt`, `archivedAt`, `reviewedAt`, ChangeEvent `at`) | 마이크로초 6자리 | `2026-10-20T03:15:00.123456Z` |
+| 사용자가 넣는 `datetime` 속성(`collectedAt`) | 초까지 | `2026-10-20T03:15:00Z` |
+
+자릿수를 고정해 문자열 정렬이 시간 순서와 같다. 입력은 오프셋이 붙은 ISO 시각도 받고 UTC 로 바꿔 저장한다.
 
 ## 인증과 CSRF
 
@@ -75,6 +82,8 @@
 | 401 | `UNAUTHENTICATED` | 세션이 없다 |
 | 403 | `CSRF_REJECTED` | CSRF 토큰이 없거나 틀렸다 |
 | 403 | `FORBIDDEN` | 역할이 모자라다 |
+| 411 | `LENGTH_REQUIRED` | 본문이 있는 `/api` 요청에 Content-Length 가 없다(chunked 전송) |
+| 413 | `PAYLOAD_TOO_LARGE` | 요청 본문이 64KiB 를 넘는다 |
 | 403 | `SELF_REVIEW_FORBIDDEN` | 자기가 작성한 Claim 을 검토하려 했다 |
 | 404 | `NOT_FOUND` | 그 ID 의 노드나 관계가 없다 |
 | 409 | `REVISION_CONFLICT` | `expectedRevision` 이 현재 revision 과 다르다. `details` 에 두 값이 있다 |
@@ -82,8 +91,11 @@
 | 409 | `NOT_ARCHIVED` | 보관되지 않은 대상을 복원하려 했다 |
 | 409 | `DUPLICATE` | 같은 시장과 종목 코드의 Security, 같은 이메일의 사용자처럼 유일해야 하는 값이 이미 있다 |
 | 409 | `LAST_ADMIN` | 마지막 활성 ADMIN 을 강등하거나 비활성화하려 했다 |
+| 409 | `LAST_EVIDENCE` | 어떤 활성 Claim 의 유일한 활성 근거 Document 를 보관하려 했다. `details.claimIds` 에 그 Claim 이 있다 |
+| 409 | `NO_ACTIVE_EVIDENCE` | 활성 근거 문서가 없는 Claim 을 복원하거나 `REVIEWED` 로 검토하려 했다 |
+| 409 | `TRANSIENT_CONFLICT` | 동시에 처리 중인 다른 요청과 잠금이 겹쳤다(교착 감지, 잠금 대기 시간 초과). 최신 내용을 다시 읽고 다시 시도한다 |
 | 500 | `INTERNAL_ERROR` | 그 밖의 서버 오류. 내부 메시지는 응답에 담지 않는다 |
-| 503 | `QUERY_TIMEOUT` | 그래프 조회가 시간 제한을 넘었다 |
+| 503 | `QUERY_TIMEOUT` | 트랜잭션이 시간 제한을 넘었다. 그래프 조회는 5초, 쓰기는 8초다 |
 | 503 | `DATABASE_UNAVAILABLE` | Neo4j 에 연결할 수 없다. 백업 중이거나 재시작 중이다 |
 
 ## 공통 표현
@@ -155,6 +167,19 @@
 }
 ```
 
+## 상한
+
+| 항목 | 상한 | 넘으면 |
+| --- | --- | --- |
+| 요청 본문 | 64KiB, Content-Length 필수 | `413 PAYLOAD_TOO_LARGE`, `411 LENGTH_REQUIRED` |
+| 검색어 `q` | 100자 | `400 VALIDATION_FAILED` |
+| Claim 의 `documentIds` | 20개 | `400 VALIDATION_FAILED` |
+| 페이지 크기 `size` | 100 | `400 VALIDATION_FAILED` |
+| 노드 상세의 `relationships`, `claims` | 100개, 50개 | 잘라 내고 `relationshipsTruncated`, `claimsTruncated` 를 `true` 로 둔다 |
+| 쓰기 트랜잭션 | 8초 | `503 QUERY_TIMEOUT` |
+| 잠금 대기(Neo4j `db.lock.acquisition.timeout`) | 5초 | `409 TRANSIENT_CONFLICT` |
+| Neo4j 서버 트랜잭션(`db.transaction.timeout`) | 10초 | `503 QUERY_TIMEOUT` |
+
 ## 페이지네이션
 
 목록 응답은 offset 방식이다. `page` 는 0 부터 세고, `size` 기본값은 20, 최댓값은 100 이다.
@@ -171,6 +196,9 @@
 서버는 대상에 쓰기 잠금을 먼저 걸고 revision 을 비교한 뒤 같은 트랜잭션에서 갱신하고 변경 이력을 남긴다.
 값이 다르면 아무것도 바꾸지 않고 `409 REVISION_CONFLICT` 를 낸다. 클라이언트는 최신 상태를 다시 읽어 사용자에게 보여 준다.
 
+바뀐 값이 없는 수정(노드 `PATCH`, Claim `PATCH`, 같은 상태와 메모의 검토, 사용자 `PATCH`)은 `200` 과 현재 표현을 돌려준다.
+revision 은 그대로이고 ChangeEvent 도 만들지 않는다. `expectedRevision` 검사는 그대로 해서, 낡은 revision 이면 바뀐 값이 없어도 `409` 다.
+
 ## 노드
 
 | 메서드 | 경로 | 설명 |
@@ -182,9 +210,12 @@
 | POST | `/api/nodes/{id}/archive` | 보관. 본문 `{"expectedRevision","reason"}`. `reason` 은 선택. 응답 `NodeView` |
 | POST | `/api/nodes/{id}/restore` | 복원. 본문 `{"expectedRevision"}`. 응답 `NodeView` |
 
-- `q` 는 `label` 과 Security 의 `ticker` 에서 대소문자를 무시하고 부분 일치로 찾는다. 비우면 전체를 돌려준다.
+- `q` 는 `label` 과 Security 의 `ticker` 에서 대소문자를 무시하고 부분 일치로 찾는다. 100자까지다. 비우면 전체를 돌려준다.
 - `POST /api/nodes` 의 `type` 은 `Company`, `Security`, `Sector`, `Document` 가운데 하나다. `Claim` 은 `400 ONTOLOGY_VIOLATION` 이고 `/api/claims` 로 만든다.
 - `PATCH` 로 Claim 을 고치면 `400 ONTOLOGY_VIOLATION` 이다. `PATCH /api/claims/{id}` 를 쓴다.
+- `relationships` 는 만든 순서로 100개, `claims` 는 오래된 순서로 50개까지 담는다. 넘으면 잘라 내고 `...Truncated` 를 `true` 로 둔다.
+- Document 를 보관할 때 그 문서가 어떤 활성 Claim 의 유일한 활성 근거면 `409 LAST_EVIDENCE` 다. Claim 을 먼저 보관하거나 다른 근거를 더한 Claim 으로 새로 만든다.
+- 활성 근거 문서가 없는 Claim 은 복원할 수 없다(`409 NO_ACTIVE_EVIDENCE`). 근거 문서를 먼저 복원한다.
 - 보관한 노드는 기본 검색, 주변 그래프, 검토 대기 목록에서 빠진다. 상세 조회와 `includeArchived=true` 검색에는 나온다.
 - 노드를 보관해도 그 노드에 걸린 관계와 Claim 은 그대로 둔다. 그래프에서는 보관된 끝점 때문에 함께 보이지 않는다.
 
@@ -195,7 +226,10 @@
   "node": "NodeView",
   "claim": "ClaimView 또는 null. 노드가 Claim 일 때만 있다",
   "relationships": ["RelationshipView. ISSUES 처럼 일반 관계만. 보관된 관계 포함"],
-  "claims": ["ClaimView. 이 노드가 SUBJECT, OBJECT, SUPPORTED_BY 의 끝인 Claim. 보관된 Claim 제외"]
+  "claims": ["ClaimView. 이 노드가 SUBJECT, OBJECT, SUPPORTED_BY 의 끝인 Claim. 보관된 Claim 제외"],
+  "relationshipsTruncated": false,
+  "claimsTruncated": false,
+  "limits": { "maxRelationships": 100, "maxClaims": 50 }
 }
 ```
 
@@ -241,7 +275,7 @@ Claim 에 딸린 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 는 이 API 로 만들 수 
 ```
 
 - `predicate` 와 주어, 목적어 타입은 온톨로지 `claimPredicates` 로 검증한다.
-- `documentIds` 는 한 개 이상이고 모두 보관되지 않은 Document 여야 한다. 근거 없는 Claim 은 만들 수 없다.
+- `documentIds` 는 1개 이상 20개 이하이고 모두 보관되지 않은 Document 여야 한다. 근거 없는 Claim 은 만들 수 없다.
 - 새 Claim 의 `reviewStatus` 는 `DRAFT` 다. `authoringMethod` 를 비우면 `MANUAL` 이다.
 - `validFrom` 이 `validTo` 보다 늦으면 `400 VALIDATION_FAILED` 다.
 
@@ -250,7 +284,8 @@ Claim 에 딸린 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 는 이 API 로 만들 수 
 내용을 고치면 `reviewStatus` 가 `DRAFT` 로 돌아가고 검토자 정보가 지워진다. 이력에는 이전 검토자가 남는다.
 
 `review` 의 `status` 는 `REVIEWED`, `REJECTED`, `DRAFT` 가운데 하나다.
-Claim 작성자와 마지막으로 내용을 고친 사람은 그 Claim 을 검토할 수 없다(`403 SELF_REVIEW_FORBIDDEN`). 두 사람이 모두 손댄 Claim 은 제3자가 검토한다. 보관된 Claim 은 검토할 수 없다(`409 ARCHIVED`).
+Claim 작성자와 마지막으로 내용을 고친 사람은 그 Claim 을 검토할 수 없다(`403 SELF_REVIEW_FORBIDDEN`).
+활성 근거 문서가 없는 Claim 은 `REVIEWED` 로 검토할 수 없다(`409 NO_ACTIVE_EVIDENCE`). `REJECTED` 와 `DRAFT` 는 할 수 있다. 두 사람이 모두 손댄 Claim 은 제3자가 검토한다. 보관된 Claim 은 검토할 수 없다(`409 ARCHIVED`).
 Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 한다.
 
 ## 주변 그래프
@@ -261,8 +296,14 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 | --- | --- | --- |
 | `id` | 필수 | 중심 노드 |
 | `hops` | 1 | 1 또는 2. 서버 설정 `workbench.graph.max-hops` 보다 크면 `400 VALIDATION_FAILED` |
-| `types` | 전체 | 중심이 아닌 노드를 이 타입으로 제한한다 |
-| `reviewStatus` | 전체 | Claim 노드를 이 검토 상태로 제한한다 |
+| `types` | 전체 | 중심을 뺀 경로 위 모든 노드를 이 타입으로 제한한다 |
+| `reviewStatus` | 전체 | 경로 위 모든 Claim 노드를 이 검토 상태로 제한한다 |
+
+필터는 결과 노드뿐 아니라 중심에서 그 노드까지 가는 경로 위의 모든 노드(중심 제외)에 적용한다.
+필터에서 빠진 노드를 거쳐야만 닿는 노드는 보이지 않는다.
+
+- `hops=2&reviewStatus=REVIEWED` 는 DRAFT Claim 을 거쳐 닿는 기업을 보여 주지 않는다. 검토되지 않은 연결이 생긴 것처럼 보이지 않게 하기 위해서다.
+- `hops=2&types=Company` 는 Claim 을 거쳐야 닿는 기업도 보여 주지 않는다. 기업 사이의 근거 있는 연결을 보려면 `types` 에 `Claim` 을 넣는다.
 
 ```json
 {
@@ -299,6 +340,9 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
   "note": "공시 원문과 대조함"
 }
 ```
+
+사용자 관리 이벤트(`targetKind = USER`)는 ADMIN 에게만 보인다. 다른 역할의 응답에서는 `targetId`, `actor` 필터와 상관없이 빠진다.
+허용 목록의 이메일이 이력으로 새지 않게 하기 위해서다.
 
 `action` 은 `CREATE`, `UPDATE`, `REVIEW`, `ARCHIVE`, `RESTORE` 가운데 하나다. `targetKind` 는 `NODE`, `RELATIONSHIP`, `USER` 가운데 하나다. 사용자 관리 변경도 같은 형식으로 남는다.
 `revision` 은 변경 뒤의 revision 이다. 이력은 지우거나 고치는 API 가 없다.

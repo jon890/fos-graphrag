@@ -1,9 +1,9 @@
 package dev.fos.workbench.history
 
+import dev.fos.workbench.config.Timestamps
 import org.springframework.data.neo4j.core.Neo4jClient
 import org.springframework.stereotype.Component
 import tools.jackson.databind.json.JsonMapper
-import java.time.Instant
 import java.util.UUID
 
 enum class ChangeAction { CREATE, UPDATE, REVIEW, ARCHIVE, RESTORE }
@@ -38,7 +38,7 @@ class Neo4jChangeEventRecorder(private val client: Neo4jClient, private val mapp
         client.query("CREATE (e:ChangeEvent) SET e = ${'$'}props").bind(
             mapOf(
                 "id" to UUID.randomUUID().toString(),
-                "at" to Instant.now().toString(),
+                "at" to Timestamps.now(),
                 "actorId" to event.actorId,
                 "action" to event.action.name,
                 "targetId" to event.targetId,

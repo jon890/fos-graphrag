@@ -1,5 +1,7 @@
 package dev.fos.workbench.knowledge
 
+import dev.fos.workbench.config.Limits
+import dev.fos.workbench.config.Timestamps
 import dev.fos.workbench.history.ChangeAction
 import dev.fos.workbench.history.ChangeEventDraft
 import dev.fos.workbench.history.ChangeEventRecorder
@@ -16,7 +18,6 @@ import dev.fos.workbench.web.ValidationFailedException
 import org.springframework.data.neo4j.core.Neo4jClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.Instant
 import java.util.UUID
 
 enum class ReviewStatus { DRAFT, REVIEWED, REJECTED }
@@ -31,10 +32,13 @@ class ClaimService(
     private val reader: KnowledgeReader,
 ) {
 
-    @Transactional
+    @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun create(request: CreateClaimRequest, actorId: String): ClaimView {
         val predicate = ontology.requirePredicate(request.predicate)
         if (request.documentIds.isEmpty()) throw ValidationFailedException(mapOf("documentIds" to "근거 문서를 하나 이상 고르세요."))
+        if (request.documentIds.distinct().size > Limits.MAX_DOCUMENTS_PER_CLAIM) {
+            throw ValidationFailedException(mapOf("documentIds" to "근거 문서는 ${Limits.MAX_DOCUMENTS_PER_CLAIM}개까지 고를 수 있습니다."))
+        }
         val ids = (listOf(request.subjectId, request.objectId) + request.documentIds).distinct()
         // 주어, 목적어, 근거 문서가 그 사이에 보관되지 않게 ID 순서로 잠근다. 없는 ID 는 404 다
         val found = ids.sorted().associateWith { guard.lockNode(it) }
@@ -60,7 +64,7 @@ class ClaimService(
         )
         requireValidPeriod(properties)
         val id = UUID.randomUUID().toString()
-        val now = Instant.now().toString()
+        val now = Timestamps.now()
         val audit = mapOf("revision" to 1L, "archived" to false, "createdAt" to now, "createdBy" to actorId, "updatedAt" to now, "updatedBy" to actorId)
         val props = properties + audit + mapOf(
             "id" to id, "type" to CLAIM, "reviewStatus" to ReviewStatus.DRAFT.name,
@@ -101,7 +105,7 @@ class ClaimService(
     }
 
     /** 본문은 바꿀 필드만 담는다. 키가 있고 값이 null 이면 그 값을 지운다(유효 기간은 미상으로 돌아간다). */
-    @Transactional
+    @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun patch(id: String, body: Map<String, Any?>, actorId: String): ClaimView {
         val expected = (body["expectedRevision"] as? Number)?.toLong()
             ?: throw ValidationFailedException(mapOf("expectedRevision" to "필수 값입니다."))
@@ -116,8 +120,12 @@ class ClaimService(
         val changes = validator.validatePatch(CLAIM, requested)
         requireValidPeriod((before + changes).filterValues { it != null })
         val contentChanged = diff(before, changes)
-        val reset = if (contentChanged.isEmpty()) emptyMap()
-        else mapOf(
+        if (contentChanged.isEmpty()) {
+            // 바뀐 값이 없으면 revision 을 올리지 않고 검토 상태도 그대로 둔다
+            guard.unlockNode(id)
+            return reader.claim(id)
+        }
+        val reset = mapOf(
             "reviewStatus" to ReviewStatus.DRAFT.name, "reviewedBy" to null, "reviewedAt" to null, "reviewNote" to null,
             "contentUpdatedBy" to actorId,
         )
@@ -131,7 +139,7 @@ class ClaimService(
         return reader.claim(id)
     }
 
-    @Transactional
+    @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun review(id: String, request: ReviewRequest, actorId: String): ClaimView {
         val status = ReviewStatus.entries.firstOrNull { it.name == request.status }
             ?: throw ValidationFailedException(mapOf("status" to "REVIEWED, REJECTED, DRAFT 가운데 하나여야 합니다."))
@@ -140,11 +148,16 @@ class ClaimService(
         guard.requireActive(before)
         // 작성자와 마지막으로 내용을 고친 사람은 그 내용을 검토할 수 없다
         if (before["createdBy"] == actorId || before["contentUpdatedBy"] == actorId) throw SelfReviewForbiddenException()
+        if (status == ReviewStatus.REVIEWED) guard.requireActiveEvidence(id)
         val note = request.note?.trim()?.takeIf { it.isNotEmpty() }?.take(2000)
+        if (before["reviewStatus"] == status.name && before["reviewNote"] == note) {
+            guard.unlockNode(id)
+            return reader.claim(id)
+        }
         val set = if (status == ReviewStatus.DRAFT) {
             mapOf("reviewStatus" to status.name, "reviewedBy" to null, "reviewedAt" to null, "reviewNote" to note)
         } else {
-            mapOf("reviewStatus" to status.name, "reviewedBy" to actorId, "reviewedAt" to Instant.now().toString(), "reviewNote" to note)
+            mapOf("reviewStatus" to status.name, "reviewedBy" to actorId, "reviewedAt" to Timestamps.now(), "reviewNote" to note)
         }
         val after = guard.updateNode(id, set, actorId)
         recorder.record(

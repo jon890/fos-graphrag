@@ -1,5 +1,7 @@
 package dev.fos.workbench.knowledge
 
+import dev.fos.workbench.config.Limits
+import dev.fos.workbench.config.Timestamps
 import dev.fos.workbench.config.params
 import dev.fos.workbench.history.ChangeAction
 import dev.fos.workbench.history.ChangeEventDraft
@@ -15,7 +17,6 @@ import dev.fos.workbench.web.OntologyViolationException
 import org.springframework.data.neo4j.core.Neo4jClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.Instant
 import java.util.UUID
 
 @Service
@@ -28,7 +29,7 @@ class NodeService(
     private val reader: KnowledgeReader,
 ) {
 
-    @Transactional
+    @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun create(request: CreateNodeRequest, actorId: String): NodeView {
         val def = ontology.requireNodeType(request.type)
         if (def.managedBy == CLAIMS) {
@@ -36,7 +37,7 @@ class NodeService(
         }
         val properties = validator.validateCreate(request.type, request.properties)
         if (request.type == SECURITY) requireUniqueListing(properties, exceptId = null)
-        val now = Instant.now().toString()
+        val now = Timestamps.now()
         val id = UUID.randomUUID().toString()
         val props = properties + mapOf(
             "id" to id, "type" to request.type, "revision" to 1L, "archived" to false,
@@ -54,7 +55,7 @@ class NodeService(
         return reader.node(id)
     }
 
-    @Transactional
+    @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun patch(id: String, request: PatchNodeRequest, actorId: String): NodeView {
         val before = guard.lockNode(id)
         val type = before["type"] as String
@@ -64,6 +65,11 @@ class NodeService(
         guard.requireRevision(before, request.expectedRevision)
         guard.requireActive(before)
         val changes = validator.validatePatch(type, request.properties)
+        if (diff(before, changes).isEmpty()) {
+            // 바뀐 값이 없으면 revision 을 올리지 않고 이력도 남기지 않는다
+            guard.unlockNode(id)
+            return reader.node(id)
+        }
         val merged = (before + changes).filterValues { it != null }
         if (type == SECURITY) requireUniqueListing(merged, exceptId = id)
         val after = guard.updateNode(id, changes + ("searchText" to searchText(type, merged)), actorId)
@@ -76,22 +82,24 @@ class NodeService(
         return reader.node(id)
     }
 
-    @Transactional
+    @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun archive(id: String, request: RevisionRequest, actorId: String): NodeView {
         val before = guard.lockNode(id)
         guard.requireRevision(before, request.expectedRevision)
         guard.requireActive(before)
-        val set = mapOf("archived" to true, "archivedAt" to Instant.now().toString())
+        if (before["type"] == DOCUMENT) guard.requireNotLastEvidence(id)
+        val set = mapOf("archived" to true, "archivedAt" to Timestamps.now())
         val after = guard.updateNode(id, set, actorId)
         record(ChangeAction.ARCHIVE, before, after, actorId, request.reason)
         return reader.node(id)
     }
 
-    @Transactional
+    @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun restore(id: String, request: RevisionRequest, actorId: String): NodeView {
         val before = guard.lockNode(id)
         guard.requireRevision(before, request.expectedRevision)
         if (before["archived"] != true) throw NotArchivedException()
+        if (before["type"] == ClaimService.CLAIM) guard.requireActiveEvidence(id)
         val after = guard.updateNode(id, mapOf("archived" to false, "archivedAt" to null), actorId)
         record(ChangeAction.RESTORE, before, after, actorId, request.reason)
         return reader.node(id)
@@ -123,5 +131,6 @@ class NodeService(
     companion object {
         const val CLAIMS = "claims"
         const val SECURITY = "Security"
+        const val DOCUMENT = "Document"
     }
 }

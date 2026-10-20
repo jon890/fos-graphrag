@@ -1,5 +1,7 @@
 package dev.fos.workbench.users
 
+import dev.fos.workbench.config.Limits
+import dev.fos.workbench.config.Timestamps
 import dev.fos.workbench.auth.Role
 import dev.fos.workbench.auth.UserRecord
 import dev.fos.workbench.auth.UserRepository
@@ -18,7 +20,6 @@ import org.springframework.data.neo4j.core.Neo4jClient
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.Instant
 
 data class UserView(
     val id: String,
@@ -55,7 +56,7 @@ class UserAdminService(
     @Transactional(readOnly = true)
     fun list(): List<UserView> = users.findAll().map(UserView::of)
 
-    @Transactional
+    @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun create(request: CreateUserRequest, actorId: String): UserView {
         val email = request.email.trim().lowercase()
         val role = Role.parse(request.role)
@@ -77,7 +78,7 @@ class UserAdminService(
     }
 
     /** 본문은 expectedRevision 과 바꿀 필드(role, displayName, enabled)만 담는다. */
-    @Transactional
+    @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     @Suppress("UNCHECKED_CAST")
     fun patch(id: String, body: Map<String, Any?>, actorId: String): UserView {
         val expected = (body["expectedRevision"] as? Number)?.toLong()
@@ -85,8 +86,17 @@ class UserAdminService(
         val unknown = body.keys - setOf("expectedRevision", "role", "displayName", "enabled")
         if (unknown.isNotEmpty()) throw ValidationFailedException(unknown.associateWith { "바꿀 수 없는 필드입니다." })
 
-        val before = client.query("MATCH (u:User {id: \$id}) WHERE u.email IS NOT NULL SET u._lock = true RETURN properties(u) AS u")
-            .bind(id).to("id").fetch().one().map { (it["u"] as Map<String, Any?>) - "_lock" }.orElseThrow { NotFoundException(id) }
+        // 대상과 활성 관리자를 ID 순서로 한 번에 잠근다. 두 관리자가 서로를 동시에 강등해도 잠금 순서가 같아 교착이 줄고,
+        // 마지막 관리자 판정이 잠금 뒤의 값으로 이루어진다
+        val locked = client.query(
+            """
+            MATCH (u:User) WHERE u.email IS NOT NULL AND (u.id = ${'$'}id OR (u.role = 'ADMIN' AND u.enabled = true))
+            WITH u ORDER BY u.id
+            SET u._lock = true
+            RETURN properties(u) AS u
+            """,
+        ).bind(id).to("id").fetch().all().map { (it["u"] as Map<String, Any?>) - "_lock" }
+        val before = locked.firstOrNull { it["id"] == id } ?: throw NotFoundException(id)
         val current = (before["revision"] as Number).toLong()
         if (current != expected) throw RevisionConflictException(expected, current)
 
@@ -103,13 +113,15 @@ class UserAdminService(
         val wasActiveAdmin = before["role"] == Role.ADMIN.name && before["enabled"] == true
         val staysActiveAdmin = (changes["role"] ?: before["role"]) == Role.ADMIN.name && (changes["enabled"] ?: before["enabled"]) == true
         if (wasActiveAdmin && !staysActiveAdmin) {
-            // 두 관리자가 서로를 동시에 강등하지 못하게 다른 활성 관리자도 잠근 뒤 센다
-            val others = client.query(
-                "MATCH (u:User {role: 'ADMIN', enabled: true}) WHERE u.id <> \$id WITH u ORDER BY u.id SET u._lock = true RETURN count(u) AS n",
-            ).bind(id).to("id").fetch().one().map { (it["n"] as Number).toLong() }.orElse(0L)
-            if (others == 0L) throw LastAdminException()
+            val others = locked.count { it["id"] != id && it["role"] == Role.ADMIN.name && it["enabled"] == true }
+            if (others == 0) throw LastAdminException()
         }
 
+        if (diff(before, changes).isEmpty()) {
+            // 바뀐 값이 없으면 revision 을 올리지 않고 이력도 남기지 않는다
+            client.query("MATCH (u:User) WHERE u._lock IS NOT NULL REMOVE u._lock").run()
+            return UserView.of(UserRecord.from(before))
+        }
         val after = client.query(
             """
             MATCH (u:User {id: ${'$'}id})
@@ -120,7 +132,7 @@ class UserAdminService(
             REMOVE other._lock
             RETURN DISTINCT properties(u) AS u
             """,
-        ).bindAll(mapOf("id" to id, "set" to changes, "now" to Instant.now().toString(), "actor" to actorId))
+        ).bindAll(mapOf("id" to id, "set" to changes, "now" to Timestamps.now(), "actor" to actorId))
             .fetch().one().map { it["u"] as Map<String, Any?> }.get()
         val recorded = diff(before, changes)
         if (recorded.isNotEmpty()) {

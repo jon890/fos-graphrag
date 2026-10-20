@@ -6,6 +6,7 @@ import java.time.Duration
 @ConfigurationProperties("workbench")
 data class WorkbenchProperties(
     val graph: Graph = Graph(),
+    val detail: Detail = Detail(),
     val security: Security = Security(),
     val bootstrap: Bootstrap = Bootstrap(),
 ) {
@@ -14,6 +15,12 @@ data class WorkbenchProperties(
         val maxNodes: Int = 150,
         val maxRelationships: Int = 300,
         val timeout: Duration = Duration.ofSeconds(5),
+    )
+
+    /** 노드 상세의 관계와 Claim 목록 상한. 넘으면 잘라 내고 truncated 를 표시한다. */
+    data class Detail(
+        val maxRelationships: Int = 100,
+        val maxClaims: Int = 50,
     )
 
     data class Security(

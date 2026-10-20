@@ -64,10 +64,11 @@ class GraphService(
             MATCH (c:Knowledge {id: ${'$'}id})
             MATCH p = (c)-[*1..$hops]-(m:Knowledge)
             WHERE m <> c
-              AND all(x IN nodes(p) WHERE x.archived = false)
               AND all(r IN relationships(p) WHERE r.archived = false)
-              AND (${'$'}types IS NULL OR m.type IN ${'$'}types)
-              AND (${'$'}reviewStatus IS NULL OR m.type <> 'Claim' OR m.reviewStatus = ${'$'}reviewStatus)
+              // 필터는 중심을 뺀 경로 위 모든 노드에 적용한다. 필터에서 빠진 노드를 거쳐야만 닿는 노드는 보이지 않는다
+              AND all(x IN nodes(p)[1..] WHERE x.archived = false
+                  AND (${'$'}types IS NULL OR x.type IN ${'$'}types)
+                  AND (${'$'}reviewStatus IS NULL OR x.type <> 'Claim' OR x.reviewStatus = ${'$'}reviewStatus))
             WITH m, min(length(p)) AS distance
             ORDER BY distance, m.id
             LIMIT ${'$'}limit

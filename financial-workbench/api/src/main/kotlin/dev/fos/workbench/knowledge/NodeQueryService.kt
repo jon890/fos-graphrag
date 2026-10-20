@@ -1,5 +1,7 @@
 package dev.fos.workbench.knowledge
 
+import dev.fos.workbench.config.Limits
+import dev.fos.workbench.config.WorkbenchProperties
 import dev.fos.workbench.config.params
 import dev.fos.workbench.ontology.Ontology
 import dev.fos.workbench.web.Page
@@ -15,7 +17,9 @@ class NodeQueryService(
     private val ontology: Ontology,
     private val reader: KnowledgeReader,
     private val relationships: RelationshipService,
+    properties: WorkbenchProperties,
 ) {
+    private val limits = properties.detail
 
     @Transactional(readOnly = true)
     fun detail(id: String): NodeDetail {
@@ -25,22 +29,28 @@ class NodeQueryService(
             MATCH (a:Knowledge)-[r]->(b:Knowledge)
             WHERE (a.id = ${'$'}id OR b.id = ${'$'}id) AND type(r) IN ${'$'}types
             RETURN type(r) AS type, properties(r) AS r, properties(a) AS a, properties(b) AS b
-            ORDER BY r.createdAt
+            ORDER BY r.createdAt, r.id
+            LIMIT ${'$'}limit
             """,
-        ).bindAll(mapOf("id" to id, "types" to ontology.relationshipTypes.keys.toList())).fetch().all().toList()
+        ).bindAll(mapOf("id" to id, "types" to ontology.relationshipTypes.keys.toList(), "limit" to limits.maxRelationships + 1L))
+            .fetch().all().toList()
         val claimIds = client.query(
             """
             MATCH (c:Knowledge:Claim)-[l:SUBJECT|OBJECT|SUPPORTED_BY]->(:Knowledge {id: ${'$'}id})
             WHERE c.archived = false
             WITH DISTINCT c
-            RETURN c.id AS id ORDER BY c.createdAt
+            RETURN c.id AS id ORDER BY c.createdAt, c.id
+            LIMIT ${'$'}limit
             """,
-        ).bind(id).to("id").fetch().all().map { it["id"] as String }
+        ).bindAll(mapOf("id" to id, "limit" to limits.maxClaims + 1L)).fetch().all().map { it["id"] as String }
         return NodeDetail(
             node = node,
             claim = if (node.type == ClaimService.CLAIM) reader.claim(id) else null,
-            relationships = relationships.views(relationshipRows),
-            claims = reader.claims(claimIds),
+            relationships = relationships.views(relationshipRows.take(limits.maxRelationships)),
+            claims = reader.claims(claimIds.take(limits.maxClaims)),
+            relationshipsTruncated = relationshipRows.size > limits.maxRelationships,
+            claimsTruncated = claimIds.size > limits.maxClaims,
+            limits = DetailLimits(limits.maxRelationships, limits.maxClaims),
         )
     }
 
@@ -49,6 +59,9 @@ class NodeQueryService(
     @Suppress("UNCHECKED_CAST")
     fun search(q: String?, types: List<String>?, reviewStatus: String?, includeArchived: Boolean, page: PageQuery): Page<NodeView> {
         types?.forEach { ontology.requireNodeType(it) }
+        if ((q?.trim()?.length ?: 0) > Limits.MAX_QUERY_LENGTH) {
+            throw ValidationFailedException(mapOf("q" to "검색어는 ${Limits.MAX_QUERY_LENGTH}자 이하여야 합니다."))
+        }
         val params = params(
             "q" to q?.trim()?.lowercase()?.takeIf { it.isNotEmpty() },
             "types" to types?.takeIf { it.isNotEmpty() },

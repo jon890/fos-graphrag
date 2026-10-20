@@ -8,7 +8,12 @@ import org.junit.jupiter.api.Test
 import org.springframework.test.context.TestPropertySource
 import java.net.URLEncoder
 
-@TestPropertySource(properties = ["workbench.graph.max-nodes=5", "workbench.graph.max-relationships=6"])
+@TestPropertySource(
+    properties = [
+        "workbench.graph.max-nodes=5", "workbench.graph.max-relationships=6",
+        "workbench.detail.max-relationships=3", "workbench.detail.max-claims=2",
+    ],
+)
 class SearchAndGraphIntegrationTest : IntegrationTest() {
 
     private fun q(s: String) = URLEncoder.encode(s, Charsets.UTF_8)
@@ -64,6 +69,35 @@ class SearchAndGraphIntegrationTest : IntegrationTest() {
         assertThat(graph["limits"]["maxNodes"].asInt()).isEqualTo(5)
         assertThat(graph["nodes"][0]["id"].asString()).isEqualTo(center.id)
         assertThat(graph["edges"].size()).isEqualTo(4)
+
+        // 상세의 관계 목록도 상한까지만 주고 잘림을 표시한다
+        val detail = alice.get("/api/nodes/${center.id}").body
+        assertThat(detail["relationships"].size()).isEqualTo(3)
+        assertThat(detail["relationshipsTruncated"].asBoolean()).isTrue()
+        assertThat(detail["claimsTruncated"].asBoolean()).isFalse()
+        assertThat(detail["limits"]["maxRelationships"].asInt()).isEqualTo(3)
+    }
+
+    @Test
+    fun `필터는 경로 위 모든 노드에 적용되어 검토되지 않은 Claim 을 거친 이웃을 보이지 않는다`() {
+        val alice = loggedIn(ALICE)
+        val bob = loggedIn(BOB)
+        val fx = Fixtures(alice)
+        val a = fx.company("A")
+        val b = fx.company("B")
+        val c = fx.company("C")
+        val d = fx.document("근거")
+        fx.claim("SUPPLIES_TO", a.id, b.id, listOf(d.id))
+        val reviewed = fx.claim("COMPETES_WITH", a.id, c.id, listOf(d.id)).body
+        bob.post("/api/claims/${reviewed.id}/review", mapOf("expectedRevision" to 1, "status" to "REVIEWED"))
+
+        val onlyReviewed = alice.get("/api/graph/neighborhood?id=${a.id}&hops=2&reviewStatus=REVIEWED&types=Company,Claim").body
+        assertThat(onlyReviewed["nodes"].toList().map { it["id"].asString() })
+            .containsExactlyInAnyOrder(a.id, reviewed.id, c.id)
+
+        // 타입 필터도 경로 전체에 적용된다. Claim 을 빼면 Claim 을 거쳐야 닿는 기업도 보이지 않는다
+        val companiesOnly = alice.get("/api/graph/neighborhood?id=${a.id}&hops=2&types=Company").body
+        assertThat(companiesOnly["nodes"].toList().map { it["id"].asString() }).containsExactly(a.id)
     }
 
     @Test

@@ -6,6 +6,7 @@ import dev.fos.workbench.config.params
 import dev.fos.workbench.web.Page
 import dev.fos.workbench.web.PageQuery
 import org.springframework.data.neo4j.core.Neo4jClient
+import org.springframework.security.core.Authentication
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -41,11 +42,15 @@ class ChangeController(
         @RequestParam(required = false) actor: String?,
         @RequestParam(required = false) page: Int?,
         @RequestParam(required = false) size: Int?,
+        authentication: Authentication,
     ): Page<ChangeEventView> {
         val query = PageQuery.of(page, size)
+        // 사용자 관리 이벤트는 허용 목록(이메일)을 드러내므로 ADMIN 에게만 보인다
+        val admin = authentication.authorities.any { it.authority == "ROLE_ADMIN" }
         val actorId = actor?.let { users.findByEmail(it)?.id ?: return query.of(emptyList(), 0) }
-        val params = params("targetId" to targetId, "actorId" to actorId, "skip" to query.skip, "limit" to query.size)
-        val where = "WHERE (\$targetId IS NULL OR e.targetId = \$targetId) AND (\$actorId IS NULL OR e.actorId = \$actorId)"
+        val params = params("targetId" to targetId, "actorId" to actorId, "skip" to query.skip, "limit" to query.size, "admin" to admin)
+        val where = "WHERE (\$targetId IS NULL OR e.targetId = \$targetId) AND (\$actorId IS NULL OR e.actorId = \$actorId) " +
+            "AND (\$admin OR e.targetKind <> 'USER')"
         val total = client.query("MATCH (e:ChangeEvent) $where RETURN count(e) AS total")
             .bindAll(params).fetch().one().map { (it["total"] as Number).toLong() }.orElse(0L)
         @Suppress("UNCHECKED_CAST")
