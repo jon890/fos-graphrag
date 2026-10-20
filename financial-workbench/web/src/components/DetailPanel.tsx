@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, errorMessage } from '../api/client'
 import type { NodeDetail } from '../api/types'
-import { useApp } from '../context'
-import { formatDateTime } from '../lib/format'
+import { useApp, useLabels } from '../context'
+import { formatDateTime, userName } from '../lib/format'
 import { ClaimCard } from './ClaimCard'
 import { ClaimCreateForm } from './ClaimCreateForm'
 import { ClaimEditForm, ReviewControls } from './ClaimEditor'
@@ -16,17 +16,20 @@ interface Props {
   refreshKey: string
   /** 저장, 보관처럼 서버 상태를 바꾼 뒤 부른다. 그래프와 검색 결과를 다시 읽는다 */
   onChanged: () => void
+  /** 방금 만든 노드를 열었을 때 상세 위에 보일 성공 안내 */
+  flash?: { id: string; text: string } | null
   onFocus: (id: string) => void
   onSelect: (id: string) => void
   onOpenHistory: (id: string) => void
 }
 
-type Notice = { kind: 'success' | 'conflict' | 'error'; text: string; sub?: string }
+type Notice = { kind: 'success' | 'conflict' | 'error'; text: string; sub?: string; actions?: { label: string; onClick: () => void }[] }
 
 export const CONFLICT_TEXT = '다른 사용자가 먼저 수정했습니다. 최신 내용을 불러왔습니다. 확인한 뒤 다시 수정하세요.'
 
-export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSelect, onOpenHistory }: Props) {
+export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus, onSelect, onOpenHistory }: Props) {
   const { ontology, canEdit } = useApp()
+  const labels = useLabels()
   const [detail, setDetail] = useState<NodeDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -36,10 +39,10 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
   const [addingClaim, setAddingClaim] = useState(false)
 
   useEffect(() => {
-    setNotice(null)
+    setNotice(flash && flash.id === selectedId ? { kind: 'success', text: flash.text } : null)
     setAddingClaim(false)
     setArchiveReason('')
-  }, [selectedId])
+  }, [selectedId, flash])
 
   useEffect(() => {
     if (!selectedId) {
@@ -76,20 +79,33 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
     [onChanged],
   )
 
-  const fail = useCallback((e: unknown) => {
-    if (e instanceof ApiError && e.code === 'REVISION_CONFLICT') {
-      // 덮어쓰지 않는다. 최신 상세를 다시 읽어 폼을 새 값으로 바꾼다.
-      setNotice({ kind: 'conflict', text: CONFLICT_TEXT, sub: e.message })
-      setReloadKey((k) => k + 1)
-      return
-    }
-    setNotice({ kind: 'error', text: errorMessage(e) })
-  }, [])
+  const fail = useCallback(
+    (e: unknown) => {
+      if (e instanceof ApiError && e.code === 'REVISION_CONFLICT') {
+        // 덮어쓰지 않는다. 최신 상세를 다시 읽어 폼을 새 값으로 바꾼다.
+        setNotice({ kind: 'conflict', text: CONFLICT_TEXT, sub: e.message })
+        setReloadKey((k) => k + 1)
+        return
+      }
+      if (e instanceof ApiError && e.code === 'LAST_EVIDENCE') {
+        // 이 문서만 근거로 쓰는 주장으로 바로 갈 수 있게 한다. 화면에서 근거를 더하는 기능은 없다.
+        const ids = Array.isArray(e.details?.claimIds) ? (e.details.claimIds as unknown[]).filter((id): id is string => typeof id === 'string') : []
+        setNotice({
+          kind: 'error',
+          text: errorMessage(e),
+          actions: ids.map((id, i) => ({ label: ids.length > 1 ? `주장 ${i + 1} 열기` : '주장 열기', onClick: () => onSelect(id) })),
+        })
+        return
+      }
+      setNotice({ kind: 'error', text: errorMessage(e) })
+    },
+    [onSelect],
+  )
 
   if (!selectedId) {
     return (
       <div className="detail-empty muted" data-testid="detail-empty">
-        노드를 선택하면 상세가 여기에 나옵니다.
+        항목을 선택하면 상세가 여기에 나옵니다.
       </div>
     )
   }
@@ -108,12 +124,12 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
   const archiveOrRestore = async () => {
     try {
       if (node.archived) {
-        const v = await api.nodes.restore(node.id, node.revision)
-        succeed(`복원했습니다 (revision ${v.revision}).`)
+        await api.nodes.restore(node.id, node.revision)
+        succeed('복원했습니다.')
       } else {
-        const v = await api.nodes.archive(node.id, node.revision, archiveReason.trim() || undefined)
+        await api.nodes.archive(node.id, node.revision, archiveReason.trim() || undefined)
         setArchiveReason('')
-        succeed(`보관했습니다 (revision ${v.revision}). 기본 검색과 주변 그래프에서 빠집니다.`)
+        succeed('보관했습니다. 기본 검색과 주변 그래프에서 빠집니다.')
       }
     } catch (e) {
       fail(e)
@@ -124,7 +140,7 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
     <div className="detail-panel" data-testid="detail-panel" data-node-id={node.id} data-node-type={node.type}>
       <div className="detail-head">
         <TypeBadge type={node.type} />
-        <h2 data-testid="detail-label">{node.label}</h2>
+        <h2 data-testid="detail-label">{labels.node(node)}</h2>
         <StatusBadge status={node.reviewStatus} />
         {node.archived && (
           <span className="archived-badge" data-testid="detail-archived">
@@ -138,12 +154,21 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
         <div className={`notice notice-${notice.kind}`} role="status" data-testid="detail-notice" data-kind={notice.kind}>
           {notice.text}
           {notice.sub && notice.sub !== notice.text && <div className="small muted">서버 응답: {notice.sub}</div>}
+          {notice.actions && notice.actions.length > 0 && (
+            <div className="row">
+              {notice.actions.map((a) => (
+                <button key={a.label} type="button" data-testid="notice-action" onClick={a.onClick}>
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       <div className="row actions">
         <button className="link-button" data-testid="node-history-link" onClick={() => onOpenHistory(node.id)}>
-          이 노드 이력
+          이 항목의 변경 이력
         </button>
         <button className="link-button" data-testid="node-center-graph" onClick={() => onFocus(node.id)}>
           그래프 중심으로
@@ -170,20 +195,18 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
 
       {!canEdit && (
         <div className="info-box" data-testid="viewer-hint">
-          열람자(VIEWER)는 조회만 할 수 있습니다. 수정, 검토, 보관은 편집자에게 요청하세요.
+          열람자는 조회만 할 수 있습니다. 수정, 검토, 보관은 편집자에게 요청하세요.
         </div>
       )}
 
       <dl className="kv meta" data-testid="node-meta">
-        <dt>revision</dt>
-        <dd data-testid="node-revision">{node.revision}</dd>
         <dt>생성</dt>
         <dd>
-          {node.createdBy.displayName} · {formatDateTime(node.createdAt)}
+          {userName(node.createdBy, '알 수 없음')} · {formatDateTime(node.createdAt)}
         </dd>
         <dt>수정</dt>
         <dd data-testid="node-updated-by">
-          {node.updatedBy.displayName} · {formatDateTime(node.updatedAt)}
+          {userName(node.updatedBy, '알 수 없음')} · {formatDateTime(node.updatedAt)}
         </dd>
         {node.archivedAt && (
           <>
@@ -191,13 +214,20 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
             <dd>{formatDateTime(node.archivedAt)}</dd>
           </>
         )}
-        <dt>ID</dt>
-        <dd className="mono small">{node.id}</dd>
       </dl>
+      <details className="meta-details" data-testid="node-meta-details">
+        <summary>자세히</summary>
+        <dl className="kv meta">
+          <dt>revision</dt>
+          <dd data-testid="node-revision">{node.revision}</dd>
+          <dt>ID</dt>
+          <dd className="mono small">{node.id}</dd>
+        </dl>
+      </details>
 
       {claim ? (
         <section className="detail-section">
-          <h3>Claim</h3>
+          <h3>{labels.type(node.type)}</h3>
           <ClaimCard claim={claim} onOpenNode={onSelect} />
           {canEdit && (
             <>
@@ -213,7 +243,7 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
           <NodeEditForm
             key={`${node.id}:${node.revision}`}
             node={node}
-            onSaved={(v) => succeed(`저장했습니다 (revision ${v.revision}).`)}
+            onSaved={() => succeed('저장했습니다.')}
             onError={fail}
           />
         </section>
@@ -234,33 +264,35 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
         />
       )}
 
-      <section className="detail-section" data-testid="node-claims-section">
-        <h3>이 노드에 걸린 Claim ({detail.claims.length})</h3>
-        {detail.claims.length === 0 && <div className="muted small">걸린 Claim 이 없습니다.</div>}
-        {detail.claimsTruncated && (
-          <div className="info-box" data-testid="detail-claims-truncated">
-            Claim 이 많아 오래된 것부터 {detail.limits.maxClaims}개만 보입니다. 전체는 검토 대기 탭이나 그래프에서 확인하세요.
-          </div>
-        )}
-        {detail.claims.map((c) => (
-          <ClaimCard key={c.id} claim={c} onOpenNode={onSelect} showOpen />
-        ))}
-        {canEdit && hasClaimPredicates && !claim && !addingClaim && (
-          <button data-testid="claim-add-toggle" disabled={node.archived} onClick={() => setAddingClaim(true)}>
-            Claim 추가
-          </button>
-        )}
-        {canEdit && addingClaim && (
-          <ClaimCreateForm
-            subject={node}
-            onCancel={() => setAddingClaim(false)}
-            onCreated={() => {
-              setAddingClaim(false)
-              succeed('Claim 을 만들었습니다. 다른 사용자의 검토를 기다립니다.')
-            }}
-          />
-        )}
-      </section>
+      {!claim && (
+        <section className="detail-section" data-testid="node-claims-section">
+          <h3>이 항목에 걸린 주장 ({detail.claims.length})</h3>
+          {detail.claims.length === 0 && <div className="muted small">걸린 주장이 없습니다.</div>}
+          {detail.claimsTruncated && (
+            <div className="info-box" data-testid="detail-claims-truncated">
+              주장이 많아 오래된 것부터 {detail.limits.maxClaims}개만 보입니다. 전체는 검토 대기 탭이나 그래프에서 확인하세요.
+            </div>
+          )}
+          {detail.claims.map((c) => (
+            <ClaimCard key={c.id} claim={c} onOpenNode={onSelect} showOpen />
+          ))}
+          {canEdit && hasClaimPredicates && !addingClaim && (
+            <button data-testid="claim-add-toggle" disabled={node.archived} onClick={() => setAddingClaim(true)}>
+              주장 추가
+            </button>
+          )}
+          {canEdit && addingClaim && (
+            <ClaimCreateForm
+              subject={node}
+              onCancel={() => setAddingClaim(false)}
+              onCreated={() => {
+                setAddingClaim(false)
+                succeed('주장을 만들었습니다. 다른 편집자의 검토를 기다립니다.')
+              }}
+            />
+          )}
+        </section>
+      )}
     </div>
   )
 }

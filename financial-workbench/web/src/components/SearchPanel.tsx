@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, errorMessage } from '../api/client'
-import { NODE_TYPES, REVIEW_STATUSES, type NodeView, type Page, type ReviewStatus } from '../api/types'
-import { creatableTypes, useApp } from '../context'
+import type { NodeView, Page, ReviewStatus } from '../api/types'
+import { creatableTypes, useApp, useLabels } from '../context'
+import { withEulReul } from '../lib/labels'
 import { NodeCreateForm } from './NodeCreateForm'
 import { Pager } from './Pager'
 import { StatusBadge, TypeBadge } from './TypeBadge'
@@ -18,12 +19,15 @@ interface Props {
   onFiltersChange: (f: SearchFilters) => void
   selectedId: string | null
   onFocus: (id: string) => void
+  /** 새 노드를 만들었을 때. 안내 문장과 함께 부른다 */
+  onCreated: (node: NodeView, message: string) => void
   refreshTick: number
   typesParam: (types: string[]) => string[] | undefined
 }
 
-export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, refreshTick, typesParam }: Props) {
+export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onCreated, refreshTick, typesParam }: Props) {
   const { ontology, canEdit } = useApp()
+  const labels = useLabels()
   const [qInput, setQInput] = useState(filters.q)
   const [pageNo, setPageNo] = useState(0)
   const [result, setResult] = useState<Page<NodeView> | null>(null)
@@ -70,10 +74,13 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, ref
 
   const toggleType = (type: string, on: boolean) => {
     const next = on ? [...filters.types, type] : filters.types.filter((t) => t !== type)
-    update({ types: NODE_TYPES.filter((t) => next.includes(t)) })
+    update({ types: labels.types.filter((t) => next.includes(t)) })
   }
 
   const creatable = creatableTypes(ontology)
+  // 조건 없이 검색해도 결과가 없으면 아직 아무것도 등록하지 않은 것이다.
+  const nothingRegistered =
+    !filters.q && !filters.reviewStatus && !filters.includeArchived && filters.types.length === labels.types.length
 
   return (
     <div className="search-panel">
@@ -90,8 +97,8 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, ref
       </form>
 
       <fieldset className="filters">
-        <legend>타입</legend>
-        {NODE_TYPES.map((t) => (
+        <legend>종류</legend>
+        {labels.types.map((t) => (
           <label key={t} className="check">
             <input
               type="checkbox"
@@ -103,16 +110,16 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, ref
           </label>
         ))}
         <label className="field-inline">
-          Claim 검토 상태
+          주장 검토 상태
           <select
             data-testid="filter-review-status"
             value={filters.reviewStatus}
             onChange={(e) => update({ reviewStatus: e.target.value as ReviewStatus | '' })}
           >
             <option value="">전체</option>
-            {REVIEW_STATUSES.map((s) => (
+            {labels.reviewStatuses.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {labels.status(s)}
               </option>
             ))}
           </select>
@@ -126,7 +133,7 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, ref
           />
           보관 포함
         </label>
-        <div className="hint">타입과 검토 상태 필터는 주변 그래프에도 적용됩니다.</div>
+        <div className="hint">종류와 검토 상태 필터는 주변 그래프에도 적용됩니다.</div>
       </fieldset>
 
       <div className="search-results" data-testid="search-results">
@@ -134,7 +141,9 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, ref
         {error && <div className="error-box">{error}</div>}
         {result && !loading && result.items.length === 0 && (
           <div className="muted" data-testid="search-empty">
-            검색 결과가 없습니다.
+            {nothingRegistered
+              ? `아직 등록된 항목이 없습니다.${canEdit ? ' 아래에서 처음 항목을 만들어 보세요.' : ''}`
+              : '검색 결과가 없습니다.'}
           </div>
         )}
         {result && result.items.length > 0 && (
@@ -149,7 +158,7 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, ref
                   onClick={() => onFocus(n.id)}
                 >
                   <TypeBadge type={n.type} />
-                  <span className="result-label">{n.label}</span>
+                  <span className="result-label">{labels.node(n)}</span>
                   <StatusBadge status={n.reviewStatus} />
                   {n.archived && <span className="archived-badge">보관됨</span>}
                 </button>
@@ -163,15 +172,15 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, ref
       <div className="create-box">
         {!canEdit ? (
           <div className="muted small" data-testid="viewer-create-hint">
-            열람자(VIEWER)는 노드를 만들 수 없습니다.
+            열람자는 항목을 만들 수 없습니다.
           </div>
         ) : !creating ? (
           <div className="row">
             <select data-testid="new-node-type" value={createType} onChange={(e) => setCreateType(e.target.value)}>
-              <option value="">새 노드 타입</option>
+              <option value="">무엇을 만들까요?</option>
               {creatable.map((t) => (
                 <option key={t} value={t}>
-                  {t}
+                  {labels.type(t)}
                 </option>
               ))}
             </select>
@@ -181,12 +190,12 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, ref
               disabled={!createType}
               onClick={() => setCreating(true)}
             >
-              새 노드 만들기
+              새로 만들기
             </button>
           </div>
         ) : (
           <>
-            <h3>새 {createType}</h3>
+            <h3>새 {labels.type(createType)}</h3>
             <div className="hint">{ontology.nodeTypes[createType]?.description}</div>
             <NodeCreateForm
               key={createType}
@@ -195,7 +204,7 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, ref
               onCancel={() => setCreating(false)}
               onCreated={(node) => {
                 setCreating(false)
-                onFocus(node.id)
+                onCreated(node, `「${labels.node(node)}」 ${withEulReul(labels.type(node.type))} 만들었습니다.`)
                 void run()
               }}
             />

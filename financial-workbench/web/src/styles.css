@@ -164,6 +164,11 @@ button.link-button:disabled { color: var(--text); opacity: 1; cursor: default; }
   text-align: center;
 }
 .graph-overlay.subtle { align-items: flex-end; padding-bottom: 16px; }
+.welcome { max-width: 460px; text-align: left; color: var(--text, #1f2937); }
+.welcome h2 { margin: 0 0 8px; font-size: 18px; }
+.welcome ol { padding-left: 20px; margin: 8px 0; display: grid; gap: 6px; }
+.meta-details { margin: 4px 0 8px; font-size: 12px; }
+.meta-details summary { cursor: pointer; color: var(--muted); }
 .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; }
 .legend-item { display: inline-flex; align-items: center; gap: 4px; }
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }

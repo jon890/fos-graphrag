@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../api/client'
 import type { ClaimView, Page, ReviewStatus } from '../api/types'
-import { useApp } from '../context'
-import { formatDateTime, truncate } from '../lib/format'
+import { useApp, useLabels } from '../context'
+import { formatDateTime, truncate, userName } from '../lib/format'
 import { Pager } from './Pager'
 import { TypeBadge } from './TypeBadge'
 
 function ReviewRow({ claim, onDone, onError, onOpen }: { claim: ClaimView; onDone: (m: string) => void; onError: (e: unknown) => void; onOpen: (id: string) => void }) {
   const { user, canEdit } = useApp()
+  const labels = useLabels()
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
-  const own = claim.createdBy.id === user.id
+  const own = claim.createdBy?.id === user.id
   // 서버는 마지막으로 내용을 고친 사람도 막을 수 있다. 그때는 403 SELF_REVIEW_FORBIDDEN 메시지를 보인다.
   const blocked = own || !canEdit
 
@@ -18,7 +19,7 @@ function ReviewRow({ claim, onDone, onError, onOpen }: { claim: ClaimView; onDon
     setBusy(true)
     try {
       await api.claims.review(claim.id, claim.revision, status, note.trim() || null)
-      onDone(`${claim.subject.label} → ${claim.object.label} (${String(claim.properties.predicate ?? claim.label)}) 를 ${status === 'REVIEWED' ? '검토 완료' : '반려'} 처리했습니다.`)
+      onDone(`${claim.subject?.label ?? '?'} → ${claim.object?.label ?? '?'} (${labels.node(claim)}) 주장을 ${labels.status(status)} 처리했습니다.`)
     } catch (e) {
       onError(e)
     } finally {
@@ -30,34 +31,30 @@ function ReviewRow({ claim, onDone, onError, onOpen }: { claim: ClaimView; onDon
     <tr data-testid="review-row" data-claim-id={claim.id}>
       <td>
         <button className="link-button" onClick={() => onOpen(claim.id)}>
-          {String(claim.properties.predicate ?? claim.label)}
+          {labels.node(claim)}
         </button>
       </td>
-      <td>
-        <TypeBadge type={claim.subject.type} /> {claim.subject.label}
-      </td>
-      <td>
-        <TypeBadge type={claim.object.type} /> {claim.object.label}
-      </td>
+      <td>{claim.subject ? <><TypeBadge type={claim.subject.type} /> {claim.subject.label}</> : <span className="muted">(알 수 없음)</span>}</td>
+      <td>{claim.object ? <><TypeBadge type={claim.object.type} /> {claim.object.label}</> : <span className="muted">(알 수 없음)</span>}</td>
       <td title={String(claim.properties.evidenceText ?? '')}>{truncate(String(claim.properties.evidenceText ?? ''), 50)}</td>
-      <td>{claim.createdBy.displayName}</td>
+      <td>{userName(claim.createdBy, '알 수 없음')}</td>
       <td>{formatDateTime(claim.createdAt)}</td>
       <td className="review-actions">
         {!canEdit ? (
           <span className="muted small" data-testid="review-viewer-hint">
-            열람자(VIEWER)는 검토할 수 없습니다.
+            열람자는 검토할 수 없습니다.
           </span>
         ) : own ? (
           <span className="muted small" data-testid="review-own-hint">
-            본인이 작성한 Claim 은 검토할 수 없습니다.
+            본인이 작성한 주장은 검토할 수 없습니다.
           </span>
         ) : null}
         <input data-testid="review-row-note" placeholder="메모(선택)" value={note} disabled={blocked || busy} onChange={(e) => setNote(e.target.value)} />
         <button className="primary" data-testid="review-row-approve" disabled={blocked || busy} onClick={() => void review('REVIEWED')}>
-          검토 완료
+          {labels.status('REVIEWED')}
         </button>
         <button className="danger" data-testid="review-row-reject" disabled={blocked || busy} onClick={() => void review('REJECTED')}>
-          반려
+          {labels.status('REJECTED')}
         </button>
       </td>
     </tr>
@@ -65,6 +62,7 @@ function ReviewRow({ claim, onDone, onError, onOpen }: { claim: ClaimView; onDon
 }
 
 export function ReviewTab({ onOpen }: { onOpen: (id: string) => void }) {
+  const labels = useLabels()
   const [pageNo, setPageNo] = useState(0)
   const [page, setPage] = useState<Page<ClaimView> | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -93,7 +91,7 @@ export function ReviewTab({ onOpen }: { onOpen: (id: string) => void }) {
   return (
     <div className="tab-page" data-testid="review-tab">
       <div className="row toolbar">
-        <h2>검토 대기 (DRAFT)</h2>
+        <h2>검토 대기</h2>
         <button data-testid="review-refresh" onClick={() => void load()}>
           새로고침
         </button>
@@ -112,10 +110,10 @@ export function ReviewTab({ onOpen }: { onOpen: (id: string) => void }) {
       <table className="data-table" data-testid="review-table">
         <thead>
           <tr>
-            <th>predicate</th>
-            <th>주어</th>
-            <th>목적어</th>
-            <th>근거 문장</th>
+            <th>{labels.property('Claim', 'predicate')}</th>
+            <th>{labels.relationship('SUBJECT')}</th>
+            <th>{labels.relationship('OBJECT')}</th>
+            <th>{labels.property('Claim', 'evidenceText')}</th>
             <th>작성자</th>
             <th>생성 시각</th>
             <th>검토</th>
@@ -142,7 +140,7 @@ export function ReviewTab({ onOpen }: { onOpen: (id: string) => void }) {
           {page && page.items.length === 0 && (
             <tr>
               <td colSpan={7} className="muted" data-testid="review-empty">
-                검토를 기다리는 Claim 이 없습니다.
+                검토를 기다리는 주장이 없습니다.
               </td>
             </tr>
           )}

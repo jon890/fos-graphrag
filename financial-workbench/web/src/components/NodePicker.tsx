@@ -1,6 +1,7 @@
 import { useState, type KeyboardEvent } from 'react'
 import { api, errorMessage } from '../api/client'
 import type { NodeView } from '../api/types'
+import { useLabels } from '../context'
 import { TypeBadge } from './TypeBadge'
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 
 /** 이름이나 종목 코드로 노드를 찾아 하나 고른다. */
 export function NodePicker({ types, onPick, testIdPrefix, placeholder, excludeIds = [] }: Props) {
+  const labels = useLabels()
   const [q, setQ] = useState('')
   const [results, setResults] = useState<NodeView[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -46,7 +48,7 @@ export function NodePicker({ types, onPick, testIdPrefix, placeholder, excludeId
         <input
           data-testid={`${testIdPrefix}-input`}
           value={q}
-          placeholder={placeholder ?? `${types.join(', ')} 검색`}
+          placeholder={placeholder ?? `${types.map(labels.type).join(', ')} 검색`}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={onKeyDown}
         />
@@ -75,7 +77,7 @@ export function NodePicker({ types, onPick, testIdPrefix, placeholder, excludeId
                   setQ('')
                 }}
               >
-                <TypeBadge type={n.type} /> {n.label}
+                <TypeBadge type={n.type} /> {labels.node(n)}
               </button>
             </li>
           ))}

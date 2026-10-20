@@ -126,6 +126,9 @@ async function createNode(page: Page, type: string, label: string, props: Record
   }
   await page.getByTestId('create-submit').click()
   await expect(page.getByTestId('detail-label')).toHaveText(label)
+  // 만든 직후 상세 위에 성공 안내가 나온다.
+  await expect(page.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
+  await expect(page.getByTestId('detail-notice')).toContainText('만들었습니다')
 }
 
 /** 노드 고르기 입력에서 검색해 정확히 그 이름의 결과를 고른다. */
@@ -175,6 +178,85 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     const unverifiedPage = await open(browser)
     await loginAs(unverifiedPage, { ...editorA, sub: `unverified-${suffix}`, emailVerified: false }, 'denied')
     await shot(unverifiedPage, '00b-denied')
+  })
+
+  test('0c) 변경 이력 탭을 필터 없이 열어도 작성자가 없는 이력(첫 관리자 생성)이 「시스템」 으로 보이고 화면이 유지된다', async () => {
+    await pageAdmin.getByTestId('tab-changes').click()
+    await expect(pageAdmin.getByTestId('changes-table')).toBeVisible()
+    // 첫 관리자를 만든 이력은 가장 오래돼서 뒤쪽 쪽에 있을 수 있다.
+    const systemRow = pageAdmin.getByTestId('change-row').filter({ hasText: '시작 설정으로 만든 첫 관리자' })
+    for (let i = 0; i < 50 && (await systemRow.count()) === 0; i += 1) {
+      const next = pageAdmin.getByTestId('changes-pager-next')
+      if (await next.isDisabled()) break
+      await next.click()
+      await pageAdmin.waitForTimeout(300)
+    }
+    await expect(systemRow).toHaveCount(1)
+    await expect(systemRow).toContainText('시스템')
+    // 머리글과 탭이 남아 있다.
+    await expect(pageAdmin.getByTestId('tab-changes')).toBeVisible()
+    await expect(pageAdmin.getByTestId('current-user-name')).toHaveText(admin.name)
+    await expect(pageAdmin.getByTestId('error-boundary')).toHaveCount(0)
+    await shot(pageAdmin, '00c-changes-all-system-actor')
+  })
+
+  test('0d) 한 탭이 렌더링 오류를 내도 머리글과 탭이 남고 「다시 시도」 로 돌아온다', async () => {
+    // 서버가 모양이 어긋난 응답을 주는 상황을 만든다(items 가 null).
+    await pageAdmin.route('**/api/changes*', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: null, page: 0, size: 20, totalItems: 0, totalPages: 0 }) }),
+    )
+    await pageAdmin.getByTestId('tab-list').click()
+    await pageAdmin.getByTestId('tab-changes').click()
+    await expect(pageAdmin.getByTestId('error-boundary')).toContainText('이 화면을 불러오지 못했습니다.')
+    await expect(pageAdmin.getByTestId('tab-workspace')).toBeVisible()
+    await expect(pageAdmin.getByTestId('current-user-name')).toHaveText(admin.name)
+    await shot(pageAdmin, '00d-error-boundary')
+
+    // 다른 탭으로 옮기면 새 탭이 바로 그려진다.
+    await pageAdmin.getByTestId('tab-list').click()
+    await expect(pageAdmin.getByTestId('list-tab')).toBeVisible()
+    await expect(pageAdmin.getByTestId('error-boundary')).toHaveCount(0)
+
+    // 서버가 정상으로 돌아오면 「다시 시도」 로 화면이 돌아온다.
+    await pageAdmin.getByTestId('tab-changes').click()
+    await expect(pageAdmin.getByTestId('error-boundary')).toBeVisible()
+    await pageAdmin.unroute('**/api/changes*')
+    await pageAdmin.getByTestId('error-boundary-retry').click()
+    await expect(pageAdmin.getByTestId('changes-table')).toBeVisible()
+    await expect(pageAdmin.getByTestId('error-boundary')).toHaveCount(0)
+  })
+
+  test('0e) 첫 화면 안내와 만들기 폼이 한국어 표시 이름으로 보인다', async () => {
+    await pageAdmin.getByTestId('tab-workspace').click()
+    await expect(pageAdmin.getByTestId('welcome-guide')).toBeVisible()
+    await expect(pageAdmin.getByTestId('welcome-guide')).toContainText('기업 추가')
+    await expect(pageAdmin.getByTestId('welcome-guide')).toContainText('근거 문서 등록')
+    await expect(pageAdmin.getByTestId('welcome-guide')).toContainText('주장 추가')
+    await shot(pageAdmin, '00e-first-screen')
+
+    const typeSelect = pageAdmin.getByTestId('new-node-type')
+    await expect(typeSelect.locator('option')).toHaveText(['무엇을 만들까요?', '기업', '종목', '산업', '근거 문서'])
+    // 저장되는 값은 그대로다.
+    await expect(typeSelect.locator('option')).toHaveCount(5)
+    await typeSelect.selectOption('Company')
+    await pageAdmin.getByTestId('new-node-button').click()
+    const company = pageAdmin.getByTestId('create-form')
+    await expect(company).toContainText('기업 이름')
+    await expect(company).toContainText('국가')
+    await expect(company).toContainText('두 글자 국가 코드. 예: KR, US')
+    await expect(company).not.toContainText('문자열')
+    await expect(company).not.toContainText('registrationNumber')
+    await shot(pageAdmin, '00e-company-form')
+    await pageAdmin.getByTestId('create-cancel').click()
+
+    await typeSelect.selectOption('Security')
+    await pageAdmin.getByTestId('new-node-button').click()
+    const market = pageAdmin.getByTestId('create-prop-market')
+    await expect(market.locator('option')).toHaveText(['선택하세요', '코스피', '코스닥', '나스닥', '뉴욕증권거래소', '기타'])
+    await expect(market.locator('option[value="KRX_KOSPI"]')).toHaveText('코스피')
+    await expect(pageAdmin.getByTestId('create-prop-securityType').locator('option')).toHaveText(['(없음)', '보통주', '우선주', 'ETF', '예탁증서(ADR)', '기타'])
+    await shot(pageAdmin, '00e-security-form')
+    await pageAdmin.getByTestId('create-cancel').click()
   })
 
   test('1) A 가 기업 두 개와 종목을 만들고 ISSUES 관계를 잇는다', async ({ browser }) => {
@@ -333,6 +415,23 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA.locator('[data-testid="change-row"][data-action="ARCHIVE"]')).toHaveCount(1)
     await expect(pageA.locator('[data-testid="change-row"][data-action="RESTORE"]')).toHaveCount(1)
     await shot(pageA, '06-archive-restore-history')
+  })
+
+  test('6b) 유일한 근거 문서를 보관하려 하면 해당 주장을 여는 버튼이 나온다', async () => {
+    await searchAndOpen(pageA, data.docTitle)
+    await pageA.getByTestId('node-archive-button').click()
+    const notice = pageA.getByTestId('detail-notice')
+    await expect(notice).toHaveAttribute('data-kind', 'error')
+    await expect(notice).toContainText('그 주장을 먼저 보관하세요')
+    await expect(notice).not.toContainText('근거를 더하거나')
+    await shot(pageA, '06b-last-evidence')
+    await notice.getByTestId('notice-action').click()
+    await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-type', 'Claim')
+    // 주장 상세에는 「이 항목에 걸린 주장」 절이 없고, 수정 폼은 「다시 검토」 안내를 쓴다. revision 은 「자세히」 안에 있다.
+    await expect(pageA.getByTestId('node-claims-section')).toHaveCount(0)
+    await expect(pageA.getByTestId('claim-edit-form')).toContainText('다시 검토를 받아야 합니다')
+    await expect(pageA.getByTestId('claim-edit-confidence')).toHaveCount(0)
+    await expect(pageA.getByTestId('node-meta-details')).not.toHaveAttribute('open', '')
   })
 
   test('7) 열람자는 편집 버튼이 없고, API 로 직접 만들어도 403 FORBIDDEN 이다', async ({ browser }) => {

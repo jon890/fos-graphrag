@@ -1,5 +1,18 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useMemo } from 'react'
 import type { CurrentUser, Ontology } from './api/types'
+import {
+  actionLabel,
+  nodeDisplayLabel,
+  predicateLabel,
+  propertyDef,
+  propertyLabel,
+  relationshipLabel,
+  reviewStatusKeys,
+  reviewStatusLabel,
+  typeKeys,
+  typeLabel,
+  valueLabel,
+} from './lib/labels'
 
 export interface AppContextValue {
   user: CurrentUser
@@ -14,6 +27,28 @@ export function useApp(): AppContextValue {
   const ctx = useContext(AppContext)
   if (!ctx) throw new Error('AppContext 가 없습니다.')
   return ctx
+}
+
+/** 현재 온톨로지의 표시 이름을 읽는 함수 묶음. 이름이 없으면 키를 그대로 돌려준다 */
+export function useLabels() {
+  const { ontology } = useApp()
+  return useMemo(
+    () => ({
+      /** 노드 타입 키 목록. YAML 순서 */
+      types: typeKeys(ontology),
+      reviewStatuses: reviewStatusKeys(ontology),
+      type: (type: string) => typeLabel(ontology, type),
+      property: (type: string, prop: string) => propertyLabel(ontology, type, prop),
+      propertyDef: (type: string, prop: string) => propertyDef(ontology, type, prop),
+      value: (type: string, prop: string, value: unknown) => valueLabel(ontology, type, prop, value),
+      relationship: (key: string) => relationshipLabel(ontology, key),
+      predicate: (key: string) => predicateLabel(ontology, key),
+      status: (status: string) => reviewStatusLabel(ontology, status),
+      action: (action: string) => actionLabel(ontology, action),
+      node: (node: { type: string; label: string }) => nodeDisplayLabel(ontology, node),
+    }),
+    [ontology],
+  )
 }
 
 /** 사용자가 직접 만들 수 있는 노드 타입. managedBy 가 있는 Claim 은 전용 API 로 만든다. */

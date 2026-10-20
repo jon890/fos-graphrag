@@ -1,11 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, errorMessage } from '../api/client'
-import { NODE_TYPES, type NodeView, type Page } from '../api/types'
-import { formatDateTime } from '../lib/format'
+import type { NodeView, Page } from '../api/types'
+import { useLabels } from '../context'
+import { formatDateTime, userName } from '../lib/format'
 import { Pager } from './Pager'
 import { StatusBadge, TypeBadge } from './TypeBadge'
 
 export function ListTab({ onOpen }: { onOpen: (id: string) => void }) {
+  const labels = useLabels()
   const [type, setType] = useState('')
   const [qInput, setQInput] = useState('')
   const [q, setQ] = useState('')
@@ -46,10 +48,10 @@ export function ListTab({ onOpen }: { onOpen: (id: string) => void }) {
             setPageNo(0)
           }}
         >
-          <option value="">모든 타입</option>
-          {NODE_TYPES.map((t) => (
+          <option value="">모든 종류</option>
+          {labels.types.map((t) => (
             <option key={t} value={t}>
-              {t}
+              {labels.type(t)}
             </option>
           ))}
         </select>
@@ -75,9 +77,8 @@ export function ListTab({ onOpen }: { onOpen: (id: string) => void }) {
       <table className="data-table" data-testid="list-table">
         <thead>
           <tr>
-            <th>타입</th>
+            <th>종류</th>
             <th>이름</th>
-            <th>revision</th>
             <th>수정자</th>
             <th>수정 시각</th>
             <th>보관</th>
@@ -90,17 +91,16 @@ export function ListTab({ onOpen }: { onOpen: (id: string) => void }) {
                 <TypeBadge type={n.type} />
               </td>
               <td>
-                {n.label} <StatusBadge status={n.reviewStatus} />
+                {labels.node(n)} <StatusBadge status={n.reviewStatus} />
               </td>
-              <td>{n.revision}</td>
-              <td>{n.updatedBy.displayName}</td>
+              <td>{userName(n.updatedBy, '알 수 없음')}</td>
               <td>{formatDateTime(n.updatedAt)}</td>
               <td>{n.archived ? '보관됨' : ''}</td>
             </tr>
           ))}
           {page && page.items.length === 0 && (
             <tr>
-              <td colSpan={6} className="muted" data-testid="list-empty">
+              <td colSpan={5} className="muted" data-testid="list-empty">
                 결과가 없습니다.
               </td>
             </tr>

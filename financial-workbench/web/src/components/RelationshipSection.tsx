@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { api, errorMessage } from '../api/client'
 import type { NodeView, RelationshipView } from '../api/types'
-import { useApp } from '../context'
+import { useApp, useLabels } from '../context'
 import { NodePicker } from './NodePicker'
 import { TypeBadge } from './TypeBadge'
 
@@ -23,6 +23,7 @@ interface Props {
 
 export function RelationshipSection({ node, relationships, onChanged, onError, onOpenNode }: Props) {
   const { ontology, canEdit } = useApp()
+  const labels = useLabels()
   const options = useMemo<Option[]>(() => {
     const out: Option[] = []
     for (const [type, def] of Object.entries(ontology.relationshipTypes)) {
@@ -41,7 +42,7 @@ export function RelationshipSection({ node, relationships, onChanged, onError, o
 
   const submit = async () => {
     if (!option || !target) {
-      setError('대상 노드를 고르세요.')
+      setError('연결할 항목을 고르세요.')
       return
     }
     setBusy(true)
@@ -52,7 +53,7 @@ export function RelationshipSection({ node, relationships, onChanged, onError, o
       await api.relationships.create(option.type, fromId, toId)
       setAdding(false)
       setTarget(null)
-      onChanged(`${option.type} 관계를 추가했습니다.`)
+      onChanged(`「${labels.relationship(option.type)}」 관계를 추가했습니다.`)
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -73,14 +74,14 @@ export function RelationshipSection({ node, relationships, onChanged, onError, o
   return (
     <section className="detail-section" data-testid="relationship-section">
       <h3>관계</h3>
-      {relationships.length === 0 && <div className="muted small">일반 관계가 없습니다.</div>}
+      {relationships.length === 0 && <div className="muted small">연결된 항목이 없습니다.</div>}
       <ul className="rel-list">
         {relationships.map((r) => (
           <li key={r.id} data-testid="relationship-row" data-rel-type={r.type} className={r.archived ? 'archived' : ''}>
             <button className="link-button" disabled={r.from.id === node.id} onClick={() => onOpenNode(r.from.id)}>
               <TypeBadge type={r.from.type} /> {r.from.label}
             </button>
-            <span className="rel-type">—{r.type}→</span>
+            <span className="rel-type">—{labels.relationship(r.type)}→</span>
             <button className="link-button" disabled={r.to.id === node.id} onClick={() => onOpenNode(r.to.id)}>
               <TypeBadge type={r.to.type} /> {r.to.label}
             </button>
@@ -102,7 +103,7 @@ export function RelationshipSection({ node, relationships, onChanged, onError, o
       {canEdit && adding && option && (
         <div className="sub-form" data-testid="relationship-add-form">
           <div className="field">
-            <label>관계 타입</label>
+            <label>관계 종류</label>
             <select
               data-testid="relationship-type-select"
               value={option.key}
@@ -114,15 +115,15 @@ export function RelationshipSection({ node, relationships, onChanged, onError, o
               {options.map((o) => (
                 <option key={o.key} value={o.key}>
                   {o.direction === 'out'
-                    ? `이 노드 —${o.type}→ (${o.otherTypes.join(', ')})`
-                    : `(${o.otherTypes.join(', ')}) —${o.type}→ 이 노드`}
+                    ? `이 항목 —${labels.relationship(o.type)}→ (${o.otherTypes.map(labels.type).join(', ')})`
+                    : `(${o.otherTypes.map(labels.type).join(', ')}) —${labels.relationship(o.type)}→ 이 항목`}
                 </option>
               ))}
             </select>
             <div className="hint">{ontology.relationshipTypes[option.type]?.description}</div>
           </div>
           <div className="field">
-            <label>{option.direction === 'out' ? '끝 노드' : '시작 노드'}</label>
+            <label>{option.direction === 'out' ? '연결할 항목(끝)' : '연결할 항목(시작)'}</label>
             {target ? (
               <div className="chip" data-testid="relationship-target-selected">
                 <TypeBadge type={target.type} /> {target.label}

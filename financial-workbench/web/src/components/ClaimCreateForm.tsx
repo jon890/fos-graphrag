@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { api, ApiError, errorMessage } from '../api/client'
 import type { NodeView } from '../api/types'
-import { useApp } from '../context'
+import { useApp, useLabels } from '../context'
+import { withEulReul } from '../lib/labels'
 import { NodeCreateForm } from './NodeCreateForm'
 import { NodePicker } from './NodePicker'
 import { fieldErrorsOf } from './PropertyFields'
@@ -13,9 +14,10 @@ interface Props {
   onCancel: () => void
 }
 
-/** 이 노드를 주어로 하는 Claim 을 만든다. form 요소를 쓰지 않는다: 안에 문서 생성 form 이 들어간다. */
+/** 이 항목을 주체로 하는 주장을 만든다. form 요소를 쓰지 않는다: 안에 문서 생성 form 이 들어간다. */
 export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
   const { ontology } = useApp()
+  const labels = useLabels()
   const predicates = useMemo(
     () => Object.entries(ontology.claimPredicates).filter(([, def]) => def.subjectTypes.includes(subject.type)),
     [ontology, subject.type],
@@ -45,9 +47,9 @@ export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
 
   const submit = async () => {
     const errs: Record<string, string> = {}
-    if (!predicate) errs.predicate = 'predicate 를 고르세요.'
-    if (!object) errs.objectId = '목적어를 고르세요.'
-    if (documents.length === 0) errs.documentIds = '근거 문서를 한 개 이상 고르세요.'
+    if (!predicate) errs.predicate = `${withEulReul(labels.property('Claim', 'predicate'))} 고르세요.`
+    if (!object) errs.objectId = `${withEulReul(labels.relationship('OBJECT'))} 고르세요.`
+    if (documents.length === 0) errs.documentIds = `${withEulReul(labels.relationship('SUPPORTED_BY'))} 한 개 이상 고르세요.`
     if (!description.trim()) errs.description = '필수 값입니다.'
     if (!evidenceText.trim()) errs.evidenceText = '필수 값입니다.'
     if (validFrom && validTo && validFrom > validTo) errs.validTo = '종료일이 시작일보다 빠릅니다.'
@@ -85,30 +87,31 @@ export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
   return (
     <div className="sub-form" data-testid="claim-add-form">
       <div className="field">
-        <label>predicate</label>
+        <label>{labels.property('Claim', 'predicate')}</label>
         <select data-testid="claim-predicate-select" value={predicate} onChange={(e) => changePredicate(e.target.value)}>
-          {predicates.map(([name, def]) => (
+          {predicates.map(([name]) => (
             <option key={name} value={name}>
-              {name}: {def.description}
+              {labels.predicate(name)}
             </option>
           ))}
         </select>
         {predicateDef && (
           <div className="hint">
-            주어 {predicateDef.subjectTypes.join(', ')} → 목적어 {predicateDef.objectTypes.join(', ')}
+            {predicateDef.description} ({labels.relationship('SUBJECT')}: {predicateDef.subjectTypes.map(labels.type).join(', ')} · {labels.relationship('OBJECT')}:{' '}
+            {predicateDef.objectTypes.map(labels.type).join(', ')})
           </div>
         )}
       </div>
 
       <div className="field">
-        <label>주어</label>
+        <label>{labels.relationship('SUBJECT')}</label>
         <div>
           <TypeBadge type={subject.type} /> {subject.label}
         </div>
       </div>
 
       <div className="field">
-        <label>목적어 ({objectTypes.join(', ')})</label>
+        <label>{labels.relationship('OBJECT')} ({objectTypes.map(labels.type).join(', ')})</label>
         {object ? (
           <div className="chip" data-testid="claim-object-selected">
             <TypeBadge type={object.type} /> {object.label}
@@ -123,7 +126,7 @@ export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
       </div>
 
       <div className="field">
-        <label>근거 문서 (1개 이상)</label>
+        <label>{labels.relationship('SUPPORTED_BY')} (1개 이상)</label>
         {documents.length > 0 && (
           <ul className="chip-list">
             {documents.map((d) => (
@@ -140,12 +143,12 @@ export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
           types={['Document']}
           onPick={addDocument}
           testIdPrefix="claim-doc-picker"
-          placeholder="문서 제목 검색"
+          placeholder="근거 문서 제목 검색"
           excludeIds={documents.map((d) => d.id)}
         />
         {!creatingDoc ? (
           <button className="link-button" data-testid="claim-doc-create-toggle" onClick={() => setCreatingDoc(true)}>
-            + 문서 새로 등록
+            + 근거 문서 새로 등록
           </button>
         ) : (
           <div className="nested-box">
@@ -165,7 +168,8 @@ export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
 
       <div className="field">
         <label htmlFor="claim-description">
-          설명<span className="required"> *</span>
+          {labels.property('Claim', 'description')}
+          <span className="required"> *</span>
         </label>
         <textarea
           id="claim-description"
@@ -179,7 +183,8 @@ export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
       </div>
       <div className="field">
         <label htmlFor="claim-evidence">
-          근거 문장<span className="required"> *</span>
+          {labels.property('Claim', 'evidenceText')}
+          <span className="required"> *</span>
         </label>
         <textarea
           id="claim-evidence"
@@ -193,11 +198,11 @@ export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
       </div>
       <div className="row">
         <label className="field-inline">
-          validFrom
+          {labels.property('Claim', 'validFrom')}
           <input type="date" data-testid="claim-valid-from-input" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} />
         </label>
         <label className="field-inline">
-          validTo
+          {labels.property('Claim', 'validTo')}
           <input type="date" data-testid="claim-valid-to-input" value={validTo} onChange={(e) => setValidTo(e.target.value)} />
         </label>
       </div>
@@ -211,7 +216,7 @@ export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
       )}
       <div className="row">
         <button className="primary" data-testid="claim-add-submit" disabled={busy} onClick={() => void submit()}>
-          {busy ? '저장 중…' : 'Claim 만들기'}
+          {busy ? '저장 중…' : '주장 만들기'}
         </button>
         <button onClick={onCancel}>취소</button>
       </div>

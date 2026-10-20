@@ -52,7 +52,7 @@ class TransientConflictException :
 class LastEvidenceException(claimIds: List<String>) :
     ApiException(
         HttpStatus.CONFLICT, "LAST_EVIDENCE",
-        "이 문서가 유일한 활성 근거인 Claim 이 있어 보관할 수 없습니다. 그 Claim 에 다른 근거를 더하거나 Claim 을 먼저 보관하세요.",
+        "이 문서만 근거로 쓰는 주장이 있어 보관할 수 없습니다. 그 주장을 먼저 보관하세요.",
         mapOf("claimIds" to claimIds),
     )
 

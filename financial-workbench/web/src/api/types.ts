@@ -1,10 +1,8 @@
 // docs/api-contract.md 의 응답 모양을 그대로 옮긴 타입이다.
 
 export type ReviewStatus = 'DRAFT' | 'REVIEWED' | 'REJECTED'
+/** 온톨로지가 reviewStatuses 를 주지 않을 때만 쓰는 값 목록. 평소에는 ontology.reviewStatuses 의 키를 쓴다 */
 export const REVIEW_STATUSES: ReviewStatus[] = ['DRAFT', 'REVIEWED', 'REJECTED']
-
-export const NODE_TYPES = ['Company', 'Security', 'Sector', 'Document', 'Claim'] as const
-export type NodeType = (typeof NODE_TYPES)[number]
 
 export type PropertyValue = string | number | boolean | null
 
@@ -60,9 +58,10 @@ export interface NodeView {
   archived: boolean
   archivedAt: string | null
   createdAt: string
-  createdBy: UserRef
+  /** 서버 DTO 가 UserRef? 다. 작성자 사용자를 찾지 못하면 null 이다 */
+  createdBy: UserRef | null
   updatedAt: string
-  updatedBy: UserRef
+  updatedBy: UserRef | null
   reviewStatus: ReviewStatus | null
 }
 
@@ -73,7 +72,7 @@ export interface DocumentSummary {
   publisher?: string | null
   documentType?: string | null
   publishedAt?: string | null
-  collectedAt: string
+  collectedAt: string | null
   archived: boolean
 }
 
@@ -82,8 +81,8 @@ export interface ClaimView extends NodeView {
   reviewedBy: UserRef | null
   reviewedAt: string | null
   reviewNote: string | null
-  subject: NodeRef
-  object: NodeRef
+  subject: NodeRef | null
+  object: NodeRef | null
   documents: DocumentSummary[]
 }
 
@@ -95,7 +94,7 @@ export interface RelationshipView {
   revision: number
   archived: boolean
   createdAt: string
-  createdBy: UserRef
+  createdBy: UserRef | null
 }
 
 export interface NodeDetail {
@@ -151,7 +150,8 @@ export type ChangeAction = 'CREATE' | 'UPDATE' | 'REVIEW' | 'ARCHIVE' | 'RESTORE
 export interface ChangeEventView {
   id: string
   at: string
-  actor: UserRef
+  /** 첫 관리자를 만든 이력처럼 작성자가 사용자 목록에 없으면 null 이다. 서버 ChangeEventView.actor 는 UserRef? 다 */
+  actor: UserRef | null
   action: ChangeAction
   targetId: string
   targetKind: 'NODE' | 'RELATIONSHIP' | 'USER'
@@ -164,17 +164,28 @@ export interface ChangeEventView {
 
 export type PropertyType = 'string' | 'text' | 'url' | 'enum' | 'date' | 'datetime' | 'number' | 'integer' | 'boolean'
 
+/** 온톨로지 YAML 의 표시 이름. 없으면 화면은 키를 그대로 보인다 */
+export interface LabelDef {
+  label: string
+  description?: string
+}
+
 export interface PropertyDef {
   type: PropertyType
+  /** 화면에 보일 이름 */
+  label?: string
   required: boolean
   maxLength?: number
   values?: string[]
+  /** enum 값의 표시 이름. 저장되는 값은 values 의 키 그대로다 */
+  valueLabels?: Record<string, string>
   min?: number
   max?: number
   description?: string
 }
 
 export interface NodeTypeDef {
+  label?: string
   description: string
   labelProperty: string
   managedBy?: string
@@ -182,18 +193,21 @@ export interface NodeTypeDef {
 }
 
 export interface RelationshipTypeDef {
+  label?: string | null
   description: string
   from: string[]
   to: string[]
 }
 
 export interface ClaimRelationshipDef {
+  label?: string | null
   description: string
   from?: string[]
   to?: string[]
 }
 
 export interface ClaimPredicateDef {
+  label?: string | null
   description: string
   subjectTypes: string[]
   objectTypes: string[]
@@ -205,6 +219,10 @@ export interface Ontology {
   relationshipTypes: Record<string, RelationshipTypeDef>
   claimRelationships?: Record<string, ClaimRelationshipDef>
   claimPredicates: Record<string, ClaimPredicateDef>
+  /** Claim 검토 상태(DRAFT 등)의 표시 이름 */
+  reviewStatuses?: Record<string, LabelDef>
+  /** 변경 이력 작업(CREATE 등)의 표시 이름 */
+  changeActions?: Record<string, LabelDef>
 }
 
 export interface ApiErrorBody {

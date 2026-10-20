@@ -131,8 +131,10 @@ flowchart LR
 | 경로 | 책임 |
 | --- | --- |
 | `web/src/api/` | fetch 래퍼, CSRF 처리, 계약 타입 |
-| `web/src/components/` | 화면 조각. 그래프, 상세 패널, 표, 폼 |
-| `web/src/lib/` | 그래프 병합, 입력값 변환처럼 화면과 무관한 함수와 단위 테스트 |
+| `web/src/components/` | 화면 조각. 그래프, 상세 패널, 표, 폼. `ErrorBoundary` 가 탭 단위로 렌더링 오류를 붙잡아 머리글과 탭을 지키고, 앱 최상위(`main.tsx`)에도 하나 있다 |
+| `web/src/lib/` | 그래프 병합, 입력값 변환, 표시 이름 조회(`labels.ts`)처럼 화면과 무관한 함수와 단위 테스트 |
+
+화면에 보이는 타입, 속성, 선택지, 관계, 검토 상태 이름은 코드에 적지 않고 `/api/ontology` 의 표시 이름(`label`, `valueLabels`)을 `labels.ts` 로 읽는다. 이름이 없으면 키를 그대로 보인다. 규칙은 [데이터 스키마](data-schema.md) 의 「표시 이름」 이다.
 
 개발할 때는 Vite 가 `/api` 를 `127.0.0.1:8080` 으로 넘겨 같은 origin 을 흉내 낸다.
 운영에서는 API 컨테이너가 빌드된 웹 파일을 함께 제공한다.
@@ -143,7 +145,7 @@ flowchart LR
 | --- | --- | --- |
 | 온톨로지 단위 테스트 | `api/src/test/kotlin/.../ontology/` | 쓰지 않음 |
 | 통합 테스트 | `api/src/test/kotlin/.../` 의 `*IntegrationTest` | Testcontainers 로 `neo4j:5.26.30-community` 와 가짜 OIDC 공급자를 띄운다 |
-| 웹 단위 테스트 | `web/src/**/*.test.ts` | 쓰지 않음 |
+| 웹 단위 테스트 | `web/src/**/*.test.ts`, `*.test.tsx` | 쓰지 않음. 컴포넌트는 `react-dom/server` 로 렌더링해 확인한다 |
 | 브라우저 테스트 | `web/e2e/` | 운영 Compose 와 `compose.e2e.yml`. 가짜 OIDC 공급자로 실제 OAuth 리다이렉트를 탄다 |
 
 mock 으로 Neo4j 를 대신한 테스트는 없다. 트랜잭션 일관성 테스트만 실패하는 `ChangeEventRecorder` 를 주입한다. 이때도 Neo4j 는 실제 컨테이너다.
