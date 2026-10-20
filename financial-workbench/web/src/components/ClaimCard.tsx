@@ -1,5 +1,5 @@
 import type { ClaimView, NodeRef } from '../api/types'
-import { formatDateTime, orUnknown } from '../lib/format'
+import { formatDateTime, orUnknown, userName } from '../lib/format'
 import { StatusBadge, TypeBadge } from './TypeBadge'
 
 function str(v: unknown): string {
@@ -13,7 +13,8 @@ interface Props {
   showOpen?: boolean
 }
 
-function RefLink({ node, onOpenNode, testId }: { node: NodeRef; onOpenNode?: (id: string) => void; testId: string }) {
+function RefLink({ node, onOpenNode, testId }: { node: NodeRef | null; onOpenNode?: (id: string) => void; testId: string }) {
+  if (!node) return <span className="muted" data-testid={testId}>(알 수 없음)</span>
   return (
     <button className="link-button" data-testid={testId} disabled={!onOpenNode} onClick={() => onOpenNode?.(node.id)}>
       <TypeBadge type={node.type} /> {node.label}
@@ -79,7 +80,7 @@ export function ClaimCard({ claim, onOpenNode, showOpen }: Props) {
         </dd>
         <dt>작성</dt>
         <dd>
-          <span data-testid="claim-author">{claim.createdBy.displayName}</span>
+          <span data-testid="claim-author">{userName(claim.createdBy, '알 수 없음')}</span>
           <span className="muted small">
             {' '}
             {formatDateTime(claim.createdAt)} · {str(p.authoringMethod) || 'MANUAL'}

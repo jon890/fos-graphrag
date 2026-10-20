@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, errorMessage } from '../api/client'
 import type { NodeDetail } from '../api/types'
 import { useApp } from '../context'
-import { formatDateTime } from '../lib/format'
+import { formatDateTime, userName } from '../lib/format'
 import { ClaimCard } from './ClaimCard'
 import { ClaimCreateForm } from './ClaimCreateForm'
 import { ClaimEditForm, ReviewControls } from './ClaimEditor'
@@ -179,11 +179,11 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
         <dd data-testid="node-revision">{node.revision}</dd>
         <dt>생성</dt>
         <dd>
-          {node.createdBy.displayName} · {formatDateTime(node.createdAt)}
+          {userName(node.createdBy, '알 수 없음')} · {formatDateTime(node.createdAt)}
         </dd>
         <dt>수정</dt>
         <dd data-testid="node-updated-by">
-          {node.updatedBy.displayName} · {formatDateTime(node.updatedAt)}
+          {userName(node.updatedBy, '알 수 없음')} · {formatDateTime(node.updatedAt)}
         </dd>
         {node.archivedAt && (
           <>

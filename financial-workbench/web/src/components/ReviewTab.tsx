@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage } from '../api/client'
 import type { ClaimView, Page, ReviewStatus } from '../api/types'
 import { useApp } from '../context'
-import { formatDateTime, truncate } from '../lib/format'
+import { formatDateTime, truncate, userName } from '../lib/format'
 import { Pager } from './Pager'
 import { TypeBadge } from './TypeBadge'
 
@@ -10,7 +10,7 @@ function ReviewRow({ claim, onDone, onError, onOpen }: { claim: ClaimView; onDon
   const { user, canEdit } = useApp()
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
-  const own = claim.createdBy.id === user.id
+  const own = claim.createdBy?.id === user.id
   // 서버는 마지막으로 내용을 고친 사람도 막을 수 있다. 그때는 403 SELF_REVIEW_FORBIDDEN 메시지를 보인다.
   const blocked = own || !canEdit
 
@@ -18,7 +18,7 @@ function ReviewRow({ claim, onDone, onError, onOpen }: { claim: ClaimView; onDon
     setBusy(true)
     try {
       await api.claims.review(claim.id, claim.revision, status, note.trim() || null)
-      onDone(`${claim.subject.label} → ${claim.object.label} (${String(claim.properties.predicate ?? claim.label)}) 를 ${status === 'REVIEWED' ? '검토 완료' : '반려'} 처리했습니다.`)
+      onDone(`${claim.subject?.label ?? '?'} → ${claim.object?.label ?? '?'} (${String(claim.properties.predicate ?? claim.label)}) 를 ${status === 'REVIEWED' ? '검토 완료' : '반려'} 처리했습니다.`)
     } catch (e) {
       onError(e)
     } finally {
@@ -33,14 +33,10 @@ function ReviewRow({ claim, onDone, onError, onOpen }: { claim: ClaimView; onDon
           {String(claim.properties.predicate ?? claim.label)}
         </button>
       </td>
-      <td>
-        <TypeBadge type={claim.subject.type} /> {claim.subject.label}
-      </td>
-      <td>
-        <TypeBadge type={claim.object.type} /> {claim.object.label}
-      </td>
+      <td>{claim.subject ? <><TypeBadge type={claim.subject.type} /> {claim.subject.label}</> : <span className="muted">(알 수 없음)</span>}</td>
+      <td>{claim.object ? <><TypeBadge type={claim.object.type} /> {claim.object.label}</> : <span className="muted">(알 수 없음)</span>}</td>
       <td title={String(claim.properties.evidenceText ?? '')}>{truncate(String(claim.properties.evidenceText ?? ''), 50)}</td>
-      <td>{claim.createdBy.displayName}</td>
+      <td>{userName(claim.createdBy, '알 수 없음')}</td>
       <td>{formatDateTime(claim.createdAt)}</td>
       <td className="review-actions">
         {!canEdit ? (

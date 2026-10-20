@@ -1,13 +1,53 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, errorMessage } from '../api/client'
 import type { ChangeEventView, Page } from '../api/types'
-import { formatDateTime, summarizeValue } from '../lib/format'
+import { formatDateTime, summarizeValue, userName } from '../lib/format'
 import { Pager } from './Pager'
 
 interface Props {
   targetId: string
   onTargetIdChange: (id: string) => void
   onOpen: (id: string) => void
+}
+
+export function ChangeRows({ items, onOpen }: { items: ChangeEventView[]; onOpen: (id: string) => void }) {
+  return (
+    <>
+      {items.map((c) => (
+        <tr key={c.id} data-testid="change-row" data-action={c.action} data-target-id={c.targetId}>
+          <td>{formatDateTime(c.at)}</td>
+          <td title={c.actor?.email}>{userName(c.actor)}</td>
+          <td data-testid="change-action">
+            <span className={`action-badge action-${c.action.toLowerCase()}`}>{c.action}</span>
+          </td>
+          <td>
+            {c.targetType}
+            {c.targetKind === 'RELATIONSHIP' ? ' (관계)' : c.targetKind === 'USER' ? ' (사용자)' : ''}
+          </td>
+          <td>
+            {c.targetKind === 'NODE' ? (
+              <button className="link-button" onClick={() => onOpen(c.targetId)}>
+                {c.targetLabel}
+              </button>
+            ) : (
+              c.targetLabel
+            )}
+          </td>
+          <td>{c.revision}</td>
+          <td>
+            <ul className="change-list">
+              {Object.entries(c.changes ?? {}).map(([key, diff]) => (
+                <li key={key}>
+                  <span className="mono">{key}</span>: {summarizeValue(diff?.before)} → {summarizeValue(diff?.after)}
+                </li>
+              ))}
+            </ul>
+          </td>
+          <td>{c.note ?? ''}</td>
+        </tr>
+      ))}
+    </>
+  )
 }
 
 export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
@@ -85,39 +125,7 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
           </tr>
         </thead>
         <tbody>
-          {page?.items.map((c) => (
-            <tr key={c.id} data-testid="change-row" data-action={c.action} data-target-id={c.targetId}>
-              <td>{formatDateTime(c.at)}</td>
-              <td title={c.actor.email}>{c.actor.displayName}</td>
-              <td data-testid="change-action">
-                <span className={`action-badge action-${c.action.toLowerCase()}`}>{c.action}</span>
-              </td>
-              <td>
-                {c.targetType}
-                {c.targetKind === 'RELATIONSHIP' ? ' (관계)' : c.targetKind === 'USER' ? ' (사용자)' : ''}
-              </td>
-              <td>
-                {c.targetKind === 'NODE' ? (
-                  <button className="link-button" onClick={() => onOpen(c.targetId)}>
-                    {c.targetLabel}
-                  </button>
-                ) : (
-                  c.targetLabel
-                )}
-              </td>
-              <td>{c.revision}</td>
-              <td>
-                <ul className="change-list">
-                  {Object.entries(c.changes ?? {}).map(([key, diff]) => (
-                    <li key={key}>
-                      <span className="mono">{key}</span>: {summarizeValue(diff?.before)} → {summarizeValue(diff?.after)}
-                    </li>
-                  ))}
-                </ul>
-              </td>
-              <td>{c.note ?? ''}</td>
-            </tr>
-          ))}
+          {page && <ChangeRows items={page.items} onOpen={onOpen} />}
           {page && page.items.length === 0 && (
             <tr>
               <td colSpan={8} className="muted" data-testid="changes-empty">

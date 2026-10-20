@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, errorMessage } from '../api/client'
 import { NODE_TYPES, type NodeView, type Page } from '../api/types'
-import { formatDateTime } from '../lib/format'
+import { formatDateTime, userName } from '../lib/format'
 import { Pager } from './Pager'
 import { StatusBadge, TypeBadge } from './TypeBadge'
 
@@ -93,7 +93,7 @@ export function ListTab({ onOpen }: { onOpen: (id: string) => void }) {
                 {n.label} <StatusBadge status={n.reviewStatus} />
               </td>
               <td>{n.revision}</td>
-              <td>{n.updatedBy.displayName}</td>
+              <td>{userName(n.updatedBy, '알 수 없음')}</td>
               <td>{formatDateTime(n.updatedAt)}</td>
               <td>{n.archived ? '보관됨' : ''}</td>
             </tr>

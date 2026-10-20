@@ -5,6 +5,11 @@ export function formatDateTime(iso: string | null | undefined): string {
   return d.toLocaleString('ko-KR', { hour12: false })
 }
 
+/** 사용자 참조를 표시 이름으로 바꾼다. 서버가 null 을 주는 경우(작성자 사용자 없음)에는 fallback 을 쓴다. */
+export function userName(ref: { displayName: string } | null | undefined, fallback = '시스템'): string {
+  return ref?.displayName ?? fallback
+}
+
 export function orUnknown(value: unknown): string {
   return value === null || value === undefined || value === '' ? '미상' : String(value)
 }

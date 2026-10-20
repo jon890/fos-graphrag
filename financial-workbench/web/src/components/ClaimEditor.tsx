@@ -16,7 +16,7 @@ export function ReviewControls({ claim, onDone, onError }: ReviewProps) {
   const { user } = useApp()
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
-  const own = claim.createdBy.id === user.id
+  const own = claim.createdBy?.id === user.id
   const disabled = busy || own || claim.archived
 
   const review = async (status: ReviewStatus) => {

@@ -60,9 +60,10 @@ export interface NodeView {
   archived: boolean
   archivedAt: string | null
   createdAt: string
-  createdBy: UserRef
+  /** 서버 DTO 가 UserRef? 다. 작성자 사용자를 찾지 못하면 null 이다 */
+  createdBy: UserRef | null
   updatedAt: string
-  updatedBy: UserRef
+  updatedBy: UserRef | null
   reviewStatus: ReviewStatus | null
 }
 
@@ -73,7 +74,7 @@ export interface DocumentSummary {
   publisher?: string | null
   documentType?: string | null
   publishedAt?: string | null
-  collectedAt: string
+  collectedAt: string | null
   archived: boolean
 }
 
@@ -82,8 +83,8 @@ export interface ClaimView extends NodeView {
   reviewedBy: UserRef | null
   reviewedAt: string | null
   reviewNote: string | null
-  subject: NodeRef
-  object: NodeRef
+  subject: NodeRef | null
+  object: NodeRef | null
   documents: DocumentSummary[]
 }
 
@@ -95,7 +96,7 @@ export interface RelationshipView {
   revision: number
   archived: boolean
   createdAt: string
-  createdBy: UserRef
+  createdBy: UserRef | null
 }
 
 export interface NodeDetail {
@@ -151,7 +152,8 @@ export type ChangeAction = 'CREATE' | 'UPDATE' | 'REVIEW' | 'ARCHIVE' | 'RESTORE
 export interface ChangeEventView {
   id: string
   at: string
-  actor: UserRef
+  /** 첫 관리자를 만든 이력처럼 작성자가 사용자 목록에 없으면 null 이다. 서버 ChangeEventView.actor 는 UserRef? 다 */
+  actor: UserRef | null
   action: ChangeAction
   targetId: string
   targetKind: 'NODE' | 'RELATIONSHIP' | 'USER'

@@ -9,6 +9,7 @@ import { ReviewTab } from './components/ReviewTab'
 import { ChangesTab } from './components/ChangesTab'
 import { OntologyTab } from './components/OntologyTab'
 import { UsersTab } from './components/UsersTab'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 export type TabKey = 'workspace' | 'list' | 'review' | 'changes' | 'ontology' | 'users'
 
@@ -147,23 +148,25 @@ export default function App() {
         {!ontology && !ontologyError && <div className="center-message">온톨로지를 불러오는 중…</div>}
         {ontology && (
           <AppContext.Provider value={{ user, ontology, canEdit }}>
-            {activeTab === 'workspace' && (
-              <Workspace
-                centerId={centerId}
-                focusSeq={focusSeq}
-                selectedId={selectedId}
-                onFocus={focusNode}
-                onSelect={setSelectedId}
-                onOpenHistory={openHistory}
-              />
-            )}
-            {activeTab === 'list' && <ListTab onOpen={openNode} />}
-            {activeTab === 'review' && <ReviewTab onOpen={openNode} />}
-            {activeTab === 'changes' && (
-              <ChangesTab targetId={changesTargetId} onTargetIdChange={setChangesTargetId} onOpen={openNode} />
-            )}
-            {activeTab === 'ontology' && <OntologyTab />}
-            {activeTab === 'users' && user.role === 'ADMIN' && <UsersTab onOpenHistory={openHistory} />}
+            <ErrorBoundary resetKey={activeTab}>
+              {activeTab === 'workspace' && (
+                <Workspace
+                  centerId={centerId}
+                  focusSeq={focusSeq}
+                  selectedId={selectedId}
+                  onFocus={focusNode}
+                  onSelect={setSelectedId}
+                  onOpenHistory={openHistory}
+                />
+              )}
+              {activeTab === 'list' && <ListTab onOpen={openNode} />}
+              {activeTab === 'review' && <ReviewTab onOpen={openNode} />}
+              {activeTab === 'changes' && (
+                <ChangesTab targetId={changesTargetId} onTargetIdChange={setChangesTargetId} onOpen={openNode} />
+              )}
+              {activeTab === 'ontology' && <OntologyTab />}
+              {activeTab === 'users' && user.role === 'ADMIN' && <UsersTab onOpenHistory={openHistory} />}
+            </ErrorBoundary>
           </AppContext.Provider>
         )}
       </main>
