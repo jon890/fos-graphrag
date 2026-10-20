@@ -1,38 +1,36 @@
 #!/usr/bin/env bash
-# 덤프 파일로 Neo4j 를 복원한다. 현재 데이터를 덮어쓰므로 먼저 현재 상태를 한 번 더 덤프한다.
-# 사용: scripts/restore.sh backups/neo4j-YYYYMMDD-HHMMSS.dump
+# 덤프 파일로 Neo4j 를 복원한다. 서비스를 한 번만 멈추고, 그 상태에서 현재 데이터를 먼저 덤프한 뒤 덮어쓴다.
+# 사용: scripts/restore.sh <덤프 파일>   (어느 디렉터리에서 실행해도 된다)
 set -euo pipefail
-cd "$(dirname "$0")/.."
 
 if [ $# -ne 1 ] || [ ! -f "$1" ]; then
   echo "사용법: $0 <덤프 파일>" >&2
   exit 2
 fi
+# cd 하기 전에 인자를 절대 경로로 바꾼다
 source_dump="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+cd "$(dirname "$0")/.."
+source scripts/lib.sh
 
-echo "덮어쓰기 전에 현재 상태를 백업한다"
-"$(dirname "$0")/backup.sh"
+stamp="$(date +%Y%m%d-%H%M%S)"
+safety="$PWD/backups/tmp-before-restore-$stamp"
+stage="$PWD/backups/restore"
 
-compose=(docker compose -f "${COMPOSE_FILE_PATH:-compose.yml}")
-stage="backups/restore"
+stop_services
+trap 'echo "neo4j 와 app 을 다시 시작한다"; start_services' EXIT
+
+echo "덮어쓰기 전에 현재 상태를 덤프한다"
+dump_to "$safety"
+mv "$safety/neo4j.dump" "backups/neo4j-before-restore-$stamp.dump"
+rmdir "$safety"
+
 mkdir -p "$stage"
 chmod 777 "$stage"
 # load 는 디렉터리에서 <데이터베이스 이름>.dump 를 찾는다
 cp "$source_dump" "$stage/neo4j.dump"
 chmod 644 "$stage/neo4j.dump"
-
-restart() {
-  "${compose[@]}" start neo4j app >/dev/null
-  "${compose[@]}" up -d --wait neo4j app >/dev/null
-}
-
-echo "app 과 neo4j 를 멈춘다"
-"${compose[@]}" stop app neo4j
-trap restart EXIT
-
-"${compose[@]}" run --rm --no-deps -v "$PWD/$stage:/backups" neo4j \
+docker compose run --rm --no-deps -v "$stage:/backups" neo4j \
   neo4j-admin database load neo4j --from-path=/backups --overwrite-destination=true
-
 rm -f "$stage/neo4j.dump"
+echo "복원 전 상태: backups/neo4j-before-restore-$stamp.dump"
 echo "복원: $1"
-echo "neo4j 와 app 을 다시 시작한다"

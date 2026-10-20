@@ -1,79 +1,120 @@
 # 배포와 백업
 
-## 기본 시나리오: 홈서버와 사설 VPN
+## 기본 시나리오: 공개 HTTPS 경로와 앱 로그인
 
-나와 친구가 같은 사설 VPN(WireGuard, Tailscale 같은 것)에 들어와 홈서버의 워크벤치에 접속한다.
-워크벤치는 인터넷에 공개하지 않는다.
+워크벤치는 TLS 를 끝내는 reverse proxy(Traefik 같은 것) 뒤에 두고 공개 HTTPS 경로로 연다.
+**앱의 Google 로그인과 허용 사용자 목록이 유일한 접근 제어다.**
+VPN 이나 Cloudflare Access 같은 접근 제어 계층을 앞에 더 두면 더 안전하다. 그때도 앱 로그인은 두 번째 계층으로 그대로 쓴다.
 
 ```mermaid
 flowchart LR
-  F1[내 노트북] -- VPN --> H
-  F2[친구 노트북] -- VPN --> H
+  U1[사용자 브라우저] -- HTTPS --> P[reverse proxy<br/>TLS 종료]
+  U1 -. Google 로그인 .-> G[Google]
   subgraph H[홈서버]
-    APP[app 컨테이너 :8080] --- NEO[(neo4j 컨테이너)]
+    P -- HTTP, 127.0.0.1:WORKBENCH_PORT --> APP[app 컨테이너 :8080]
+    APP --- NEO[(neo4j 컨테이너)]
   end
+  APP -. code 교환 .-> G
 ```
 
 - `app` 은 호스트의 `${WORKBENCH_BIND}:${WORKBENCH_PORT}` 에만 열린다. 기본값은 `127.0.0.1:8081` 이다.
-  홈서버에서는 `WORKBENCH_BIND` 를 VPN 인터페이스의 주소로 둔다. `0.0.0.0` 으로 두지 않는다.
+  reverse proxy 가 같은 호스트에 있으면 그대로 둔다. 8080 은 다른 서비스와 겹치기 쉬워 기본값으로 쓰지 않는다.
 - `neo4j` 는 호스트 포트를 열지 않는다. Compose 내부 네트워크에서 `app` 만 접근한다.
-- 실제 홈서버 주소, 계정, 키, 경로는 이 저장소에 넣지 않는다. 홈서버의 `.env` 에만 둔다.
-- VPN 안에서 HTTP 로 접속하면 세션 쿠키가 암호화되지 않은 채 VPN 터널 안으로만 오간다.
-  VPN 밖으로 공개하거나 reverse proxy 로 HTTPS 를 붙이면 `WORKBENCH_SECURE_COOKIE=true` 로 둔다.
+- reverse proxy 는 `X-Forwarded-Proto`, `X-Forwarded-Host`, `X-Forwarded-For` 를 붙인다.
+  app 은 `WORKBENCH_FORWARD_HEADERS_STRATEGY=native` 로 이 헤더를 읽어 OAuth redirect URI 를 `https://<공개 origin>/login/oauth2/code/google` 로 만든다.
+  Tomcat 은 사설 대역(10/8, 172.16/12, 192.168/16, 127/8)에서 온 프록시의 헤더만 믿는다. Docker 네트워크의 프록시가 여기에 든다.
+- 세션 쿠키와 CSRF 쿠키는 `WORKBENCH_SECURE_COOKIE=true`(운영 기본값)로 Secure 다. HTTPS 가 없는 로컬 확인에서만 끈다.
+- HSTS 는 앞단이 붙이는 것을 기본으로 한다. 앞단이 붙이지 않으면 `WORKBENCH_HSTS=true` 로 앱이 붙인다.
+- 실제 홈서버 주소, 도메인, 계정, 키, 경로는 이 저장소에 넣지 않는다. 홈서버의 `.env` 에만 둔다.
 
 이번 작업에서는 홈서버에 배포하지 않았다. 아래 절차는 로컬 Compose 에서 확인했다(2026-10-20, macOS, Colima).
+실제 Google 로그인은 client 가 없어 확인하지 못했다. 가짜 OIDC 공급자로 같은 리다이렉트 흐름을 확인했다.
+
+## Google OAuth client 만들기
+
+1. Google Cloud Console 에서 프로젝트를 고르거나 새로 만든다.
+2. 「API 및 서비스 → OAuth 동의 화면」 에서 사용자 유형을 「외부」 로 고른다. 개인 Gmail 사용자가 들어와야 하기 때문이다.
+   앱 이름, 지원 이메일을 넣고 범위는 `openid`, `email`, `profile` 만 고른다. 게시 상태가 「테스트」 면 테스트 사용자에 쓸 Gmail 을 넣는다.
+3. 「사용자 인증 정보 → 사용자 인증 정보 만들기 → OAuth 클라이언트 ID」 에서 유형을 「웹 애플리케이션」 으로 고른다.
+4. 「승인된 리디렉션 URI」 에 `https://<공개 origin>/login/oauth2/code/google` 을 넣는다. 끝의 경로가 정확히 같아야 한다.
+   「승인된 JavaScript 원본」 은 비워 둔다. 브라우저가 Google API 를 직접 부르지 않는다.
+5. 만든 뒤 나오는 두 값을 홈서버의 `.env` 에 넣는다.
+
+| 받은 값 | 환경변수 |
+| --- | --- |
+| 클라이언트 ID | `GOOGLE_CLIENT_ID` |
+| 클라이언트 보안 비밀번호 | `GOOGLE_CLIENT_SECRET` |
+
+두 값이 비어 있으면 운영 프로필의 app 은 시작하지 않는다.
 
 ## 준비
 
 ```bash
 # cwd: financial-workbench
 cp .env.example .env
-# .env 에서 NEO4J_PASSWORD 를 정한다. 기본값은 없다
-docker compose config --quiet
+# .env 에서 NEO4J_PASSWORD, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, WORKBENCH_BOOTSTRAP_ADMIN_EMAIL 을 채운다
+bash scripts/check-compose.sh
 ```
 
 | 변수 | 필수 | 설명 |
 | --- | --- | --- |
 | `NEO4J_PASSWORD` | 예 | Neo4j 비밀번호. 비어 있으면 Compose 와 API 가 모두 시작하지 않는다 |
-| `WORKBENCH_BIND` | 아니요 | app 을 열 호스트 주소. 기본 `127.0.0.1` |
-| `WORKBENCH_PORT` | 아니요 | app 호스트 포트. 기본 `8081` |
-| `WORKBENCH_SECURE_COOKIE` | 아니요 | HTTPS 뒤에서 `true` |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 예 | Google OAuth client. 비어 있으면 API 가 시작하지 않는다 |
+| `WORKBENCH_BOOTSTRAP_ADMIN_EMAIL` | 처음 한 번 | 사용자가 한 명도 없을 때 만들 첫 ADMIN 의 Gmail. 사용자가 있으면 무시한다 |
+| `WORKBENCH_BIND`, `WORKBENCH_PORT` | 아니요 | app 을 열 호스트 주소와 포트. 기본 `127.0.0.1`, `8081` |
+| `WORKBENCH_SECURE_COOKIE` | 아니요 | 기본 `true` |
+| `WORKBENCH_FORWARD_HEADERS_STRATEGY` | 아니요 | 기본 `native`. 앞단 없이 직접 열면 `none` |
+| `WORKBENCH_SESSION_TIMEOUT` | 아니요 | 유휴 세션 만료. 기본 `8h` |
+| `WORKBENCH_HSTS` | 아니요 | 기본 `false` |
+| `WORKBENCH_IMAGE` | 아니요 | GHCR 이미지를 쓸 때 `ghcr.io/jon890/fos-graphrag-workbench:sha-<7자리>` |
 
-## 실행
+## 실행과 첫 관리자
 
 ```bash
 # cwd: financial-workbench
-docker compose up -d --build --wait
+docker compose up -d --build --wait     # GHCR 이미지를 쓰면 WORKBENCH_IMAGE 를 두고 docker compose pull app 다음 --build 없이 실행
 curl -fsS http://127.0.0.1:8081/api/health
 ```
 
-`--wait` 는 두 컨테이너의 health check 가 통과할 때까지 기다린다.
-`neo4j` 는 `cypher-shell 'RETURN 1'` 로, `app` 은 `/api/health` 로 상태를 확인한다.
+첫 관리자는 `WORKBENCH_BOOTSTRAP_ADMIN_EMAIL` 의 Gmail 로 로그인한다. 그 뒤 「사용자」 탭에서 다른 사람의 Gmail 과 역할을 추가한다.
+공개 가입은 없다. 목록에 없는 계정은 로그인 화면에서 「접근 권한이 없습니다」 를 본다.
 
-## 사용자 만들기
+| 역할 | 할 수 있는 일 |
+| --- | --- |
+| `VIEWER` | 조회만 |
+| `EDITOR` | 지식 데이터의 생성, 수정, 검토, 보관, 복원 |
+| `ADMIN` | EDITOR 권한과 사용자 관리 |
 
-공개 가입은 없다. 아래 명령으로만 계정을 만든다. 비밀번호는 명령 인자가 아니라 환경변수로 넘겨 셸 기록에 남지 않게 한다.
+마지막 활성 ADMIN 은 강등하거나 비활성화할 수 없다. 사용자를 비활성화하면 그 사람의 세션은 다음 요청에서 끊긴다.
 
-```bash
-# cwd: financial-workbench
-read -s WORKBENCH_USER_PASSWORD && export WORKBENCH_USER_PASSWORD
-scripts/user-add.sh alice "Alice"
-unset WORKBENCH_USER_PASSWORD
-```
+## 이미지 배포
 
-`scripts/user-add.sh` 는 `docker compose run --rm --no-deps app user-add <username> <displayName>` 를 실행한다.
-같은 이름이 있으면 실패한다. 비밀번호는 12자 이상이어야 한다.
+`.github/workflows/workbench-image.yml` 이 `ghcr.io/jon890/fos-graphrag-workbench` 에 `latest` 와 `sha-<7자리>` 태그로 올린다.
+Actions 결제 한도 때문에 `workflow_dispatch` 로만 실행한다. 플랫폼은 `linux/amd64` 다.
+홈서버에서는 `latest` 대신 `sha-<7자리>` 를 `WORKBENCH_IMAGE` 에 고정해 쓴다.
 
 ## 자원 설정
 
-`compose.yml` 은 홈서버의 다른 서비스와 메모리를 나눠 쓰도록 상한을 둔다.
+| 서비스 | 변수 | 기본값 | 근거 |
+| --- | --- | --- | --- |
+| `neo4j` | `WORKBENCH_NEO4J_MEM_LIMIT` | `1536m` | heap 과 page cache 를 더한 1 GiB 에 JVM 밖 메모리(스레드, 네트워크 버퍼, 네이티브)로 0.5 GiB 를 더했다 |
+| `neo4j` | `NEO4J_HEAP_SIZE` | `512m` | 두 사람이 쓰는 수천 노드 규모의 쿼리와 트랜잭션에 충분하다 |
+| `neo4j` | `NEO4J_PAGECACHE_SIZE` | `512m` | 첫 버전의 저장소 크기(수십 MiB)를 모두 담고도 남는다. 데이터가 늘면 이 값을 먼저 키운다 |
+| `app` | `WORKBENCH_API_MEM_LIMIT` | `768m` | JVM 은 `-XX:MaxRAMPercentage=70` 으로 이 한도의 70%(약 537 MiB)를 heap 상한으로 쓴다 |
 
-| 서비스 | 메모리 상한 | 세부 |
-| --- | --- | --- |
-| `neo4j` | 1536 MiB | heap 512 MiB, page cache 512 MiB |
-| `app` | 768 MiB | JVM `-XX:MaxRAMPercentage=70` |
+`deploy.resources` 는 쓰지 않는다. 일반 `docker compose` 가 적용하는 `mem_limit` 을 쓴다.
 
-데이터가 늘면 page cache 를 먼저 키운다. 두 사람이 쓰는 규모에서는 이 값으로 충분하다.
+## 컨테이너 보안
+
+- 모든 컨테이너에 `cap_drop: [ALL]` 과 `no-new-privileges:true` 를 둔다.
+- `neo4j` 만 `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID`, `KILL` 을 되살린다.
+  시작 스크립트가 `/data` 소유자를 맞추고 `neo4j` 사용자로 바꾸는 데 앞의 다섯이 필요하다.
+  `KILL` 이 없으면 tini 가 `neo4j` 사용자 프로세스에 종료 신호를 넘기지 못한다(`Operation not permitted`). 그러면 깨끗하게 종료되지 않아 오프라인 덤프가 거부된다.
+- `app` 은 uid 10001 로 돌고 cap 이 없다.
+- docker.sock 은 어느 컨테이너에도 마운트하지 않는다.
+- 운영 Neo4j 이미지는 `neo4j:5.26.30-community@sha256:...` 로 digest 를 고정한다.
+
+`scripts/check-compose.sh` 가 위 규칙과 포트 규칙을 `docker compose config` 출력으로 검사한다.
 
 ## 재시작과 데이터 보존
 
@@ -84,50 +125,66 @@ unset WORKBENCH_USER_PASSWORD
 ## 백업
 
 Neo4j Community 에디션은 온라인 백업(`neo4j-admin database backup`)을 지원하지 않는다.
-`neo4j-admin database dump` 로 오프라인 덤프를 만든다. **덤프하는 동안 `neo4j` 컨테이너가 멈춰 있어야 한다.**
-데이터베이스 파일을 쓰는 프로세스가 있으면 dump 가 거부되거나 일관되지 않은 파일을 읽는다.
-`app` 도 함께 멈춘다. `app` 이 떠 있으면 사용자가 쓰기 실패를 보고 재시도하는 사이에 상태가 엇갈린다.
+`neo4j-admin database dump` 로 오프라인 덤프를 만든다. **덤프하는 동안 `neo4j` 가 깨끗하게 종료된 상태여야 한다.**
+강제 종료되어 트랜잭션 로그가 남아 있으면 dump 가 `Active logical log detected` 로 거부한다.
+그래서 `neo4j` 의 `stop_grace_period` 를 2분으로 두고, 스크립트도 `docker compose stop -t 120 neo4j` 로 멈춘다.
+
+멈춘 동안 API 의 응답은 이렇다.
+
+| 멈춘 것 | `/api/health` | 그 밖의 API |
+| --- | --- | --- |
+| `app` 과 `neo4j` 모두(백업 스크립트) | 응답 없음. 앞단은 502 나 503 을 낸다 | 응답 없음 |
+| `neo4j` 만 | `503 {"status":"DOWN"}` | 조회와 쓰기 모두 `503 DATABASE_UNAVAILABLE`. 쓰기가 반쯤 남는 일은 없다 |
+
+스크립트는 `app` 도 함께 멈춘다. 백업 중에는 쓰기가 아예 들어오지 않게 하는 편이 사용자에게 분명하다.
 
 ```bash
 # cwd: financial-workbench
 scripts/backup.sh
 ```
 
-스크립트가 하는 일은 다음과 같다.
-
-1. `docker compose stop app neo4j`
+1. `docker compose stop app`, `docker compose stop -t 120 neo4j`
 2. 임시 디렉터리 `backups/tmp-<시각>` 을 `/backups` 로 마운트하고 `neo4j-admin database dump neo4j --to-path=/backups` 를 `neo4j` 이미지로 실행한다.
 3. 덤프 파일을 `backups/neo4j-YYYYMMDD-HHMMSS.dump` 로 옮긴다.
-4. 성공하든 실패하든 `docker compose start neo4j app` 다음 `up -d --wait` 로 health 를 기다린다.
+4. 성공하든 실패하든 `docker compose start neo4j app` 다음 두 컨테이너가 healthy 가 될 때까지 기다린다. 컨테이너를 다시 만들지 않는다.
 
 중단 시간은 데이터 크기에 비례한다. 첫 버전 규모에서는 수십 초다.
-`backups/` 는 Git 에 넣지 않는다. 홈서버 밖(다른 디스크나 친구 장비)으로 복사해 둔다.
+`backups/` 는 Git 에 넣지 않는다. 홈서버 밖(다른 디스크나 다른 장비)으로 복사해 둔다.
+Compose 파일을 여러 개 겹쳐 쓰는 환경이면 `COMPOSE_FILE` 환경변수로 넘긴다(예: `COMPOSE_FILE=compose.yml:compose.override.yml`).
 
 ## 복원
 
 ```bash
-# cwd: financial-workbench
-scripts/restore.sh backups/neo4j-20261020-120000.dump
+scripts/restore.sh backups/neo4j-20261020-120000.dump    # 어느 디렉터리에서 실행해도 된다
 ```
 
-1. `docker compose stop app neo4j`
-2. 덤프 파일을 `backups/restore/neo4j.dump` 로 복사한다. `load` 는 디렉터리에서 `<데이터베이스 이름>.dump` 를 찾는다.
-3. `backups/restore` 를 `/backups` 로 마운트하고 `neo4j-admin database load neo4j --from-path=/backups --overwrite-destination=true` 를 실행한다.
-4. `docker compose start neo4j app` 다음 health 를 기다린다.
+1. `app` 과 `neo4j` 를 한 번만 멈춘다.
+2. 멈춘 상태에서 현재 데이터를 `backups/neo4j-before-restore-<시각>.dump` 로 먼저 덤프한다. 이 덤프가 실패하면 덮어쓰지 않고 멈춘다.
+3. 덤프 파일을 `backups/restore/neo4j.dump` 로 복사하고 `neo4j-admin database load neo4j --from-path=/backups --overwrite-destination=true` 를 실행한다.
+4. `neo4j` 와 `app` 을 다시 시작하고 healthy 를 기다린다.
 
-복원은 현재 데이터베이스를 덮어쓴다. 스크립트는 덮어쓰기 전에 현재 상태를 한 번 더 덤프한다.
-
-로컬에서 확인한 순서는 이렇다. 백업을 만들고, Company 노드 하나를 지워 노드 수를 5 에서 4 로 줄인 뒤 복원했다.
-복원 뒤 노드 수가 5 로 돌아왔고, 같은 스택에서 브라우저 흐름 1~6 이 다시 통과했다.
+로컬에서 확인한 순서는 이렇다. 백업을 만들고, Company 노드 하나를 지워 노드 수를 줄인 뒤 복원했다.
+복원 뒤 노드 수가 백업 시점 값으로 돌아왔다. 쓰기 직후의 백업과 복원도 성공했다.
 
 ## 개발 환경
 
 ```bash
 # cwd: financial-workbench
-docker compose -f compose.dev.yml up -d --wait     # Neo4j 만. 127.0.0.1:7476(Browser), 127.0.0.1:7689(Bolt)
-cd api && NEO4J_PASSWORD=... ./gradlew bootRun     # API :8080
-cd web && npm ci && npm run dev                    # 웹 :5173, /api 를 :8080 으로 넘긴다
+docker compose -f compose.dev.yml up -d --wait     # Neo4j 127.0.0.1:7476(Browser), 127.0.0.1:7689(Bolt), 가짜 OIDC 127.0.0.1:8090
+cd api && NEO4J_PASSWORD=... ./gradlew bootRun --args='--spring.profiles.active=mockoidc --workbench.bootstrap.admin-email=admin@example.com'
+cd web && npm ci && npm run dev                    # 웹 :5173, /api 와 OAuth 경로를 :8080 으로 넘긴다
 ```
 
+개발 로그인은 가짜 공급자의 폼에서 아무 sub 과 claims JSON(`{"email":"admin@example.com","email_verified":true}`)을 넣는다.
 개발 Compose 의 포트는 `127.0.0.1` 에만 묶인다. `python-graphrag` 의 `7475`, `7688` 과 겹치지 않는다.
 개발 Compose 의 프로젝트 이름은 `fos-workbench-dev` 이고 볼륨도 운영 Compose 와 따로 쓴다.
+
+## 브라우저 테스트
+
+```bash
+# cwd: financial-workbench
+COMPOSE_FILE=compose.yml:compose.e2e.yml docker compose up -d --build --wait
+cd web && WORKBENCH_URL=http://127.0.0.1:8081 E2E_ADMIN_NAME=관리자 npx playwright test
+```
+
+`compose.e2e.yml` 은 가짜 OIDC 공급자를 더하고 app 을 `prod,mockoidc` 프로필로 띄운다. TLS 가 없으므로 Secure 쿠키를 끈다. 운영에서 쓰지 않는다.

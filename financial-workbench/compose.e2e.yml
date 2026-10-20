@@ -1,0 +1,24 @@
+# 브라우저 테스트 전용 override. 운영 Compose 위에 겹쳐 쓴다:
+#   docker compose -f compose.yml -f compose.e2e.yml up -d --build --wait
+# 실제 Google 대신 가짜 OIDC 공급자를 쓰고, TLS 가 없으므로 Secure 쿠키를 끈다. 운영에서 쓰지 않는다.
+services:
+  mock-oidc:
+    image: ghcr.io/navikt/mock-oauth2-server:3.0.1@sha256:4f3660e5f3586b81fe2e0d42d0c9fcd3c8c64268db0d3ade261dadd70d27020b
+    environment:
+      JSON_CONFIG: '{"interactiveLogin":true}'
+    ports:
+      - "127.0.0.1:8090:8080"
+
+  app:
+    depends_on:
+      - mock-oidc
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,mockoidc
+      GOOGLE_CLIENT_ID: workbench-e2e
+      GOOGLE_CLIENT_SECRET: workbench-e2e-secret
+      # 브라우저는 호스트 포트로, app 은 Compose 내부 이름으로 같은 공급자에 간다
+      MOCK_OIDC_BROWSER_URL: http://localhost:8090
+      MOCK_OIDC_INTERNAL_URL: http://mock-oidc:8080
+      WORKBENCH_BOOTSTRAP_ADMIN_EMAIL: "${E2E_ADMIN_EMAIL:-admin@example.com}"
+      WORKBENCH_SECURE_COOKIE: "false"
+      WORKBENCH_FORWARD_HEADERS_STRATEGY: none
