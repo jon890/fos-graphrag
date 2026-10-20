@@ -8,10 +8,14 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | testid | 요소 |
 | --- | --- |
 | `app-loading` | 세션 확인 중 표시 |
-| `login-form`, `login-username`, `login-password`, `login-submit` | 로그인 폼 |
-| `login-error` | 로그인 실패 메시지(서버 `message`) |
+| `login-form` | 로그인 화면 |
+| `login-google` | 「Google 로 로그인」. `/oauth2/authorization/google` 로 브라우저가 이동한다 |
+| `login-denied` | `/?login=denied` 로 돌아왔을 때 「접근 권한이 없습니다」 안내. `login-google` 도 함께 보인다 |
+| `login-notice` | 세션이 끊겨 돌아왔을 때의 안내 |
 | `tab-workspace`, `tab-list`, `tab-review`, `tab-changes`, `tab-ontology` | 상단 탭 |
-| `current-user-name` | 로그인 사용자의 표시 이름(displayName) |
+| `tab-users` | 사용자 탭. ADMIN 에게만 나온다 |
+| `current-user-name`, `current-user-email` | 로그인 사용자의 표시 이름, 이메일 |
+| `current-user-role` | 역할 배지. `data-role` 이 VIEWER, EDITOR, ADMIN |
 | `logout-button` | 로그아웃 |
 | `ontology-error` | 온톨로지를 받지 못했을 때 |
 
@@ -27,7 +31,8 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `search-result` * | 결과 한 줄. `data-node-id`, `data-node-type`. 이름은 안쪽 `.result-label` |
 | `search-empty` | 결과 없음 |
 | `search-pager-prev`, `search-pager-next`, `search-pager-info` | 결과가 2쪽 이상일 때 |
-| `new-node-type`, `new-node-button` | 새 노드 타입 select 와 만들기 버튼 |
+| `new-node-type`, `new-node-button` | 새 노드 타입 select 와 만들기 버튼. VIEWER 에게는 없다 |
+| `viewer-create-hint` | VIEWER 에게 보이는 「노드를 만들 수 없습니다」 안내 |
 | `create-form`, `create-submit`, `create-cancel`, `create-error` | 새 노드 폼 |
 | `create-prop-<속성>` | 새 노드 폼의 속성 입력. 예: `create-prop-name`, `create-prop-market` |
 | `create-prop-<속성>-error` | 그 속성의 오류 |
@@ -52,12 +57,15 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 
 ## 작업 공간: 오른쪽 상세
 
+VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relationship-add-toggle`, `relationship-archive-toggle`, `claim-add-toggle`, `review-controls`, `claim-edit-form` 이 나오지 않는다. `edit-prop-*` 입력은 비활성이다.
+
 | testid | 요소 |
 | --- | --- |
 | `detail-empty`, `detail-error` | 선택 없음, 상세 조회 실패 |
 | `detail-panel` | 상세 전체. `data-node-id`, `data-node-type` |
 | `detail-label`, `detail-archived` | 노드 이름, 「보관됨」 표시 |
 | `detail-notice` | 저장, 보관 결과 안내. `data-kind` 가 `success`, `conflict`(409 REVISION_CONFLICT), `error` |
+| `viewer-hint` | VIEWER 에게 보이는 「조회만 할 수 있습니다」 안내 |
 | `node-history-link` | 「이 노드 이력」. 변경 이력 탭으로 가며 targetId 필터를 채운다 |
 | `node-center-graph` | 이 노드를 그래프 중심으로 |
 | `node-archive-reason`, `node-archive-button` | 보관 사유와 보관 버튼(보관되지 않은 노드) |
@@ -129,6 +137,7 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `review-row` * | 행. `data-claim-id` |
 | `review-row-note`, `review-row-approve`, `review-row-reject` | 행 안의 메모, 검토 완료, 반려 |
 | `review-own-hint` | 자기 Claim 이라 버튼이 꺼졌다는 안내 |
+| `review-viewer-hint` | VIEWER 라 버튼이 꺼졌다는 안내 |
 | `review-message`, `review-error`, `review-empty` | 처리 결과, 오류, 빈 목록 |
 | `review-pager-prev`, `review-pager-next`, `review-pager-info` | 페이지 이동 |
 
@@ -137,7 +146,7 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | testid | 요소 |
 | --- | --- |
 | `changes-tab`, `changes-table` | 탭과 표 |
-| `changes-target-filter`, `changes-actor-filter`, `changes-filter-submit`, `changes-filter-clear` | targetId, actor 필터 |
+| `changes-target-filter`, `changes-actor-filter`, `changes-filter-submit`, `changes-filter-clear` | targetId 필터, actor(이메일) 필터 |
 | `change-row` * | 행. `data-action`(CREATE, UPDATE, REVIEW, ARCHIVE, RESTORE), `data-target-id` |
 | `change-action` * | action 칸 |
 | `changes-empty` | 이력 없음 |
@@ -150,3 +159,16 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `ontology-tab`, `ontology-version` | 탭, schemaVersion |
 | `ontology-node-type` * | 노드 타입 한 개. `data-type` |
 | `ontology-relationships`, `ontology-predicates` | 관계 타입 표, Claim predicate 표 |
+
+## 사용자 탭 (ADMIN)
+
+| testid | 요소 |
+| --- | --- |
+| `users-tab`, `users-table`, `users-refresh` | 탭, 표, 새로고침 |
+| `users-add-form`, `users-add-email`, `users-add-name`, `users-add-role`, `users-add-submit` | 허용 사용자 추가 |
+| `users-message` | 처리 결과. `data-kind` 가 `success` 나 `error`. 오류(LAST_ADMIN, REVISION_CONFLICT, DUPLICATE 등)는 서버 `message` |
+| `users-row` * | 행. `data-email`, `data-enabled`(`true`, `false`) |
+| `users-row-role`, `users-row-save` | 역할 select 와 저장 |
+| `users-row-disable`, `users-row-enable` | 비활성화, 다시 활성화(상태에 따라 하나만 보인다) |
+| `users-row-enabled`, `users-row-linked` | 「활성」/「비활성」, 「로그인함」/「첫 로그인 전」 |
+| `users-row-history` | 그 사용자의 변경 이력 |

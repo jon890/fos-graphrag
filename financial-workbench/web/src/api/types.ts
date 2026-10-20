@@ -10,8 +10,38 @@ export type PropertyValue = string | number | boolean | null
 
 export interface UserRef {
   id: string
-  username: string
+  email: string
   displayName: string
+}
+
+export type Role = 'VIEWER' | 'EDITOR' | 'ADMIN'
+export const ROLES: Role[] = ['VIEWER', 'EDITOR', 'ADMIN']
+
+/** GET /api/auth/me */
+export interface CurrentUser extends UserRef {
+  role: Role
+}
+
+/** GET /api/users 의 한 행. ADMIN 만 받는다 */
+export interface UserView {
+  id: string
+  email: string
+  displayName: string
+  role: Role
+  enabled: boolean
+  /** Google sub 이 묶였는지. 첫 로그인 전에는 false */
+  linked: boolean
+  revision: number
+  createdAt: string
+  updatedAt: string
+  lastLoginAt: string | null
+}
+
+export interface PatchUserRequest {
+  expectedRevision: number
+  role?: Role
+  displayName?: string
+  enabled?: boolean
 }
 
 export interface NodeRef {
@@ -120,7 +150,7 @@ export interface ChangeEventView {
   actor: UserRef
   action: ChangeAction
   targetId: string
-  targetKind: 'NODE' | 'RELATIONSHIP'
+  targetKind: 'NODE' | 'RELATIONSHIP' | 'USER'
   targetType: string
   targetLabel: string
   revision: number

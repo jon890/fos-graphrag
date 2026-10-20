@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage, setUnauthorizedHandler } from './api/client'
-import type { Ontology, UserRef } from './api/types'
-import { AppContext } from './context'
+import type { CurrentUser, Ontology } from './api/types'
+import { AppContext, canEditRole, ROLE_LABEL } from './context'
 import { LoginView } from './components/LoginView'
 import { Workspace } from './components/Workspace'
 import { ListTab } from './components/ListTab'
 import { ReviewTab } from './components/ReviewTab'
 import { ChangesTab } from './components/ChangesTab'
 import { OntologyTab } from './components/OntologyTab'
+import { UsersTab } from './components/UsersTab'
 
-export type TabKey = 'workspace' | 'list' | 'review' | 'changes' | 'ontology'
+export type TabKey = 'workspace' | 'list' | 'review' | 'changes' | 'ontology' | 'users'
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'workspace', label: '작업 공간' },
@@ -17,12 +18,19 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'review', label: '검토 대기' },
   { key: 'changes', label: '변경 이력' },
   { key: 'ontology', label: '온톨로지' },
+  { key: 'users', label: '사용자' },
 ]
 
-type AuthState = { status: 'checking' } | { status: 'anonymous'; notice?: string } | { status: 'signed-in'; user: UserRef }
+/** /?login=denied 인지 본다. 서버가 허용하지 않은 로그인 뒤 여기로 돌려보낸다. */
+function readLoginDenied(): boolean {
+  return new URLSearchParams(window.location.search).get('login') === 'denied'
+}
+
+type AuthState = { status: 'checking' } | { status: 'anonymous'; notice?: string } | { status: 'signed-in'; user: CurrentUser }
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState>({ status: 'checking' })
+  const [denied, setDenied] = useState(readLoginDenied)
   const [ontology, setOntology] = useState<Ontology | null>(null)
   const [ontologyError, setOntologyError] = useState<string | null>(null)
   const [tab, setTab] = useState<TabKey>('workspace')
@@ -39,7 +47,11 @@ export default function App() {
     })
     api.auth
       .me()
-      .then((user) => setAuth({ status: 'signed-in', user }))
+      .then((user) => {
+        // 로그인에 성공했으면 주소창의 ?login=denied 같은 흔적을 지운다.
+        if (window.location.search) window.history.replaceState(null, '', window.location.pathname)
+        setAuth({ status: 'signed-in', user })
+      })
       .catch(() => setAuth({ status: 'anonymous' }))
     return () => setUnauthorizedHandler(null)
   }, [])
@@ -81,6 +93,7 @@ export default function App() {
     }
     focusNode(null)
     setOntology(null)
+    setDenied(false)
     setTab('workspace')
     setAuth({ status: 'anonymous' })
   }
@@ -89,20 +102,25 @@ export default function App() {
     return <div className="center-message" data-testid="app-loading">불러오는 중…</div>
   }
   if (auth.status === 'anonymous') {
-    return <LoginView notice={auth.notice} onLoggedIn={(user) => setAuth({ status: 'signed-in', user })} />
+    return <LoginView denied={denied} notice={auth.notice} />
   }
+
+  const user = auth.user
+  const canEdit = canEditRole(user.role)
+  const visibleTabs = TABS.filter((t) => t.key !== 'users' || user.role === 'ADMIN')
+  const activeTab: TabKey = visibleTabs.some((t) => t.key === tab) ? tab : 'workspace'
 
   return (
     <div className="app">
       <header className="app-header">
         <div className="app-title">금융 온톨로지 워크벤치</div>
         <nav className="tabs" role="tablist">
-          {TABS.map((t) => (
+          {visibleTabs.map((t) => (
             <button
               key={t.key}
               role="tab"
-              aria-selected={tab === t.key}
-              className={tab === t.key ? 'tab active' : 'tab'}
+              aria-selected={activeTab === t.key}
+              className={activeTab === t.key ? 'tab active' : 'tab'}
               data-testid={`tab-${t.key}`}
               onClick={() => setTab(t.key)}
             >
@@ -111,8 +129,14 @@ export default function App() {
           ))}
         </nav>
         <div className="user-box">
-          <span data-testid="current-user-name">{auth.user.displayName}</span>
-          <span className="muted"> ({auth.user.username})</span>
+          <span data-testid="current-user-name">{user.displayName}</span>
+          <span className="muted" data-testid="current-user-email">
+            {' '}
+            {user.email}
+          </span>
+          <span className={`role-badge role-${user.role.toLowerCase()}`} data-testid="current-user-role" data-role={user.role}>
+            {user.role} · {ROLE_LABEL[user.role] ?? user.role}
+          </span>
           <button className="link-button" data-testid="logout-button" onClick={logout}>
             로그아웃
           </button>
@@ -122,8 +146,8 @@ export default function App() {
         {ontologyError && <div className="error-box" data-testid="ontology-error">{ontologyError}</div>}
         {!ontology && !ontologyError && <div className="center-message">온톨로지를 불러오는 중…</div>}
         {ontology && (
-          <AppContext.Provider value={{ user: auth.user, ontology }}>
-            {tab === 'workspace' && (
+          <AppContext.Provider value={{ user, ontology, canEdit }}>
+            {activeTab === 'workspace' && (
               <Workspace
                 centerId={centerId}
                 focusSeq={focusSeq}
@@ -133,12 +157,13 @@ export default function App() {
                 onOpenHistory={openHistory}
               />
             )}
-            {tab === 'list' && <ListTab onOpen={openNode} />}
-            {tab === 'review' && <ReviewTab onOpen={openNode} />}
-            {tab === 'changes' && (
+            {activeTab === 'list' && <ListTab onOpen={openNode} />}
+            {activeTab === 'review' && <ReviewTab onOpen={openNode} />}
+            {activeTab === 'changes' && (
               <ChangesTab targetId={changesTargetId} onTargetIdChange={setChangesTargetId} onOpen={openNode} />
             )}
-            {tab === 'ontology' && <OntologyTab />}
+            {activeTab === 'ontology' && <OntologyTab />}
+            {activeTab === 'users' && user.role === 'ADMIN' && <UsersTab onOpenHistory={openHistory} />}
           </AppContext.Provider>
         )}
       </main>

@@ -10,10 +10,13 @@ import type {
   Ontology,
   Page,
   PatchClaimRequest,
+  PatchUserRequest,
   PropertyValue,
   RelationshipView,
   ReviewStatus,
-  UserRef,
+  CurrentUser,
+  Role,
+  UserView,
 } from './types'
 
 export class ApiError extends Error {
@@ -38,25 +41,14 @@ export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler
 }
 
-// 쿠키를 읽지 못하는 환경을 대비해 /api/auth/csrf 본문의 토큰도 기억해 둔다.
-let lastToken: string | null = null
-
 function cookieToken(): string | null {
   return typeof document === 'undefined' ? null : readCookie(document.cookie, CSRF_COOKIE)
 }
 
-/** CSRF 토큰을 새로 받는다. 로그인, 로그아웃 뒤와 CSRF_REJECTED 재시도 때 부른다. */
+/** CSRF 쿠키를 새로 받는다. 토큰 값은 응답 본문이 아니라 XSRF-TOKEN 쿠키에서 읽는다. */
 export async function refreshCsrf(): Promise<string | null> {
-  const res = await fetch('/api/auth/csrf', { method: 'GET', credentials: 'same-origin', headers: { Accept: 'application/json' } })
-  if (res.ok) {
-    try {
-      const body = (await res.json()) as { token?: string }
-      lastToken = body.token ?? null
-    } catch {
-      lastToken = null
-    }
-  }
-  return cookieToken() ?? lastToken
+  await fetch('/api/auth/csrf', { method: 'GET', credentials: 'same-origin', headers: { Accept: 'application/json' } })
+  return cookieToken()
 }
 
 async function csrfToken(): Promise<string | null> {
@@ -77,7 +69,7 @@ async function toApiError(res: Response): Promise<ApiError> {
 }
 
 interface RequestOptions {
-  /** 401 이어도 로그인 화면으로 보내지 않는다. 로그인 요청과 최초 /me 확인에 쓴다. */
+  /** 401 이어도 로그인 화면으로 보내지 않는다. 최초 /me 확인과 로그아웃에 쓴다. */
   noAuthRedirect?: boolean
 }
 
@@ -125,6 +117,8 @@ export function buildQuery(params: Record<string, string | number | boolean | nu
 
 const enc = encodeURIComponent
 
+export const GOOGLE_LOGIN_PATH = '/oauth2/authorization/google'
+
 export interface NodeSearchParams {
   q?: string
   types?: string[]
@@ -143,21 +137,18 @@ export interface NeighborhoodParams {
 
 export const api = {
   auth: {
-    me: () => request<UserRef>('GET', '/api/auth/me', undefined, { noAuthRedirect: true }),
-    async login(username: string, password: string): Promise<UserRef> {
-      await refreshCsrf()
-      const user = await request<UserRef>('POST', '/api/auth/login', { username, password }, { noAuthRedirect: true })
-      // 로그인하면 세션 ID 가 바뀌므로 CSRF 토큰도 다시 받는다.
-      await refreshCsrf()
-      return user
+    me: () => request<CurrentUser>('GET', '/api/auth/me', undefined, { noAuthRedirect: true }),
+    /** Google OIDC 로그인. fetch 가 아니라 브라우저 이동이다. 서버가 끝나면 / 나 /?login=denied 로 돌려보낸다. */
+    startGoogleLogin(): void {
+      window.location.href = GOOGLE_LOGIN_PATH
     },
-    async logout(): Promise<void> {
-      try {
-        await request<void>('POST', '/api/auth/logout', undefined, { noAuthRedirect: true })
-      } finally {
-        lastToken = null
-      }
-    },
+    logout: () => request<void>('POST', '/api/auth/logout', undefined, { noAuthRedirect: true }),
+  },
+  users: {
+    list: () => request<UserView[]>('GET', '/api/users'),
+    create: (email: string, displayName: string, role: Role) =>
+      request<UserView>('POST', '/api/users', { email, displayName, role }),
+    patch: (id: string, body: PatchUserRequest) => request<UserView>('PATCH', `/api/users/${enc(id)}`, body),
   },
   ontology: () => request<Ontology>('GET', '/api/ontology'),
   nodes: {

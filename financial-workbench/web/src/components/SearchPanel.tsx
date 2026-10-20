@@ -23,7 +23,7 @@ interface Props {
 }
 
 export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, refreshTick, typesParam }: Props) {
-  const { ontology } = useApp()
+  const { ontology, canEdit } = useApp()
   const [qInput, setQInput] = useState(filters.q)
   const [pageNo, setPageNo] = useState(0)
   const [result, setResult] = useState<Page<NodeView> | null>(null)
@@ -161,7 +161,11 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, ref
       </div>
 
       <div className="create-box">
-        {!creating ? (
+        {!canEdit ? (
+          <div className="muted small" data-testid="viewer-create-hint">
+            열람자(VIEWER)는 노드를 만들 수 없습니다.
+          </div>
+        ) : !creating ? (
           <div className="row">
             <select data-testid="new-node-type" value={createType} onChange={(e) => setCreateType(e.target.value)}>
               <option value="">새 노드 타입</option>

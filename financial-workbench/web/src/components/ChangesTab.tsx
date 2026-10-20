@@ -50,8 +50,8 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
           <input data-testid="changes-target-filter" className="mono" size={38} value={targetInput} onChange={(e) => setTargetInput(e.target.value)} />
         </label>
         <label className="field-inline">
-          사용자
-          <input data-testid="changes-actor-filter" value={actorInput} onChange={(e) => setActorInput(e.target.value)} />
+          사용자 이메일
+          <input data-testid="changes-actor-filter" type="email" placeholder="alice@example.com" value={actorInput} onChange={(e) => setActorInput(e.target.value)} />
         </label>
         <button type="submit" data-testid="changes-filter-submit">
           조회
@@ -88,13 +88,13 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
           {page?.items.map((c) => (
             <tr key={c.id} data-testid="change-row" data-action={c.action} data-target-id={c.targetId}>
               <td>{formatDateTime(c.at)}</td>
-              <td>{c.actor.displayName}</td>
+              <td title={c.actor.email}>{c.actor.displayName}</td>
               <td data-testid="change-action">
                 <span className={`action-badge action-${c.action.toLowerCase()}`}>{c.action}</span>
               </td>
               <td>
                 {c.targetType}
-                {c.targetKind === 'RELATIONSHIP' ? ' (관계)' : ''}
+                {c.targetKind === 'RELATIONSHIP' ? ' (관계)' : c.targetKind === 'USER' ? ' (사용자)' : ''}
               </td>
               <td>
                 {c.targetKind === 'NODE' ? (

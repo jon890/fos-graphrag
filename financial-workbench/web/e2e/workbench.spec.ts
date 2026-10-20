@@ -1,8 +1,9 @@
 import path from 'node:path'
-import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
 
-// 두 사용자(A, B)가 같은 서버에서 협업하는 흐름을 순서대로 확인한다.
-// 데이터 이름에 실행마다 다른 접미사를 붙여, 이전 실행이 남긴 데이터와 겹치지 않게 한다.
+// 두 편집자(A, B)와 관리자, 열람자가 같은 서버에서 협업하는 흐름을 순서대로 확인한다.
+// 로그인은 실제 Google 대신 가짜 OIDC 서버(navikt/mock-oauth2-server, interactiveLogin)를 거친다.
+// 데이터 이름과 이메일에 실행마다 다른 접미사를 붙여, 이전 실행이 남긴 데이터와 겹치지 않게 한다.
 
 const suffix = String(Date.now())
 const data = {
@@ -19,13 +20,24 @@ const data = {
   editByB: `B 가 고친 메모 ${suffix}`,
 }
 
-const screenshotDir = process.env.E2E_SCREENSHOT_DIR ?? 'test-results/screenshots'
-
-function requiredEnv(name: string): string {
-  const value = process.env[name]
-  if (!value) throw new Error(`환경 변수 ${name} 가 필요합니다.`)
-  return value
+interface TestUser {
+  sub: string
+  email: string
+  name: string
+  emailVerified?: boolean
 }
+
+const admin: TestUser = {
+  sub: process.env.E2E_ADMIN_SUB ?? 'admin-sub',
+  email: process.env.E2E_ADMIN_EMAIL ?? 'admin@example.com',
+  name: process.env.E2E_ADMIN_NAME ?? '관리자',
+}
+const editorA: TestUser = { sub: `editor-a-${suffix}`, email: `editor-a-${suffix}@example.com`, name: '편집자A' }
+const editorB: TestUser = { sub: `editor-b-${suffix}`, email: `editor-b-${suffix}@example.com`, name: '편집자B' }
+const viewer: TestUser = { sub: `viewer-${suffix}`, email: `viewer-${suffix}@example.com`, name: '열람자' }
+const stranger: TestUser = { sub: `stranger-${suffix}`, email: `stranger-${suffix}@example.com`, name: '외부인' }
+
+const screenshotDir = process.env.E2E_SCREENSHOT_DIR ?? 'test-results/screenshots'
 
 async function shot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: path.join(screenshotDir, `${name}.png`), fullPage: true })
@@ -39,16 +51,51 @@ function exact(text: string): RegExp {
   return new RegExp(`^\\s*${escapeRegExp(text)}\\s*$`)
 }
 
-async function login(page: Page, username: string, password: string): Promise<string> {
+/**
+ * 앱의 「Google 로 로그인」 을 눌러 가짜 OIDC 서버의 로그인 폼을 채운다.
+ * expect 가 success 면 앱에 로그인된 것을, denied 면 「접근 권한이 없습니다」 화면을 확인한다.
+ */
+async function loginAs(page: Page, user: TestUser, expectResult: 'success' | 'denied' = 'success'): Promise<void> {
   await page.goto('/')
-  await page.getByTestId('login-username').fill(username)
-  await page.getByTestId('login-password').fill(password)
-  await page.getByTestId('login-submit').click()
-  const name = page.getByTestId('current-user-name')
-  await expect(name).toBeVisible()
+  await page.getByTestId('login-google').click()
+  // 가짜 서버(http://localhost:8090/default/authorize?...)의 interactiveLogin 폼이다.
+  await page.waitForURL(/\/authorize/)
+  await page.locator('input[name=username]').fill(user.sub)
+  await page
+    .locator('textarea[name=claims]')
+    .fill(JSON.stringify({ email: user.email, email_verified: user.emailVerified ?? true, name: user.name }))
+  await page.locator('input[type=submit]').click()
+
+  if (expectResult === 'denied') {
+    await expect(page.getByTestId('login-denied')).toBeVisible()
+    await expect(page.getByTestId('login-google')).toBeVisible()
+    return
+  }
+  await expect(page.getByTestId('current-user-name')).toHaveText(user.name)
   // 온톨로지를 받아야 작업 공간이 그려진다.
   await expect(page.getByTestId('search-input')).toBeVisible()
-  return (await name.textContent())?.trim() ?? ''
+}
+
+async function newPage(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {
+  // 가짜 OIDC 서버의 세션 쿠키가 섞이지 않게 사용자마다 새 context 를 쓴다.
+  const context = await browser.newContext()
+  return { context, page: await context.newPage() }
+}
+
+async function addUser(page: Page, user: TestUser, role: 'VIEWER' | 'EDITOR' | 'ADMIN'): Promise<void> {
+  await page.getByTestId('users-add-email').fill(user.email)
+  await page.getByTestId('users-add-name').fill(user.name)
+  await page.getByTestId('users-add-role').selectOption(role)
+  await page.getByTestId('users-add-submit').click()
+  await expect(page.getByTestId('users-message')).toHaveAttribute('data-kind', 'success')
+  const row = usersRow(page, user.email)
+  await expect(row).toBeVisible()
+  await expect(row.getByTestId('users-row-role')).toHaveValue(role)
+  await expect(row.getByTestId('users-row-linked')).toHaveText('첫 로그인 전')
+}
+
+function usersRow(page: Page, email: string): Locator {
+  return page.locator(`[data-testid="users-row"][data-email="${email}"]`)
 }
 
 /** 작업 공간 왼쪽 검색으로 노드를 찾아 중심 노드로 연다. */
@@ -90,27 +137,51 @@ async function pick(page: Page, prefix: string, label: string): Promise<void> {
 
 test.describe.configure({ mode: 'serial' })
 
-test.describe('금융 온톨로지 워크벤치: 두 사용자 협업', () => {
-  let contextA: BrowserContext
-  let contextB: BrowserContext
+test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
+  const contexts: BrowserContext[] = []
+  let pageAdmin: Page
   let pageA: Page
   let pageB: Page
-  let displayNameB = ''
+  let pageViewer: Page
+  let contextViewer: BrowserContext
 
-  test.beforeAll(async ({ browser }) => {
-    contextA = await browser.newContext()
-    contextB = await browser.newContext()
-    pageA = await contextA.newPage()
-    pageB = await contextB.newPage()
-  })
+  async function open(browser: Browser): Promise<Page> {
+    const { context, page } = await newPage(browser)
+    contexts.push(context)
+    return page
+  }
 
   test.afterAll(async () => {
-    await contextA?.close()
-    await contextB?.close()
+    for (const context of contexts) await context.close()
   })
 
-  test('1) A 가 기업 두 개와 종목을 만들고 ISSUES 관계를 잇는다', async () => {
-    await login(pageA, requiredEnv('E2E_USER_A'), requiredEnv('E2E_PASSWORD_A'))
+  test('0) 관리자가 편집자 두 명과 열람자를 허용 사용자로 추가한다', async ({ browser }) => {
+    pageAdmin = await open(browser)
+    await loginAs(pageAdmin, admin)
+    await expect(pageAdmin.getByTestId('current-user-role')).toHaveAttribute('data-role', 'ADMIN')
+
+    await pageAdmin.getByTestId('tab-users').click()
+    await expect(pageAdmin.getByTestId('users-table')).toBeVisible()
+    await addUser(pageAdmin, editorA, 'EDITOR')
+    await addUser(pageAdmin, editorB, 'EDITOR')
+    await addUser(pageAdmin, viewer, 'VIEWER')
+    await shot(pageAdmin, '00-users-admin')
+  })
+
+  test('0b) 목록에 없는 이메일과 확인되지 않은 이메일은 로그인을 거절한다', async ({ browser }) => {
+    const strangerPage = await open(browser)
+    await loginAs(strangerPage, stranger, 'denied')
+
+    const unverifiedPage = await open(browser)
+    await loginAs(unverifiedPage, { ...editorA, sub: `unverified-${suffix}`, emailVerified: false }, 'denied')
+    await shot(unverifiedPage, '00b-denied')
+  })
+
+  test('1) A 가 기업 두 개와 종목을 만들고 ISSUES 관계를 잇는다', async ({ browser }) => {
+    pageA = await open(browser)
+    await loginAs(pageA, editorA)
+    await expect(pageA.getByTestId('current-user-role')).toHaveAttribute('data-role', 'EDITOR')
+    await expect(pageA.getByTestId('tab-users')).toHaveCount(0)
 
     await createNode(pageA, 'Company', data.supplier, { name: data.supplier, country: 'KR' })
     await createNode(pageA, 'Company', data.customer, { name: data.customer, country: 'KR' })
@@ -165,9 +236,9 @@ test.describe('금융 온톨로지 워크벤치: 두 사용자 협업', () => {
     await shot(pageA, '02-claim-created')
   })
 
-  test('3) B 가 검토 대기 탭에서 Claim 을 검토 완료한다', async () => {
-    displayNameB = await login(pageB, requiredEnv('E2E_USER_B'), requiredEnv('E2E_PASSWORD_B'))
-    expect(displayNameB).not.toBe('')
+  test('3) B 가 검토 대기 탭에서 Claim 을 검토 완료한다', async ({ browser }) => {
+    pageB = await open(browser)
+    await loginAs(pageB, editorB)
 
     await pageB.getByTestId('tab-review').click()
     await expect(pageB.getByTestId('review-table')).toBeVisible()
@@ -199,7 +270,7 @@ test.describe('금융 온톨로지 워크벤치: 두 사용자 협업', () => {
     await expect(card).toHaveAttribute('data-review-status', 'REVIEWED')
     await expect(card.getByTestId('claim-evidence-text')).toHaveText(data.evidence)
     await expect(card.getByTestId('claim-document-title')).toHaveText(data.docTitle)
-    await expect(card.getByTestId('claim-reviewer')).toHaveText(displayNameB)
+    await expect(card.getByTestId('claim-reviewer')).toHaveText(editorB.name)
     await expect(card.getByTestId('claim-review-note')).toContainText(data.reviewNote)
     await shot(pageA, '04-graph-and-evidence')
 
@@ -262,5 +333,64 @@ test.describe('금융 온톨로지 워크벤치: 두 사용자 협업', () => {
     await expect(pageA.locator('[data-testid="change-row"][data-action="ARCHIVE"]')).toHaveCount(1)
     await expect(pageA.locator('[data-testid="change-row"][data-action="RESTORE"]')).toHaveCount(1)
     await shot(pageA, '06-archive-restore-history')
+  })
+
+  test('7) 열람자는 편집 버튼이 없고, API 로 직접 만들어도 403 FORBIDDEN 이다', async ({ browser }) => {
+    const { context, page } = await newPage(browser)
+    contexts.push(context)
+    contextViewer = context
+    pageViewer = page
+    await loginAs(pageViewer, viewer)
+    await expect(pageViewer.getByTestId('current-user-role')).toHaveAttribute('data-role', 'VIEWER')
+    await expect(pageViewer.getByTestId('tab-users')).toHaveCount(0)
+    await expect(pageViewer.getByTestId('new-node-button')).toHaveCount(0)
+
+    await searchAndOpen(pageViewer, data.supplier)
+    await expect(pageViewer.getByTestId('viewer-hint')).toBeVisible()
+    for (const id of ['node-save', 'node-archive-button', 'node-restore-button', 'relationship-add-toggle', 'claim-add-toggle']) {
+      await expect(pageViewer.getByTestId(id)).toHaveCount(0)
+    }
+    await expect(pageViewer.getByTestId('edit-prop-name')).toBeDisabled()
+
+    await pageViewer.getByTestId('tab-review').click()
+    await expect(pageViewer.getByTestId('review-table')).toBeVisible()
+    const approveButtons = pageViewer.getByTestId('review-row-approve')
+    for (let i = 0; i < (await approveButtons.count()); i += 1) await expect(approveButtons.nth(i)).toBeDisabled()
+
+    // 화면을 거치지 않고 같은 세션 쿠키로 직접 보내도 서버가 막는다.
+    const base = new URL(pageViewer.url()).origin
+    await pageViewer.request.get(`${base}/api/auth/csrf`)
+    const xsrf = (await contextViewer.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value
+    expect(xsrf, 'XSRF-TOKEN 쿠키').toBeTruthy()
+    const res = await pageViewer.request.post(`${base}/api/nodes`, {
+      headers: { 'X-XSRF-TOKEN': xsrf!, 'Content-Type': 'application/json' },
+      data: { type: 'Company', properties: { name: `열람자가 만든 기업-${suffix}` } },
+    })
+    expect(res.status()).toBe(403)
+    expect((await res.json()).code).toBe('FORBIDDEN')
+
+    await pageViewer.getByTestId('tab-workspace').click()
+    await searchAndOpen(pageViewer, data.supplier)
+    await shot(pageViewer, '07-viewer')
+  })
+
+  test('8) 관리자가 열람자를 비활성화하면 열람자의 기존 세션이 끊긴다', async () => {
+    await pageAdmin.getByTestId('tab-users').click()
+    await pageAdmin.getByTestId('users-refresh').click()
+    const row = usersRow(pageAdmin, viewer.email)
+    await expect(row.getByTestId('users-row-linked')).toHaveText('로그인함')
+    await row.getByTestId('users-row-disable').click()
+    await expect(pageAdmin.getByTestId('users-message')).toHaveAttribute('data-kind', 'success')
+    await expect(row).toHaveAttribute('data-enabled', 'false')
+    await expect(row.getByTestId('users-row-enable')).toBeVisible()
+
+    const base = new URL(pageViewer.url()).origin
+    const me = await pageViewer.request.get(`${base}/api/auth/me`)
+    expect(me.status()).toBe(401)
+
+    await pageViewer.reload()
+    await expect(pageViewer.getByTestId('login-google')).toBeVisible()
+    await expect(pageViewer.getByTestId('current-user-name')).toHaveCount(0)
+    await shot(pageViewer, '08-disabled')
   })
 })

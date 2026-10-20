@@ -7,10 +7,12 @@ import { Pager } from './Pager'
 import { TypeBadge } from './TypeBadge'
 
 function ReviewRow({ claim, onDone, onError, onOpen }: { claim: ClaimView; onDone: (m: string) => void; onError: (e: unknown) => void; onOpen: (id: string) => void }) {
-  const { user } = useApp()
+  const { user, canEdit } = useApp()
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const own = claim.createdBy.id === user.id
+  // 서버는 마지막으로 내용을 고친 사람도 막을 수 있다. 그때는 403 SELF_REVIEW_FORBIDDEN 메시지를 보인다.
+  const blocked = own || !canEdit
 
   const review = async (status: ReviewStatus) => {
     setBusy(true)
@@ -41,16 +43,20 @@ function ReviewRow({ claim, onDone, onError, onOpen }: { claim: ClaimView; onDon
       <td>{claim.createdBy.displayName}</td>
       <td>{formatDateTime(claim.createdAt)}</td>
       <td className="review-actions">
-        {own ? (
+        {!canEdit ? (
+          <span className="muted small" data-testid="review-viewer-hint">
+            열람자(VIEWER)는 검토할 수 없습니다.
+          </span>
+        ) : own ? (
           <span className="muted small" data-testid="review-own-hint">
             본인이 작성한 Claim 은 검토할 수 없습니다.
           </span>
         ) : null}
-        <input data-testid="review-row-note" placeholder="메모(선택)" value={note} disabled={own || busy} onChange={(e) => setNote(e.target.value)} />
-        <button className="primary" data-testid="review-row-approve" disabled={own || busy} onClick={() => void review('REVIEWED')}>
+        <input data-testid="review-row-note" placeholder="메모(선택)" value={note} disabled={blocked || busy} onChange={(e) => setNote(e.target.value)} />
+        <button className="primary" data-testid="review-row-approve" disabled={blocked || busy} onClick={() => void review('REVIEWED')}>
           검토 완료
         </button>
-        <button className="danger" data-testid="review-row-reject" disabled={own || busy} onClick={() => void review('REJECTED')}>
+        <button className="danger" data-testid="review-row-reject" disabled={blocked || busy} onClick={() => void review('REJECTED')}>
           반려
         </button>
       </td>

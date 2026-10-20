@@ -225,3 +225,10 @@ blockquote { margin: 0; padding: 4px 8px; border-left: 3px solid #cbd5e1; backgr
 .action-restore { background: #fce7f3; }
 .ontology-type { margin-bottom: 16px; }
 .ontology h3 { margin-top: 16px; }
+
+/* 역할 */
+.role-badge { font-size: 11px; padding: 1px 6px; border-radius: 3px; margin-left: 6px; background: #334155; color: #e2e8f0; }
+.role-admin { background: #7c2d12; color: #ffedd5; }
+.role-editor { background: #1e3a8a; color: #dbeafe; }
+.role-viewer { background: #374151; color: #e5e7eb; }
+.data-table tr.disabled-row td { color: var(--muted); background: #f9fafb; }

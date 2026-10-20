@@ -1,9 +1,11 @@
 import { createContext, useContext } from 'react'
-import type { Ontology, UserRef } from './api/types'
+import type { CurrentUser, Ontology } from './api/types'
 
 export interface AppContextValue {
-  user: UserRef
+  user: CurrentUser
   ontology: Ontology
+  /** EDITOR 와 ADMIN. VIEWER 는 조회만 한다. 서버도 403 FORBIDDEN 으로 막는다 */
+  canEdit: boolean
 }
 
 export const AppContext = createContext<AppContextValue | null>(null)
@@ -20,3 +22,9 @@ export function creatableTypes(ontology: Ontology): string[] {
     .filter(([, def]) => !def.managedBy)
     .map(([name]) => name)
 }
+
+export function canEditRole(role: string): boolean {
+  return role === 'EDITOR' || role === 'ADMIN'
+}
+
+export const ROLE_LABEL: Record<string, string> = { VIEWER: '열람자', EDITOR: '편집자', ADMIN: '관리자' }

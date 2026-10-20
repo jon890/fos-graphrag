@@ -26,7 +26,7 @@ type Notice = { kind: 'success' | 'conflict' | 'error'; text: string; sub?: stri
 export const CONFLICT_TEXT = '다른 사용자가 먼저 수정했습니다. 최신 내용을 불러왔습니다. 확인한 뒤 다시 수정하세요.'
 
 export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSelect, onOpenHistory }: Props) {
-  const { ontology } = useApp()
+  const { ontology, canEdit } = useApp()
   const [detail, setDetail] = useState<NodeDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -148,7 +148,7 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
         <button className="link-button" data-testid="node-center-graph" onClick={() => onFocus(node.id)}>
           그래프 중심으로
         </button>
-        {!node.archived && (
+        {canEdit && !node.archived && (
           <input
             className="reason-input"
             data-testid="node-archive-reason"
@@ -157,6 +157,7 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
             onChange={(e) => setArchiveReason(e.target.value)}
           />
         )}
+        {canEdit && (
         <button
           className={node.archived ? '' : 'danger'}
           data-testid={node.archived ? 'node-restore-button' : 'node-archive-button'}
@@ -164,7 +165,14 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
         >
           {node.archived ? '복원' : '보관'}
         </button>
+        )}
       </div>
+
+      {!canEdit && (
+        <div className="info-box" data-testid="viewer-hint">
+          열람자(VIEWER)는 조회만 할 수 있습니다. 수정, 검토, 보관은 편집자에게 요청하세요.
+        </div>
+      )}
 
       <dl className="kv meta" data-testid="node-meta">
         <dt>revision</dt>
@@ -191,8 +199,12 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
         <section className="detail-section">
           <h3>Claim</h3>
           <ClaimCard claim={claim} onOpenNode={onSelect} />
-          <ReviewControls claim={claim} onDone={succeed} onError={fail} />
-          <ClaimEditForm key={`${claim.id}:${claim.revision}`} claim={claim} onSaved={succeed} onError={fail} />
+          {canEdit && (
+            <>
+              <ReviewControls claim={claim} onDone={succeed} onError={fail} />
+              <ClaimEditForm key={`${claim.id}:${claim.revision}`} claim={claim} onSaved={succeed} onError={fail} />
+            </>
+          )}
         </section>
       ) : (
         <section className="detail-section">
@@ -223,12 +235,12 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
         {detail.claims.map((c) => (
           <ClaimCard key={c.id} claim={c} onOpenNode={onSelect} showOpen />
         ))}
-        {hasClaimPredicates && !claim && !addingClaim && (
+        {canEdit && hasClaimPredicates && !claim && !addingClaim && (
           <button data-testid="claim-add-toggle" disabled={node.archived} onClick={() => setAddingClaim(true)}>
             Claim 추가
           </button>
         )}
-        {addingClaim && (
+        {canEdit && addingClaim && (
           <ClaimCreateForm
             subject={node}
             onCancel={() => setAddingClaim(false)}

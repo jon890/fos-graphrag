@@ -15,7 +15,7 @@ interface Props {
  * 노드 속성 수정 폼. 부모가 key 에 revision 을 넣어, 최신 상세를 다시 읽으면 입력값도 새 값으로 바뀐다.
  */
 export function NodeEditForm({ node, onSaved, onError }: Props) {
-  const { ontology } = useApp()
+  const { ontology, canEdit } = useApp()
   const defs = ontology.nodeTypes[node.type]?.properties ?? {}
   const [values, setValues] = useState<FormValues>(() => initialFormValues(defs, node.properties))
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -53,7 +53,7 @@ export function NodeEditForm({ node, onSaved, onError }: Props) {
         defs={defs}
         values={values}
         errors={errors}
-        disabled={node.archived}
+        disabled={node.archived || !canEdit}
         testIdPrefix="edit-prop"
         onChange={(name, v) => setValues((prev) => ({ ...prev, [name]: v }))}
       />
@@ -62,9 +62,11 @@ export function NodeEditForm({ node, onSaved, onError }: Props) {
           {localMessage}
         </div>
       )}
-      <button type="submit" className="primary" disabled={busy || node.archived} data-testid="node-save">
-        {busy ? '저장 중…' : '저장'}
-      </button>
+      {canEdit && (
+        <button type="submit" className="primary" disabled={busy || node.archived} data-testid="node-save">
+          {busy ? '저장 중…' : '저장'}
+        </button>
+      )}
     </form>
   )
 }

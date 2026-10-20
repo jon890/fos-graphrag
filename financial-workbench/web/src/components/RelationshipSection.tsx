@@ -22,7 +22,7 @@ interface Props {
 }
 
 export function RelationshipSection({ node, relationships, onChanged, onError, onOpenNode }: Props) {
-  const { ontology } = useApp()
+  const { ontology, canEdit } = useApp()
   const options = useMemo<Option[]>(() => {
     const out: Option[] = []
     for (const [type, def] of Object.entries(ontology.relationshipTypes)) {
@@ -85,19 +85,21 @@ export function RelationshipSection({ node, relationships, onChanged, onError, o
               <TypeBadge type={r.to.type} /> {r.to.label}
             </button>
             {r.archived && <span className="archived-badge">보관됨</span>}
-            <button className="link-button small" data-testid="relationship-archive-toggle" onClick={() => void toggleArchive(r)}>
-              {r.archived ? '관계 복원' : '관계 보관'}
-            </button>
+            {canEdit && (
+              <button className="link-button small" data-testid="relationship-archive-toggle" onClick={() => void toggleArchive(r)}>
+                {r.archived ? '관계 복원' : '관계 보관'}
+              </button>
+            )}
           </li>
         ))}
       </ul>
 
-      {options.length > 0 && !adding && (
+      {canEdit && options.length > 0 && !adding && (
         <button data-testid="relationship-add-toggle" onClick={() => setAdding(true)} disabled={node.archived}>
           관계 추가
         </button>
       )}
-      {adding && option && (
+      {canEdit && adding && option && (
         <div className="sub-form" data-testid="relationship-add-form">
           <div className="field">
             <label>관계 타입</label>
