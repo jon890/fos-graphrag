@@ -87,7 +87,7 @@ flowchart LR
 | `workbench.graph.max-nodes` | | 150 | |
 | `workbench.graph.max-relationships` | | 300 | |
 | `workbench.graph.timeout` | | `5s` | 그래프 조회 트랜잭션 시간 제한 |
-| `workbench.session.secure-cookie` | `WORKBENCH_SECURE_COOKIE` | `false` | HTTPS 뒤에 둘 때 `true` |
+| `server.servlet.session.cookie.secure` | `WORKBENCH_SECURE_COOKIE` | `false` | HTTPS 뒤에 둘 때 `true` |
 
 운영 이미지는 `prod` 프로필로 실행한다. 이 프로필은 Neo4j 비밀번호 기본값이 없고 비어 있으면 시작을 멈춘다.
 

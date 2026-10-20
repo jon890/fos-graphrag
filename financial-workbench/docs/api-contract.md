@@ -11,11 +11,11 @@
 
 상태를 바꾸는 요청(`POST`, `PATCH`, `PUT`, `DELETE`)은 CSRF 토큰이 필요하다.
 서버는 `XSRF-TOKEN` 쿠키(HttpOnly 아님)를 내려 주고, 클라이언트는 그 값을 `X-XSRF-TOKEN` 헤더에 담는다.
-로그인 요청도 CSRF 토큰이 필요하므로 클라이언트는 먼저 `GET /api/auth/csrf` 를 부른다.
+로그인 요청도 CSRF 토큰이 필요하므로 클라이언트는 먼저 `GET /api/auth/csrf` 를 부른다. 토큰 값은 응답 본문이 아니라 쿠키에서 읽는다.
 
 | 메서드 | 경로 | 입력 | 성공 응답 | 실패 |
 | --- | --- | --- | --- | --- |
-| GET | `/api/auth/csrf` | 없음 | `200 {"headerName":"X-XSRF-TOKEN","token":"..."}` 와 쿠키 | 없음 |
+| GET | `/api/auth/csrf` | 없음 | `200 {"headerName":"X-XSRF-TOKEN","cookieName":"XSRF-TOKEN"}` 와 쿠키 | 없음 |
 | POST | `/api/auth/login` | `{"username","password"}` | `200 UserRef` | `401 INVALID_CREDENTIALS`, `403 CSRF_REJECTED` |
 | POST | `/api/auth/logout` | 없음 | `204` | `403 CSRF_REJECTED` |
 | GET | `/api/auth/me` | 없음 | `200 UserRef` | `401 UNAUTHENTICATED` |

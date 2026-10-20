@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: financial-workbench
+  neo4j:
+    uri: ${NEO4J_URI:bolt://localhost:7689}
+    authentication:
+      username: ${NEO4J_USERNAME:neo4j}
+      # 기본값을 두지 않는다. 값이 없으면 시작에 실패한다
+      password: ${NEO4J_PASSWORD}
+  data:
+    neo4j:
+      database: ${NEO4J_DATABASE:neo4j}
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: 8080
+  shutdown: graceful
+  servlet:
+    session:
+      timeout: 12h
+      cookie:
+        name: WORKBENCH_SESSION
+        http-only: true
+        same-site: lax
+        secure: ${WORKBENCH_SECURE_COOKIE:false}
+
+workbench:
+  graph:
+    max-hops: 2
+    max-nodes: 150
+    max-relationships: 300
+    timeout: 5s
+
+logging:
+  level:
+    org.springframework.data.neo4j.cypher.unrecognized: error
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  web:
+    resources:
+      static-locations: file:/app/static/
