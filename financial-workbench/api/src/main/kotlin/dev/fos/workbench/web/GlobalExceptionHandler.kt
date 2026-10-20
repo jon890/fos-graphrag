@@ -49,46 +49,26 @@ class GlobalExceptionHandler {
     fun integrity(e: DataIntegrityViolationException): ResponseEntity<ApiError> = api(DuplicateException("이미 같은 값이 있습니다."))
 
     /**
-     * 트랜잭션 시간 제한과 Neo4j 연결 끊김은 Spring 이 여러 예외로 감싸 올리므로 원인 사슬을 따라가 판정한다.
-     * Neo4j 오류 원문은 응답에 담지 않는다.
+     * 트랜잭션 시간 제한, Neo4j 연결 끊김, 잠금 충돌은 Spring 이 여러 예외로 감싸 올린다.
+     * 분류는 Neo4jErrorClassifier 가 한다. Neo4j 오류 원문은 응답에 담지 않는다.
      */
     @ExceptionHandler(Exception::class)
-    fun unexpected(e: Exception): ResponseEntity<ApiError> {
-        if (isTimeout(e)) return api(QueryTimeoutException())
-        if (isTransient(e)) {
-            log.info("일시적 충돌: {}", e.javaClass.simpleName)
-            return api(TransientConflictException())
-        }
-        if (isUnavailable(e)) {
+    fun unexpected(e: Exception): ResponseEntity<ApiError> = when (Neo4jErrorClassifier.classify(e)) {
+        Neo4jErrorClassifier.Kind.TIMEOUT -> api(QueryTimeoutException())
+        Neo4jErrorClassifier.Kind.UNAVAILABLE -> {
             log.warn("Neo4j 에 연결할 수 없다: {}", e.javaClass.simpleName)
-            return api(DatabaseUnavailableException())
+            api(DatabaseUnavailableException())
         }
-        log.error("처리하지 못한 예외", e)
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ApiError("INTERNAL_ERROR", "서버 오류가 발생했습니다."))
+        Neo4jErrorClassifier.Kind.TRANSIENT_CONFLICT -> {
+            log.info("일시적 잠금 충돌: {}", e.javaClass.simpleName)
+            api(TransientConflictException())
+        }
+        Neo4jErrorClassifier.Kind.OTHER -> {
+            log.error("처리하지 못한 예외", e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiError("INTERNAL_ERROR", "서버 오류가 발생했습니다."))
+        }
     }
 
     private fun validation(fieldErrors: Map<String, String>) =
         ResponseEntity.badRequest().body(ApiError("VALIDATION_FAILED", "입력값이 올바르지 않습니다.", mapOf("fieldErrors" to fieldErrors)))
-
-    private fun isUnavailable(e: Throwable): Boolean =
-        generateSequence(e) { it.cause }.any {
-            it is org.neo4j.driver.exceptions.ServiceUnavailableException ||
-                it is org.neo4j.driver.exceptions.SessionExpiredException ||
-                it is org.springframework.dao.DataAccessResourceFailureException
-        }
-
-    /** 교착 감지와 잠금 대기 시간 초과는 다시 시도하면 풀리는 충돌이다. 시간 제한 초과는 isTimeout 이 먼저 잡는다. */
-    private fun isTransient(e: Throwable): Boolean =
-        generateSequence(e) { it.cause }.any {
-            it is org.neo4j.driver.exceptions.TransientException ||
-                it is org.springframework.dao.TransientDataAccessException ||
-                it is org.springframework.dao.PessimisticLockingFailureException
-        }
-
-    private fun isTimeout(e: Throwable): Boolean =
-        generateSequence(e) { it.cause }.any {
-            (it is org.neo4j.driver.exceptions.Neo4jException && it.code().contains("TransactionTimedOut")) ||
-                (it.message?.contains("TransactionTimedOut") == true)
-        }
 }

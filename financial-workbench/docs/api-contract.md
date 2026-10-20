@@ -93,10 +93,12 @@
 | 409 | `LAST_ADMIN` | 마지막 활성 ADMIN 을 강등하거나 비활성화하려 했다 |
 | 409 | `LAST_EVIDENCE` | 어떤 활성 Claim 의 유일한 활성 근거 Document 를 보관하려 했다. `details.claimIds` 에 그 Claim 이 있다 |
 | 409 | `NO_ACTIVE_EVIDENCE` | 활성 근거 문서가 없는 Claim 을 복원하거나 `REVIEWED` 로 검토하려 했다 |
-| 409 | `TRANSIENT_CONFLICT` | 동시에 처리 중인 다른 요청과 잠금이 겹쳤다(교착 감지, 잠금 대기 시간 초과). 최신 내용을 다시 읽고 다시 시도한다 |
+| 409 | `TRANSIENT_CONFLICT` | 동시에 처리 중인 다른 요청과 잠금이 겹쳤다. Neo4j 오류 코드가 `DeadlockDetected`, `LockAcquisitionTimeout` 일 때만이다. 최신 내용을 다시 읽고 다시 시도한다 |
 | 500 | `INTERNAL_ERROR` | 그 밖의 서버 오류. 내부 메시지는 응답에 담지 않는다 |
 | 503 | `QUERY_TIMEOUT` | 트랜잭션이 시간 제한을 넘었다. 그래프 조회는 5초, 쓰기는 8초다 |
-| 503 | `DATABASE_UNAVAILABLE` | Neo4j 에 연결할 수 없다. 백업 중이거나 재시작 중이다 |
+| 503 | `DATABASE_UNAVAILABLE` | Neo4j 에 연결할 수 없다. 백업 중이거나 재시작 중이다. 연결 끊김은 Spring 이 일시 예외로 감싸도 이 코드다 |
+
+Neo4j 예외는 시간 초과(`QUERY_TIMEOUT`), 연결 불가(`DATABASE_UNAVAILABLE`), 잠금 충돌(`TRANSIENT_CONFLICT`) 순서로 판정한다. 앞에서 맞으면 뒤는 보지 않는다.
 
 ## 공통 표현
 
