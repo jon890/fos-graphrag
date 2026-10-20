@@ -100,7 +100,12 @@ curl -fsS http://127.0.0.1:8081/api/health
 ## 이미지 배포
 
 `.github/workflows/workbench-image.yml` 이 `ghcr.io/jon890/fos-graphrag-workbench` 에 `latest` 와 `sha-<7자리>` 태그로 올린다.
-Actions 결제 한도 때문에 `workflow_dispatch` 로만 실행한다. 플랫폼은 `linux/amd64` 다.
+이 workflow 는 `homeserver` label 이 붙은 self-hosted runner 가 있어야 돈다. GitHub-hosted runner 로는 돌지 않는다.
+runner 에는 docker 와 socket 이 없어서, workflow 는 checkout 다음에 `homeserver-image-build financial-workbench` 만 실행한다.
+이미지 이름, 태그, label 은 그 명령이 정하고 workflow 에는 적지 않는다.
+`workflow_dispatch` 로만 실행하고 플랫폼은 `linux/amd64` 다.
+빌드는 BuildKit 이 아닌 기존 빌더로 하므로 Dockerfile 에 `RUN --mount`, `COPY --chmod`, `# syntax=` 를 쓰지 않는다.
+runner 없이 확인하려면 로컬에서 `docker build --platform linux/amd64 financial-workbench` 를 실행한다.
 홈서버에서는 `latest` 대신 `sha-<7자리>` 를 `WORKBENCH_IMAGE` 에 고정해 쓴다.
 
 ## 자원 설정
