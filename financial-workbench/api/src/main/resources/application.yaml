@@ -1,6 +1,11 @@
 spring:
   application:
     name: financial-workbench
+  profiles:
+    # prod 는 실제 Google, e2e 는 가짜 OIDC 공급자를 쓴다. 둘이 공유하는 컨테이너 설정은 container 에 둔다
+    group:
+      prod: container
+      e2e: container, mockoidc
   neo4j:
     uri: ${NEO4J_URI:bolt://localhost:7689}
     authentication:
@@ -17,8 +22,12 @@ spring:
 server:
   port: 8080
   shutdown: graceful
-  # TLS 를 끝내는 앞단 뒤에서는 native 로 둔다. Tomcat 은 사설 대역의 프록시가 보낸 X-Forwarded-* 만 믿는다
+  # TLS 를 끝내는 앞단 뒤에서는 native 로 둔다. Tomcat 은 internal-proxies 에 맞는 주소가 보낸 X-Forwarded-* 만 믿는다
   forward-headers-strategy: ${WORKBENCH_FORWARD_HEADERS_STRATEGY:none}
+  tomcat:
+    remoteip:
+      # 기본값은 loopback 과 Docker 기본 브리지 대역(172.16.0.0/12)이다. 앞단 프록시 주소만 남기도록 좁힌다
+      internal-proxies: ${WORKBENCH_TRUSTED_PROXIES:127\.0\.0\.1|0:0:0:0:0:0:0:1|::1|172\.(1[6-9]|2[0-9]|3[01])\.[0-9]+\.[0-9]+}
   servlet:
     session:
       timeout: ${WORKBENCH_SESSION_TIMEOUT:8h}
@@ -53,14 +62,30 @@ logging:
     org.springframework.data.neo4j.cypher.unrecognized: error
 
 ---
-# 운영 프로필. Google OpenID Connect 로만 로그인한다. 비밀값이 없으면 시작하지 않는다
+# 컨테이너 이미지 공통. prod 와 e2e 가 함께 쓴다
+spring:
+  config:
+    activate:
+      on-profile: container
+  web:
+    resources:
+      static-locations: file:/app/static/
+
+---
+# 운영 프로필. Google OpenID Connect 로만 로그인한다. 비밀값이 없으면 시작하지 않는다(ProdStartupGuard)
+# 쿠키는 기본으로 Secure 다. TLS 없이 직접 열 때만 WORKBENCH_SECURE_COOKIE=false 로 끈다
+server:
+  servlet:
+    session:
+      cookie:
+        secure: ${WORKBENCH_SECURE_COOKIE:true}
+workbench:
+  security:
+    secure-cookies: ${WORKBENCH_SECURE_COOKIE:true}
 spring:
   config:
     activate:
       on-profile: prod
-  web:
-    resources:
-      static-locations: file:/app/static/
   security:
     oauth2:
       client:
@@ -71,8 +96,8 @@ spring:
             scope: openid, email, profile
 
 ---
-# 개발과 테스트용 가짜 OIDC 공급자(ghcr.io/navikt/mock-oauth2-server).
-# 등록 이름은 google 그대로 두어 콜백 경로가 운영과 같다. 운영 Compose 는 이 프로필을 켜지 않는다.
+# 개발과 테스트용 가짜 OIDC 공급자(ghcr.io/navikt/mock-oauth2-server). e2e 프로필에 들어 있다.
+# 등록 이름은 google 그대로 두어 콜백 경로가 운영과 같다. prod 와 함께 켜면 ProdStartupGuard 가 시작을 막는다.
 # 브라우저가 가는 주소와 API 가 토큰을 받는 주소가 다를 수 있어 둘을 따로 받는다
 spring:
   config:

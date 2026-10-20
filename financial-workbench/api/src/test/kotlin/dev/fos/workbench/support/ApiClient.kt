@@ -62,6 +62,25 @@ class ApiClient(private val baseUrl: String, private val mapper: JsonMapper) {
         return done.headers().firstValue("Location").orElse("")
     }
 
+    /** 본문을 그대로 보낸다. chunked 면 길이를 모르는 스트림으로 보내 Content-Length 가 빠진다. */
+    fun sendRaw(method: String, path: String, body: String, chunked: Boolean = false): Response {
+        val builder = HttpRequest.newBuilder(URI.create(baseUrl + path)).timeout(Duration.ofSeconds(30))
+            .header("Content-Type", "application/json").header("Accept", "application/json")
+        xsrfToken()?.let { builder.header("X-XSRF-TOKEN", it) }
+        val publisher = if (chunked) HttpRequest.BodyPublishers.ofInputStream { body.byteInputStream() }
+        else HttpRequest.BodyPublishers.ofString(body)
+        val response = http.send(builder.method(method, publisher).build(), HttpResponse.BodyHandlers.ofString())
+        val json = runCatching { mapper.readTree(response.body()) }.getOrNull() ?: mapper.createObjectNode()
+        return Response(response.statusCode(), json, response.headers().map())
+    }
+
+    /** 첫 리다이렉트만 받아 Location 을 돌려준다. OAuth 시작 주소의 redirect_uri 를 확인할 때 쓴다. */
+    fun firstRedirect(path: String, headers: Map<String, String> = emptyMap()): String {
+        val builder = HttpRequest.newBuilder(URI.create(baseUrl + path)).timeout(Duration.ofSeconds(30))
+        headers.forEach { (k, v) -> builder.header(k, v) }
+        return http.send(builder.GET().build(), HttpResponse.BodyHandlers.ofString()).headers().firstValue("Location").orElse("")
+    }
+
     fun xsrfToken(): String? = cookies.cookieStore.cookies.firstOrNull { it.name == "XSRF-TOKEN" }?.value
 
     private fun raw(method: String, uri: URI, form: String?): HttpResponse<String> {
