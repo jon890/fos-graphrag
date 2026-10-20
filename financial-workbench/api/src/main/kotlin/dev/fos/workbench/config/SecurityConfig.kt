@@ -3,6 +3,7 @@ package dev.fos.workbench.config
 import dev.fos.workbench.auth.Neo4jUserDetailsService
 import dev.fos.workbench.web.ApiError
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.MediaType
@@ -33,7 +34,9 @@ class SecurityConfig {
     @Bean
     fun securityContextRepository(): SecurityContextRepository = HttpSessionSecurityContextRepository()
 
+    /** user-add 명령은 웹 서버 없이 돌므로 필터 체인을 만들지 않는다. */
     @Bean
+    @ConditionalOnWebApplication
     fun filterChain(http: HttpSecurity, contextRepository: SecurityContextRepository, mapper: JsonMapper): SecurityFilterChain {
         fun write(response: HttpServletResponse, status: Int, error: ApiError) {
             response.status = status
