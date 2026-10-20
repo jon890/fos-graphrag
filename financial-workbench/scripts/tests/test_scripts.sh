@@ -30,4 +30,7 @@ check "이미지 workflow 는 main 에서만 publish 한다" grep -q "if: github
 check "e2e override 는 prod 프로필을 켜지 않는다" bash -c '! grep -E "SPRING_PROFILES_ACTIVE:.*prod" compose.e2e.yml'
 check "운영 Neo4j 에 트랜잭션과 잠금 대기 상한이 있다" bash -c 'grep -q NEO4J_db_transaction_timeout compose.yml && grep -q NEO4J_db_lock_acquisition_timeout compose.yml'
 
+# 백업과 복원의 실패 경로(중단, load 실패)를 가짜 docker 로 검사한다
+if bash scripts/tests/test_backup_failures.sh; then :; else failed=1; fi
+
 exit $failed

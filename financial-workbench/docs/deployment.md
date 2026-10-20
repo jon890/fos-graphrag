@@ -25,6 +25,11 @@ flowchart LR
   app 은 `WORKBENCH_TRUSTED_PROXIES`(Java 정규식)에 맞는 주소에서 온 요청의 `X-Forwarded-*` 만 믿는다.
   기본값은 loopback 과 Docker 브리지 대역 `172.16.0.0/12` 다. 같은 호스트의 프록시가 published 포트로 넘기면 Docker 게이트웨이(`172.x.0.1`)에서 온 것으로 보이기 때문이다.
   프록시 컨테이너 IP 를 고정할 수 있으면 그 주소 하나로 좁힌다(예: `172\.20\.0\.10`). 믿지 않는 주소가 보낸 헤더는 무시하고, redirect URI 는 `http://` 로 만들어져 Google 이 거절한다.
+  **이 기본값은 `WORKBENCH_BIND` 가 loopback(`127.0.0.1`)일 때만 안전하다.**
+  bind 를 loopback 밖(`0.0.0.0`, LAN 주소)으로 바꾸면 외부 클라이언트의 요청도 Docker 게이트웨이 주소에서 온 것으로 보여 신뢰 대상이 된다.
+  그러면 누구나 `X-Forwarded-For`, `X-Forwarded-Proto` 를 마음대로 넣을 수 있다.
+  그래서 운영 프로필은 forward headers 를 읽고(`native`) bind 가 loopback 이 아닌데 `WORKBENCH_TRUSTED_PROXIES` 가 비어 있으면 시작하지 않는다.
+  bind 를 바꿀 때는 앞단 프록시 주소만 `WORKBENCH_TRUSTED_PROXIES` 에 넣는다.
 - 앞단에서 요청 본문 크기를 제한한다(예: Traefik `buffering.maxRequestBodyBytes` 를 1MiB). app 도 `/api` 요청 본문을 64KiB 로 막지만 앞단에서 먼저 막는 편이 자원을 덜 쓴다.
 - 세션 쿠키와 CSRF 쿠키는 `WORKBENCH_SECURE_COOKIE=true`(운영 기본값)로 Secure 다. HTTPS 가 없는 로컬 확인에서만 끈다.
 - HSTS 는 앞단이 붙이는 것을 기본으로 한다. 앞단이 붙이지 않으면 `WORKBENCH_HSTS=true` 로 앱이 붙인다.
@@ -176,10 +181,18 @@ Compose 파일을 여러 개 겹쳐 쓰는 환경이면 `COMPOSE_FILE` 환경변
 scripts/restore.sh backups/neo4j-20261020-120000.dump    # 어느 디렉터리에서 실행해도 된다
 ```
 
-1. `app` 과 `neo4j` 를 한 번만 멈춘다.
-2. 멈춘 상태에서 현재 데이터를 `backups/neo4j-before-restore-<시각>.dump` 로 먼저 덤프한다. 이 덤프가 실패하면 덮어쓰지 않고 멈춘다.
+1. 덤프 파일이 Neo4j 5 형식(크기 1KiB 이상, `DZV1` 머리말)인지 확인한다. 아니면 서비스를 멈추지 않고 끝낸다.
+   그다음 안전 덤프 경로(`backups/neo4j-before-restore-<시각>.dump`)를 출력하고 `app` 과 `neo4j` 를 한 번만 멈춘다.
+2. 멈춘 상태에서 현재 데이터를 안전 덤프로 저장한다. 이 덤프가 실패하면 아무것도 덮어쓰지 않았으므로 서비스를 다시 올리고 끝낸다.
 3. 덤프 파일을 표준 입력으로 넘겨 `neo4j-admin database load neo4j --from-stdin --overwrite-destination=true` 를 실행한다.
-4. `neo4j` 와 `app` 을 다시 시작하고 healthy 를 기다린다.
+4. 성공하면 `neo4j` 와 `app` 을 다시 시작하고 healthy 를 기다린다.
+
+**load 가 실패하면 `neo4j` 와 `app` 을 멈춘 채 둔다.** `--overwrite-destination` 이 기존 DB 를 먼저 지웠거나 반쯤 바꿨을 수 있어서다.
+로컬에서 형식만 맞고 내용이 깨진 파일로 확인했을 때 실패한 load 뒤에는 DB 가 없었다. 이 상태로 Neo4j 를 올리면 빈 DB 가 새로 만들어진다.
+스크립트는 안전 덤프 경로와 되돌리는 명령(`scripts/restore.sh --skip-safety-dump <안전 덤프>`)을 출력한다.
+`--skip-safety-dump` 는 덮어쓸 DB 가 이미 없거나 깨져 다시 안전 덤프를 뜰 수 없을 때만 쓴다. 원인을 확인한 뒤 그 명령으로 복원 전 상태로 되돌린다.
+백업과 복원이 Ctrl-C 로 중단되면 반쯤 쓴 `.partial` 파일을 지운다. 백업 중단은 데이터를 바꾸지 않았으므로 서비스를 다시 올린다.
+이 실패 경로는 `scripts/tests/test_backup_failures.sh` 가 가짜 docker 명령으로 검사한다.
 
 로컬에서 확인한 순서는 이렇다. 백업을 만들고, Company 노드 하나를 지워 노드 수를 줄인 뒤 복원했다.
 복원 뒤 노드 수가 백업 시점 값으로 돌아왔다. 쓰기 직후의 백업과 복원도 성공했다.
