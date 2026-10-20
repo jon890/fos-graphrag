@@ -1,0 +1,87 @@
+# 금융 온톨로지 정의
+# API 는 이 파일만 읽어 쓰기를 검증한다. Neo4j 는 이 규칙을 집행하지 않는다.
+# 바꾸면 schemaVersion 을 올리고 docs/data-schema.md 의 「온톨로지」 절을 함께 고친다.
+
+schemaVersion: "1.0.0"
+
+nodeTypes:
+  Company:
+    description: 기업. 상장 여부와 무관한 법인이다.
+    labelProperty: name
+    properties:
+      name: { type: string, required: true, maxLength: 200, description: 기업 이름 }
+      country: { type: string, required: false, maxLength: 2, description: ISO 3166-1 alpha-2 국가 코드 }
+      registrationNumber: { type: string, required: false, maxLength: 64, description: 법인등록번호 같은 공적 식별자 }
+      description: { type: text, required: false, maxLength: 4000, description: 메모 }
+
+  Security:
+    description: 거래되는 종목. 같은 기업의 여러 상장과 동명이종목을 시장과 종목 코드로 구분한다.
+    labelProperty: name
+    properties:
+      market: { type: enum, required: true, values: [KRX_KOSPI, KRX_KOSDAQ, NASDAQ, NYSE, OTHER], description: 상장 시장 }
+      ticker: { type: string, required: true, maxLength: 32, description: 시장 안의 종목 코드 }
+      name: { type: string, required: true, maxLength: 200, description: 종목 이름 }
+      securityType: { type: enum, required: false, values: [COMMON, PREFERRED, ETF, ADR, OTHER], description: 종목 종류 }
+      currency: { type: string, required: false, maxLength: 3, description: ISO 4217 통화 코드 }
+
+  Sector:
+    description: 산업 분류.
+    labelProperty: name
+    properties:
+      name: { type: string, required: true, maxLength: 200, description: 산업 이름 }
+      scheme: { type: string, required: false, maxLength: 64, description: 분류 체계 이름(예 GICS, KSIC) }
+      code: { type: string, required: false, maxLength: 32, description: 분류 체계 안의 코드 }
+
+  Document:
+    description: 근거 자료. 서버는 URL 을 가져오지 않는다. 사람이 메타데이터를 등록한다.
+    labelProperty: title
+    properties:
+      title: { type: string, required: true, maxLength: 300, description: 자료 제목 }
+      url: { type: url, required: true, maxLength: 2000, description: 자료 위치 }
+      publisher: { type: string, required: false, maxLength: 200, description: 발행 주체 }
+      documentType: { type: enum, required: false, values: [FILING, NEWS, REPORT, IR, OTHER], description: 자료 종류 }
+      publishedAt: { type: date, required: false, description: 자료 공개일. 모르면 비워 둔다 }
+      collectedAt: { type: datetime, required: true, description: 자료를 수집한 시각 }
+
+  Claim:
+    description: 자료나 사람이 제시한 주장. 생성과 검토는 Claim 전용 API 로만 한다.
+    labelProperty: predicate
+    managedBy: claims
+    properties:
+      predicate: { type: enum, required: true, values: [SUPPLIES_TO, BELONGS_TO_SECTOR, COMPETES_WITH, HAS_EXPOSURE_TO], description: 주장의 의미 }
+      description: { type: text, required: true, maxLength: 4000, description: 주장 설명 }
+      evidenceText: { type: text, required: true, maxLength: 4000, description: 근거 자료에서 옮긴 문장 }
+      validFrom: { type: date, required: false, description: 관계가 성립하기 시작한 날. 모르면 비워 두고 미상으로 표시한다 }
+      validTo: { type: date, required: false, description: 관계가 끝난 날. 모르면 비워 두고 미상으로 표시한다 }
+      authoringMethod: { type: enum, required: true, values: [MANUAL, AI], description: 작성 방식 }
+      extractionConfidence: { type: number, required: false, min: 0, max: 1, description: AI 추출의 확신도. 투자 성공 확률이 아니다 }
+
+relationshipTypes:
+  ISSUES:
+    description: 기업이 종목을 발행한다. 근거가 필요 없는 식별 관계다.
+    from: [Company]
+    to: [Security]
+
+# Claim 과 대상 노드를 잇는 관계다. Claim API 가 만들고 일반 관계 API 로는 만들 수 없다.
+claimRelationships:
+  SUBJECT: { description: 주장의 주어, from: [Claim] }
+  OBJECT: { description: 주장의 목적어, from: [Claim] }
+  SUPPORTED_BY: { description: 주장의 근거 자료, from: [Claim], to: [Document] }
+
+claimPredicates:
+  SUPPLIES_TO:
+    description: 주어 기업이 목적어 기업에 제품이나 서비스를 공급한다.
+    subjectTypes: [Company]
+    objectTypes: [Company]
+  BELONGS_TO_SECTOR:
+    description: 주어가 목적어 산업에 속한다.
+    subjectTypes: [Company, Security]
+    objectTypes: [Sector]
+  COMPETES_WITH:
+    description: 주어 기업과 목적어 기업이 같은 시장에서 경쟁한다.
+    subjectTypes: [Company]
+    objectTypes: [Company]
+  HAS_EXPOSURE_TO:
+    description: 주어의 실적이 목적어의 변화에 영향을 받는다.
+    subjectTypes: [Company, Security]
+    objectTypes: [Company, Security, Sector]
