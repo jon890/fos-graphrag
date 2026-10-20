@@ -103,6 +103,10 @@ export interface NodeDetail {
   claim: ClaimView | null
   relationships: RelationshipView[]
   claims: ClaimView[]
+  /** 서버 상한을 넘어 목록을 잘랐는지 */
+  relationshipsTruncated: boolean
+  claimsTruncated: boolean
+  limits: { maxRelationships: number; maxClaims: number }
 }
 
 export interface Page<T> {

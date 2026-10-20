@@ -53,6 +53,11 @@ export function ClaimCard({ claim, onOpenNode, showOpen }: Props) {
         <dt>출처 문서</dt>
         <dd>
           {claim.documents.length === 0 && <span className="muted">없음</span>}
+          {claim.documents.length > 0 && claim.documents.every((d) => d.archived) && (
+            <div className="info-box" data-testid="claim-no-active-evidence">
+              근거 문서가 모두 보관되었습니다. 근거 문서를 복원하기 전에는 이 Claim 을 복원하거나 검토 완료할 수 없습니다.
+            </div>
+          )}
           <ul className="doc-list">
             {claim.documents.map((d) => (
               <li key={d.id} data-testid="claim-document">

@@ -41,9 +41,16 @@ export function ReviewControls({ claim, onDone, onError }: ReviewProps) {
         </div>
       )}
       {claim.archived && <div className="info-box">보관된 Claim 은 검토할 수 없습니다.</div>}
+      {!claim.archived && claim.documents.every((d) => d.archived) && (
+        <div className="info-box">활성 근거 문서가 없어 검토 완료할 수 없습니다. 반려나 초안으로 되돌리기는 할 수 있습니다.</div>
+      )}
       <input data-testid="review-note" placeholder="검토 메모(선택)" value={note} disabled={disabled} onChange={(e) => setNote(e.target.value)} />
       <div className="row">
-        <button className="primary" data-testid="review-approve" disabled={disabled} onClick={() => void review('REVIEWED')}>
+        <button
+          className="primary"
+          data-testid="review-approve"
+          disabled={disabled || claim.documents.every((d) => d.archived)}
+          onClick={() => void review('REVIEWED')}>
           검토 완료
         </button>
         <button className="danger" data-testid="review-reject" disabled={disabled} onClick={() => void review('REJECTED')}>

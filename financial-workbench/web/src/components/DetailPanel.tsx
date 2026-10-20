@@ -219,6 +219,11 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
         </section>
       )}
 
+      {!claim && detail.relationshipsTruncated && (
+        <div className="info-box" data-testid="detail-relationships-truncated">
+          관계가 많아 처음 {detail.limits.maxRelationships}개만 보입니다. 전체는 목록 탭이나 그래프에서 확인하세요.
+        </div>
+      )}
       {!claim && (
         <RelationshipSection
           node={node}
@@ -232,6 +237,11 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, onFocus, onSele
       <section className="detail-section" data-testid="node-claims-section">
         <h3>이 노드에 걸린 Claim ({detail.claims.length})</h3>
         {detail.claims.length === 0 && <div className="muted small">걸린 Claim 이 없습니다.</div>}
+        {detail.claimsTruncated && (
+          <div className="info-box" data-testid="detail-claims-truncated">
+            Claim 이 많아 오래된 것부터 {detail.limits.maxClaims}개만 보입니다. 전체는 검토 대기 탭이나 그래프에서 확인하세요.
+          </div>
+        )}
         {detail.claims.map((c) => (
           <ClaimCard key={c.id} claim={c} onOpenNode={onSelect} showOpen />
         ))}
