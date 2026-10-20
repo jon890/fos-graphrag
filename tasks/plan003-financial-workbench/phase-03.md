@@ -1,6 +1,7 @@
 # Phase 03. 검색, 주변 그래프, 목록 조회
 
 **Execution profile**: standard
+**Status**: completed
 
 ## 목표
 

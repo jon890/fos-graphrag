@@ -1,6 +1,7 @@
 # Phase 05. Compose, 백업, 브라우저 검증, 문서
 
 **Execution profile**: standard
+**Status**: completed
 
 ## 목표
 

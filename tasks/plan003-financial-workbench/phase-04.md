@@ -1,6 +1,7 @@
 # Phase 04. 웹 화면
 
 **Execution profile**: standard
+**Status**: completed
 
 ## 목표
 

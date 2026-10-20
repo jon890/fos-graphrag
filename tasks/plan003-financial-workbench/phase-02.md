@@ -1,6 +1,7 @@
 # Phase 02. 노드, 관계, Claim 쓰기와 변경 이력
 
 **Execution profile**: deep
+**Status**: completed
 
 ## 목표
 

@@ -1,6 +1,7 @@
 # Phase 01. API 뼈대, 온톨로지 검증, 인증
 
 **Execution profile**: deep
+**Status**: completed
 
 ## 목표
 
