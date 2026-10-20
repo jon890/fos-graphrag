@@ -3,8 +3,8 @@
   "description": "두 사람이 금융 기업·종목·관계와 근거를 공동 관리하는 Neo4j 워크벤치의 첫 마일스톤을 만든다",
   "status": "completed",
   "created_at": "2026-10-20",
-  "total_phases": 5,
-  "current_phase": 5,
+  "total_phases": 6,
+  "current_phase": 6,
   "phases": [
     {
       "number": 1,
@@ -39,6 +39,13 @@
       "file": "phase-05.md",
       "title": "Compose, 백업, 브라우저 검증, 문서",
       "execution_profile": "standard",
+      "status": "completed"
+    },
+    {
+      "number": 6,
+      "file": "phase-06.md",
+      "title": "Google 로그인, 역할 권한, 공개 배포 대비",
+      "execution_profile": "deep",
       "status": "completed"
     }
   ]
