@@ -12,6 +12,10 @@ data class Ontology(
     val relationshipTypes: Map<String, RelationshipTypeDef>,
     val claimRelationships: Map<String, ClaimRelationshipDef>,
     val claimPredicates: Map<String, ClaimPredicateDef>,
+    /** Claim 검토 상태의 표시 이름. 키는 서버가 정한 값(DRAFT, REVIEWED, REJECTED)이다 */
+    val reviewStatuses: Map<String, LabelDef> = emptyMap(),
+    /** 변경 이력 작업(CREATE, UPDATE, ...)의 표시 이름 */
+    val changeActions: Map<String, LabelDef> = emptyMap(),
 ) {
     /** Cypher 에 label 로 넣을 수 있는 이름인지 확인한다. 허용 목록 밖이면 예외다. */
     fun requireNodeType(name: String): NodeTypeDef =
@@ -37,6 +41,8 @@ data class Ontology(
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class NodeTypeDef(
+    /** 화면에 보일 이름. 없으면 화면이 타입 키를 그대로 보인다 */
+    val label: String? = null,
     val description: String,
     val labelProperty: String,
     val managedBy: String? = null,
@@ -46,9 +52,12 @@ data class NodeTypeDef(
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class PropertyDef(
     val type: PropertyType,
+    val label: String? = null,
     val required: Boolean = false,
     val maxLength: Int? = null,
     val values: List<String>? = null,
+    /** enum 값의 표시 이름. 키는 [values] 안에 있어야 한다. 저장되는 값은 바뀌지 않는다 */
+    val valueLabels: Map<String, String>? = null,
     val min: Double? = null,
     val max: Double? = null,
     val description: String = "",
@@ -67,19 +76,29 @@ enum class PropertyType(@get:JsonValue val yaml: String) {
 }
 
 data class RelationshipTypeDef(
+    val label: String? = null,
     val description: String,
     val from: List<String>,
     val to: List<String>,
 )
 
 data class ClaimRelationshipDef(
+    val label: String? = null,
     val description: String,
     val from: List<String>,
     val to: List<String> = emptyList(),
 )
 
 data class ClaimPredicateDef(
+    val label: String? = null,
     val description: String,
     val subjectTypes: List<String>,
     val objectTypes: List<String>,
+)
+
+/** 화면에 보일 이름과 짧은 설명. 키 자체는 서버가 정한다. */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+data class LabelDef(
+    val label: String,
+    val description: String? = null,
 )

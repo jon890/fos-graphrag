@@ -1,87 +1,143 @@
 # 금융 온톨로지 정의
-# API 는 이 파일만 읽어 쓰기를 검증한다. Neo4j 는 이 규칙을 집행하지 않는다.
+# API 는 이 파일만 읽어 쓰기를 검증하고, 같은 파일의 표시 이름을 /api/ontology 로 웹에 내려 준다.
+# Neo4j 는 이 규칙을 집행하지 않는다.
 # 바꾸면 schemaVersion 을 올리고 docs/data-schema.md 의 「온톨로지」 절을 함께 고친다.
+#
+# 표시 이름(화면에 보이는 말)은 모두 이 파일이 소유한다. 웹 코드에는 타입, 속성, 선택지 이름을 적지 않는다.
+# - label: 화면에 보일 이름. 없으면 화면은 키를 그대로 보인다.
+# - valueLabels: enum 속성의 선택지 표시 이름. 키는 values 에 있는 값이어야 한다. 저장되는 값은 바뀌지 않는다.
+# - description: 입력칸 바로 아래에 보이는 도움말. 개발 용어 없이 쓴다.
+# YAML 흐름 표기({ ... }) 안에서는 쉼표와 콜론이 값을 끊는다. 쉼표나 콜론이 든 문장은 반드시 따옴표로 감싼다.
+# API 는 알 수 없는 키가 있으면 시작을 멈춘다. 쉼표로 잘린 값이나 오타를 시작할 때 잡기 위해서다.
 
-schemaVersion: "1.0.0"
+schemaVersion: "1.1.0"
 
 nodeTypes:
   Company:
+    label: 기업
     description: 기업. 상장 여부와 무관한 법인이다.
     labelProperty: name
     properties:
-      name: { type: string, required: true, maxLength: 200, description: 기업 이름 }
-      country: { type: string, required: false, maxLength: 2, description: ISO 3166-1 alpha-2 국가 코드 }
-      registrationNumber: { type: string, required: false, maxLength: 64, description: 법인등록번호 같은 공적 식별자 }
-      description: { type: text, required: false, maxLength: 4000, description: 메모 }
+      name: { type: string, label: 기업 이름, required: true, maxLength: 200, description: "기업의 공식 이름. 예: 삼성전자" }
+      country: { type: string, label: 국가, required: false, maxLength: 2, description: "두 글자 국가 코드. 예: KR, US" }
+      registrationNumber: { type: string, label: 법인등록번호, required: false, maxLength: 64, description: 기업을 구분하는 공적 번호. 모르면 비워 둔다 }
+      description: { type: text, label: 메모, required: false, maxLength: 4000, description: 기업에 대해 남겨 둘 메모 }
 
   Security:
+    label: 종목
     description: 거래되는 종목. 같은 기업의 여러 상장과 동명이종목을 시장과 종목 코드로 구분한다.
     labelProperty: name
     properties:
-      market: { type: enum, required: true, values: [KRX_KOSPI, KRX_KOSDAQ, NASDAQ, NYSE, OTHER], description: 상장 시장 }
-      ticker: { type: string, required: true, maxLength: 32, description: 시장 안의 종목 코드 }
-      name: { type: string, required: true, maxLength: 200, description: 종목 이름 }
-      securityType: { type: enum, required: false, values: [COMMON, PREFERRED, ETF, ADR, OTHER], description: 종목 종류 }
-      currency: { type: string, required: false, maxLength: 3, description: ISO 4217 통화 코드 }
+      market:
+        type: enum
+        label: 상장 시장
+        required: true
+        values: [KRX_KOSPI, KRX_KOSDAQ, NASDAQ, NYSE, OTHER]
+        valueLabels: { KRX_KOSPI: 코스피, KRX_KOSDAQ: 코스닥, NASDAQ: 나스닥, NYSE: 뉴욕증권거래소, OTHER: 기타 }
+        description: 종목이 거래되는 시장
+      ticker: { type: string, label: 종목 코드, required: true, maxLength: 32, description: "시장 안에서 쓰는 종목 코드. 예: 005930" }
+      name: { type: string, label: 종목 이름, required: true, maxLength: 200, description: "종목의 이름. 예: 삼성전자 보통주" }
+      securityType:
+        type: enum
+        label: 종목 종류
+        required: false
+        values: [COMMON, PREFERRED, ETF, ADR, OTHER]
+        valueLabels: { COMMON: 보통주, PREFERRED: 우선주, ETF: ETF, ADR: 예탁증서(ADR), OTHER: 기타 }
+        description: 주식의 종류
+      currency: { type: string, label: 거래 통화, required: false, maxLength: 3, description: "세 글자 통화 코드. 예: KRW, USD" }
 
   Sector:
+    label: 산업
     description: 산업 분류.
     labelProperty: name
     properties:
-      name: { type: string, required: true, maxLength: 200, description: 산업 이름 }
-      scheme: { type: string, required: false, maxLength: 64, description: 분류 체계 이름(예 GICS, KSIC) }
-      code: { type: string, required: false, maxLength: 32, description: 분류 체계 안의 코드 }
+      name: { type: string, label: 산업 이름, required: true, maxLength: 200, description: "산업의 이름. 예: 반도체" }
+      scheme: { type: string, label: 분류 체계, required: false, maxLength: 64, description: "산업을 나눈 기준의 이름. 예: GICS, KSIC" }
+      code: { type: string, label: 분류 코드, required: false, maxLength: 32, description: 분류 체계 안에서 쓰는 코드 }
 
   Document:
-    description: 근거 자료. 서버는 URL 을 가져오지 않는다. 사람이 메타데이터를 등록한다.
+    label: 근거 문서
+    description: 주장의 근거가 되는 자료. 서버가 주소를 읽어 오지 않는다. 사람이 자료의 정보를 직접 등록한다.
     labelProperty: title
     properties:
-      title: { type: string, required: true, maxLength: 300, description: 자료 제목 }
-      url: { type: url, required: true, maxLength: 2000, description: 자료 위치 }
-      publisher: { type: string, required: false, maxLength: 200, description: 발행 주체 }
-      documentType: { type: enum, required: false, values: [FILING, NEWS, REPORT, IR, OTHER], description: 자료 종류 }
-      publishedAt: { type: date, required: false, description: 자료 공개일. 모르면 비워 둔다 }
-      collectedAt: { type: datetime, required: true, description: 자료를 수집한 시각 }
+      title: { type: string, label: 제목, required: true, maxLength: 300, description: 자료의 제목 }
+      url: { type: url, label: 주소, required: true, maxLength: 2000, description: "https:// 로 시작하는 자료 주소" }
+      publisher: { type: string, label: 발행처, required: false, maxLength: 200, description: "자료를 낸 곳. 예: 금융감독원, 한국경제" }
+      documentType:
+        type: enum
+        label: 자료 종류
+        required: false
+        values: [FILING, NEWS, REPORT, IR, OTHER]
+        valueLabels: { FILING: 공시, NEWS: 뉴스, REPORT: 보고서, IR: IR 자료, OTHER: 기타 }
+        description: 자료의 성격
+      publishedAt: { type: date, label: 공개일, required: false, description: 자료가 공개된 날. 모르면 비워 둔다 }
+      collectedAt: { type: datetime, label: 수집 시각, required: true, description: 이 자료를 확인한 시각 }
 
   Claim:
-    description: 자료나 사람이 제시한 주장. 생성과 검토는 Claim 전용 API 로만 한다.
+    label: 주장
+    description: 자료나 사람이 내놓은 주장. 근거 문서와 함께 등록하고 다른 편집자가 검토한다.
     labelProperty: predicate
     managedBy: claims
     properties:
-      predicate: { type: enum, required: true, values: [SUPPLIES_TO, BELONGS_TO_SECTOR, COMPETES_WITH, HAS_EXPOSURE_TO], description: 주장의 의미 }
-      description: { type: text, required: true, maxLength: 4000, description: 주장 설명 }
-      evidenceText: { type: text, required: true, maxLength: 4000, description: 근거 자료에서 옮긴 문장 }
-      validFrom: { type: date, required: false, description: 관계가 성립하기 시작한 날. 모르면 비워 두고 미상으로 표시한다 }
-      validTo: { type: date, required: false, description: 관계가 끝난 날. 모르면 비워 두고 미상으로 표시한다 }
-      authoringMethod: { type: enum, required: true, values: [MANUAL, AI], description: 작성 방식 }
-      extractionConfidence: { type: number, required: false, min: 0, max: 1, description: AI 추출의 확신도. 투자 성공 확률이 아니다 }
+      predicate: { type: enum, label: 관계 종류, required: true, values: [SUPPLIES_TO, BELONGS_TO_SECTOR, COMPETES_WITH, HAS_EXPOSURE_TO], description: 주장이 말하는 관계의 종류 }
+      description: { type: text, label: 설명, required: true, maxLength: 4000, description: 주장을 한두 문장으로 풀어 쓴 글 }
+      evidenceText: { type: text, label: 근거 문장, required: true, maxLength: 4000, description: 근거 문서에서 그대로 옮긴 문장 }
+      validFrom: { type: date, label: 시작일, required: false, description: 관계가 시작된 날. 모르면 비워 두고 미상으로 표시한다 }
+      validTo: { type: date, label: 종료일, required: false, description: 관계가 끝난 날. 모르면 비워 두고 미상으로 표시한다 }
+      authoringMethod:
+        type: enum
+        label: 작성 방식
+        required: true
+        values: [MANUAL, AI]
+        valueLabels: { MANUAL: 직접 작성, AI: AI 추출 }
+        description: 사람이 직접 썼는지 AI 가 뽑았는지
+      extractionConfidence: { type: number, label: 확신도, required: false, min: 0, max: 1, description: AI 가 뽑은 내용이 맞을 가능성을 0 에서 1 사이로 적는다. 투자 성공 확률이 아니다 }
 
 relationshipTypes:
   ISSUES:
+    label: 발행한다
     description: 기업이 종목을 발행한다. 근거가 필요 없는 식별 관계다.
     from: [Company]
     to: [Security]
 
 # Claim 과 대상 노드를 잇는 관계다. Claim API 가 만들고 일반 관계 API 로는 만들 수 없다.
 claimRelationships:
-  SUBJECT: { description: 주장의 주어, from: [Claim] }
-  OBJECT: { description: 주장의 목적어, from: [Claim] }
-  SUPPORTED_BY: { description: 주장의 근거 자료, from: [Claim], to: [Document] }
+  SUBJECT: { label: 주체, description: 주장의 주어, from: [Claim] }
+  OBJECT: { label: 대상, description: 주장의 목적어, from: [Claim] }
+  SUPPORTED_BY: { label: 근거 문서, description: 주장의 근거 자료, from: [Claim], to: [Document] }
 
 claimPredicates:
   SUPPLIES_TO:
-    description: 주어 기업이 목적어 기업에 제품이나 서비스를 공급한다.
+    label: 공급한다
+    description: 주체 기업이 대상 기업에 제품이나 서비스를 공급한다.
     subjectTypes: [Company]
     objectTypes: [Company]
   BELONGS_TO_SECTOR:
-    description: 주어가 목적어 산업에 속한다.
+    label: 속한다
+    description: 주체가 대상 산업에 속한다.
     subjectTypes: [Company, Security]
     objectTypes: [Sector]
   COMPETES_WITH:
-    description: 주어 기업과 목적어 기업이 같은 시장에서 경쟁한다.
+    label: 경쟁한다
+    description: 주체 기업과 대상 기업이 같은 시장에서 경쟁한다.
     subjectTypes: [Company]
     objectTypes: [Company]
   HAS_EXPOSURE_TO:
-    description: 주어의 실적이 목적어의 변화에 영향을 받는다.
+    label: 영향을 받는다
+    description: 주체의 실적이 대상의 변화에 영향을 받는다.
     subjectTypes: [Company, Security]
     objectTypes: [Company, Security, Sector]
+
+# Claim 검토 상태. 값은 서버가 정하고, 여기서는 화면에 보일 이름만 정한다.
+reviewStatuses:
+  DRAFT: { label: 초안, description: 아직 다른 편집자가 확인하지 않았다 }
+  REVIEWED: { label: 검토 완료, description: 다른 편집자가 근거를 확인했다 }
+  REJECTED: { label: 반려, description: 다른 편집자가 받아들이지 않았다 }
+
+# 변경 이력의 작업 이름. 값은 서버가 정한다.
+changeActions:
+  CREATE: { label: 만들기 }
+  UPDATE: { label: 수정 }
+  REVIEW: { label: 검토 }
+  ARCHIVE: { label: 보관 }
+  RESTORE: { label: 복원 }

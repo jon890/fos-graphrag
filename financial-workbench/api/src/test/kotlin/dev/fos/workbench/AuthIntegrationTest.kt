@@ -32,7 +32,12 @@ class AuthIntegrationTest : IntegrationTest() {
         assertThat(me.body["email"].asString()).isEqualTo(ALICE)
         assertThat(me.body["role"].asString()).isEqualTo("EDITOR")
         assertThat(me.body.has("googleSub")).isFalse()
-        assertThat(client.get("/api/ontology").body["schemaVersion"].asString()).isEqualTo("1.0.0")
+        val ontology = client.get("/api/ontology").body
+        assertThat(ontology["schemaVersion"].asString()).isEqualTo("1.1.0")
+        // 화면용 표시 이름이 같은 응답에 실려 온다
+        assertThat(ontology["nodeTypes"]["Company"]["label"].asString()).isEqualTo("기업")
+        assertThat(ontology["nodeTypes"]["Security"]["properties"]["market"]["valueLabels"]["KRX_KOSPI"].asString()).isEqualTo("코스피")
+        assertThat(ontology["reviewStatuses"]["DRAFT"]["label"].asString()).isEqualTo("초안")
     }
 
     @Test

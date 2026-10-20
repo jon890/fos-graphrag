@@ -3,6 +3,7 @@ package dev.fos.workbench.ontology
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.io.ClassPathResource
+import tools.jackson.databind.DeserializationFeature
 import tools.jackson.dataformat.yaml.YAMLMapper
 import tools.jackson.module.kotlin.kotlinModule
 import tools.jackson.module.kotlin.readValue
@@ -17,9 +18,30 @@ object OntologyLoader {
         "searchText", "reviewStatus", "reviewedBy", "reviewedAt", "reviewNote", "contentUpdatedBy",
     )
 
-    private val mapper = YAMLMapper.builder().addModule(kotlinModule()).build()
+    /**
+     * 알 수 없는 키는 시작을 막는다. YAML 흐름 표기에서 쉼표로 잘린 값(`{ description: 예 GICS, KSIC }` 의 `KSIC`)이나
+     * 키 오타가 조용히 사라져 화면에 잘린 설명이 나가는 것을 시작 때 잡기 위해서다.
+     */
+    private val mapper = YAMLMapper.builder().addModule(kotlinModule()).enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build()
 
-    fun load(input: InputStream): Ontology = input.use { mapper.readValue<Ontology>(it) }.also(::checkConsistency)
+    fun load(input: InputStream): Ontology = input.use { mapper.readValue<Ontology>(it) }.let(::withDerivedLabels).also(::checkConsistency)
+
+    /**
+     * Claim 의 predicate 선택지 이름은 claimPredicates 의 label 하나에서 온다. 두 곳에 적어 어긋나지 않게,
+     * managedBy 가 claims 인 타입의 predicate enum 에 valueLabels 를 채워 웹이 enum 이름을 한 방식으로만 읽게 한다.
+     * 파일에 valueLabels 를 직접 적었으면 그 값이 이긴다.
+     */
+    private fun withDerivedLabels(o: Ontology): Ontology {
+        val predicateLabels = o.claimPredicates.mapNotNull { (key, def) -> def.label?.let { key to it } }.toMap()
+        if (predicateLabels.isEmpty()) return o
+        return o.copy(
+            nodeTypes = o.nodeTypes.mapValues { (_, type) ->
+                val predicate = type.properties["predicate"]
+                if (type.managedBy != "claims" || predicate == null || predicate.type != PropertyType.ENUM) type
+                else type.copy(properties = type.properties + ("predicate" to predicate.copy(valueLabels = predicateLabels + (predicate.valueLabels ?: emptyMap()))))
+            },
+        )
+    }
 
     fun loadDefault(): Ontology = load(ClassPathResource(RESOURCE).inputStream)
 
@@ -37,6 +59,8 @@ object OntologyLoader {
             require(reserved.isEmpty()) { "$name 이 시스템 속성 이름을 사용자 속성으로 정의한다: $reserved" }
             def.properties.forEach { (prop, p) ->
                 require(p.type != PropertyType.ENUM || !p.values.isNullOrEmpty()) { "$name.$prop enum 에 values 가 없다" }
+                val stray = p.valueLabels.orEmpty().keys.filterNot { it in p.values.orEmpty() }
+                require(stray.isEmpty()) { "$name.$prop 의 valueLabels 가 values 에 없는 값을 가리킨다: $stray" }
             }
         }
         require(Regex("[A-Za-z][A-Za-z0-9_]*").let { r -> (types + o.allRelationshipTypes).all { r.matches(it) } }) {

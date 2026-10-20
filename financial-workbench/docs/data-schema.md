@@ -16,6 +16,22 @@ Neo4j 는 온톨로지 규칙을 집행하지 않는다. 아래 제약 조건은
 
 웹에서 타입과 관계 정의를 바꾸는 기능은 아직 없다.
 
+### 표시 이름
+
+화면에 보이는 이름은 코드가 아니라 같은 YAML 이 소유한다. 타입, 속성, enum 값, 관계, predicate 가 늘어도 YAML 만 고치면 화면이 따라간다.
+저장되는 값(`KRX_KOSPI`, `SUPPLIES_TO`, `DRAFT` 등)과 키는 표시 이름과 상관없이 그대로다.
+
+| 위치 | 키 | 뜻 |
+| --- | --- | --- |
+| `nodeTypes.<타입>`, `nodeTypes.<타입>.properties.<속성>`, `relationshipTypes.<관계>`, `claimRelationships.<관계>`, `claimPredicates.<predicate>` | `label` | 화면에 보일 이름. 없으면 화면이 키를 그대로 보인다 |
+| enum 속성 | `valueLabels` | 선택지 표시 이름. 키는 `values` 안에 있어야 한다 |
+| `reviewStatuses.<상태>`, `changeActions.<작업>` | `label`, `description` | Claim 검토 상태와 변경 이력 작업의 표시 이름. 키는 서버가 정한 값이다 |
+| 속성 | `description` | 입력칸 바로 아래에 보이는 도움말. 개발 용어 없이 쓴다 |
+
+- Claim 의 `predicate` 선택지 이름은 `claimPredicates.<predicate>.label` 에서 온다. 로더가 응답의 `valueLabels` 에 채워 주므로 따로 적지 않는다.
+- 로더는 알 수 없는 키가 있으면 시작을 멈춘다. YAML 흐름 표기(`{ ... }`) 안에서 쉼표나 콜론이 든 문장을 따옴표로 감싸지 않으면 뒷부분이 값 없는 키가 되기 때문이다.
+- `OntologyLabelsTest` 가 모든 타입, 속성, enum 값, 관계, predicate, 검토 상태, 변경 작업에 표시 이름이 있는지 확인한다.
+
 ## 속성 타입
 
 | 온톨로지 타입 | JSON 입력 | Neo4j 저장 |

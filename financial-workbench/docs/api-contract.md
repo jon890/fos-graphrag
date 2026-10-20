@@ -353,7 +353,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 
 | 메서드 | 경로 | 인증 | 응답 |
 | --- | --- | --- | --- |
-| GET | `/api/ontology` | 필요 | 온톨로지 YAML 을 그대로 옮긴 JSON |
+| GET | `/api/ontology` | 필요 | 온톨로지 YAML 을 그대로 옮긴 JSON. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다 |
 
 ## 사용자 관리
 
