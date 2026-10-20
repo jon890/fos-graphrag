@@ -283,7 +283,7 @@ FOS 의 `search_financial_knowledge`, `get_company_context`, `get_evidence` 는 
 | --- | --- | --- |
 | `search_financial_knowledge` | `GET /api/nodes`, `GET /api/claims` | `id`, `type`, `label`, `revision`, `reviewStatus`, `updatedAt` |
 | `get_company_context` | `GET /api/nodes/{id}`, `GET /api/graph/neighborhood` | `relationships`, `claims[].subject`, `claims[].object`, `claims[].reviewStatus`, `properties.validFrom`, `properties.validTo` |
-| `get_evidence` | `GET /api/claims/{id}` | `evidenceText`, `documents[].url`, `documents[].publishedAt`, `documents[].collectedAt`, `reviewedBy`, `reviewedAt`, `revision` |
+| `get_evidence` | `GET /api/claims/{id}` | `properties.evidenceText`, `documents[].url`, `documents[].publishedAt`, `documents[].collectedAt`, `reviewedBy`, `reviewedAt`, `revision` |
 
 도구는 `revision` 과 `updatedAt` 을 답변에 함께 남겨 어느 시점의 지식을 근거로 삼았는지 추적한다.
 도구 쪽 인증 방식(서비스 계정이나 읽기 전용 토큰)은 연동할 때 정한다. 이 API 는 아직 세션 로그인만 받는다.
