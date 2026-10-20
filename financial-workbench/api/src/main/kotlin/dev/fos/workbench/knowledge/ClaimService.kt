@@ -143,6 +143,8 @@ class ClaimService(
     fun review(id: String, request: ReviewRequest, actorId: String): ClaimView {
         val status = ReviewStatus.entries.firstOrNull { it.name == request.status }
             ?: throw ValidationFailedException(mapOf("status" to "REVIEWED, REJECTED, DRAFT 가운데 하나여야 합니다."))
+        // REVIEWED 는 활성 근거가 있어야 한다. 근거 보관과 같은 잠금 순서(Document 다음 Claim)를 지킨다
+        if (status == ReviewStatus.REVIEWED) guard.lockEvidenceDocuments(id)
         val before = lockClaim(id)
         guard.requireRevision(before, request.expectedRevision)
         guard.requireActive(before)

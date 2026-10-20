@@ -96,6 +96,8 @@ class NodeService(
 
     @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun restore(id: String, request: RevisionRequest, actorId: String): NodeView {
+        // Claim 은 근거 Document 를 먼저 잠근다. 근거 보관과 같은 잠금 순서(Document 다음 Claim)를 지킨다
+        if (reader.nodeProps(id)["type"] == ClaimService.CLAIM) guard.lockEvidenceDocuments(id)
         val before = guard.lockNode(id)
         guard.requireRevision(before, request.expectedRevision)
         if (before["archived"] != true) throw NotArchivedException()

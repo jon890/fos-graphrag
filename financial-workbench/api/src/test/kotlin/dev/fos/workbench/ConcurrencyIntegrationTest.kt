@@ -96,4 +96,32 @@ class ConcurrencyIntegrationTest : IntegrationTest() {
             neo4j.query("MATCH (u:User {email: \$email}) SET u.enabled = false").bind(email).to("email").run()
         }
     }
+
+    @Test
+    fun `Claim 복원과 그 Claim 의 마지막 근거 보관이 동시에 오면 하나만 성공한다`() {
+        val alice = loggedIn(ALICE)
+        val bob = loggedIn(BOB)
+        val fx = Fixtures(alice)
+        repeat(5) { round ->
+            val doc = fx.document("경합근거$round")
+            val claim = fx.claim("SUPPLIES_TO", fx.company("a$round").id, fx.company("b$round").id, listOf(doc.id)).body
+            assertThat(alice.post("/api/nodes/${claim.id}/archive", mapOf("expectedRevision" to 1)).status).isEqualTo(200)
+
+            val results = race(
+                { alice.post("/api/nodes/${claim.id}/restore", mapOf("expectedRevision" to 2)) },
+                { bob.post("/api/nodes/${doc.id}/archive", mapOf("expectedRevision" to 1)) },
+            )
+            assertThat(results.map { it.status }).describedAs("round $round: ${results.map { it.code }}").containsExactlyInAnyOrder(200, 409)
+            assertThat(results.filter { it.status == 409 }.map { it.code }.single())
+                .isIn("NO_ACTIVE_EVIDENCE", "LAST_EVIDENCE", "TRANSIENT_CONFLICT")
+
+            // 어느 쪽이 이기든 활성 근거 없는 활성 Claim 은 남지 않는다
+            val orphan = neo4j.query(
+                "MATCH (c:Claim {id: \$id}) WHERE c.archived = false AND NOT EXISTS { MATCH (c)-[:SUPPORTED_BY]->(d) WHERE d.archived = false } RETURN count(c) AS n",
+            ).bind(claim.id).to("id").fetch().one().get()["n"] as Long
+            assertThat(orphan).isZero()
+            val locks = neo4j.query("MATCH (n) WHERE n._lock IS NOT NULL RETURN count(n) AS n").fetch().one().get()["n"] as Long
+            assertThat(locks).isZero()
+        }
+    }
 }

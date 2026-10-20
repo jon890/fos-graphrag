@@ -47,32 +47,50 @@ class RevisionGuard(private val client: Neo4jClient, private val ontology: Ontol
         client.query("MATCH (n:Knowledge {id: \$id}) REMOVE n._lock").bind(id).to("id").run()
     }
 
-    /** Claim 에 보관되지 않은 근거 문서가 하나 이상 있는지. */
-    fun hasActiveEvidence(claimId: String): Boolean =
+    /**
+     * 근거 규칙의 잠금 순서는 Document 다음 Claim 이다.
+     * Claim 을 복원하거나 REVIEWED 로 검토할 때는 Claim 을 잠그기 전에 이 함수로 근거 Document 를 ID 순서로 잠근다.
+     * Document 보관은 그 Document 를 먼저 잠그고 연결된 Claim 을 잠근다. 두 쪽 모두 Document 를 먼저 쥐므로 서로를 기다린다.
+     */
+    fun lockEvidenceDocuments(claimId: String) {
         client.query(
+            """
+            MATCH (:Knowledge:Claim {id: ${'$'}id})-[:SUPPORTED_BY]->(d:Knowledge)
+            WITH d ORDER BY d.id
+            SET d._lock = true
+            """,
+        ).bind(claimId).to("id").run()
+    }
+
+    /** lockEvidenceDocuments 로 잠근 뒤 부른다. 활성 근거가 없으면 거절하고, 있으면 Document 잠금 표시를 지운다. */
+    fun requireActiveEvidence(claimId: String) {
+        val active = client.query(
             "MATCH (:Knowledge:Claim {id: \$id})-[:SUPPORTED_BY]->(d:Knowledge) WHERE d.archived = false RETURN count(d) > 0 AS ok",
         ).bind(claimId).to("id").fetch().one().map { it["ok"] == true }.orElse(false)
-
-    fun requireActiveEvidence(claimId: String) {
-        if (!hasActiveEvidence(claimId)) throw NoActiveEvidenceException()
+        if (!active) throw NoActiveEvidenceException()
+        client.query("MATCH (:Knowledge:Claim {id: \$id})-[:SUPPORTED_BY]->(d:Knowledge) REMOVE d._lock").bind(claimId).to("id").run()
     }
 
     /**
-     * Document 를 보관하기 전에 부른다. 이 문서를 근거로 쓰는 활성 Claim 을 ID 순서로 잠근 뒤,
-     * 이 문서 말고 다른 활성 근거가 없는 Claim 이 있으면 거절한다. 두 문서를 동시에 보관해도 두 번째는 잠금 뒤 값을 본다.
+     * Document 를 잠근 뒤(보관 경로) 부른다. 이 문서를 근거로 쓰는 Claim 을 보관 여부와 상관없이 ID 순서로 잠근 다음,
+     * 잠금 뒤의 값으로 활성 Claim 가운데 다른 활성 근거가 없는 것을 찾는다. 있으면 거절한다.
+     * 잠금 전에 archived 로 거르면, 동시에 복원되는 Claim 을 놓친다.
      */
     fun requireNotLastEvidence(documentId: String) {
+        client.query(
+            """
+            MATCH (c:Knowledge:Claim)-[:SUPPORTED_BY]->(:Knowledge {id: ${'$'}id})
+            WITH DISTINCT c ORDER BY c.id
+            SET c._lock = true
+            """,
+        ).bind(documentId).to("id").run()
         val orphaned = client.query(
             """
             MATCH (c:Knowledge:Claim)-[:SUPPORTED_BY]->(:Knowledge {id: ${'$'}id})
-            WHERE c.archived = false
-            WITH c ORDER BY c.id
-            SET c._lock = true
-            WITH c
-            WHERE NOT EXISTS {
+            WHERE c.archived = false AND NOT EXISTS {
               MATCH (c)-[:SUPPORTED_BY]->(other:Knowledge) WHERE other.id <> ${'$'}id AND other.archived = false
             }
-            RETURN c.id AS id
+            RETURN DISTINCT c.id AS id ORDER BY id
             """,
         ).bind(documentId).to("id").fetch().all().map { it["id"] as String }
         if (orphaned.isNotEmpty()) throw LastEvidenceException(orphaned)

@@ -79,6 +79,22 @@ class SearchAndGraphIntegrationTest : IntegrationTest() {
     }
 
     @Test
+    fun `상세의 Claim 목록도 상한까지만 주고 잘림을 표시한다`() {
+        val alice = loggedIn(ALICE)
+        val fx = Fixtures(alice)
+        val subject = fx.company("Claim많음")
+        val document = fx.document("근거")
+        val created = (1..3).map { fx.claim("SUPPLIES_TO", subject.id, fx.company("고객$it").id, listOf(document.id)).body.id }
+
+        val detail = alice.get("/api/nodes/${subject.id}").body
+        assertThat(detail["claims"].size()).isEqualTo(2)
+        assertThat(detail["claimsTruncated"].asBoolean()).isTrue()
+        assertThat(detail["limits"]["maxClaims"].asInt()).isEqualTo(2)
+        // 오래된 것부터 담는다
+        assertThat(detail["claims"].toList().map { it["id"].asString() }).containsExactly(created[0], created[1])
+    }
+
+    @Test
     fun `필터는 경로 위 모든 노드에 적용되어 검토되지 않은 Claim 을 거친 이웃을 보이지 않는다`() {
         val alice = loggedIn(ALICE)
         val bob = loggedIn(BOB)
