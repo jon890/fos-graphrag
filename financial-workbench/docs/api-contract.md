@@ -6,22 +6,55 @@
 
 ## 인증과 CSRF
 
-인증은 서버 세션이다. 로그인에 성공하면 `WORKBENCH_SESSION` 쿠키(HttpOnly, SameSite=Lax)가 생긴다.
-`/api/health`, `/api/auth/csrf`, `/api/auth/login` 을 뺀 모든 `/api` 경로는 로그인이 필요하다. 조회도 같다.
+로그인은 Google OpenID Connect 하나다. 비밀번호 로그인과 공개 가입은 없다.
+브라우저가 `/oauth2/authorization/google` 로 이동하면 Google 동의 화면을 거쳐 `/login/oauth2/code/google` 로 돌아온다.
+서버는 아래 셋을 모두 만족할 때만 세션을 만든다.
+
+1. Google 이 준 `email_verified` 가 `true` 다.
+2. 그 이메일이 허용 사용자 목록에 있다. 대소문자는 구분하지 않는다.
+3. 그 사용자가 활성 상태다.
+
+| 결과 | 이동 |
+| --- | --- |
+| 성공 | `/` |
+| 허용되지 않음(위 셋 가운데 하나라도 어김) | `/?login=denied`. 이메일이 목록에 있는지는 드러내지 않는다 |
+
+첫 로그인 때 Google `sub` 을 사용자에 묶는다. 그 뒤에는 `sub` 으로 찾으므로 Google 계정의 이메일이 바뀌어도 같은 사람이다.
+다른 `sub` 이 같은 이메일로 오면 거절한다. 로그인에 성공하면 세션 ID 를 새로 발급한다.
+
+세션 쿠키는 `WORKBENCH_SESSION`(HttpOnly, SameSite=Lax, 운영에서 Secure)이다.
+아래 표의 공개 경로와 정적 파일, OAuth 경로를 뺀 모든 `/api` 경로는 로그인이 필요하다. 조회도 같다.
+서버는 요청마다 사용자 상태와 역할을 다시 읽는다. 비활성화된 사용자의 세션은 다음 요청에서 끊기고 `401 UNAUTHENTICATED` 를 받는다.
 
 상태를 바꾸는 요청(`POST`, `PATCH`, `PUT`, `DELETE`)은 CSRF 토큰이 필요하다.
 서버는 `XSRF-TOKEN` 쿠키(HttpOnly 아님)를 내려 주고, 클라이언트는 그 값을 `X-XSRF-TOKEN` 헤더에 담는다.
-로그인 요청도 CSRF 토큰이 필요하므로 클라이언트는 먼저 `GET /api/auth/csrf` 를 부른다. 토큰 값은 응답 본문이 아니라 쿠키에서 읽는다.
+쿠키가 없으면 먼저 `GET /api/auth/csrf` 를 부른다. 토큰 값은 응답 본문이 아니라 쿠키에서 읽는다.
 
-| 메서드 | 경로 | 입력 | 성공 응답 | 실패 |
+| 메서드 | 경로 | 인증 | 성공 응답 | 실패 |
 | --- | --- | --- | --- | --- |
-| GET | `/api/auth/csrf` | 없음 | `200 {"headerName":"X-XSRF-TOKEN","cookieName":"XSRF-TOKEN"}` 와 쿠키 | 없음 |
-| POST | `/api/auth/login` | `{"username","password"}` | `200 UserRef` | `401 INVALID_CREDENTIALS`, `403 CSRF_REJECTED` |
-| POST | `/api/auth/logout` | 없음 | `204` | `403 CSRF_REJECTED` |
-| GET | `/api/auth/me` | 없음 | `200 UserRef` | `401 UNAUTHENTICATED` |
+| GET | `/api/health` | 불필요 | `200 {"status":"UP"}` | `503 {"status":"DOWN"}` |
+| GET | `/api/auth/csrf` | 불필요 | `200 {"headerName":"X-XSRF-TOKEN","cookieName":"XSRF-TOKEN"}` 와 쿠키 | 없음 |
+| GET | `/api/auth/me` | 필요 | `200 CurrentUser` | `401 UNAUTHENTICATED` |
+| POST | `/api/auth/logout` | 필요 | `204` | `403 CSRF_REJECTED` |
 
-로그인에 성공하면 세션 ID 를 새로 발급하고, CSRF 토큰도 새로 받아야 한다.
-공개 가입 API 는 없다. 계정은 [배포 문서](deployment.md)의 `user-add` 명령으로만 만든다.
+`CurrentUser`
+
+```json
+{ "id": "uuid", "email": "alice@example.com", "displayName": "Alice", "role": "EDITOR" }
+```
+
+## 역할
+
+역할은 사용자마다 하나다. 권한은 서버가 집행하고, 화면에서 버튼을 숨기는 것은 보조다.
+
+| 역할 | 할 수 있는 일 |
+| --- | --- |
+| `VIEWER` | 모든 `GET` 조회(검색, 상세, 주변 그래프, 목록, 변경 이력, 온톨로지) |
+| `EDITOR` | VIEWER 권한과 노드, 관계, Claim 의 생성, 수정, 검토, 보관, 복원 |
+| `ADMIN` | EDITOR 권한과 `/api/users` 의 사용자 관리 |
+
+역할이 모자라면 `403 FORBIDDEN` 이다.
+온톨로지 정의(타입, 관계, 속성)는 Git 의 YAML 로 관리하고 웹에서 바꾸지 않는다. 나중에 웹 편집을 더하면 `ADMIN` 만 하게 한다.
 
 ## 오류 형식
 
@@ -40,23 +73,25 @@
 | 400 | `VALIDATION_FAILED` | 본문 형식, 필수 값, 길이, 날짜 형식이 틀렸다. `details.fieldErrors` 에 `{필드: 사유}` 가 있다 |
 | 400 | `ONTOLOGY_VIOLATION` | 온톨로지에 없는 타입, 속성, 관계, predicate 이거나 시작·끝 노드 타입이 맞지 않는다. `details.rule` 에 위반한 규칙 이름이 있다 |
 | 401 | `UNAUTHENTICATED` | 세션이 없다 |
-| 401 | `INVALID_CREDENTIALS` | 사용자 이름이나 비밀번호가 틀렸다 |
 | 403 | `CSRF_REJECTED` | CSRF 토큰이 없거나 틀렸다 |
+| 403 | `FORBIDDEN` | 역할이 모자라다 |
 | 403 | `SELF_REVIEW_FORBIDDEN` | 자기가 작성한 Claim 을 검토하려 했다 |
 | 404 | `NOT_FOUND` | 그 ID 의 노드나 관계가 없다 |
 | 409 | `REVISION_CONFLICT` | `expectedRevision` 이 현재 revision 과 다르다. `details` 에 두 값이 있다 |
 | 409 | `ARCHIVED` | 보관된 대상을 수정하려 했다. 먼저 복원한다 |
 | 409 | `NOT_ARCHIVED` | 보관되지 않은 대상을 복원하려 했다 |
-| 409 | `DUPLICATE` | 같은 시장과 종목 코드의 Security 처럼 유일해야 하는 값이 이미 있다 |
+| 409 | `DUPLICATE` | 같은 시장과 종목 코드의 Security, 같은 이메일의 사용자처럼 유일해야 하는 값이 이미 있다 |
+| 409 | `LAST_ADMIN` | 마지막 활성 ADMIN 을 강등하거나 비활성화하려 했다 |
 | 500 | `INTERNAL_ERROR` | 그 밖의 서버 오류. 내부 메시지는 응답에 담지 않는다 |
 | 503 | `QUERY_TIMEOUT` | 그래프 조회가 시간 제한을 넘었다 |
+| 503 | `DATABASE_UNAVAILABLE` | Neo4j 에 연결할 수 없다. 백업 중이거나 재시작 중이다 |
 
 ## 공통 표현
 
 `UserRef`
 
 ```json
-{ "id": "uuid", "username": "alice", "displayName": "Alice" }
+{ "id": "uuid", "email": "alice@example.com", "displayName": "Alice" }
 ```
 
 `NodeRef`: 다른 노드를 가리킬 때 쓴다.
@@ -77,9 +112,9 @@
   "archived": false,
   "archivedAt": null,
   "createdAt": "2026-10-20T03:15:00Z",
-  "createdBy": { "id": "uuid", "username": "alice", "displayName": "Alice" },
+  "createdBy": { "id": "uuid", "email": "alice@example.com", "displayName": "Alice" },
   "updatedAt": "2026-10-20T03:15:00Z",
-  "updatedBy": { "id": "uuid", "username": "alice", "displayName": "Alice" },
+  "updatedBy": { "id": "uuid", "email": "alice@example.com", "displayName": "Alice" },
   "reviewStatus": null
 }
 ```
@@ -91,7 +126,7 @@
 ```json
 {
   "reviewStatus": "REVIEWED",
-  "reviewedBy": { "id": "uuid", "username": "bob", "displayName": "Bob" },
+  "reviewedBy": { "id": "uuid", "email": "bob@example.com", "displayName": "Bob" },
   "reviewedAt": "2026-10-20T04:00:00Z",
   "reviewNote": "공시 원문과 대조함",
   "subject": { "id": "uuid", "type": "Company", "label": "가상부품", "archived": false },
@@ -116,7 +151,7 @@
   "from": { "id": "uuid", "type": "Company", "label": "가상전자", "archived": false },
   "to": { "id": "uuid", "type": "Security", "label": "가상전자 보통주", "archived": false },
   "revision": 1, "archived": false,
-  "createdAt": "...", "createdBy": { "id": "uuid", "username": "alice", "displayName": "Alice" }
+  "createdAt": "...", "createdBy": { "id": "uuid", "email": "alice@example.com", "displayName": "Alice" }
 }
 ```
 
@@ -140,7 +175,7 @@
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
-| GET | `/api/nodes` | 검색. 쿼리: `q`, `types`(쉼표 구분), `reviewStatus`, `includeArchived`(기본 `false`), `page`, `size`. 응답 `Page<NodeView>`. `label` 오름차순 |
+| GET | `/api/nodes` | 검색. 쿼리: `q`, `types`(쉼표 구분), `reviewStatus`, `includeArchived`(기본 `false`), `page`, `size`. 응답 `Page<NodeView>`. 대소문자를 무시한 `label` 오름차순(Security 는 그 뒤에 `ticker`) |
 | GET | `/api/nodes/{id}` | 상세. 응답 `NodeDetail` |
 | POST | `/api/nodes` | 생성. 본문 `{"type","properties"}`. 응답 `201 NodeView` |
 | PATCH | `/api/nodes/{id}` | 속성 수정. 본문 `{"expectedRevision", "properties": {키: 값 또는 null}}`. `null` 은 그 속성을 지운다. 응답 `NodeView` |
@@ -176,7 +211,7 @@ Claim 에 딸린 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 는 이 API 로 만들 수 
 | POST | `/api/relationships/{id}/restore` | 복원. 본문 `{"expectedRevision"}`. 응답 `RelationshipView` |
 
 같은 타입, 같은 시작과 끝 노드의 보관되지 않은 관계가 이미 있으면 `409 DUPLICATE` 다.
-보관된 끝 노드에 관계를 만들면 `409 ARCHIVED` 다.
+보관된 끝 노드에 관계를 만들면 `409 ARCHIVED` 다. 복원도 같은 규칙이다. 같은 활성 관계가 이미 있으면 `409 DUPLICATE`, 끝 노드가 보관됐으면 `409 ARCHIVED` 다.
 
 ## Claim
 
@@ -215,7 +250,7 @@ Claim 에 딸린 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 는 이 API 로 만들 수 
 내용을 고치면 `reviewStatus` 가 `DRAFT` 로 돌아가고 검토자 정보가 지워진다. 이력에는 이전 검토자가 남는다.
 
 `review` 의 `status` 는 `REVIEWED`, `REJECTED`, `DRAFT` 가운데 하나다.
-Claim 작성자는 자기 Claim 을 검토할 수 없다(`403 SELF_REVIEW_FORBIDDEN`). 보관된 Claim 은 검토할 수 없다(`409 ARCHIVED`).
+Claim 작성자와 마지막으로 내용을 고친 사람은 그 Claim 을 검토할 수 없다(`403 SELF_REVIEW_FORBIDDEN`). 두 사람이 모두 손댄 Claim 은 제3자가 검토한다. 보관된 Claim 은 검토할 수 없다(`409 ARCHIVED`).
 Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 한다.
 
 ## 주변 그래프
@@ -247,13 +282,13 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 
 ## 변경 이력
 
-`GET /api/changes?targetId={uuid}&actor={username}&page=0&size=20` 은 최근 것부터 `Page<ChangeEventView>` 를 돌려준다.
+`GET /api/changes?targetId={uuid}&actor={email}&page=0&size=20` 은 최근 것부터 `Page<ChangeEventView>` 를 돌려준다.
 
 ```json
 {
   "id": "uuid",
   "at": "2026-10-20T04:00:00Z",
-  "actor": { "id": "uuid", "username": "bob", "displayName": "Bob" },
+  "actor": { "id": "uuid", "email": "bob@example.com", "displayName": "Bob" },
   "action": "REVIEW",
   "targetId": "uuid",
   "targetKind": "NODE",
@@ -265,15 +300,39 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 }
 ```
 
-`action` 은 `CREATE`, `UPDATE`, `REVIEW`, `ARCHIVE`, `RESTORE` 가운데 하나다. `targetKind` 는 `NODE` 나 `RELATIONSHIP` 이다.
+`action` 은 `CREATE`, `UPDATE`, `REVIEW`, `ARCHIVE`, `RESTORE` 가운데 하나다. `targetKind` 는 `NODE`, `RELATIONSHIP`, `USER` 가운데 하나다. 사용자 관리 변경도 같은 형식으로 남는다.
 `revision` 은 변경 뒤의 revision 이다. 이력은 지우거나 고치는 API 가 없다.
 
-## 온톨로지와 health
+## 온톨로지
 
 | 메서드 | 경로 | 인증 | 응답 |
 | --- | --- | --- | --- |
 | GET | `/api/ontology` | 필요 | 온톨로지 YAML 을 그대로 옮긴 JSON |
-| GET | `/api/health` | 불필요 | `200 {"status":"UP","neo4j":"UP","ontologyVersion":"1.0.0"}`. Neo4j 가 응답하지 않으면 `503` 과 `"status":"DOWN"` |
+
+## 사용자 관리
+
+모두 `ADMIN` 만 부를 수 있다. 사용자 노드도 revision 을 가지며 수정은 `expectedRevision` 을 받는다.
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| GET | `/api/users` | 전체 사용자. 이메일 오름차순. 응답 `UserView[]` |
+| POST | `/api/users` | 허용 사용자 추가. 본문 `{"email","displayName","role"}`. 응답 `201 UserView`. 같은 이메일이 있으면 `409 DUPLICATE` |
+| PATCH | `/api/users/{id}` | 본문 `{"expectedRevision","role","displayName","enabled"}`. `expectedRevision` 밖의 필드는 바꿀 것만 담는다. 응답 `UserView` |
+
+`UserView`
+
+```json
+{
+  "id": "uuid", "email": "bob@example.com", "displayName": "Bob", "role": "EDITOR",
+  "enabled": true, "linked": true, "revision": 2,
+  "createdAt": "...", "updatedAt": "...", "lastLoginAt": "..."
+}
+```
+
+- `linked` 는 Google `sub` 이 묶였는지다. 처음 로그인하기 전에는 `false` 다. `sub` 값은 응답에 담지 않는다.
+- 마지막 활성 `ADMIN` 을 다른 역할로 바꾸거나 비활성화하면 `409 LAST_ADMIN` 이다. 자기 자신에게도 같다.
+- 이메일은 바꿀 수 없다. 잘못 넣었으면 비활성화하고 새로 추가한다.
+- 추가, 역할 변경, 비활성화, 다시 활성화는 ChangeEvent(`targetKind = USER`)로 같은 트랜잭션에 남는다.
 
 ## 후속 도구가 쓸 필드
 
@@ -286,4 +345,4 @@ FOS 의 `search_financial_knowledge`, `get_company_context`, `get_evidence` 는 
 | `get_evidence` | `GET /api/claims/{id}` | `properties.evidenceText`, `documents[].url`, `documents[].publishedAt`, `documents[].collectedAt`, `reviewedBy`, `reviewedAt`, `revision` |
 
 도구는 `revision` 과 `updatedAt` 을 답변에 함께 남겨 어느 시점의 지식을 근거로 삼았는지 추적한다.
-도구 쪽 인증 방식(서비스 계정이나 읽기 전용 토큰)은 연동할 때 정한다. 이 API 는 아직 세션 로그인만 받는다.
+도구 쪽 인증 방식(서비스 계정이나 읽기 전용 토큰)은 연동할 때 정한다. 이 API 는 아직 Google 로그인 세션만 받는다.

@@ -59,6 +59,7 @@ Claim 만 더 가지는 시스템 속성이 있다.
 | `reviewedBy` | String | 검토자 `:User` 의 `id`. `DRAFT` 로 돌아가면 지운다 |
 | `reviewedAt` | String | 검토 시각 |
 | `reviewNote` | String | 검토 메모 |
+| `contentUpdatedBy` | String | 내용을 마지막으로 고친 `:User` 의 `id`. 처음에는 작성자다. 이 사람과 작성자는 검토할 수 없다 |
 
 타입별 사용자 속성은 온톨로지 파일이 정한다. 요약은 다음과 같다.
 
@@ -91,10 +92,15 @@ Claim 노드 하나와 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 관계로 저장한�
 
 ## 사용자
 
-`(:User {id, username, displayName, passwordHash, enabled, createdAt})`
+`(:User {id, email, displayName, role, enabled, googleSub, revision, createdAt, createdBy, updatedAt, updatedBy, lastLoginAt})`
 
-- `passwordHash` 는 BCrypt(강도 10)다. 평문은 저장하지 않는다.
+- `email` 은 소문자로 저장한다. 허용 목록의 키다.
+- `googleSub` 은 첫 Google 로그인 때 묶는다. 그 뒤에는 이 값으로 사용자를 찾는다. 응답에는 담지 않는다.
+- `role` 은 `VIEWER`, `EDITOR`, `ADMIN` 가운데 하나다.
+- 비밀번호는 저장하지 않는다. 로그인은 Google OpenID Connect 로만 한다.
+- 개인 계좌 키, 잔고, 주문 내역은 이 모델에 넣지 않는다.
 - `:User` 는 `:Knowledge` label 이 없어 검색과 그래프에 나오지 않는다.
+- 사용자 관리 변경도 ChangeEvent(`targetKind = USER`)로 남는다. 첫 관리자를 만든 이벤트의 actor 는 `system` 이다.
 
 ## 변경 이력
 
@@ -113,7 +119,8 @@ API 가 시작할 때 `IF NOT EXISTS` 로 만든다.
 | --- | --- | --- |
 | `knowledge_id_unique` | `(:Knowledge).id` 유일 | 외부 ID |
 | `user_id_unique` | `(:User).id` 유일 | 사용자 ID |
-| `user_username_unique` | `(:User).username` 유일 | 로그인 |
+| `user_email_unique` | `(:User).email` 유일 | 허용 목록 |
+| `user_google_sub_unique` | `(:User).googleSub` 유일 | 같은 Google 계정이 두 사용자에 묶이지 않게 한다 |
 | `security_listing_unique` | `(:Security).(market, ticker)` 유일 | 같은 시장의 같은 종목 코드 중복 방지 |
 | `change_event_id_unique` | `(:ChangeEvent).id` 유일 | 이력 ID |
 | `change_event_target` | `(:ChangeEvent).targetId` 인덱스 | 대상별 이력 조회 |

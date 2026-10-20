@@ -1,6 +1,6 @@
 package dev.fos.workbench.knowledge
 
-import dev.fos.workbench.auth.WorkbenchUser
+import dev.fos.workbench.auth.WorkbenchPrincipal
 import dev.fos.workbench.web.Page
 import dev.fos.workbench.web.PageQuery
 import org.springframework.http.HttpStatus
@@ -34,18 +34,18 @@ class NodeController(private val nodes: NodeService, private val queries: NodeQu
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun create(@RequestBody body: CreateNodeRequest, @AuthenticationPrincipal user: WorkbenchUser): NodeView =
+    fun create(@RequestBody body: CreateNodeRequest, @AuthenticationPrincipal user: WorkbenchPrincipal): NodeView =
         nodes.create(body, user.id)
 
     @PatchMapping("/{id}")
-    fun patch(@PathVariable id: String, @RequestBody body: PatchNodeRequest, @AuthenticationPrincipal user: WorkbenchUser): NodeView =
+    fun patch(@PathVariable id: String, @RequestBody body: PatchNodeRequest, @AuthenticationPrincipal user: WorkbenchPrincipal): NodeView =
         nodes.patch(id, body, user.id)
 
     @PostMapping("/{id}/archive")
-    fun archive(@PathVariable id: String, @RequestBody body: RevisionRequest, @AuthenticationPrincipal user: WorkbenchUser): NodeView =
+    fun archive(@PathVariable id: String, @RequestBody body: RevisionRequest, @AuthenticationPrincipal user: WorkbenchPrincipal): NodeView =
         nodes.archive(id, body, user.id)
 
     @PostMapping("/{id}/restore")
-    fun restore(@PathVariable id: String, @RequestBody body: RevisionRequest, @AuthenticationPrincipal user: WorkbenchUser): NodeView =
+    fun restore(@PathVariable id: String, @RequestBody body: RevisionRequest, @AuthenticationPrincipal user: WorkbenchPrincipal): NodeView =
         nodes.restore(id, body, user.id)
 }

@@ -23,6 +23,7 @@ dependencies {
     implementation(platform(libs.spring.boot.bom))
     implementation(libs.spring.boot.webmvc)
     implementation(libs.spring.boot.security)
+    implementation(libs.spring.boot.oauth2.client)
     implementation(libs.spring.boot.data.neo4j)
     implementation(libs.spring.boot.validation)
     implementation(libs.jackson.kotlin)

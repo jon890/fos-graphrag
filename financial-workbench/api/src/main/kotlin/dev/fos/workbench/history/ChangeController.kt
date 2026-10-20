@@ -43,7 +43,7 @@ class ChangeController(
         @RequestParam(required = false) size: Int?,
     ): Page<ChangeEventView> {
         val query = PageQuery.of(page, size)
-        val actorId = actor?.let { users.findByUsername(it)?.id ?: return query.of(emptyList(), 0) }
+        val actorId = actor?.let { users.findByEmail(it)?.id ?: return query.of(emptyList(), 0) }
         val params = params("targetId" to targetId, "actorId" to actorId, "skip" to query.skip, "limit" to query.size)
         val where = "WHERE (\$targetId IS NULL OR e.targetId = \$targetId) AND (\$actorId IS NULL OR e.actorId = \$actorId)"
         val total = client.query("MATCH (e:ChangeEvent) $where RETURN count(e) AS total")

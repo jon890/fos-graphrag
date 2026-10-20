@@ -1,5 +1,6 @@
 package dev.fos.workbench.support
 
+import dev.fos.workbench.auth.Role
 import dev.fos.workbench.auth.UserRepository
 import org.junit.jupiter.api.BeforeEach
 import org.springframework.beans.factory.annotation.Autowired
@@ -7,43 +8,63 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 import org.springframework.core.env.Environment
 import org.springframework.data.neo4j.core.Neo4jClient
-import org.springframework.security.crypto.password.PasswordEncoder
+import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.DynamicPropertyRegistry
+import org.springframework.test.context.DynamicPropertySource
 import tools.jackson.databind.json.JsonMapper
 
 /**
- * 실제 서버 포트와 실제 Neo4j 컨테이너로 도는 통합 테스트의 공통 설정.
+ * 실제 서버 포트, 실제 Neo4j, 가짜 OIDC 공급자로 도는 통합 테스트의 공통 설정.
  * NEO4J_PASSWORD 는 설정 placeholder 를 채우기 위한 값이고, 접속 정보는 ServiceConnection 이 덮어쓴다.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = ["NEO4J_PASSWORD=placeholder-overridden-by-service-connection"],
 )
+@ActiveProfiles("mockoidc")
 @Import(TestcontainersConfig::class)
 abstract class IntegrationTest {
 
     @Autowired lateinit var environment: Environment
     @Autowired lateinit var users: UserRepository
-    @Autowired lateinit var encoder: PasswordEncoder
     @Autowired lateinit var mapper: JsonMapper
     @Autowired lateinit var neo4j: Neo4jClient
 
     @BeforeEach
     fun ensureUsers() {
-        listOf(ALICE to "Alice", BOB to "Bob").forEach { (name, display) ->
-            if (users.findByUsername(name) == null) users.create(name, display, encoder.encode(PASSWORD)!!)
+        USERS.forEach { (email, name, role) ->
+            if (users.findByEmail(email) == null) users.create(email, name, role, "system")
         }
     }
 
     fun anonymous(): ApiClient = ApiClient("http://localhost:${environment.getProperty("local.server.port")}", mapper)
 
-    fun loggedIn(username: String): ApiClient = anonymous().also {
-        val response = it.login(username, PASSWORD)
-        check(response.status == 200) { "로그인 실패: ${response.status} ${response.body}" }
+    /** 허용 목록의 이메일로 가짜 공급자를 거쳐 로그인한다. sub 은 이메일마다 고정이다. */
+    fun loggedIn(email: String): ApiClient = anonymous().also {
+        val location = it.oidcLogin(subOf(email), email)
+        check(location.endsWith("/") && !location.contains("denied")) { "로그인 실패: $location" }
     }
 
+    fun subOf(email: String) = "sub-$email"
+
     companion object {
-        const val ALICE = "alice"
-        const val BOB = "bob"
-        const val PASSWORD = "correct-horse-battery"
+        const val ALICE = "alice@example.com"
+        const val BOB = "bob@example.com"
+        const val ADMIN = "admin@example.com"
+        const val VIEWER = "viewer@example.com"
+
+        val USERS = listOf(
+            Triple(ALICE, "Alice", Role.EDITOR),
+            Triple(BOB, "Bob", Role.EDITOR),
+            Triple(ADMIN, "Admin", Role.ADMIN),
+            Triple(VIEWER, "Viewer", Role.VIEWER),
+        )
+
+        @JvmStatic
+        @DynamicPropertySource
+        fun mockOidc(registry: DynamicPropertyRegistry) {
+            registry.add("MOCK_OIDC_BROWSER_URL") { TestcontainersConfig.mockOidcUrl() }
+            registry.add("MOCK_OIDC_INTERNAL_URL") { TestcontainersConfig.mockOidcUrl() }
+        }
     }
 }

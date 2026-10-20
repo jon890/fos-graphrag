@@ -1,6 +1,5 @@
 package dev.fos.workbench.ontology
 
-import dev.fos.workbench.auth.UserAddCommand
 import dev.fos.workbench.web.OntologyViolationException
 import dev.fos.workbench.web.ValidationFailedException
 import org.assertj.core.api.Assertions.assertThat
@@ -72,13 +71,6 @@ class OntologyValidatorTest {
         assertThat(ontology.nodeTypes.keys).containsExactlyInAnyOrder("Company", "Security", "Sector", "Document", "Claim")
         assertThat(ontology.requirePredicate("SUPPLIES_TO").subjectTypes).containsExactly("Company")
         assertThatThrownBy { ontology.requireRelationshipType("OWNS_ACCOUNT") }.isInstanceOf(OntologyViolationException::class.java)
-    }
-
-    @Test
-    fun `사용자 생성 명령은 짧은 비밀번호를 거절한다`() {
-        assertThat(UserAddCommand.validate("alice", "Alice", "short")).contains("12자")
-        assertThat(UserAddCommand.validate("Alice", "Alice", "long-enough-password")).isNotNull()
-        assertThat(UserAddCommand.validate("alice", "Alice", "long-enough-password")).isNull()
     }
 
     @Suppress("UNCHECKED_CAST")

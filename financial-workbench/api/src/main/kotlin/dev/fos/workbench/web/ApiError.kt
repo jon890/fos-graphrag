@@ -42,3 +42,6 @@ class SelfReviewForbiddenException :
 
 class QueryTimeoutException :
     ApiException(HttpStatus.SERVICE_UNAVAILABLE, "QUERY_TIMEOUT", "그래프 조회가 시간 제한을 넘었습니다. 범위를 줄여 다시 시도하세요.")
+
+class DatabaseUnavailableException :
+    ApiException(HttpStatus.SERVICE_UNAVAILABLE, "DATABASE_UNAVAILABLE", "데이터베이스에 연결할 수 없습니다. 백업이나 재시작 중일 수 있으니 잠시 뒤 다시 시도하세요.")

@@ -35,7 +35,7 @@ class ClaimIntegrationTest : IntegrationTest() {
         val reviewed = bob.post("/api/claims/${claim.id}/review", mapOf("expectedRevision" to 1, "status" to "REVIEWED", "note" to "공시 원문과 대조함"))
         assertThat(reviewed.status).isEqualTo(200)
         assertThat(reviewed.body["reviewStatus"].asString()).isEqualTo("REVIEWED")
-        assertThat(reviewed.body["reviewedBy"]["username"].asString()).isEqualTo(BOB)
+        assertThat(reviewed.body["reviewedBy"]["email"].asString()).isEqualTo(BOB)
         assertThat(reviewed.body["reviewNote"].asString()).isEqualTo("공시 원문과 대조함")
 
         // 상세 조회에서 근거와 검토자가 함께 보인다
@@ -46,7 +46,7 @@ class ClaimIntegrationTest : IntegrationTest() {
 
         val history = alice.get("/api/changes?targetId=${claim.id}").body["items"]
         assertThat(history[0]["action"].asString()).isEqualTo("REVIEW")
-        assertThat(history[0]["actor"]["username"].asString()).isEqualTo(BOB)
+        assertThat(history[0]["actor"]["email"].asString()).isEqualTo(BOB)
     }
 
     @Test
@@ -98,5 +98,23 @@ class ClaimIntegrationTest : IntegrationTest() {
         assertThat(unknownPredicate.code).isEqualTo("ONTOLOGY_VIOLATION")
 
         assertThat(fx.claim("BELONGS_TO_SECTOR", company.id, sector.id, listOf(document.id)).status).isEqualTo(201)
+    }
+
+    @Test
+    fun `내용을 마지막으로 고친 사람도 자기 수정본을 검토할 수 없다`() {
+        val alice = loggedIn(ALICE)
+        val bob = loggedIn(BOB)
+        val fx = Fixtures(alice)
+        val claim = fx.claim("SUPPLIES_TO", fx.company("a").id, fx.company("b").id, listOf(fx.document("d").id)).body
+
+        val edited = bob.patch("/api/claims/${claim.id}", mapOf("expectedRevision" to 1, "evidenceText" to "B 가 바꾼 근거 문장"))
+        assertThat(edited.status).isEqualTo(200)
+        val selfReview = bob.post("/api/claims/${claim.id}/review", mapOf("expectedRevision" to 2, "status" to "REVIEWED"))
+        assertThat(selfReview.code).isEqualTo("SELF_REVIEW_FORBIDDEN")
+        // 작성자 A 도 여전히 검토할 수 없다. 두 사람 모두 손댄 내용은 제3자가 검토한다
+        assertThat(alice.post("/api/claims/${claim.id}/review", mapOf("expectedRevision" to 2, "status" to "REVIEWED")).code)
+            .isEqualTo("SELF_REVIEW_FORBIDDEN")
+        assertThat(loggedIn(ADMIN).post("/api/claims/${claim.id}/review", mapOf("expectedRevision" to 2, "status" to "REVIEWED")).status)
+            .isEqualTo(200)
     }
 }

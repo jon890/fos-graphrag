@@ -1,19 +1,17 @@
 package dev.fos.workbench.web
 
-import org.neo4j.driver.exceptions.ClientException
-import org.neo4j.driver.exceptions.TransientException
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
-import org.springframework.dao.InvalidDataAccessResourceUsageException
-import org.springframework.dao.TransientDataAccessResourceException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
+import org.springframework.web.servlet.resource.NoResourceFoundException
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -39,18 +37,28 @@ class GlobalExceptionHandler {
     fun mismatch(e: MethodArgumentTypeMismatchException): ResponseEntity<ApiError> =
         validation(mapOf(e.name to "형식이 올바르지 않습니다."))
 
+    @ExceptionHandler(NoResourceFoundException::class)
+    fun noResource(e: NoResourceFoundException): ResponseEntity<ApiError> =
+        ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError("NOT_FOUND", "대상을 찾을 수 없습니다."))
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException::class)
+    fun method(e: HttpRequestMethodNotSupportedException): ResponseEntity<ApiError> =
+        ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(ApiError("METHOD_NOT_ALLOWED", "지원하지 않는 메서드입니다."))
+
     @ExceptionHandler(DataIntegrityViolationException::class)
     fun integrity(e: DataIntegrityViolationException): ResponseEntity<ApiError> = api(DuplicateException("이미 같은 값이 있습니다."))
 
-    /** 트랜잭션 시간 제한은 드라이버가 ClientException 이나 TransientException 으로 알린다. */
-    @ExceptionHandler(TransientDataAccessResourceException::class, InvalidDataAccessResourceUsageException::class, ClientException::class, TransientException::class)
-    fun neo4j(e: Exception): ResponseEntity<ApiError> {
-        if (isTimeout(e)) return api(QueryTimeoutException())
-        return unexpected(e)
-    }
-
+    /**
+     * 트랜잭션 시간 제한과 Neo4j 연결 끊김은 Spring 이 여러 예외로 감싸 올리므로 원인 사슬을 따라가 판정한다.
+     * Neo4j 오류 원문은 응답에 담지 않는다.
+     */
     @ExceptionHandler(Exception::class)
     fun unexpected(e: Exception): ResponseEntity<ApiError> {
+        if (isTimeout(e)) return api(QueryTimeoutException())
+        if (isUnavailable(e)) {
+            log.warn("Neo4j 에 연결할 수 없다: {}", e.javaClass.simpleName)
+            return api(DatabaseUnavailableException())
+        }
         log.error("처리하지 못한 예외", e)
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
             .body(ApiError("INTERNAL_ERROR", "서버 오류가 발생했습니다."))
@@ -58,6 +66,13 @@ class GlobalExceptionHandler {
 
     private fun validation(fieldErrors: Map<String, String>) =
         ResponseEntity.badRequest().body(ApiError("VALIDATION_FAILED", "입력값이 올바르지 않습니다.", mapOf("fieldErrors" to fieldErrors)))
+
+    private fun isUnavailable(e: Throwable): Boolean =
+        generateSequence(e) { it.cause }.any {
+            it is org.neo4j.driver.exceptions.ServiceUnavailableException ||
+                it is org.neo4j.driver.exceptions.SessionExpiredException ||
+                it is org.springframework.dao.DataAccessResourceFailureException
+        }
 
     private fun isTimeout(e: Throwable): Boolean =
         generateSequence(e) { it.cause }.any {

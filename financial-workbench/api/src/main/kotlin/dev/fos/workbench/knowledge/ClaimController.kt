@@ -1,6 +1,6 @@
 package dev.fos.workbench.knowledge
 
-import dev.fos.workbench.auth.WorkbenchUser
+import dev.fos.workbench.auth.WorkbenchPrincipal
 import dev.fos.workbench.web.Page
 import dev.fos.workbench.web.PageQuery
 import org.springframework.http.HttpStatus
@@ -38,14 +38,14 @@ class ClaimController(
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun create(@RequestBody body: CreateClaimRequest, @AuthenticationPrincipal user: WorkbenchUser): ClaimView =
+    fun create(@RequestBody body: CreateClaimRequest, @AuthenticationPrincipal user: WorkbenchPrincipal): ClaimView =
         claims.create(body, user.id)
 
     @PatchMapping("/{id}")
-    fun patch(@PathVariable id: String, @RequestBody body: Map<String, Any?>, @AuthenticationPrincipal user: WorkbenchUser): ClaimView =
+    fun patch(@PathVariable id: String, @RequestBody body: Map<String, Any?>, @AuthenticationPrincipal user: WorkbenchPrincipal): ClaimView =
         claims.patch(id, body, user.id)
 
     @PostMapping("/{id}/review")
-    fun review(@PathVariable id: String, @RequestBody body: ReviewRequest, @AuthenticationPrincipal user: WorkbenchUser): ClaimView =
+    fun review(@PathVariable id: String, @RequestBody body: ReviewRequest, @AuthenticationPrincipal user: WorkbenchPrincipal): ClaimView =
         claims.review(id, body, user.id)
 }

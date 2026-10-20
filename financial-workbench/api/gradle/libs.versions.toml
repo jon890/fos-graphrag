@@ -12,6 +12,7 @@ spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
 spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
 spring-boot-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
 spring-boot-security = { module = "org.springframework.boot:spring-boot-starter-security" }
+spring-boot-oauth2-client = { module = "org.springframework.boot:spring-boot-starter-security-oauth2-client" }
 spring-boot-data-neo4j = { module = "org.springframework.boot:spring-boot-starter-data-neo4j" }
 spring-boot-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
 jackson-kotlin = { module = "tools.jackson.module:jackson-module-kotlin" }

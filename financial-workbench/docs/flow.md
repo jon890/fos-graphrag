@@ -4,22 +4,29 @@
 
 ```mermaid
 sequenceDiagram
-  participant W as 웹
+  participant W as 브라우저
   participant A as API
+  participant G as Google
   participant N as Neo4j
   W->>A: GET /api/auth/me
   A-->>W: 401 UNAUTHENTICATED
-  W->>A: GET /api/auth/csrf
-  A-->>W: 200, XSRF-TOKEN 쿠키
-  W->>A: POST /api/auth/login (X-XSRF-TOKEN)
-  A->>N: MATCH (:User {username})
-  alt 비밀번호 일치
-    A-->>W: 200 UserRef, 새 세션 쿠키
-    W->>A: GET /api/auth/csrf (새 토큰)
-  else 불일치나 비활성 사용자
-    A-->>W: 401 INVALID_CREDENTIALS
+  W->>A: GET /oauth2/authorization/google
+  A-->>W: 302 Google 동의 화면 (state, nonce)
+  W->>G: 로그인과 동의
+  G-->>W: 302 /login/oauth2/code/google?code
+  W->>A: 콜백
+  A->>G: code 로 ID 토큰 교환
+  A->>A: email_verified 확인
+  A->>N: googleSub 으로 사용자 찾기, 없으면 이메일로 찾고 sub 묶기
+  alt 허용 목록에 있고 활성
+    A-->>W: 302 /, 새 세션 쿠키
+  else 확인 안 된 이메일, 목록 밖, 다른 sub, 비활성
+    A-->>W: 302 /?login=denied, 세션 없음
   end
 ```
+
+로그인한 뒤에도 API 는 요청마다 사용자 상태와 역할을 다시 읽는다.
+관리자가 사용자를 비활성화하면 그 사용자의 다음 요청은 `401` 이고 세션이 지워진다.
 
 ## 공급 관계 Claim 등록과 검토
 
@@ -38,7 +45,7 @@ sequenceDiagram
   A-->>UA: 201 ClaimView (DRAFT)
   UB->>A: GET /api/claims?reviewStatus=DRAFT
   UB->>A: POST /api/claims/{id}/review (REVIEWED, expectedRevision)
-  alt 작성자가 자기 Claim 을 검토
+  alt 작성자나 마지막 내용 수정자가 검토
     A-->>UB: 403 SELF_REVIEW_FORBIDDEN
   else revision 일치
     A->>N: 한 트랜잭션: 잠금, 비교, 상태 변경, ChangeEvent
@@ -74,7 +81,9 @@ sequenceDiagram
 flowchart TD
   R[쓰기 요청] --> S{세션}
   S -- 없음 --> E401[401 UNAUTHENTICATED]
-  S -- 있음 --> C{CSRF 토큰}
+  S -- 있음 --> RL{역할}
+  RL -- 모자람 --> E403R[403 FORBIDDEN]
+  RL -- 충분 --> C{CSRF 토큰}
   C -- 틀림 --> E403[403 CSRF_REJECTED]
   C -- 맞음 --> V{입력 형식}
   V -- 틀림 --> E400[400 VALIDATION_FAILED]

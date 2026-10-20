@@ -13,16 +13,17 @@
 - 온톨로지(타입, 속성, 관계, Claim predicate, 스키마 버전)를 Git 의 YAML 로 관리하고 웹에서 읽기 전용으로 보여 준다.
 - Company, Security, Sector, Document, Claim 을 만들고 고친다. Company 와 Security 는 `ISSUES` 관계로 잇는다.
 - 근거가 필요한 주장은 Claim 으로 만든다. Claim 은 근거 문서, 근거 문장, 유효 기간, 작성 방식, 검토 상태를 가진다.
-- 사용자별 로그인, 변경 이력, revision 기반 충돌 감지, 보관과 복원.
+- Google 계정 로그인, 허용 사용자 목록, `VIEWER`, `EDITOR`, `ADMIN` 역할과 사용자 관리 화면.
+- 변경 이력, revision 기반 충돌 감지, 보관과 복원.
 - 검색, 주변 그래프(기본 1홉, 최대 2홉), 표 목록, 검토 대기 목록, 변경 이력 화면.
-- 운영 Compose, 개발 Compose, 백업과 복원 스크립트, 홈서버 VPN 배포 문서.
+- 운영 Compose, 개발 Compose, 백업과 복원 스크립트, 공개 HTTPS 경로 배포 문서, GHCR 이미지 workflow.
 
 ## 만들지 않는 것
 
 - GraphRAG 검색, 임베딩, AI 추출, Ollama 컨테이너.
 - 실시간 공동 커서, WebSocket 동기화.
-- 웹에서 온톨로지 정의를 바꾸는 기능.
-- 공개 가입, 초대, 조직 관리.
+- 웹에서 온톨로지 정의를 바꾸는 기능. 더한다면 `ADMIN` 만 한다.
+- 공개 가입, 초대 메일, 조직 관리. 비밀번호 로그인.
 - 외부 URL 을 서버가 가져오는 기능. 문서는 사람이 메타데이터를 등록한다.
 - 증권 계좌, 주문, 토스증권 연동. 이것은 FOS Control Plane 과 Toss 커넥터의 책임이다.
 - 실제 홈서버 배포.

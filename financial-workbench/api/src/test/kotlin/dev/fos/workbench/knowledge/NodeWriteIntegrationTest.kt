@@ -17,7 +17,7 @@ class NodeWriteIntegrationTest : IntegrationTest() {
         val alice = loggedIn(ALICE)
         val company = Fixtures(alice).company("가상전자")
         assertThat(company.revision).isEqualTo(1)
-        assertThat(company["createdBy"]["username"].asString()).isEqualTo(ALICE)
+        assertThat(company["createdBy"]["email"].asString()).isEqualTo(ALICE)
 
         val updated = alice.patch("/api/nodes/${company.id}", mapOf("expectedRevision" to 1, "properties" to mapOf("country" to "US", "registrationNumber" to "110111-0000000")))
         assertThat(updated.status).isEqualTo(200)
@@ -33,7 +33,7 @@ class NodeWriteIntegrationTest : IntegrationTest() {
         assertThat(latest["action"].asString()).isEqualTo("UPDATE")
         assertThat(latest["revision"].asLong()).isEqualTo(3)
         assertThat(latest["changes"]["registrationNumber"]["before"].asString()).isEqualTo("110111-0000000")
-        assertThat(latest["actor"]["username"].asString()).isEqualTo(ALICE)
+        assertThat(latest["actor"]["email"].asString()).isEqualTo(ALICE)
     }
 
     @Test
@@ -90,6 +90,24 @@ class NodeWriteIntegrationTest : IntegrationTest() {
 
         val actions = alice.get("/api/changes?targetId=${created.body.id}").body["items"].toList().map { it["action"].asString() }
         assertThat(actions).containsExactly("RESTORE", "ARCHIVE", "CREATE")
+    }
+
+    @Test
+    fun `관계 복원은 만들기와 같은 규칙으로 중복과 보관된 끝 노드를 거절한다`() {
+        val alice = loggedIn(ALICE)
+        val fx = Fixtures(alice)
+        val company = fx.company("복원규칙")
+        val security = fx.security("복원규칙 보통주")
+        val first = alice.post("/api/relationships", mapOf("type" to "ISSUES", "fromId" to company.id, "toId" to security.id)).body
+        alice.post("/api/relationships/${first.id}/archive", mapOf("expectedRevision" to 1))
+        val second = alice.post("/api/relationships", mapOf("type" to "ISSUES", "fromId" to company.id, "toId" to security.id))
+        assertThat(second.status).isEqualTo(201)
+
+        assertThat(alice.post("/api/relationships/${first.id}/restore", mapOf("expectedRevision" to 2)).code).isEqualTo("DUPLICATE")
+
+        alice.post("/api/relationships/${second.body.id}/archive", mapOf("expectedRevision" to 1))
+        alice.post("/api/nodes/${security.id}/archive", mapOf("expectedRevision" to 1))
+        assertThat(alice.post("/api/relationships/${first.id}/restore", mapOf("expectedRevision" to 2)).code).isEqualTo("ARCHIVED")
     }
 
     @Test
