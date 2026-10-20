@@ -27,11 +27,43 @@ stop_services() {
   docker compose stop -t 120 neo4j
 }
 
-# $1 디렉터리에 neo4j.dump 를 만든다. neo4j 가 멈춘 상태에서만 부른다
-dump_to() {
-  local dir="$1"
-  mkdir -p "$dir"
-  chmod 777 "$dir"
-  docker compose run --rm --no-deps -v "$dir:/backups" neo4j \
-    neo4j-admin database dump neo4j --to-path=/backups --overwrite-destination=true
+# 백업 디렉터리와 파일은 실행한 사용자만 읽고 쓴다(디렉터리 700, 파일 600)
+prepare_backup_dir() {
+  umask 077
+  mkdir -p backups
+  chmod 700 backups
+}
+
+# 덤프를 컨테이너의 표준 출력으로 받아 호스트 파일에 쓴다. 호스트 디렉터리를 컨테이너에 마운트하지 않으므로
+# neo4j uid 에 쓰기 권한을 열어 줄 필요가 없다. neo4j 가 멈춘 상태에서만 부른다
+dump_to_file() {
+  local file="$1" tmp="$1.partial"
+  if ! docker compose run --rm --no-deps -T neo4j neo4j-admin database dump neo4j --to-stdout >"$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  check_dump "$tmp"
+  mv "$tmp" "$file"
+}
+
+# 덤프 파일을 표준 입력으로 넘겨 불러온다. neo4j 가 멈춘 상태에서만 부른다
+load_from_file() {
+  docker compose run --rm --no-deps -T neo4j \
+    neo4j-admin database load neo4j --from-stdin --overwrite-destination=true <"$1"
+}
+
+# 덤프는 Neo4j 형식 머리말로 시작한다. 시작 스크립트의 안내문이 섞이면 여기서 멈춘다
+check_dump() {
+  local size
+  size="$(wc -c <"$1" | tr -d ' ')"
+  if [ "$size" -lt 1024 ]; then
+    echo "덤프가 너무 작다($size 바이트). 백업을 중단한다" >&2
+    rm -f "$1"
+    return 1
+  fi
+  if head -c 64 "$1" | LC_ALL=C grep -q 'Changed password\|Warning\|INFO'; then
+    echo "덤프 앞에 텍스트가 섞였다. 백업을 중단한다" >&2
+    rm -f "$1"
+    return 1
+  fi
 }

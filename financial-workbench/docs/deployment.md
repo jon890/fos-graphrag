@@ -22,7 +22,10 @@ flowchart LR
 - `neo4j` 는 호스트 포트를 열지 않는다. Compose 내부 네트워크에서 `app` 만 접근한다.
 - reverse proxy 는 `X-Forwarded-Proto`, `X-Forwarded-Host`, `X-Forwarded-For` 를 붙인다.
   app 은 `WORKBENCH_FORWARD_HEADERS_STRATEGY=native` 로 이 헤더를 읽어 OAuth redirect URI 를 `https://<공개 origin>/login/oauth2/code/google` 로 만든다.
-  Tomcat 은 사설 대역(10/8, 172.16/12, 192.168/16, 127/8)에서 온 프록시의 헤더만 믿는다. Docker 네트워크의 프록시가 여기에 든다.
+  app 은 `WORKBENCH_TRUSTED_PROXIES`(Java 정규식)에 맞는 주소에서 온 요청의 `X-Forwarded-*` 만 믿는다.
+  기본값은 loopback 과 Docker 브리지 대역 `172.16.0.0/12` 다. 같은 호스트의 프록시가 published 포트로 넘기면 Docker 게이트웨이(`172.x.0.1`)에서 온 것으로 보이기 때문이다.
+  프록시 컨테이너 IP 를 고정할 수 있으면 그 주소 하나로 좁힌다(예: `172\.20\.0\.10`). 믿지 않는 주소가 보낸 헤더는 무시하고, redirect URI 는 `http://` 로 만들어져 Google 이 거절한다.
+- 앞단에서 요청 본문 크기를 제한한다(예: Traefik `buffering.maxRequestBodyBytes` 를 1MiB). app 도 `/api` 요청 본문을 64KiB 로 막지만 앞단에서 먼저 막는 편이 자원을 덜 쓴다.
 - 세션 쿠키와 CSRF 쿠키는 `WORKBENCH_SECURE_COOKIE=true`(운영 기본값)로 Secure 다. HTTPS 가 없는 로컬 확인에서만 끈다.
 - HSTS 는 앞단이 붙이는 것을 기본으로 한다. 앞단이 붙이지 않으면 `WORKBENCH_HSTS=true` 로 앱이 붙인다.
 - 실제 홈서버 주소, 도메인, 계정, 키, 경로는 이 저장소에 넣지 않는다. 홈서버의 `.env` 에만 둔다.
@@ -62,10 +65,12 @@ bash scripts/check-compose.sh
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 예 | Google OAuth client. 비어 있으면 API 가 시작하지 않는다 |
 | `WORKBENCH_BOOTSTRAP_ADMIN_EMAIL` | 처음 한 번 | 사용자가 한 명도 없을 때 만들 첫 ADMIN 의 Gmail. 사용자가 있으면 무시한다 |
 | `WORKBENCH_BIND`, `WORKBENCH_PORT` | 아니요 | app 을 열 호스트 주소와 포트. 기본 `127.0.0.1`, `8081` |
-| `WORKBENCH_SECURE_COOKIE` | 아니요 | 기본 `true` |
+| `WORKBENCH_SECURE_COOKIE` | 아니요 | 기본 `true`. 운영 프로필은 값이 없어도 `true` 다 |
 | `WORKBENCH_FORWARD_HEADERS_STRATEGY` | 아니요 | 기본 `native`. 앞단 없이 직접 열면 `none` |
 | `WORKBENCH_SESSION_TIMEOUT` | 아니요 | 유휴 세션 만료. 기본 `8h` |
 | `WORKBENCH_HSTS` | 아니요 | 기본 `false` |
+| `WORKBENCH_TRUSTED_PROXIES` | 아니요 | X-Forwarded-* 를 믿을 프록시 주소(정규식). 비우면 loopback 과 `172.16.0.0/12` |
+| `NEO4J_TX_TIMEOUT`, `NEO4J_LOCK_TIMEOUT` | 아니요 | Neo4j 서버의 트랜잭션 시간 제한(기본 `10s`)과 잠금 대기 상한(기본 `5s`) |
 | `WORKBENCH_IMAGE` | 아니요 | GHCR 이미지를 쓸 때 `ghcr.io/jon890/fos-graphrag-workbench:sha-<7자리>` |
 
 ## 실행과 첫 관리자
@@ -104,6 +109,15 @@ Actions 결제 한도 때문에 `workflow_dispatch` 로만 실행한다. 플랫�
 
 `deploy.resources` 는 쓰지 않는다. 일반 `docker compose` 가 적용하는 `mem_limit` 을 쓴다.
 
+## 실행 시간 상한
+
+| 상한 | 값 | 넘으면 |
+| --- | --- | --- |
+| API 쓰기 트랜잭션 | 8초 | `503 QUERY_TIMEOUT` |
+| API 그래프 조회 | 5초 | `503 QUERY_TIMEOUT` |
+| Neo4j 서버 트랜잭션(`NEO4J_TX_TIMEOUT`) | 10초 | API 밖에서 연 트랜잭션(cypher-shell 등)도 끊는다 |
+| Neo4j 잠금 대기(`NEO4J_LOCK_TIMEOUT`) | 5초 | `409 TRANSIENT_CONFLICT`. 화면은 다시 시도하라고 안내한다 |
+
 ## 컨테이너 보안
 
 - 모든 컨테이너에 `cap_drop: [ALL]` 과 `no-new-privileges:true` 를 둔다.
@@ -112,7 +126,9 @@ Actions 결제 한도 때문에 `workflow_dispatch` 로만 실행한다. 플랫�
   `KILL` 이 없으면 tini 가 `neo4j` 사용자 프로세스에 종료 신호를 넘기지 못한다(`Operation not permitted`). 그러면 깨끗하게 종료되지 않아 오프라인 덤프가 거부된다.
 - `app` 은 uid 10001 로 돌고 cap 이 없다.
 - docker.sock 은 어느 컨테이너에도 마운트하지 않는다.
-- 운영 Neo4j 이미지는 `neo4j:5.26.30-community@sha256:...` 로 digest 를 고정한다.
+- 운영 Neo4j 이미지와 Dockerfile 의 베이스 이미지(node, Temurin JDK, JRE)는 태그와 digest 로 고정한다.
+- Gradle Wrapper 는 `distributionSha256Sum` 으로 배포본을 확인한다.
+- 이미지 workflow 는 `main` 에서 실행했을 때만 publish 한다. 다른 ref 에서 실행하면 job 을 건너뛴다.
 
 `scripts/check-compose.sh` 가 위 규칙과 포트 규칙을 `docker compose config` 출력으로 검사한다.
 
@@ -143,9 +159,11 @@ Neo4j Community 에디션은 온라인 백업(`neo4j-admin database backup`)을 
 scripts/backup.sh
 ```
 
-1. `docker compose stop app`, `docker compose stop -t 120 neo4j`
-2. 임시 디렉터리 `backups/tmp-<시각>` 을 `/backups` 로 마운트하고 `neo4j-admin database dump neo4j --to-path=/backups` 를 `neo4j` 이미지로 실행한다.
-3. 덤프 파일을 `backups/neo4j-YYYYMMDD-HHMMSS.dump` 로 옮긴다.
+1. `backups/` 를 700 으로 만들고 umask 077 로 파일을 600 으로 만든다.
+2. `docker compose stop app`, `docker compose stop -t 120 neo4j`
+3. `neo4j-admin database dump neo4j --to-stdout` 을 `neo4j` 이미지로 실행하고 표준 출력을 `backups/neo4j-YYYYMMDD-HHMMSS.dump` 에 쓴다.
+   호스트 디렉터리를 컨테이너에 마운트하지 않으므로 neo4j uid 에 쓰기 권한을 열 필요가 없다.
+   덤프가 1KiB 보다 작거나 앞에 텍스트가 섞이면 파일을 지우고 실패로 끝낸다.
 4. 성공하든 실패하든 `docker compose start neo4j app` 다음 두 컨테이너가 healthy 가 될 때까지 기다린다. 컨테이너를 다시 만들지 않는다.
 
 중단 시간은 데이터 크기에 비례한다. 첫 버전 규모에서는 수십 초다.
@@ -160,7 +178,7 @@ scripts/restore.sh backups/neo4j-20261020-120000.dump    # 어느 디렉터리�
 
 1. `app` 과 `neo4j` 를 한 번만 멈춘다.
 2. 멈춘 상태에서 현재 데이터를 `backups/neo4j-before-restore-<시각>.dump` 로 먼저 덤프한다. 이 덤프가 실패하면 덮어쓰지 않고 멈춘다.
-3. 덤프 파일을 `backups/restore/neo4j.dump` 로 복사하고 `neo4j-admin database load neo4j --from-path=/backups --overwrite-destination=true` 를 실행한다.
+3. 덤프 파일을 표준 입력으로 넘겨 `neo4j-admin database load neo4j --from-stdin --overwrite-destination=true` 를 실행한다.
 4. `neo4j` 와 `app` 을 다시 시작하고 healthy 를 기다린다.
 
 로컬에서 확인한 순서는 이렇다. 백업을 만들고, Company 노드 하나를 지워 노드 수를 줄인 뒤 복원했다.
@@ -187,4 +205,6 @@ COMPOSE_FILE=compose.yml:compose.e2e.yml docker compose up -d --build --wait
 cd web && WORKBENCH_URL=http://127.0.0.1:8081 E2E_ADMIN_NAME=관리자 npx playwright test
 ```
 
-`compose.e2e.yml` 은 가짜 OIDC 공급자를 더하고 app 을 `prod,mockoidc` 프로필로 띄운다. TLS 가 없으므로 Secure 쿠키를 끈다. 운영에서 쓰지 않는다.
+`compose.e2e.yml` 은 가짜 OIDC 공급자를 더하고 app 을 `e2e` 프로필로 띄운다. `e2e` 는 `prod` 를 포함하지 않는다.
+운영 Compose 위에 겹치므로 이미지, 보안 헤더, cap_drop, 메모리 상한은 운영과 같다. TLS 가 없으므로 Secure 쿠키와 forward headers 만 끈다.
+`prod` 와 가짜 공급자(`mockoidc`)를 함께 켜면 app 이 시작하지 않는다. 운영에서 이 파일을 쓰지 않는다.

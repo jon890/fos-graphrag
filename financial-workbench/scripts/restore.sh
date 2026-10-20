@@ -12,25 +12,14 @@ source_dump="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 cd "$(dirname "$0")/.."
 source scripts/lib.sh
 
-stamp="$(date +%Y%m%d-%H%M%S)"
-safety="$PWD/backups/tmp-before-restore-$stamp"
-stage="$PWD/backups/restore"
+prepare_backup_dir
+safety="backups/neo4j-before-restore-$(date +%Y%m%d-%H%M%S).dump"
 
 stop_services
 trap 'echo "neo4j 와 app 을 다시 시작한다"; start_services' EXIT
 
 echo "덮어쓰기 전에 현재 상태를 덤프한다"
-dump_to "$safety"
-mv "$safety/neo4j.dump" "backups/neo4j-before-restore-$stamp.dump"
-rmdir "$safety"
-
-mkdir -p "$stage"
-chmod 777 "$stage"
-# load 는 디렉터리에서 <데이터베이스 이름>.dump 를 찾는다
-cp "$source_dump" "$stage/neo4j.dump"
-chmod 644 "$stage/neo4j.dump"
-docker compose run --rm --no-deps -v "$stage:/backups" neo4j \
-  neo4j-admin database load neo4j --from-path=/backups --overwrite-destination=true
-rm -f "$stage/neo4j.dump"
-echo "복원 전 상태: backups/neo4j-before-restore-$stamp.dump"
+dump_to_file "$safety"
+load_from_file "$source_dump"
+echo "복원 전 상태: $safety"
 echo "복원: $1"
