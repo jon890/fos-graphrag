@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, errorMessage } from '../api/client'
 import type { NodeView, Page, ReviewStatus } from '../api/types'
 import { creatableTypes, useApp, useLabels } from '../context'
-import { withEulReul } from '../lib/labels'
+import { withEulReul, withJosa } from '../lib/labels'
 import { ClaimCreateForm } from './ClaimCreateForm'
 import { NodeCreateForm } from './NodeCreateForm'
 import { Pager } from './Pager'
@@ -21,7 +21,7 @@ interface Props {
   selectedId: string | null
   onFocus: (id: string) => void
   /** 새 노드를 만들었을 때. 안내 문장과 함께 부른다 */
-  onCreated: (node: NodeView, message: string) => void
+  onCreated: (node: NodeView, message: string, kind?: 'success' | 'error') => void
   refreshTick: number
   typesParam: (types: string[]) => string[] | undefined
 }
@@ -162,6 +162,9 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
                 >
                   <TypeBadge type={n.type} />
                   <span className="result-label">{labels.node(n)}</span>
+                  <span className="result-hint text-xs text-muted-foreground" data-testid="search-result-hint">
+                    {labels.hint(n)}
+                  </span>
                   <StatusBadge status={n.reviewStatus} />
                   {n.archived && <span className="archived-badge">보관됨</span>}
                 </button>
@@ -216,9 +219,23 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
                 type={createType}
                 testIdPrefix="create"
                 onCancel={() => setCreating(false)}
-                onCreated={(node) => {
+                onUseExisting={(n) => {
                   setCreating(false)
-                  onCreated(node, `「${labels.node(node)}」 ${withEulReul(labels.type(node.type))} 만들었습니다.`)
+                  onFocus(n.id)
+                }}
+                onCreated={(node, linkError) => {
+                  setCreating(false)
+                  if (linkError) {
+                    const pickerLabel =
+                      Object.values(ontology.relationshipTypes).find((r) => r.createPicker && r.to.includes(node.type))?.createPicker?.label ?? '관계'
+                    onCreated(
+                      node,
+                      `「${labels.node(node)}」 ${withEulReul(labels.type(node.type))} 만들었지만 ${withJosa(pickerLabel, '을(를)')} 잇지 못했습니다. 상세의 관계 추가로 다시 이으세요. (${linkError})`,
+                      'error',
+                    )
+                  } else {
+                    onCreated(node, `「${labels.node(node)}」 ${withEulReul(labels.type(node.type))} 만들었습니다.`)
+                  }
                   void run()
                 }}
               />

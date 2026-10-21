@@ -10,15 +10,24 @@ export const testOntology: Ontology = {
       label: '기업',
       description: '기업',
       labelProperty: 'name',
+      hintProperties: ['country'],
       properties: {
         name: { type: 'string', label: '기업 이름', required: true, description: '기업의 공식 이름. 예: 삼성전자' },
-        country: { type: 'string', label: '국가', required: false, maxLength: 2, description: '두 글자 국가 코드. 예: KR, US' },
+        country: {
+          type: 'enum',
+          label: '국가',
+          required: false,
+          values: ['KR', 'US'],
+          valueLabels: { KR: '대한민국 (KR)', US: '미국 (US)' },
+          description: '기업이 등록된 나라',
+        },
       },
     },
     Security: {
       label: '종목',
       description: '종목',
       labelProperty: 'name',
+      hintProperties: ['market'],
       properties: {
         market: {
           type: 'enum',
@@ -34,7 +43,10 @@ export const testOntology: Ontology = {
       label: '근거 문서',
       description: '근거 자료',
       labelProperty: 'title',
-      properties: { title: { type: 'string', label: '제목', required: true } },
+      properties: {
+        title: { type: 'string', label: '제목', required: true },
+        url: { type: 'url', label: '주소', required: true },
+      },
     },
     Person: {
       label: '인물',
@@ -61,7 +73,7 @@ export const testOntology: Ontology = {
       },
     },
   },
-  relationshipTypes: { ISSUES: { label: '발행한다', description: '', from: ['Company'], to: ['Security'] } },
+  relationshipTypes: { ISSUES: { label: '발행한다', description: '', from: ['Company'], to: ['Security'], createPicker: { label: '발행 기업' } } },
   claimRelationships: { SUBJECT: { label: '주체', description: '' }, OBJECT: { label: '대상', description: '' } },
   claimPredicates: { SUPPLIES_TO: { label: '공급한다', description: '', sentence: '{subject}이(가) {object}에 공급한다', subjectTypes: ['Company'], objectTypes: ['Company'] } },
   reviewStatuses: { DRAFT: { label: '초안' }, REVIEWED: { label: '검토 완료' }, REJECTED: { label: '반려' } },

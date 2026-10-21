@@ -1,10 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { NodeCreateForm } from './NodeCreateForm'
+import { PropertyFields } from './PropertyFields'
 import { SearchPanel } from './SearchPanel'
 import { StatusBadge, TypeBadge } from './TypeBadge'
 import { WelcomeGuide } from './WelcomeGuide'
-import { withApp } from './testSupport'
+import { testOntology, withApp } from './testSupport'
 
 // 「Person」 은 화면 코드에 없는 타입이다. 온톨로지에만 있어도 화면이 따라오는지 본다.
 describe('온톨로지에 새로 더한 타입', () => {
@@ -23,6 +24,32 @@ describe('온톨로지에 새로 더한 타입', () => {
     const html = renderToStaticMarkup(withApp(<NodeCreateForm type="Security" testIdPrefix="create" onCreated={() => {}} onCancel={() => {}} />))
     expect(html).toContain('<option value="KRX_KOSPI">코스피</option>')
     expect(html).toContain('<option value="KRX_KOSDAQ">코스닥</option>')
+  })
+
+  it('종목 만들기 폼에만 발행 기업 고르기 칸이 있다', () => {
+    const security = renderToStaticMarkup(withApp(<NodeCreateForm type="Security" testIdPrefix="create" onCreated={() => {}} onCancel={() => {}} />))
+    expect(security).toContain('발행 기업')
+    expect(security).toContain('create-link-ISSUES-picker-input')
+    const company = renderToStaticMarkup(withApp(<NodeCreateForm type="Company" testIdPrefix="create" onCreated={() => {}} onCancel={() => {}} />))
+    expect(company).not.toContain('create-link-ISSUES-picker-input')
+  })
+
+  it('저장된 값이 목록 밖인 enum 칸은 선택지로 보인다', () => {
+    const defs = testOntology.nodeTypes.Company.properties
+    const render = (country: string) =>
+      renderToStaticMarkup(
+        <PropertyFields defs={defs} values={{ name: 'x', country }} testIdPrefix="edit-prop" onChange={() => {}} />,
+      )
+    const unlisted = render('KOR')
+    expect(unlisted).toContain('목록에 없는 값: KOR')
+    expect(unlisted).toContain('edit-prop-country-unlisted')
+    expect(render('KR')).not.toContain('edit-prop-country-unlisted')
+  })
+
+  it('주소 입력칸은 브라우저 형식 검사를 받지 않는다', () => {
+    const html = renderToStaticMarkup(withApp(<NodeCreateForm type="Document" testIdPrefix="claim-doc-create" onCreated={() => {}} onCancel={() => {}} />))
+    expect(html).toContain('inputMode="url"')
+    expect(html).not.toContain('type="url"')
   })
 
   it('검색 패널의 종류 필터와 만들기 선택지에 새 타입이 나온다', () => {

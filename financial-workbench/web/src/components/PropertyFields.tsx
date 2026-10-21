@@ -41,6 +41,11 @@ export function PropertyFields({ defs, values, errors = {}, onChange, testIdPref
                     {def.valueLabels?.[v] ?? v}
                   </option>
                 ))}
+                {value !== '' && !(def.values ?? []).includes(value) && (
+                  <option value={value} data-testid={`${id}-unlisted`}>
+                    목록에 없는 값: {value}
+                  </option>
+                )}
               </select>
             )
             break
@@ -73,7 +78,16 @@ export function PropertyFields({ defs, values, errors = {}, onChange, testIdPref
             )
             break
           case 'url':
-            input = <input {...common} type="url" maxLength={def.maxLength} onChange={(e) => onChange(name, e.target.value)} />
+            input = (
+              <input
+                {...common}
+                type="text"
+                inputMode="url"
+                maxLength={def.maxLength}
+                autoComplete="url"
+                onChange={(e) => onChange(name, e.target.value)}
+              />
+            )
             break
           default:
             input = <input {...common} type="text" maxLength={def.maxLength} onChange={(e) => onChange(name, e.target.value)} />

@@ -184,6 +184,8 @@ export interface PropertyDef {
   min?: number
   max?: number
   description?: string
+  /** enum 값의 예전 표기. 서버가 시작할 때 쓰고 화면은 쓰지 않는다 */
+  valueAliases?: Record<string, string[]>
 }
 
 export interface NodeTypeDef {
@@ -191,7 +193,14 @@ export interface NodeTypeDef {
   description: string
   labelProperty: string
   managedBy?: string
+  /** 이름 옆에 함께 보일 속성. 같은 이름의 항목을 구분하게 한다 */
+  hintProperties?: string[]
   properties: Record<string, PropertyDef>
+}
+
+export interface CreatePickerDef {
+  label: string
+  description?: string | null
 }
 
 export interface RelationshipTypeDef {
@@ -199,6 +208,8 @@ export interface RelationshipTypeDef {
   description: string
   from: string[]
   to: string[]
+  /** 끝(to) 타입 만들기 폼에 시작(from) 노드를 고르는 칸 */
+  createPicker?: CreatePickerDef | null
 }
 
 export interface ClaimRelationshipDef {

@@ -2,29 +2,43 @@ import { useState, type FormEvent } from 'react'
 import { api, ApiError, errorMessage } from '../api/client'
 import type { NodeView } from '../api/types'
 import { useApp, useLabels } from '../context'
-import { buildCreateProperties, initialFormValues, type FormValues } from '../lib/formValues'
+import { buildCreateProperties, initialCreateValues, type FormValues } from '../lib/formValues'
+import { sameName, withJosa } from '../lib/labels'
+import { NodePicker } from './NodePicker'
 import { fieldErrorsOf, PropertyFields } from './PropertyFields'
+import { TypeBadge } from './TypeBadge'
 
 interface Props {
   type: string
-  onCreated: (node: NodeView) => void
+  /** linkError 는 시작 노드 관계만 실패했을 때의 이유다 */
+  onCreated: (node: NodeView, linkError?: string) => void
   onCancel: () => void
   testIdPrefix: string
+  /** 같은 이름 경고의 후보를 누를 때. 없으면 후보에 단추가 없다 */
+  onUseExisting?: (node: NodeView) => void
+  /** 그 단추의 글자. 기본 「열기」 */
+  useExistingLabel?: string
 }
 
 /** 온톨로지 속성 정의로 생성 폼을 만든다. */
-export function NodeCreateForm({ type, onCreated, onCancel, testIdPrefix }: Props) {
+export function NodeCreateForm({ type, onCreated, onCancel, testIdPrefix, onUseExisting, useExistingLabel }: Props) {
   const { ontology } = useApp()
   const labels = useLabels()
-  const defs = ontology.nodeTypes[type]?.properties ?? {}
-  const [values, setValues] = useState<FormValues>(() => initialFormValues(defs))
+  const typeDef = ontology.nodeTypes[type]
+  const defs = typeDef?.properties ?? {}
+  const labelProperty = typeDef?.labelProperty ?? ''
+  const [values, setValues] = useState<FormValues>(() => initialCreateValues(defs))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [duplicates, setDuplicates] = useState<NodeView[]>([])
+  const [picked, setPicked] = useState<Record<string, NodeView>>({})
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const pickers = Object.entries(ontology.relationshipTypes).filter(
+    ([, rel]) => rel.createPicker && rel.to.includes(type),
+  )
+
+  const save = async ({ skipDuplicateCheck }: { skipDuplicateCheck: boolean }) => {
     const { properties, errors: localErrors } = buildCreateProperties(defs, values)
     setErrors(localErrors)
     if (Object.keys(localErrors).length > 0) {
@@ -34,13 +48,44 @@ export function NodeCreateForm({ type, onCreated, onCancel, testIdPrefix }: Prop
     setBusy(true)
     setError(null)
     try {
-      onCreated(await api.nodes.create(type, properties))
+      if (!skipDuplicateCheck) {
+        const name = values[labelProperty] ?? ''
+        try {
+          const page = await api.nodes.search({ q: name.trim(), types: [type], size: 100 })
+          const same = page.items.filter((n) => sameName(n.label, name))
+          if (same.length > 0) {
+            setDuplicates(same)
+            return
+          }
+        } catch {
+          // 같은 이름 검사는 돕는 기능이라 실패해도 저장은 막지 않는다
+        }
+      }
+      setDuplicates([])
+      const created = await api.nodes.create(type, properties)
+      const linkErrors: string[] = []
+      for (const [relType] of pickers) {
+        const from = picked[relType]
+        if (!from) continue
+        try {
+          await api.relationships.create(relType, from.id, created.id)
+        } catch (e) {
+          linkErrors.push(errorMessage(e))
+        }
+      }
+      onCreated(created, linkErrors.length > 0 ? linkErrors.join('\n') : undefined)
     } catch (err) {
       setError(errorMessage(err))
       if (err instanceof ApiError) setErrors(fieldErrorsOf(err.details))
     } finally {
       setBusy(false)
     }
+  }
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    void save({ skipDuplicateCheck: false })
   }
 
   return (
@@ -50,8 +95,67 @@ export function NodeCreateForm({ type, onCreated, onCancel, testIdPrefix }: Prop
         values={values}
         errors={errors}
         testIdPrefix={`${testIdPrefix}-prop`}
-        onChange={(name, v) => setValues((prev) => ({ ...prev, [name]: v }))}
+        onChange={(name, v) => {
+          if (name === labelProperty) setDuplicates([])
+          setValues((prev) => ({ ...prev, [name]: v }))
+        }}
       />
+      {pickers.map(([relType, rel]) => (
+        <div className="field" key={relType}>
+          <div className="label">{rel.createPicker?.label}</div>
+          {picked[relType] ? (
+            <div className="row" data-testid={`${testIdPrefix}-link-${relType}-selected`}>
+              <TypeBadge type={picked[relType].type} />
+              <span>{labels.node(picked[relType])}</span>
+              <button
+                type="button"
+                data-testid={`${testIdPrefix}-link-${relType}-clear`}
+                onClick={() =>
+                  setPicked((prev) => {
+                    const next = { ...prev }
+                    delete next[relType]
+                    return next
+                  })
+                }
+              >
+                다시 고르기
+              </button>
+            </div>
+          ) : (
+            <NodePicker
+              types={rel.from}
+              testIdPrefix={`${testIdPrefix}-link-${relType}-picker`}
+              onPick={(n) => setPicked((prev) => ({ ...prev, [relType]: n }))}
+            />
+          )}
+          {rel.createPicker?.description && <div className="hint">{rel.createPicker.description}</div>}
+        </div>
+      ))}
+      {duplicates.length > 0 && (
+        <div className="hint" role="status" data-testid={`${testIdPrefix}-duplicate`}>
+          <div>같은 이름의 {withJosa(labels.type(type), '이(가)')} 이미 있습니다.</div>
+          <ul>
+            {duplicates.map((n) => (
+              <li key={n.id} data-testid={`${testIdPrefix}-duplicate-item`} data-node-id={n.id}>
+                <TypeBadge type={n.type} /> {labels.node(n)} <span className="muted small">{labels.hint(n)}</span>
+                {onUseExisting && (
+                  <button type="button" data-testid={`${testIdPrefix}-duplicate-open`} onClick={() => onUseExisting(n)}>
+                    {useExistingLabel ?? '열기'}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            disabled={busy}
+            data-testid={`${testIdPrefix}-duplicate-confirm`}
+            onClick={() => void save({ skipDuplicateCheck: true })}
+          >
+            그래도 만들기
+          </button>
+        </div>
+      )}
       {error && (
         <div className="error-box" role="alert" data-testid={`${testIdPrefix}-error`}>
           {error}

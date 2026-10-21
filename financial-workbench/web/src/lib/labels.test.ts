@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import type { Ontology } from '../api/types'
 import { creatableTypes } from '../context'
+import { testOntology } from '../components/testSupport'
 import {
   actionLabel,
   claimSentenceParts,
   createFirstHint,
   nodeDisplayLabel,
+  nodeHint,
   predicateLabel,
   propertyLabel,
   relationshipLabel,
   reviewStatusKeys,
   reviewStatusLabel,
+  sameName,
   typeKeys,
   typeLabel,
   valueLabel,
@@ -157,5 +160,31 @@ describe('createFirstHint', () => {
   it('고를 후보가 없을 때 먼저 만들 타입을 알린다', () => {
     expect(createFirstHint(['기업'])).toBe('먼저 기업을 만드세요')
     expect(createFirstHint(['기업', '종목'])).toBe('먼저 기업, 종목을 만드세요')
+  })
+})
+
+describe('nodeHint', () => {
+  const createdAt = '2026-10-21T00:00:00Z'
+
+  it('hintProperties 의 표시 값과 만든 날을 잇는다', () => {
+    expect(nodeHint(testOntology, { type: 'Company', properties: { country: 'KR' }, createdAt })).toMatch(/^대한민국 \(KR\) · /)
+  })
+
+  it('값이 빈 속성과 hintProperties 가 없는 타입은 만든 날만이다', () => {
+    const dateOnly = nodeHint(testOntology, { type: 'Company', properties: {}, createdAt })
+    expect(dateOnly).not.toContain(' · ')
+    expect(nodeHint(testOntology, { type: 'Person', properties: { name: 'x' }, createdAt })).toBe(dateOnly)
+  })
+})
+
+describe('sameName', () => {
+  it('앞뒤 공백과 대소문자는 무시한다', () => {
+    expect(sameName(' 가나 전자 ', '가나 전자')).toBe(true)
+    expect(sameName('ABC', 'abc')).toBe(true)
+  })
+
+  it('다른 글자와 가운데 공백 차이는 다른 이름이다', () => {
+    expect(sameName('가나', '가나전자')).toBe(false)
+    expect(sameName('가나 전자', '가나  전자')).toBe(false)
   })
 })

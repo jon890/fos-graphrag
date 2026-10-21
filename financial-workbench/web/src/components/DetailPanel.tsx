@@ -17,7 +17,7 @@ interface Props {
   /** 저장, 보관처럼 서버 상태를 바꾼 뒤 부른다. 그래프와 검색 결과를 다시 읽는다 */
   onChanged: () => void
   /** 방금 만든 노드를 열었을 때 상세 위에 보일 성공 안내 */
-  flash?: { id: string; text: string } | null
+  flash?: { id: string; text: string; kind?: 'success' | 'error' } | null
   onFocus: (id: string) => void
   onSelect: (id: string) => void
   onOpenHistory: (id: string) => void
@@ -39,7 +39,7 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
   const [addingClaim, setAddingClaim] = useState(false)
 
   useEffect(() => {
-    setNotice(flash && flash.id === selectedId ? { kind: 'success', text: flash.text } : null)
+    setNotice(flash && flash.id === selectedId ? { kind: flash.kind ?? 'success', text: flash.text } : null)
     setAddingClaim(false)
     setArchiveReason('')
   }, [selectedId, flash])
@@ -202,11 +202,11 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
       <dl className="kv meta" data-testid="node-meta">
         <dt>생성</dt>
         <dd>
-          {userName(node.createdBy, '알 수 없음')} · {formatDateTime(node.createdAt)}
+          {userName(node.createdBy)} · {formatDateTime(node.createdAt)}
         </dd>
         <dt>수정</dt>
         <dd data-testid="node-updated-by">
-          {userName(node.updatedBy, '알 수 없음')} · {formatDateTime(node.updatedAt)}
+          {userName(node.updatedBy)} · {formatDateTime(node.updatedAt)}
         </dd>
         {node.archivedAt && (
           <>

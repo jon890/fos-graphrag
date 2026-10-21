@@ -101,7 +101,10 @@ export function NodePicker({ types, onPick, testIdPrefix, placeholder, excludeId
                   setQ('')
                 }}
               >
-                <TypeBadge type={n.type} /> {labels.node(n)}
+                <TypeBadge type={n.type} /> {labels.node(n)}{' '}
+                <span className="result-hint text-xs text-muted-foreground" data-testid={`${testIdPrefix}-result-hint`}>
+                  {labels.hint(n)}
+                </span>
               </button>
             </li>
           ))}

@@ -5,6 +5,14 @@ export function formatDateTime(iso: string | null | undefined): string {
   return d.toLocaleString('ko-KR', { hour12: false })
 }
 
+/** 날짜만 보인다. 형식이 아니면 그대로 */
+export function formatDate(iso: string | null | undefined): string {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleDateString('ko-KR')
+}
+
 /** 사용자 참조를 표시 이름으로 바꾼다. 서버가 null 을 주는 경우(작성자 사용자 없음)에는 fallback 을 쓴다. */
 export function userName(ref: { displayName: string } | null | undefined, fallback = '시스템'): string {
   return ref?.displayName ?? fallback

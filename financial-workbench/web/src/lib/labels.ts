@@ -1,4 +1,5 @@
-import { REVIEW_STATUSES, type Ontology, type PropertyDef } from '../api/types'
+import { REVIEW_STATUSES, type NodeView, type Ontology, type PropertyDef } from '../api/types'
+import { formatDate } from './format'
 
 // 화면에 보이는 이름은 온톨로지(ontology/financial-ontology.yaml)가 소유한다.
 // 타입, 속성, 선택지, 관계가 늘어도 이 파일을 고치지 않는다. 이름이 없으면 키를 그대로 보인다.
@@ -129,4 +130,21 @@ export function claimSentenceParts(
   }
   pushText(sentence.slice(last))
   return parts
+}
+
+/** hintProperties 의 표시 값과 만든 날을 「 · 」 로 잇는다. 값이 빈 속성은 뺀다. 예: 「대한민국 (KR) · 2026. 10. 21.」 */
+export function nodeHint(o: Ontology, node: Pick<NodeView, 'type' | 'properties' | 'createdAt'>): string {
+  const parts: string[] = []
+  for (const prop of o.nodeTypes[node.type]?.hintProperties ?? []) {
+    const raw = node.properties[prop]
+    const text = propertyDef(o, node.type, prop)?.type === 'enum' ? valueLabel(o, node.type, prop, raw) : raw == null ? '' : String(raw)
+    if (text !== '') parts.push(text)
+  }
+  parts.push(formatDate(node.createdAt))
+  return parts.join(' · ')
+}
+
+/** 앞뒤 공백을 지우고 소문자로 바꿔 같으면 같은 이름이다. 서버 검색(CONTAINS)과 같은 규칙이라 가운데 공백은 그대로 비교한다 */
+export function sameName(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase()
 }

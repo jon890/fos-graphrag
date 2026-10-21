@@ -95,6 +95,16 @@ test('휴대폰 폭에서 노드를 만들고 그래프에서 골라 상세를 �
   await expect(page.getByTestId('detail-label')).toBeVisible()
   await expect(page.getByTestId('detail-label')).toHaveText(exact(company))
 
+  // 6b. 검색 결과에 구분 정보가 보이고 줄바꿈되어 가로로 넘치지 않는다.
+  await page.getByTestId('workspace-tab-search').click()
+  await page.getByTestId('search-input').fill(company)
+  await page.getByTestId('search-submit').click()
+  // 검색이 끝나 이 기업 하나만 남은 뒤에 본다. 이전 목록이 남은 채로 확인하지 않게 한다.
+  await expect(page.getByTestId('search-result')).toHaveCount(1)
+  await expect(page.getByTestId('search-result').first().getByTestId('search-result-hint')).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await shot(page, 'mobile-search-hint')
+
   // 7. 표가 있는 목록 탭에서도 페이지가 가로로 넘치지 않는다.
   await page.getByTestId('tab-list').click()
   await expect(page.getByTestId('list-row').first()).toBeVisible()
