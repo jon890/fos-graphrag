@@ -109,11 +109,11 @@ class ChangeController(
             }
     }
 
-    private fun toView(e: Map<String, Any?>, changes: Map<String, FieldChange>, refs: Map<String, ChangeRef>, users: Map<String, UserRef>) =
+    private fun toView(e: Map<String, Any?>, changes: Map<String, FieldChange>, refs: Map<String, ChangeRef>, userRefs: Map<String, UserRef>) =
         ChangeEventView(
             id = e["id"] as String,
             at = e["at"] as String,
-            actor = users[e["actorId"]],
+            actor = userRefs[e["actorId"]],
             action = e["action"] as String,
             targetId = e["targetId"] as String,
             targetKind = e["targetKind"] as String,

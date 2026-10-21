@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { ChangeEventView } from '../api/types'
 import { ChangeRows } from './ChangesTab'
-import { withApp } from './testSupport'
+import { testOntology, withApp } from './testSupport'
 
 function event(overrides: Partial<ChangeEventView>): ChangeEventView {
   return {
@@ -22,8 +22,8 @@ function event(overrides: Partial<ChangeEventView>): ChangeEventView {
   }
 }
 
-const render = (items: ChangeEventView[]) =>
-  renderToStaticMarkup(withApp(<table><tbody><ChangeRows items={items} onOpen={() => {}} /></tbody></table>))
+const render = (items: ChangeEventView[], ontology = testOntology) =>
+  renderToStaticMarkup(withApp(<table><tbody><ChangeRows items={items} onOpen={() => {}} /></tbody></table>, ontology))
 
 describe('ChangeRows', () => {
   it('작성자가 없는 이력(첫 관리자 생성 등)도 그리고 「시스템」 으로 보인다', () => {
@@ -71,8 +71,10 @@ describe('ChangeRows', () => {
         changes: { subjectId: { before: null, after: 'c1' } },
         refs: { c1: { id: 'c1', type: 'Company', label: '가나전자', archived: false } },
       }),
-    ])
+    ], { ...testOntology, changeFields: { subjectId: { label: '주체' } } })
     const text = html.replace(/<[^>]*>/g, '|')
+    expect(html).toContain('주체')
+    expect(text).not.toContain('subjectId')
     expect(html).toContain('가나전자')
     expect(text).not.toContain('|c1|')
     expect(html).not.toContain('font-mono')

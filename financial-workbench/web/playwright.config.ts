@@ -10,7 +10,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: process.env.WORKBENCH_URL ?? 'http://127.0.0.1:8081',
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     locale: 'ko-KR',
     timezoneId: 'Asia/Seoul',
     viewport: { width: 1440, height: 900 },

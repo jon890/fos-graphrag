@@ -58,7 +58,10 @@ async function searchAndOpen(page: Page, label: string, options: { includeArchiv
   if ((await archived.isChecked()) !== !!options.includeArchived) await archived.setChecked(!!options.includeArchived)
   await page.getByTestId('search-input').fill(label)
   await page.getByTestId('search-submit').click()
+  // 이미 같은 노드가 열려 있으면 라벨이 처음부터 같다. 상세를 새로 읽은 응답을 기다려야 예전 revision 으로 저장하지 않는다.
+  const detailLoaded = page.waitForResponse((r) => r.request().method() === 'GET' && /\/api\/nodes\/[^/?]+$/.test(new URL(r.url()).pathname))
   await searchResult(page, label).click()
+  await detailLoaded
   await expect(page.getByTestId('detail-label')).toHaveText(label)
 }
 
@@ -412,7 +415,9 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     const mineSection = pageA.getByTestId('review-section-mine')
     const mineRow = mineSection.locator(`[data-testid="review-mine-row"][data-claim-id="${supplyClaimId}"]`)
     await expect(mineRow).toBeVisible()
-    await expect(pageA.getByTestId('review-section-reviewable').locator(`[data-claim-id="${supplyClaimId}"]`)).toHaveCount(0)
+    const reviewableA = pageA.getByTestId('review-section-reviewable')
+    await expect(reviewableA.getByTestId('review-pager-info')).toBeVisible()
+    await expect(reviewableA.locator(`[data-claim-id="${supplyClaimId}"]`)).toHaveCount(0)
     await mineRow.getByTestId('review-mine-copy-link').click()
     await expect(mineRow.getByTestId('review-mine-copy-link-done').or(mineRow.getByTestId('review-mine-copy-link-fallback'))).toBeVisible()
     await shot(pageA, '03-review-mine-a')
@@ -424,12 +429,15 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     const reviewable = pageB.getByTestId('review-section-reviewable')
     await expect(reviewable.getByTestId('review-table')).toBeVisible()
     const row = reviewable.getByTestId('review-row').filter({ hasText: data.supplier })
+    const pagerInfo = reviewable.getByTestId('review-pager-info')
+    await expect(pagerInfo).toBeVisible()
     // 검토 대기 목록은 오래된 것부터라 새 Claim 이 뒤쪽 페이지에 있을 수 있다.
     for (let i = 0; i < 50 && (await row.count()) === 0; i += 1) {
       const next = reviewable.getByTestId('review-pager-next')
       if (await next.isDisabled()) break
+      const before = await pagerInfo.textContent()
       await next.click()
-      await pageB.waitForTimeout(300)
+      await expect(pagerInfo).not.toHaveText(before ?? '')
     }
     await expect(row).toHaveCount(1)
     await expect(row).toContainText(data.customer)
@@ -570,11 +578,17 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageA.getByTestId('tab-changes').click()
     await expect(pageA.getByTestId('changes-tab')).toBeVisible()
     const clear = pageA.getByTestId('changes-filter-clear')
-    if (await clear.isVisible()) await clear.click()
+    await expect(pageA.getByTestId('changes-target-selected')).toBeVisible()
+    await clear.click()
+    await expect(pageA.getByTestId('changes-target-picker-input')).toBeVisible()
 
     const actorSelect = pageA.getByTestId('changes-actor-filter')
     await expect(actorSelect).toContainText(editorA.name)
+    const pagerInfo = pageA.getByTestId('changes-pager-info')
+    await expect(pagerInfo).toBeVisible()
+    const allInfo = (await pagerInfo.textContent()) ?? ''
     await actorSelect.selectOption({ value: editorA.email })
+    await expect(pagerInfo).not.toHaveText(allInfo)
     const rows = pageA.getByTestId('change-row')
     await expect(rows.first()).toBeVisible()
     await expect

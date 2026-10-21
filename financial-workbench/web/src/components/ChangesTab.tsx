@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { api, errorMessage } from '../api/client'
 import type { ChangeEventView, NodeView, Page, UserRef } from '../api/types'
 import { useApp, useLabels } from '../context'
@@ -97,6 +97,8 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
   const [actors, setActors] = useState<UserRef[]>([])
   const [target, setTarget] = useState<NodeView | null>(null)
   /** 고른 대상이 노드가 아니거나(사용자, 관계 ID) 읽지 못했을 때 true */
+  /** 이름을 이미 아는 대상. effect 가 이 값을 보고 다시 읽을지 정한다 */
+  const knownTarget = useRef<NodeView | null>(null)
   const [targetUnknown, setTargetUnknown] = useState(false)
   const [pageNo, setPageNo] = useState(0)
   const [page, setPage] = useState<Page<ChangeEventView> | null>(null)
@@ -116,18 +118,25 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
 
   // 상세에서 들어와 이름을 모르는 대상은 노드로 읽는다. 방금 고른 노드는 이미 이름을 안다.
   useEffect(() => {
-    if (!targetId || target?.id === targetId) return
+    if (!targetId || knownTarget.current?.id === targetId) return
     let live = true
     setTargetUnknown(false)
     api.nodes
       .get(targetId)
-      .then((d) => live && setTarget(d.node))
-      .catch(() => live && (setTarget(null), setTargetUnknown(true)))
+      .then((d) => {
+        if (!live) return
+        knownTarget.current = d.node
+        setTarget(d.node)
+      })
+      .catch(() => {
+        if (!live) return
+        knownTarget.current = null
+        setTarget(null)
+        setTargetUnknown(true)
+      })
     return () => {
       live = false
     }
-    // target 은 읽은 결과를 담는 값이라 의존하지 않는다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetId])
 
   useEffect(() => {
@@ -163,6 +172,7 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
               data-testid="changes-filter-clear"
               onClick={() => {
                 setPageNo(0)
+                knownTarget.current = null
                 setTarget(null)
                 onTargetIdChange('')
               }}
@@ -177,6 +187,7 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
             placeholder="이름이나 종목 코드로 대상 찾기"
             onPick={(node) => {
               setPageNo(0)
+              knownTarget.current = node
               setTarget(node)
               onTargetIdChange(node.id)
             }}

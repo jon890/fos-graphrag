@@ -102,7 +102,7 @@ class NodeQueryService(
             WHERE (${'$'}reviewStatus IS NULL OR c.reviewStatus = ${'$'}reviewStatus)
               AND (${'$'}includeArchived OR c.archived = false)
               AND (${'$'}scope IS NULL
-                   OR (${'$'}scope = 'reviewable' AND c.createdBy <> ${'$'}userId AND coalesce(c.contentUpdatedBy, c.createdBy) <> ${'$'}userId)
+                   OR (${'$'}scope = 'reviewable' AND coalesce(c.createdBy, '') <> ${'$'}userId AND coalesce(c.contentUpdatedBy, c.createdBy) <> ${'$'}userId)
                    OR (${'$'}scope = 'mine' AND (c.createdBy = ${'$'}userId OR c.contentUpdatedBy = ${'$'}userId)))
         """
         val total = client.query("MATCH (c:Knowledge:Claim) $where RETURN count(c) AS total").bindAll(params)

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../api/client'
 import type { ClaimView, Page, ReviewStatus } from '../api/types'
 import { useApp, useLabels } from '../context'
@@ -115,25 +115,25 @@ function ReviewSection({ scope, title, testIdPrefix, emptyText, refreshKey, onOp
   const [loading, setLoading] = useState(false)
   const mine = scope === 'mine'
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    let live = true
     setLoading(true)
     setError(null)
-    try {
-      const p = await api.claims.list({ reviewStatus: 'DRAFT', scope, page: pageNo, size: 20 })
-      // 마지막 쪽을 다 처리해 빈 쪽이 되면 앞 쪽으로 간다.
-      if (p.items.length === 0 && pageNo > 0) setPageNo(pageNo - 1)
-      else setPage(p)
-    } catch (e) {
-      setError(errorMessage(e))
-    } finally {
-      setLoading(false)
+    api.claims
+      .list({ reviewStatus: 'DRAFT', scope, page: pageNo, size: 20 })
+      .then((p) => {
+        if (!live) return
+        // 마지막 쪽을 다 처리해 빈 쪽이 되면 앞 쪽으로 간다.
+        if (p.items.length === 0 && pageNo > 0) setPageNo(pageNo - 1)
+        else setPage(p)
+      })
+      .catch((e) => live && setError(errorMessage(e)))
+      .finally(() => live && setLoading(false))
+    return () => {
+      live = false
     }
-  }, [scope, pageNo])
-
-  useEffect(() => {
-    void load()
     // refreshKey 는 읽기를 다시 시키는 신호다.
-  }, [load, refreshKey])
+  }, [scope, pageNo, refreshKey])
 
   return (
     <section className="mb-6" data-testid={scope ? `review-section-${scope}` : undefined}>
