@@ -5,6 +5,18 @@ import { EMPTY_GRAPH, graphFromView, mergeGraph, type GraphData } from '../lib/g
 import { SearchPanel, type SearchFilters } from './SearchPanel'
 import { GraphPanel } from './GraphPanel'
 import { DetailPanel } from './DetailPanel'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+
+/** 1024px 미만에서 작업 공간을 나누는 탭 */
+export type MobileTab = 'search' | 'graph' | 'detail'
+
+/** 고른 노드가 있으면 상세부터 보여 준다. 다른 탭에서 노드를 열고 들어온 경우다 */
+export function initialMobileTab(selectedId: string | null): MobileTab {
+  return selectedId ? 'detail' : 'search'
+}
 
 interface Props {
   centerId: string | null
@@ -20,7 +32,10 @@ interface Props {
 
 export function Workspace({ centerId, focusSeq, selectedId, onFocus, onSelect, onOpenHistory }: Props) {
   // 타입 목록은 온톨로지에서 온다. 타입이 늘어도 이 화면은 그대로다.
-  const allTypes = useLabels().types
+  const labels = useLabels()
+  const allTypes = labels.types
+  const wide = useMediaQuery('(min-width: 1024px)')
+  const [mobileTab, setMobileTab] = useState<MobileTab>(() => initialMobileTab(selectedId))
   /** 필터가 전체 타입이면 쿼리에서 뺀다. */
   const typesParam = useCallback(
     (types: string[]): string[] | undefined => (types.length === 0 || types.length === allTypes.length ? undefined : types),
@@ -92,47 +107,94 @@ export function Workspace({ centerId, focusSeq, selectedId, onFocus, onSelect, o
     [hops, graphTypesKey, reviewStatus],
   )
 
+  const searchPanel = (
+    <SearchPanel
+      filters={filters}
+      onFiltersChange={setFilters}
+      selectedId={selectedId}
+      onFocus={(id) => {
+        onFocus(id)
+        setMobileTab('detail')
+      }}
+      onCreated={(node, message) => {
+        setFlash({ id: node.id, text: message })
+        onFocus(node.id)
+        setMobileTab('detail')
+      }}
+      refreshTick={changeTick}
+      typesParam={typesParam}
+    />
+  )
+  const graphPanel = (
+    <GraphPanel
+      data={graph}
+      centerId={centerId}
+      selectedId={selectedId}
+      loading={graphLoading}
+      error={graphError}
+      hops={hops}
+      onHopsChange={setHops}
+      onSelect={onSelect}
+      onExpand={(id) => void expand(id)}
+      onRecenter={onFocus}
+      visible={wide || mobileTab === 'graph'}
+    />
+  )
+  const detailPanel = (
+    <DetailPanel
+      selectedId={selectedId}
+      flash={flash}
+      refreshKey={`${changeTick}:${focusSeq}`}
+      onChanged={() => setChangeTick((t) => t + 1)}
+      onFocus={onFocus}
+      onSelect={onSelect}
+      onOpenHistory={onOpenHistory}
+    />
+  )
+
+  if (wide) {
+    return (
+      <div className="workspace">
+        <aside className="pane pane-left">{searchPanel}</aside>
+        <section className="pane pane-center">{graphPanel}</section>
+        <aside className="pane pane-right">{detailPanel}</aside>
+      </div>
+    )
+  }
+
+  const selectedNode = selectedId ? graph.nodes.find((n) => n.id === selectedId) : undefined
+  // 고르지 않은 탭도 그려 두고 숨긴다. 상세에서 쓰던 입력이 탭을 옮겨도 남는다.
+  const content = 'min-h-0 flex-1 data-[state=inactive]:hidden'
   return (
-    <div className="workspace">
-      <aside className="pane pane-left">
-        <SearchPanel
-          filters={filters}
-          onFiltersChange={setFilters}
-          selectedId={selectedId}
-          onFocus={onFocus}
-          onCreated={(node, message) => {
-            setFlash({ id: node.id, text: message })
-            onFocus(node.id)
-          }}
-          refreshTick={changeTick}
-          typesParam={typesParam}
-        />
-      </aside>
-      <section className="pane pane-center">
-        <GraphPanel
-          data={graph}
-          centerId={centerId}
-          selectedId={selectedId}
-          loading={graphLoading}
-          error={graphError}
-          hops={hops}
-          onHopsChange={setHops}
-          onSelect={onSelect}
-          onExpand={(id) => void expand(id)}
-          onRecenter={onFocus}
-        />
-      </section>
-      <aside className="pane pane-right">
-        <DetailPanel
-          selectedId={selectedId}
-          flash={flash}
-          refreshKey={`${changeTick}:${focusSeq}`}
-          onChanged={() => setChangeTick((t) => t + 1)}
-          onFocus={onFocus}
-          onSelect={onSelect}
-          onOpenHistory={onOpenHistory}
-        />
-      </aside>
-    </div>
+    <Tabs value={mobileTab} onValueChange={(v) => setMobileTab(v as MobileTab)} className="h-full gap-0">
+      <TabsList className="w-full shrink-0 rounded-none">
+        <TabsTrigger value="search" data-testid="workspace-tab-search">
+          검색
+        </TabsTrigger>
+        <TabsTrigger value="graph" data-testid="workspace-tab-graph">
+          그래프
+        </TabsTrigger>
+        <TabsTrigger value="detail" data-testid="workspace-tab-detail">
+          상세
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="search" forceMount className={cn('pane', content)}>
+        {searchPanel}
+      </TabsContent>
+      <TabsContent value="graph" forceMount className={cn('pane pane-center overflow-y-auto', content)}>
+        {/* 높이가 모자라면 그래프 칸이 줄지 않고 탭 안에서 세로로 스크롤한다 */}
+        <div className="min-h-[600px] flex-1">{graphPanel}</div>
+        {selectedNode && (
+          <div className="flex shrink-0 items-center justify-end border-t bg-card px-3 py-2" data-testid="graph-selection-bar">
+            <Button size="sm" className="max-w-full truncate" data-testid="graph-selection-open" onClick={() => setMobileTab('detail')}>
+              {labels.node(selectedNode)} 상세 보기
+            </Button>
+          </div>
+        )}
+      </TabsContent>
+      <TabsContent value="detail" forceMount className={cn('pane', content)}>
+        {detailPanel}
+      </TabsContent>
+    </Tabs>
   )
 }

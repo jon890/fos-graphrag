@@ -21,7 +21,7 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 1280px; background: var(--bg); font-size: 14px; }
+body { margin: 0; background: var(--bg); font-size: 14px; }
 h1, h2, h3, h4 { margin: 0 0 8px; }
 h2 { font-size: 18px; }
 h3 { font-size: 15px; }
@@ -106,7 +106,7 @@ button.link-button:disabled { color: var(--text); opacity: 1; cursor: default; }
 .app-main { flex: 1; min-height: 0; overflow: auto; }
 
 /* 작업 공간 */
-.workspace { display: grid; grid-template-columns: 300px minmax(0, 1fr) 440px; height: 100%; }
+.workspace { display: grid; grid-template-columns: 260px minmax(0, 1fr) 380px; height: 100%; }
 .pane { min-height: 0; overflow: auto; padding: 12px; background: var(--panel); }
 .pane-left { border-right: 1px solid var(--border); }
 .pane-right { border-left: 1px solid var(--border); }
@@ -229,6 +229,26 @@ blockquote { margin: 0; padding: 4px 8px; border-left: 3px solid #cbd5e1; backgr
 .action-restore { background: #fce7f3; }
 .ontology-type { margin-bottom: 16px; }
 .ontology h3 { margin-top: 16px; }
+
+/* 1024px 미만: 작업 공간은 탭으로 나뉜다(Workspace). 머리글과 표 탭이 화면 폭을 넘지 않게 한다 */
+@media (max-width: 1023px) {
+  /* 390px 에서는 제목, 탭, 사용자 상자가 한 줄에 들어가지 않는다. 탭을 둘째 줄 전체 폭에 둔다 */
+  .app-header { gap: 8px; padding: 0 8px; flex-wrap: wrap; height: auto; }
+  .app-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1 1 0;
+    padding: 8px 0;
+  }
+  .tabs { overflow-x: auto; flex-wrap: nowrap; min-width: 0; order: 3; flex-basis: 100%; }
+  .tab { flex-shrink: 0; padding: 10px 10px; }
+  .user-box { flex-shrink: 0; }
+  .user-box [data-testid="current-user-email"] { display: none; }
+  .tab-page { padding-left: 12px; padding-right: 12px; }
+  .tab-page table { display: block; overflow-x: auto; }
+}
 
 /* 역할 */
 .role-badge { font-size: 11px; padding: 1px 6px; border-radius: 3px; margin-left: 6px; background: #334155; color: #e2e8f0; }
