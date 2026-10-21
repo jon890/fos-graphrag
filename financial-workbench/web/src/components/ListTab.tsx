@@ -3,6 +3,11 @@ import { api, errorMessage } from '../api/client'
 import type { NodeView, Page } from '../api/types'
 import { useLabels } from '../context'
 import { formatDateTime, userName } from '../lib/format'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Pager } from './Pager'
 import { StatusBadge, TypeBadge } from './TypeBadge'
 
@@ -38,9 +43,9 @@ export function ListTab({ onOpen }: { onOpen: (id: string) => void }) {
   }
 
   return (
-    <div className="tab-page" data-testid="list-tab">
-      <form className="row toolbar" onSubmit={submit}>
-        <select
+    <div className="min-h-full bg-card px-3 py-4 lg:px-6" data-testid="list-tab">
+      <form className="mb-3 flex flex-wrap items-center gap-2" onSubmit={submit}>
+        <NativeSelect
           data-testid="list-type-filter"
           value={type}
           onChange={(e) => {
@@ -54,12 +59,18 @@ export function ListTab({ onOpen }: { onOpen: (id: string) => void }) {
               {labels.type(t)}
             </option>
           ))}
-        </select>
-        <input data-testid="list-search-input" placeholder="이름 또는 종목 코드" value={qInput} onChange={(e) => setQInput(e.target.value)} />
-        <button type="submit" data-testid="list-search-submit">
+        </NativeSelect>
+        <Input
+          className="min-w-48 flex-1"
+          data-testid="list-search-input"
+          placeholder="이름 또는 종목 코드"
+          value={qInput}
+          onChange={(e) => setQInput(e.target.value)}
+        />
+        <Button type="submit" variant="outline" data-testid="list-search-submit">
           검색
-        </button>
-        <label className="check">
+        </Button>
+        <label className="flex items-center gap-1.5 text-sm">
           <input
             type="checkbox"
             data-testid="list-include-archived"
@@ -71,42 +82,46 @@ export function ListTab({ onOpen }: { onOpen: (id: string) => void }) {
           />
           보관 포함
         </label>
-        {loading && <span className="muted small">불러오는 중…</span>}
+        {loading && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
       </form>
-      {error && <div className="error-box">{error}</div>}
-      <table className="data-table" data-testid="list-table">
-        <thead>
-          <tr>
-            <th>종류</th>
-            <th>이름</th>
-            <th>수정자</th>
-            <th>수정 시각</th>
-            <th>보관</th>
-          </tr>
-        </thead>
-        <tbody>
+      {error && (
+        <Alert variant="destructive" className="my-2">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      <Table data-testid="list-table">
+        <TableHeader>
+          <TableRow className="bg-slate-50 hover:bg-slate-50">
+            <TableHead>종류</TableHead>
+            <TableHead>이름</TableHead>
+            <TableHead>수정자</TableHead>
+            <TableHead>수정 시각</TableHead>
+            <TableHead>보관</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {page?.items.map((n) => (
-            <tr key={n.id} className="clickable" data-testid="list-row" data-node-id={n.id} onClick={() => onOpen(n.id)}>
-              <td>
+            <TableRow key={n.id} className="cursor-pointer" data-testid="list-row" data-node-id={n.id} onClick={() => onOpen(n.id)}>
+              <TableCell>
                 <TypeBadge type={n.type} />
-              </td>
-              <td>
+              </TableCell>
+              <TableCell>
                 {labels.node(n)} <StatusBadge status={n.reviewStatus} />
-              </td>
-              <td>{userName(n.updatedBy, '알 수 없음')}</td>
-              <td>{formatDateTime(n.updatedAt)}</td>
-              <td>{n.archived ? '보관됨' : ''}</td>
-            </tr>
+              </TableCell>
+              <TableCell>{userName(n.updatedBy, '알 수 없음')}</TableCell>
+              <TableCell>{formatDateTime(n.updatedAt)}</TableCell>
+              <TableCell>{n.archived ? '보관됨' : ''}</TableCell>
+            </TableRow>
           ))}
           {page && page.items.length === 0 && (
-            <tr>
-              <td colSpan={5} className="muted" data-testid="list-empty">
+            <TableRow>
+              <TableCell colSpan={5} className="text-muted-foreground" data-testid="list-empty">
                 결과가 없습니다.
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           )}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
       {page && <Pager page={page} onPage={setPageNo} testIdPrefix="list-pager" />}
     </div>
   )
