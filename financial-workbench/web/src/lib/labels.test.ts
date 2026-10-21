@@ -4,6 +4,7 @@ import { creatableTypes } from '../context'
 import {
   actionLabel,
   claimSentenceParts,
+  createFirstHint,
   nodeDisplayLabel,
   predicateLabel,
   propertyLabel,
@@ -149,5 +150,12 @@ describe('claimSentenceParts', () => {
       { kind: 'slot', slot: 'object' },
       { kind: 'text', text: ' UNKNOWN' },
     ])
+  })
+})
+
+describe('createFirstHint', () => {
+  it('고를 후보가 없을 때 먼저 만들 타입을 알린다', () => {
+    expect(createFirstHint(['기업'])).toBe('먼저 기업을 만드세요')
+    expect(createFirstHint(['기업', '종목'])).toBe('먼저 기업, 종목을 만드세요')
   })
 })

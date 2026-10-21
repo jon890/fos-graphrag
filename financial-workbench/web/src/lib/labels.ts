@@ -82,6 +82,11 @@ export function withEulReul(word: string): string {
   return withJosa(word, '을(를)')
 }
 
+/** 고를 후보가 하나도 없을 때의 안내. 예: 「먼저 기업을 만드세요」 */
+export function createFirstHint(typeLabels: string[]): string {
+  return `먼저 ${withEulReul(typeLabels.join(', '))} 만드세요`
+}
+
 export type SentencePart = { kind: 'slot'; slot: 'subject' | 'object' } | { kind: 'text'; text: string }
 
 const SLOT_PATTERN = /\{(subject|object)\}/g
