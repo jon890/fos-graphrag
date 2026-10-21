@@ -41,7 +41,7 @@
 
 ### 1. 계약 타입과 클라이언트
 
-- `types.ts` 의 `ClaimView` 에 `/** 마지막으로 내용을 고친 사람. 이 사람과 작성자는 검토할 수 없다 */ contentUpdatedBy: UserRef | null` 을 더한다. 테스트 fixture 가 `ClaimView` 를 직접 만들면 그 값을 채운다(`git grep -n "reviewedBy:" -- financial-workbench/web/src` 로 찾는다).
+- `types.ts` 의 `ClaimView` 에 `/** 마지막으로 내용을 고친 사람. 이 사람과 작성자는 검토할 수 없다 */ contentUpdatedBy: UserRef | null` 을 더한다. `tabs.test.tsx` 의 주장 fixture 는 `as unknown as ClaimView` 로 만들어 컴파일은 깨지지 않는다. 새 테스트에서 이 값을 쓰면 fixture 에 넣는다.
 - `client.ts` 의 `claims.list` 인자에 `scope?: 'reviewable' | 'mine'` 를 더해 쿼리에 붙인다.
 
 ### 2. 링크 함수 `financial-workbench/web/src/lib/links.ts` 신규
@@ -63,7 +63,8 @@ export function takePendingNode(storage?: Storage | null): string | null
 ### 3. `App.tsx` 의 링크 열기
 
 - 첫 `useEffect`(인증 확인) 맨 앞에서 `nodeFromSearch(window.location.search)` 가 있으면 `rememberPendingNode(id)` 한다. `me()` 성공 뒤 query 를 지우는 지금 코드는 그대로 둔다.
-- 온톨로지를 받은 뒤(`ontology` 가 생긴 뒤) 한 번 `takePendingNode()` 를 불러 값이 있으면 `openNode(id)` 한다. 같은 렌더에서 두 번 열지 않게 `useEffect` 의 의존성을 `[ontology, openNode]` 로 두고, 꺼낸 값은 지워지므로 다시 열리지 않는다.
+- `me()` 가 성공한 그 콜백에서 `takePendingNode()` 로 값을 꺼내 `useRef`(`pendingNodeRef`)에 들고 있는다. 저장소에서는 바로 지워진다. 그래서 온톨로지 읽기가 실패해도 다음 새로고침에서 다시 열리지 않는다.
+- 온톨로지를 받는 `api.ontology().then(...)` 콜백 안에서 `setOntology(o)` 와 함께, `pendingNodeRef.current` 가 있으면 `focusNode(id)` 와 `setTab('workspace')` 를 같은 콜백에서 부르고 ref 를 비운다. 같은 콜백이라 한 번에 반영되어, `Workspace`(`financial-workbench/web/src/components/Workspace.tsx`)가 `selectedId` 가 있는 상태로 처음 그려지고 좁은 화면의 첫 탭이 상세가 된다. `useEffect` 로 나중에 열면 좁은 화면이 검색 탭에 머문다(`Workspace` 는 첫 탭을 처음 그릴 때만 정한다).
 - 로그아웃은 저장소를 건드리지 않는다.
 
 ### 4. 「링크 복사」 부품 `financial-workbench/web/src/components/CopyLinkButton.tsx` 신규
@@ -83,11 +84,11 @@ interface Props {
 ### 5. 상세와 검토 칸
 
 - `DetailPanel` 의 `div.row.actions` 에서 「그래프 중심으로」 다음에 `<CopyLinkButton nodeId={node.id} testId="node-copy-link" />` 를 둔다. 열람자에게도 보인다.
-- `ClaimEditor.tsx` 의 `ReviewControls` 에서 `own` 을 `claim.createdBy?.id === user.id || claim.contentUpdatedBy?.id === user.id` 로 바꾼다. 안내 문구를 「내가 쓰거나 마지막으로 고친 주장은 다른 편집자가 검토합니다. 링크를 복사해 검토를 요청하세요.」 로 바꾸고, 같은 상자 안에 `<CopyLinkButton nodeId={claim.id} testId="self-review-copy-link" />` 를 둔다. testid `self-review-hint` 는 그대로다.
+- `ClaimEditor.tsx` 의 `ReviewControls` 에서 `own` 을 `claim.createdBy?.id === user.id || claim.contentUpdatedBy?.id === user.id` 로 바꾼다. 검토 단추는 지금처럼 끈다. 안내 문구를 「내가 쓰거나 마지막으로 고친 주장은 다른 편집자가 검토합니다. 링크를 복사해 검토를 요청하세요.」 로 바꾸고, 같은 상자 안에 `<CopyLinkButton nodeId={claim.id} testId="self-review-copy-link" />` 를 둔다. testid `self-review-hint` 는 그대로다.
 
 ### 6. `ReviewTab.tsx` 두 구역
 
-- `ReviewRow` 의 `own` 도 `contentUpdatedBy` 를 함께 본다. 안내 문구는 5번과 같다.
+- `ReviewRow` 의 `own` 도 `contentUpdatedBy` 를 함께 본다. 서버가 구역 1 에서 이런 행을 빼므로 거의 나오지 않는다. 안내는 링크를 말하지 않고 「내가 쓰거나 마지막으로 고친 주장은 다른 편집자가 검토합니다.」 로 둔다(이 행에는 「링크 복사」 가 없다).
 - 목록 하나를 그리는 부분을 `ReviewSection` 으로 뽑는다. props 는 `scope?: 'reviewable' | 'mine'`, `title: string`, `testIdPrefix: string`, `emptyText: string`, `refreshKey: number`, `onOpen`, `onDone(message)`, `onError(e)` 정도다. 구역마다 쪽 번호와 목록을 따로 들고, `refreshKey` 가 바뀌면 다시 읽는다.
 - 편집자(`canEdit`)이면 두 구역을 위아래로 그린다.
 
@@ -97,7 +98,7 @@ interface Props {
   | 2 | 내가 쓰거나 고친 주장 | `mine` | `review-mine` | 내가 쓰고 아직 검토되지 않은 주장이 없습니다. |
 
   구역 1 의 testid 는 지금과 같다(`review-table`, `review-row`, `review-empty`, `review-pager`). 구역 2 는 `review-mine-table`, `review-mine-row`, `review-mine-empty`, `review-mine-pager` 다. 각 구역을 `section[data-testid="review-section-reviewable"]`, `section[data-testid="review-section-mine"]` 로 감싼다.
-- 구역 2 의 행은 `ReviewRow` 를 쓰지 않고 `ReviewMineRow` 로 그린다. 칸은 구역 1 과 같고, 마지막 칸에 「다른 편집자가 검토합니다.」 와 `<CopyLinkButton nodeId={claim.id} testId="review-mine-copy-link" />` 를 둔다. 검토 단추와 메모 칸은 없다.
+- 구역 2 의 행은 `ReviewRow` 를 쓰지 않고 `ReviewMineRow` 로 그린다. 행에 `data-claim-id={claim.id}` 를 둔다. 칸은 구역 1 과 같고, 마지막 칸에 「다른 편집자가 검토합니다. 링크를 복사해 검토를 요청하세요.」 와 `<CopyLinkButton nodeId={claim.id} testId="review-mine-copy-link" />` 를 둔다. 검토 단추와 메모 칸은 없다.
 - 열람자이면 구역을 나누지 않고 지금처럼 `scope` 없이 한 목록(`review-table`)을 그린다. 제목은 「검토 대기」 그대로다.
 - 한 구역에서 처리하면(`onDone`) 두 구역을 모두 다시 읽는다. 처리한 주장이 다른 구역으로 옮겨 가는 경우는 없지만 새로고침 단추와 같은 동작으로 맞춘다. 「새로고침」(`review-refresh`)도 두 구역을 다시 읽는다.
 
@@ -113,14 +114,16 @@ interface Props {
   - 가짜 `Storage`(Map 으로 만든 객체)로 `rememberPendingNode('n1', s)` 뒤 `takePendingNode(s)` 가 `n1`, 다시 부르면 `null` 이다.
   - `getItem` 이 예외를 던지는 저장소로 `takePendingNode` 가 `null` 이고, `setItem` 이 예외를 던져도 `rememberPendingNode` 가 예외를 내지 않는다.
 - `financial-workbench/web/src/components/tabs.test.tsx`
-  - 「ReviewTab 은…」 테스트를 고친다. 편집자 렌더에 `review-section-reviewable` 과 `review-section-mine` 이 있다. 열람자(`withApp` 에 VIEWER 사용자를 넘길 수 있게 `testSupport.tsx` 의 `withApp` 에 선택 인자 `user` 를 더한다)이면 두 구역 testid 가 없고 `review-table` 이 있다.
+  - 「ReviewTab 은…」 테스트를 고친다. 편집자 렌더에 `review-section-reviewable` 과 `review-section-mine` 이 있다. 열람자이면 두 구역 testid 가 없고 `review-table` 이 있다. 이를 위해 `testSupport.tsx` 의 `withApp(children, ontology, user)` 에 선택 인자 `user` 를 더하고, 지금 고정한 `canEdit: true` 를 `canEditRole(user.role)`(`financial-workbench/web/src/context.ts`)로 바꾼다. 기본 사용자는 지금처럼 EDITOR 라 다른 테스트는 그대로다.
   - 「ReviewRow 는…」 옆에 테스트를 더한다. `contentUpdatedBy.id` 가 `u1` 인 주장을 `ReviewRow` 로 그리면 `review-own-hint` 가 있고 승인 단추가 `disabled` 다.
 - `financial-workbench/web/src/components/screens.test.tsx` 에 `CopyLinkButton` 정적 렌더 테스트를 더한다. `data-testid="x-link"` 단추가 있고 `-done`, `-fallback` 은 없다.
 - `financial-workbench/web/e2e/support.ts` 의 `loginAs` 에 선택 인자 `startPath = '/'` 를 더해 `page.goto(startPath)` 로 시작하게 한다. 기존 호출은 그대로 통한다.
 - `financial-workbench/web/e2e/workbench.spec.ts`
-  - `3)` 의 B 검토 앞에서 A(`pageA`)가 `tab-review` 를 열면 `review-section-mine` 안의 `review-mine-row` 가운데 `data.supplier` 를 담은 행이 있고, `review-section-reviewable` 안에는 그 행이 없다. 그 행의 `review-mine-copy-link` 를 누르면 `review-mine-copy-link-done` 이나 `review-mine-copy-link-fallback` 가운데 하나가 보인다(`locator.or`). `shot(pageA, '03-review-mine-a')` 를 남긴다.
-  - 같은 테스트에서 B 의 `review-section-reviewable` 에 그 행이 있다(기존 단언의 범위를 그 구역으로 좁힌다).
-  - `3b) 링크로 들어오면 로그인한 뒤 그 주장의 상세가 열린다` 를 더한다. 새 context 의 페이지로 `loginAs(page, editorB, 'success', \`/?node=${주장 id}\`)` 를 하고 `detail-label` 이 `${data.supplier} → ${data.customer} 공급한다` 다. 주장 id 는 A 의 상세 `detail-panel` 의 `data-node-id` 로 앞 테스트에서 적어 둔다. 끝나면 그 context 를 닫는다. 주소창에 `?node=` 가 남지 않는다(`page.url()` 에 `node=` 가 없다).
+  - describe 범위에 `let supplyClaimId = ''` 를 둔다. `2)` 끝에서 만든 주장 카드(`node-claims-section` 의 `claim-card`, `hasText: data.evidence`)의 `data-claim-id` 를 읽어 넣는다. phase 03 의 `6c)` 도 이 변수를 쓴다.
+  - `3)` 의 B 검토 앞에서 A(`pageA`)가 `tab-review` 를 열면 `review-section-mine` 안에 `review-mine-row[data-claim-id="${supplyClaimId}"]` 가 있고, `review-section-reviewable` 안에는 그 id 의 행이 없다. 그 행의 `review-mine-copy-link` 를 누르면 `review-mine-copy-link-done` 이나 `review-mine-copy-link-fallback` 가운데 하나가 보인다(`locator.or`). `shot(pageA, '03-review-mine-a')` 를 남긴다.
+  - 같은 테스트에서 B 의 기존 단언(`review-row`, `hasText: data.supplier`)을 `review-section-reviewable` 안으로 좁힌다.
+  - `3b) 링크로 들어오면 로그인한 뒤 그 주장의 상세가 열린다` 를 더한다. 새 context 의 페이지로 `loginAs(page, editorB, 'success', '/?node=' + supplyClaimId)` 를 하고 `detail-panel` 의 `data-node-id` 가 `supplyClaimId`, `detail-label` 이 `${data.supplier} → ${data.customer} 공급한다` 다. 끝나면 그 context 를 닫는다.
+  - `financial-workbench/web/e2e/mobile.spec.ts` 끝에 단계를 더한다. 만든 기업의 상세에서 `detail-panel` 의 `data-node-id` 를 읽고, 같은 페이지로 `page.goto('/?node=' + id)` 하면 `workspace-tab-detail` 이 `aria-selected="true"` 이고 `detail-label` 이 그 기업 이름이다. 주소에 `node=` 가 남지 않는다(`expect(page).not.toHaveURL(/node=/)`).
   - `7)` 의 열람자 단언은 그대로 통해야 한다. 열람자는 구역이 없다.
 
 ## 검증
@@ -158,3 +161,4 @@ cd financial-workbench && NEO4J_PASSWORD=e2e-local-password COMPOSE_PROJECT_NAME
 | `financial-workbench/web/TESTIDS.md` | 수정 |
 | `financial-workbench/web/e2e/support.ts` | 수정 |
 | `financial-workbench/web/e2e/workbench.spec.ts` | 수정 |
+| `financial-workbench/web/e2e/mobile.spec.ts` | 수정 |

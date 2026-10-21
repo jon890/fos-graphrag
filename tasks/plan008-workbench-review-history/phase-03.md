@@ -11,7 +11,7 @@
 
 ## 컨텍스트
 
-- 서버 계약(phase 01 결과): `ChangeEventView` 에 `refs: Record<id, { id, type, label, archived }>` 가 있다. `GET /api/changes/actors` 는 `UserRef[]`(`id`, `email`, `displayName`)를 표시 이름 순서로 준다. `/api/ontology` 에 `changeFields: Record<키, { label }>` 가 있다. 뜻은 `financial-workbench/docs/api-contract.md` 「변경 이력」 과 `financial-workbench/docs/data-schema.md` 표시 이름 표다.
+- 서버 계약(phase 01 결과): `ChangeEventView` 에 `refs: Record<id, { id, type, label, archived }>` 가 있다. 노드 ID 키(`subjectId`, `objectId`, `documentIds`, `fromId`, `toId`)와 검토자 키(`reviewedBy`, `type` 이 `User`)의 ID 가 담긴다. `GET /api/changes/actors` 는 `UserRef[]`(`id`, `email`, `displayName`)를 표시 이름 순서로 준다. `/api/ontology` 에 `changeFields: Record<키, { label }>` 가 있다. 뜻은 `financial-workbench/docs/api-contract.md` 「변경 이력」 과 `financial-workbench/docs/data-schema.md` 표시 이름 표다.
 - 이력 탭은 `financial-workbench/web/src/components/ChangesTab.tsx` 다.
   - `changeLine(ontology, targetType, key, diff)` 가 enum 이면 `enumValueLabel`, 아니면 `summarizeValue` 로 「전 → 후」 를 만든다. 속성이 아닌 키는 `propertyLabel` 이 키를 그대로 돌려줘 `font-mono` 로 보인다.
   - `ChangeRows({ items, onOpen })` 가 행을 그리고, 열은 시각, 사용자, 작업, 대상 종류, 대상 이름, 수정 번호, 변경 내용, 메모 여덟 개다. 빈 목록 칸은 `colSpan={8}` 이다.
@@ -57,7 +57,8 @@ export function changeValueText(o: Ontology, targetType: string, key: string, va
 | 조건 | 결과 |
 | --- | --- |
 | `null`, `undefined`, `''` | 「(없음)」 |
-| 키가 `subjectId`, `objectId`, `documentIds`, `fromId`, `toId` | ID 마다 `refs[id]` 의 `nodeDisplayLabel(o, ref)`, 없으면 「(찾을 수 없는 항목)」. 목록이면 `, ` 로 잇는다 |
+| 키가 `subjectId`, `objectId`, `documentIds`, `fromId`, `toId`, `reviewedBy` | ID 마다 `refs[id]` 의 이름(노드는 `nodeDisplayLabel(o, ref)`, `User` 는 `ref.label`), 없으면 「(찾을 수 없는 항목)」. 목록이면 `, ` 로 잇는다 |
+| 키가 `reviewedAt` | `formatDateTime(value)` |
 | 키가 `reviewStatus` | `reviewStatusLabel(o, value)` |
 | 키가 `role` | `ROLE_LABEL[value] ?? value` |
 | `true` / `false` | 「예」 / 「아니오」 |
@@ -69,7 +70,8 @@ export function changeValueText(o: Ontology, targetType: string, key: string, va
 ### 3. `ChangesTab.tsx` 의 행
 
 - `changeLine` 을 지우고 `changeFieldLabel`, `changeValueText` 를 쓴다. 키 이름에 `font-mono` 를 붙이는 분기를 지운다.
-- ID 를 이름으로 보인 값이 한 개짜리 ID(목록이 아님)이고 `refs` 에 있으면 그 이름을 `Button variant="link"` 로 그려 누르면 `onOpen(id)` 한다. 목록 값은 글자로만 보인다.
+- ID 를 이름으로 보인 값이 노드 ID 한 개(목록이 아니고 `type` 이 `User` 가 아님)이고 `refs` 에 있으면 그 이름을 `Button variant="link"` 로 그려 누르면 `onOpen(id)` 한다. 목록 값은 글자로만 보인다.
+- 사용자 칸 `TableCell` 에 `data-testid="change-actor"` 를 둔다.
 - 「수정 번호」 열과 그 칸을 지우고, 행(`change-row`)의 `title` 에 `수정 번호 ${c.revision}` 을 둔다. 빈 목록 칸은 `colSpan={7}` 이다.
 
 ### 4. `ChangesTab.tsx` 의 좁혀 보기
@@ -80,23 +82,24 @@ export function changeValueText(o: Ontology, targetType: string, key: string, va
 
 ### 5. `financial-workbench/web/TESTIDS.md`
 
-「변경 이력 탭」 표에서 `changes-target-filter`, `changes-filter-submit` 를 지우고 `changes-target-picker-*`, `changes-target-selected`, `changes-filter-clear`(지우기), `changes-actor-filter`(select, 값은 이메일)를 적는다. revision 이 행 `title` 로 옮겨 갔다고 적는다.
+「변경 이력 탭」 표에서 `changes-target-filter`, `changes-filter-submit` 를 지우고 `change-actor` *(행의 사용자 칸)를 더하고, `changes-target-picker-*`, `changes-target-selected`, `changes-filter-clear`(지우기), `changes-actor-filter`(select, 값은 이메일)를 적는다. revision 이 행 `title` 로 옮겨 갔다고 적는다.
 
 ### 6. 이 phase 를 검증하는 테스트
 
 - `financial-workbench/web/src/lib/changes.test.ts` 신규. `testOntology` 에 `changeFields: { subjectId: { label: '주체' }, documentIds: { label: '근거 문서' }, archived: { label: '보관' }, reviewStatus: { label: '검토 상태' }, role: { label: '역할' } }` 를 더한 온톨로지로 본다(테스트 안에서 펼쳐 만든다).
   - `changeFieldLabel(o, 'Company', 'name')` 은 속성 label, `'subjectId'` 는 「주체」, `'unknownKey'` 는 키 그대로다.
+  - `reviewedBy` 값 `'u2'` 와 `refs = { u2: { id: 'u2', type: 'User', label: 'Bob', archived: false } }` 이면 「Bob」 이다.
   - `subjectId` 값 `'c1'` 과 `refs = { c1: { id: 'c1', type: 'Company', label: '가나전자', archived: false } }` 이면 「가나전자」, `refs` 가 비면 「(찾을 수 없는 항목)」 이다. `documentIds` 값 `['d1', 'd2']` 는 두 이름을 `, ` 로 잇는다.
   - `archived` 의 `false`, `true` 는 「아니오」, 「예」, `reviewStatus` 의 `'DRAFT'` 는 「초안」, `role` 의 `'EDITOR'` 는 「편집자」, `null` 은 「(없음)」 이다.
-- `financial-workbench/web/src/components/ChangesTab.test.tsx`: fixture 에 `refs: {}` 를 채운다. 테스트를 더한다. 주장 `CREATE` 이력(`changes: { subjectId: { before: null, after: 'c1' } }`, `refs` 에 c1)을 그리면 「주체」 와 「가나전자」 가 있고 `c1` 원문과 `font-mono` 가 없다. 「수정 번호」 열 머리가 없다.
+- `financial-workbench/web/src/components/ChangesTab.test.tsx`: fixture 에 `refs: {}` 를 채운다. 테스트를 더한다. 주장 `CREATE` 이력(`changes: { subjectId: { before: null, after: 'c1' } }`, `refs` 에 c1)을 그리면 「주체」 와 「가나전자」 가 있고, 글자로서의 `>c1<` 와 `font-mono` 가 없다(속성 값 `data-node-id="c1"` 은 있어도 된다). 「수정 번호」 열 머리가 없다.
 - `financial-workbench/web/src/components/tabs.test.tsx`: 「ChangesTab 은 대상 필터를 input 으로…」 를 「ChangesTab 은 대상 고르기 칸을 그리고 옛 표 class 를 쓰지 않는다」 로 바꾼다. `changes-target-picker-input` 이 있고 `changes-target-filter` 가 없다.
 - `financial-workbench/web/e2e/workbench.spec.ts`
   - `6)` 끝에 단언을 더한다. ARCHIVE 행이 「보관」 과 「아니오 → 예」 를 담는다.
   - `6)` 다음에 `6c) 변경 이력에서 사용자를 표시 이름으로 고르고 주장 이력의 주체와 대상이 이름으로 보인다` 를 더한다.
     1. `pageA` 로 `tab-changes` 를 연다. 대상이 골라져 있으면 `changes-filter-clear` 로 지운다.
-    2. `changes-actor-filter` 에서 편집자 A 의 표시 이름을 고르면 보이는 모든 `change-row` 의 사용자 칸이 그 이름이다.
-    3. `changes-target-picker-input` 에 `data.supplier` 를 넣고 `changes-target-picker-search` 를 누른 뒤, `changes-target-picker-result` 가운데 `data-node-id` 가 공급사 기업인 후보를 누른다. `changes-target-selected` 에 `data.supplier` 가 보이고 모든 `change-row` 의 `data-target-id` 가 그 id 다.
-    4. `3b)` 가 적어 둔 주장 id 로 `pageA.goto(\`/?node=${주장 id}\`)` 를 열어 주장 상세를 연다. 주장은 기업 이름으로 검색되지 않으므로(`docs/prd.md` 「남은 한계」) 검색으로 찾지 않는다. `detail-label` 이 주장 이름이 될 때까지 기다린다. `node-history-link` 를 누르면 `CREATE` 행이 「주체」, `data.supplier`, 「대상」, `data.customer` 를 담고 UUID 형식 글자(`/[0-9a-f]{8}-[0-9a-f]{4}-/`)를 담지 않는다. `shot(pageA, '06c-changes-names')` 를 남긴다.
+    2. `changes-actor-filter` 의 선택지에 편집자 A 의 표시 이름이 보이는지 확인하고, `selectOption({ value: editorA.email })` 로 고른다. 표시 이름은 실행마다 같고 이메일만 달라 이름으로 고르면 예전 실행의 사용자가 골라질 수 있다. `change-row` 가 1개 이상이 될 때까지 기다린 뒤(`expect(rows.first()).toBeVisible()`), 모든 행의 `change-actor` 가 A 의 표시 이름인지 `expect.poll` 로 본다. 다시 읽기 전의 행을 검사하지 않게 하려는 것이다.
+    3. `changes-actor-filter` 를 `''`(모두)로 돌린다. `changes-target-picker-input` 에 `data.supplier` 를 넣고 `changes-target-picker-search` 를 누른 뒤, `changes-target-picker-result` 가운데 `hasText: exact(data.supplier)` 인 후보를 누른다(`exact` 는 `e2e/support.ts` 의 도우미다). `changes-target-selected` 에 `data.supplier` 가 보인다. 행이 1개 이상인지 확인한 뒤 모든 행의 `data-target-id` 가 같은 값인지 본다.
+    4. `pageA.goto('/?node=' + supplyClaimId)` 로 주장 상세를 연다. 주장은 기업 이름으로 검색되지 않으므로(`docs/prd.md` 「남은 한계」) 검색으로 찾지 않는다. `detail-panel` 의 `data-node-id` 가 `supplyClaimId` 가 될 때까지 기다리고, 주소에 `node=` 가 남지 않는다(`expect(pageA).not.toHaveURL(/node=/)`). `node-history-link` 를 누르면 `CREATE` 행이 「주체」, `data.supplier`, 「대상」, `data.customer` 를 담고, 행의 보이는 글자에 UUID 형식(`/[0-9a-f]{8}-[0-9a-f]{4}-/`)이 없다(`not.toContainText`, 속성은 보지 않는다). `shot(pageA, '06c-changes-names')` 를 남긴다.
   - `0c)` 는 그대로 통해야 한다.
 
 ## 검증

@@ -358,7 +358,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 `action` 은 `CREATE`, `UPDATE`, `REVIEW`, `ARCHIVE`, `RESTORE` 가운데 하나다. `targetKind` 는 `NODE`, `RELATIONSHIP`, `USER` 가운데 하나다. 사용자 관리 변경도 같은 형식으로 남는다.
 `revision` 은 변경 뒤의 revision 이다. 이력은 지우거나 고치는 API 가 없다.
 
-`refs` 는 `changes` 안의 노드 ID 를 지금 이름으로 바꾼 맵이다. 키는 노드 ID, 값은 `{"id","type","label","archived"}` 다. 대상 키는 `subjectId`, `objectId`, `documentIds`, `fromId`, `toId` 이고, 이 키의 `before`, `after` 에 든 ID 를 모두 담는다. 찾지 못한 ID 는 빠진다.
+`refs` 는 `changes` 안의 ID 를 지금 이름으로 바꾼 맵이다. 키는 ID, 값은 `{"id","type","label","archived"}` 다. 노드 ID 키는 `subjectId`, `objectId`, `documentIds`, `fromId`, `toId` 이고 `type` 은 노드 타입이다. 사용자 ID 키는 `reviewedBy` 이고 `type` 은 `User`, `label` 은 표시 이름, `archived` 는 `false` 다. 이 키의 `before`, `after` 에 든 ID 를 모두 담는다. 찾지 못한 ID 는 빠진다.
 이름은 읽는 시점의 이름이다. 노드 이름을 바꾸면 예전 이력에도 새 이름이 보인다. 그때의 이름은 `targetLabel` 만 남긴다.
 
 ## 온톨로지

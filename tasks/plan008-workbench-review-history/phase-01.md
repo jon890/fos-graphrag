@@ -61,12 +61,13 @@
 
 - `ChangeController.kt` 에 `data class ChangeRef(val id: String, val type: String, val label: String, val archived: Boolean)` 를 두고, `ChangeEventView` 의 `changes` 다음에 `val refs: Map<String, ChangeRef>` 를 더한다.
 - 생성자에 `private val ontology: Ontology` 를 더한다.
-- `list` 에서 행을 읽은 뒤, 모든 행의 `changes` 에서 `REF_KEYS = setOf("subjectId", "objectId", "documentIds", "fromId", "toId")` 키의 `before`, `after` 에 든 문자열(목록이면 그 원소)을 모아 쿼리 한 번으로 읽는다. 모은 것이 없으면 쿼리하지 않는다.
+- 같은 파일의 `companion object` 에 상수 셋을 둔다. `NODE_REF_KEYS = setOf("subjectId", "objectId", "documentIds", "fromId", "toId")`, `USER_REF_KEYS = setOf("reviewedBy")`, 그리고 이력 `changes` 에 나오는 키 가운데 온톨로지 속성이 아닌 것 전부인 `CHANGE_FIELD_KEYS = NODE_REF_KEYS + USER_REF_KEYS + setOf("reviewStatus", "reviewedAt", "reviewNote", "archived", "email", "displayName", "role", "enabled")` 다. 새 키를 이력에 남기는 코드를 더하면 이 상수에 더한다는 주석을 단다. `reviewedBy`, `reviewedAt`, `reviewNote` 는 검토된 주장을 고칠 때 `ClaimService.patch` 의 `diff(before, reset - "contentUpdatedBy")` 가 남긴다.
+- `list` 에서 행을 읽은 뒤, 모든 행의 `changes` 에서 `NODE_REF_KEYS` 키의 `before`, `after` 에 든 문자열(목록이면 그 원소)을 모아 쿼리 한 번으로 읽는다. 모은 것이 없으면 쿼리하지 않는다.
 
   ```cypher
   MATCH (n:Knowledge) WHERE n.id IN $ids RETURN properties(n) AS n
   ```
-  이름은 `ontology.labelOf(n["type"], n)` 이다. 각 행의 `refs` 는 그 행에 나온 ID 만 담는다. 찾지 못한 ID 는 빠진다.
+  이름은 `ontology.labelOf(n["type"], n)` 이다. `USER_REF_KEYS` 키의 사용자 ID 는 `users.findRefs` 로 읽어 `ChangeRef(id, "User", displayName, false)` 로 둔다(작업자 refs 를 읽을 때 함께 넘겨 한 번에 읽는다). 각 행의 `refs` 는 그 행에 나온 ID 만 담는다. 찾지 못한 ID 는 빠진다.
 - 새 끝점 `@GetMapping("/api/changes/actors")` `fun actors(authentication: Authentication): List<UserRef>` 를 둔다. `list` 와 같은 `admin` 판정으로 `MATCH (e:ChangeEvent) WHERE $admin OR e.targetKind <> 'USER' RETURN DISTINCT e.actorId AS id` 를 읽고 `users.findRefs(ids).values` 를 `displayName` 순서로 돌려준다. 사용자가 아닌 `system` 은 `findRefs` 에서 빠진다. `@Transactional(readOnly = true)` 를 붙인다.
 - 보안 설정은 고치지 않는다. `config/SecurityConfig.kt` 가 `GET /api/**` 를 VIEWER 이상에게 연다. 열람자도 이력과 사용자 목록을 읽는다.
 
@@ -83,6 +84,9 @@
   | `fromId` | 시작 |
   | `toId` | 끝 |
   | `reviewStatus` | 검토 상태 |
+  | `reviewedBy` | 검토자 |
+  | `reviewedAt` | 검토 시각 |
+  | `reviewNote` | 검토 메모 |
   | `archived` | 보관 |
   | `email` | 이메일 |
   | `displayName` | 표시 이름 |
@@ -102,8 +106,9 @@
   - 같은 컨테이너의 다른 데이터가 있으므로 「있다, 없다」 로만 단언한다. 한 쪽 100개를 넘을 만큼 데이터가 쌓이지 않는다는 전제를 주석으로 남긴다.
 - `financial-workbench/api/src/test/kotlin/dev/fos/workbench/history/ChangeHistoryIntegrationTest.kt` 신규
   - 「이력의 노드 ID 는 지금 이름으로 함께 온다」: Alice 가 기업 둘, 문서 하나, 주장 하나를 만든다. 주장의 `CREATE` 이력(`/api/changes?targetId=<주장 id>`)의 `refs[주체 id].label` 이 주체 기업 이름이고 `refs[문서 id].type` 이 `Document` 다. 주체 기업 이름을 `PATCH /api/nodes` 로 바꾸면 같은 이력의 `refs[주체 id].label` 이 새 이름이다.
-  - 「사용자 목록은 이력에 나온 사람만, ADMIN 이 아니면 사용자 관리 이벤트만 남긴 사람은 빠진다」: Alice 가 노드를 하나 만든 뒤 Bob 의 `GET /api/changes/actors` 에 Alice 의 email 이 있다. 첫 관리자 생성 이력은 작업자가 `system` 이라 목록에 없다. 사용자 관리만 한 관리자 계정(`ADMIN`)이 지식 데이터를 바꾸지 않았으면, Bob 의 응답에 그 email 이 없고 Admin 의 응답에는 있다. 다른 테스트가 Admin 으로 지식 데이터를 바꿀 수 있으면 이 단언은 Admin 으로 사용자 하나를 만든 뒤 Admin 응답에 있는 것만 본다.
-- `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyLabelsTest.kt` 의 서버 키 테스트에 `changeFields` 가 작업 항목 4 의 11개 키를 모두 가지고 `label` 이 비어 있지 않은지 단언을 더한다.
+  - 「검토된 주장을 고친 이력의 검토자도 이름으로 온다」: Alice 가 주장을 만들고 Bob 이 `REVIEWED` 로 검토한 뒤 Alice 가 내용을 고친다. 그 `UPDATE` 이력의 `changes.reviewedBy.before` 가 Bob 의 id 이고 `refs[Bob id].label` 이 `Bob`, `type` 이 `User` 다.
+  - 「사용자 목록은 이력에 나온 사람만, ADMIN 이 아니면 사용자 관리 이벤트만 남긴 사람은 빠진다」: 같은 컨테이너에서 기본 ADMIN 계정은 다른 테스트가 지식 데이터를 바꾸므로 쓰지 않는다. `loggedIn(ADMIN)` 으로 이 테스트 전용 관리자(이메일 `admin-actors-<suffix>@example.com`, 역할 ADMIN)를 `POST /api/users` 로 만들고 그 이메일로 `loggedIn` 한다. 이 전용 관리자로 사용자 하나를 `POST /api/users` 로 만든다. Bob 의 `GET /api/changes/actors` 에 전용 관리자 email 이 없고, 기본 ADMIN 의 응답에는 있다. Alice 가 노드 하나를 만든 뒤 Bob 의 응답에 Alice 의 email 이 있다. 같은 방식으로 관리자를 만드는 예는 `ConcurrencyIntegrationTest.kt` 에 있다.
+- `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyLabelsTest.kt` 의 서버 키 테스트에 `ontology.changeFields.keys` 가 `ChangeController.CHANGE_FIELD_KEYS` 와 같고(`containsExactlyInAnyOrderElementsOf`) `label` 이 비어 있지 않은지 단언을 더한다. 서버가 새 키를 남기면 이 테스트가 YAML 에 이름을 더하라고 실패한다.
 
 ## 검증
 
