@@ -1,5 +1,5 @@
-import path from 'node:path'
 import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
+import { admin, exact, loginAs, newPage, shot, type TestUser } from './support'
 
 // 두 편집자(A, B)와 관리자, 열람자가 같은 서버에서 협업하는 흐름을 순서대로 확인한다.
 // 로그인은 실제 Google 대신 가짜 OIDC 서버(navikt/mock-oauth2-server, interactiveLogin)를 거친다.
@@ -20,67 +20,10 @@ const data = {
   editByB: `B 가 고친 메모 ${suffix}`,
 }
 
-interface TestUser {
-  sub: string
-  email: string
-  name: string
-  emailVerified?: boolean
-}
-
-const admin: TestUser = {
-  sub: process.env.E2E_ADMIN_SUB ?? 'admin-sub',
-  email: process.env.E2E_ADMIN_EMAIL ?? 'admin@example.com',
-  name: process.env.E2E_ADMIN_NAME ?? '관리자',
-}
 const editorA: TestUser = { sub: `editor-a-${suffix}`, email: `editor-a-${suffix}@example.com`, name: '편집자A' }
 const editorB: TestUser = { sub: `editor-b-${suffix}`, email: `editor-b-${suffix}@example.com`, name: '편집자B' }
 const viewer: TestUser = { sub: `viewer-${suffix}`, email: `viewer-${suffix}@example.com`, name: '열람자' }
 const stranger: TestUser = { sub: `stranger-${suffix}`, email: `stranger-${suffix}@example.com`, name: '외부인' }
-
-const screenshotDir = process.env.E2E_SCREENSHOT_DIR ?? 'test-results/screenshots'
-
-async function shot(page: Page, name: string): Promise<void> {
-  await page.screenshot({ path: path.join(screenshotDir, `${name}.png`), fullPage: true })
-}
-
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-function exact(text: string): RegExp {
-  return new RegExp(`^\\s*${escapeRegExp(text)}\\s*$`)
-}
-
-/**
- * 앱의 「Google 로 로그인」 을 눌러 가짜 OIDC 서버의 로그인 폼을 채운다.
- * expect 가 success 면 앱에 로그인된 것을, denied 면 「접근 권한이 없습니다」 화면을 확인한다.
- */
-async function loginAs(page: Page, user: TestUser, expectResult: 'success' | 'denied' = 'success'): Promise<void> {
-  await page.goto('/')
-  await page.getByTestId('login-google').click()
-  // 가짜 서버(http://localhost:8090/default/authorize?...)의 interactiveLogin 폼이다.
-  await page.waitForURL(/\/authorize/)
-  await page.locator('input[name=username]').fill(user.sub)
-  await page
-    .locator('textarea[name=claims]')
-    .fill(JSON.stringify({ email: user.email, email_verified: user.emailVerified ?? true, name: user.name }))
-  await page.locator('input[type=submit]').click()
-
-  if (expectResult === 'denied') {
-    await expect(page.getByTestId('login-denied')).toBeVisible()
-    await expect(page.getByTestId('login-google')).toBeVisible()
-    return
-  }
-  await expect(page.getByTestId('current-user-name')).toHaveText(user.name)
-  // 온톨로지를 받아야 작업 공간이 그려진다.
-  await expect(page.getByTestId('search-input')).toBeVisible()
-}
-
-async function newPage(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {
-  // 가짜 OIDC 서버의 세션 쿠키가 섞이지 않게 사용자마다 새 context 를 쓴다.
-  const context = await browser.newContext()
-  return { context, page: await context.newPage() }
-}
 
 async function addUser(page: Page, user: TestUser, role: 'VIEWER' | 'EDITOR' | 'ADMIN'): Promise<void> {
   await page.getByTestId('users-add-email').fill(user.email)
