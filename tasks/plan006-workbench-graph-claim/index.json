@@ -1,0 +1,28 @@
+{
+  "name": "plan006-workbench-graph-claim",
+  "description": "주장의 이름을 「주체 → 대상 관계」 로 읽을 때 만들고, 그래프에서 주장을 선 하나로 접어 보이며, 주장 만들기 폼을 문장 채우기로 바꿔 왼쪽 만들기와 상세 양쪽에서 시작하게 한다",
+  "status": "pending",
+  "created_at": "2026-10-21",
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "title": "주장 이름, 그래프의 주장 끝 노드, 문장 틀",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "title": "그래프에서 주장을 선으로 접기",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "title": "문장 채우기 주장 폼과 두 입구",
+      "execution_profile": "standard"
+    }
+  ]
+}
