@@ -111,7 +111,7 @@ class NodeService(
         val type = after["type"] as String
         recorder.record(
             ChangeEventDraft(
-                actorId, action, after["id"] as String, TargetKind.NODE, type, ontology.labelOf(type, after),
+                actorId, action, after["id"] as String, TargetKind.NODE, type, reader.labelOf(after),
                 (after["revision"] as Number).toLong(),
                 mapOf("archived" to FieldChange(before["archived"], after["archived"])),
                 note?.takeIf { it.isNotBlank() }?.take(1000),

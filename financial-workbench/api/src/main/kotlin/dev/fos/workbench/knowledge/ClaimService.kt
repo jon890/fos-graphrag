@@ -93,7 +93,13 @@ class ClaimService(
         client.query("UNWIND \$ids AS lockedId MATCH (n:Knowledge {id: lockedId}) REMOVE n._lock").bind(ids).to("ids").run()
         recorder.record(
             ChangeEventDraft(
-                actorId, ChangeAction.CREATE, id, TargetKind.NODE, CLAIM, request.predicate, 1L,
+                actorId, ChangeAction.CREATE, id, TargetKind.NODE, CLAIM,
+                ontology.claimLabel(
+                    ontology.labelOf(subject["type"] as String, subject),
+                    ontology.labelOf(obj["type"] as String, obj),
+                    request.predicate,
+                ),
+                1L,
                 properties.mapValues { (_, v) -> FieldChange(null, v) } + mapOf(
                     "subjectId" to FieldChange(null, request.subjectId),
                     "objectId" to FieldChange(null, request.objectId),
@@ -132,7 +138,7 @@ class ClaimService(
         val after = guard.updateNode(id, changes + reset, actorId)
         recorder.record(
             ChangeEventDraft(
-                actorId, ChangeAction.UPDATE, id, TargetKind.NODE, CLAIM, before["predicate"] as String,
+                actorId, ChangeAction.UPDATE, id, TargetKind.NODE, CLAIM, reader.labelOf(before),
                 (after["revision"] as Number).toLong(), contentChanged + diff(before, reset - "contentUpdatedBy"),
             ),
         )
@@ -164,7 +170,7 @@ class ClaimService(
         val after = guard.updateNode(id, set, actorId)
         recorder.record(
             ChangeEventDraft(
-                actorId, ChangeAction.REVIEW, id, TargetKind.NODE, CLAIM, before["predicate"] as String,
+                actorId, ChangeAction.REVIEW, id, TargetKind.NODE, CLAIM, reader.labelOf(before),
                 (after["revision"] as Number).toLong(),
                 mapOf("reviewStatus" to FieldChange(before["reviewStatus"], status.name)), note,
             ),

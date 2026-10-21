@@ -50,6 +50,37 @@ class ClaimIntegrationTest : IntegrationTest() {
     }
 
     @Test
+    fun `Claim 이름은 읽을 때 주체와 대상 이름으로 만들고 이력에는 그때의 이름을 남긴다`() {
+        val alice = loggedIn(ALICE)
+        val bob = loggedIn(BOB)
+        val fx = Fixtures(alice)
+        val supplier = fx.company("가상부품")
+        val customer = fx.company("가상전자")
+        val first = "가상부품-${fx.suffix} → 가상전자-${fx.suffix} 공급한다"
+
+        val claim = fx.claim("SUPPLIES_TO", supplier.id, customer.id, listOf(fx.document("보고서").id)).body
+        assertThat(claim["label"].asString()).isEqualTo(first)
+        fun history(action: String) = alice.get("/api/changes?targetId=${claim.id}").body["items"].toList()
+            .single { it["action"].asString() == action }["targetLabel"].asString()
+        assertThat(history("CREATE")).isEqualTo(first)
+
+        val renamed = "가상소재-${fx.suffix}"
+        val patched = alice.patch("/api/nodes/${supplier.id}", mapOf("expectedRevision" to 1, "properties" to mapOf("name" to renamed)))
+        assertThat(patched.status).describedAs(patched.body.toString()).isEqualTo(200)
+        assertThat(alice.get("/api/claims/${claim.id}").body["label"].asString()).startsWith(renamed)
+        assertThat(alice.get("/api/nodes/${claim.id}").body["node"]["label"].asString()).startsWith(renamed)
+        assertThat(alice.get("/api/nodes/${customer.id}").body["claims"][0]["label"].asString()).startsWith(renamed)
+
+        val reviewed = bob.post("/api/claims/${claim.id}/review", mapOf("expectedRevision" to 1, "status" to "REVIEWED"))
+        assertThat(reviewed.status).describedAs(reviewed.body.toString()).isEqualTo(200)
+        assertThat(history("REVIEW")).startsWith(renamed)
+        assertThat(history("CREATE")).isEqualTo(first)
+
+        alice.post("/api/nodes/${claim.id}/archive", mapOf("expectedRevision" to reviewed.body.revision))
+        assertThat(history("ARCHIVE")).isEqualTo("$renamed → 가상전자-${fx.suffix} 공급한다")
+    }
+
+    @Test
     fun `내용을 고치면 검토 상태가 DRAFT 로 돌아가고 유효 기간을 미상으로 되돌릴 수 있다`() {
         val alice = loggedIn(ALICE)
         val bob = loggedIn(BOB)

@@ -127,7 +127,12 @@ class SearchAndGraphIntegrationTest : IntegrationTest() {
 
         val oneHop = alice.get("/api/graph/neighborhood?id=${supplier.id}").body
         assertThat(oneHop["truncated"].asBoolean()).isFalse()
-        assertThat(oneHop["nodes"].toList().map { it["id"].asString() }).containsExactlyInAnyOrder(supplier.id, claim.id)
+        assertThat(oneHop["nodes"].toList().map { it["id"].asString() }).containsExactlyInAnyOrder(supplier.id, claim.id, customer.id)
+        assertThat(oneHop["edges"].toList().map { it["type"].asString() }).containsExactlyInAnyOrder("SUBJECT", "OBJECT")
+        val claimNode = oneHop["nodes"].toList().single { it.id == claim.id }
+        assertThat(claimNode["predicate"].asString()).isEqualTo("SUPPLIES_TO")
+        assertThat(claimNode["label"].asString()).isEqualTo("공급사-${fx.suffix} → 고객사-${fx.suffix} 공급한다")
+        assertThat(oneHop["nodes"].toList().single { it.id == supplier.id }["predicate"].isNull).isTrue()
 
         val twoHops = alice.get("/api/graph/neighborhood?id=${supplier.id}&hops=2").body
         assertThat(twoHops["nodes"].toList().map { it["id"].asString() })
@@ -143,6 +148,31 @@ class SearchAndGraphIntegrationTest : IntegrationTest() {
 
         alice.post("/api/nodes/${supplier.id}/archive", mapOf("expectedRevision" to 1))
         assertThat(alice.get("/api/graph/neighborhood?id=${supplier.id}").status).isEqualTo(404)
+    }
+
+    @Test
+    fun `1홉 그래프는 주장의 주체와 대상을 더하고 종류 필터와 노드 한도를 지킨다`() {
+        val alice = loggedIn(ALICE)
+        val fx = Fixtures(alice)
+        val supplier = fx.company("공급")
+        val customer = fx.company("고객")
+        val document = fx.document("근거")
+        val claim = fx.claim("SUPPLIES_TO", supplier.id, customer.id, listOf(document.id)).body
+
+        val fromCustomer = alice.get("/api/graph/neighborhood?id=${customer.id}").body
+        assertThat(fromCustomer["nodes"].toList().map { it.id }).contains(supplier.id)
+
+        val claimsOnly = alice.get("/api/graph/neighborhood?id=${supplier.id}&types=Claim").body
+        assertThat(claimsOnly["nodes"].toList().map { it.id }).containsExactlyInAnyOrder(supplier.id, claim.id)
+
+        val hub = fx.company("중심")
+        repeat(4) { i ->
+            val c = fx.company("거래처$i")
+            assertThat(fx.claim("SUPPLIES_TO", hub.id, c.id, listOf(document.id)).status).isEqualTo(201)
+        }
+        val capped = alice.get("/api/graph/neighborhood?id=${hub.id}").body
+        assertThat(capped["nodes"].size()).isEqualTo(5)
+        assertThat(capped["truncated"].asBoolean()).isTrue()
     }
 
     @Test

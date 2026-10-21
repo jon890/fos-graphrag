@@ -37,6 +37,10 @@ data class Ontology(
         val def = nodeTypes[type] ?: return type
         return properties[def.labelProperty]?.toString() ?: type
     }
+
+    /** Claim 의 이름. 「주체 → 대상 관계 표시 이름」 이고, 찾지 못한 끝은 ? 로 둔다 */
+    fun claimLabel(subjectLabel: String?, objectLabel: String?, predicate: String): String =
+        "${subjectLabel ?: "?"} → ${objectLabel ?: "?"} ${claimPredicates[predicate]?.label ?: predicate}"
 }
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -94,6 +98,8 @@ data class ClaimPredicateDef(
     val description: String,
     val subjectTypes: List<String>,
     val objectTypes: List<String>,
+    /** 주장 만들기 폼의 문장 틀. `{subject}`, `{object}` 자리에 고르기 칸이 들어간다 */
+    val sentence: String? = null,
 )
 
 /** 화면에 보일 이름과 짧은 설명. 키 자체는 서버가 정한다. */
