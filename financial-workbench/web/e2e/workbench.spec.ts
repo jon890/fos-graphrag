@@ -288,13 +288,20 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   test('4) A 가 공급사 주변 그래프와 근거, 검토자를 확인한다', async () => {
     await searchAndOpen(pageA, data.supplier)
 
-    const claimNode = pageA.locator('[data-testid="graph-node"][data-node-type="Claim"][data-review-status="REVIEWED"]')
-    await expect(claimNode.first()).toBeAttached()
-    // 고객사는 1홉에서도 주장의 대상으로 함께 온다
-    await expect(pageA.locator('[data-testid="graph-node"][data-node-type="Company"]').filter({ hasText: data.customer })).toHaveCount(1)
-    await expect(claimNode.filter({ hasText: `${data.supplier} → ${data.customer} 공급한다` })).toHaveCount(1)
+    const canvas = pageA.getByTestId('graph-canvas')
+    await expect(canvas).toHaveAttribute('data-collapsed-claims', '1')
 
     const card = pageA.getByTestId('node-claims-section').getByTestId('claim-card').filter({ hasText: data.evidence })
+    const claimId = (await card.getAttribute('data-claim-id'))!
+    const claimItem = pageA.locator(`[data-testid="graph-node"][data-node-id="${claimId}"]`)
+    const companies = (name: string) => pageA.locator('[data-testid="graph-node"][data-node-type="Company"]').filter({ hasText: name })
+    const documents = pageA.locator('[data-testid="graph-node"][data-node-type="Document"]').filter({ hasText: data.docTitle })
+    // 주장은 공급사에서 고객사로 가는 선 하나로 접혀 있고, 목록에는 접힌 주장으로 남는다
+    await expect(claimItem).toHaveAttribute('data-collapsed', 'true')
+    await expect(claimItem).toHaveAttribute('data-review-status', 'REVIEWED')
+    await expect(claimItem).toContainText(`${data.supplier} → ${data.customer} 공급한다`)
+    await expect(companies(data.customer)).toHaveCount(1)
+
     await expect(card).toHaveAttribute('data-review-status', 'REVIEWED')
     await expect(card.getByTestId('claim-evidence-text')).toHaveText(data.evidence)
     await expect(card.getByTestId('claim-document-title')).toHaveText(data.docTitle)
@@ -302,15 +309,25 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(card.getByTestId('claim-review-note')).toContainText(data.reviewNote)
     await shot(pageA, '04-graph-and-evidence')
 
-    // 고객사는 1홉에서도 주장의 대상으로 함께 온다. 문서는 주장 너머(2홉)에 있다. Claim 을 골라 이웃 확장하면 그래프에 합쳐진다.
-    const claimId = await card.getAttribute('data-claim-id')
-    await pageA.locator(`[data-testid="graph-node"][data-node-id="${claimId}"] button`).click()
-    await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-id', claimId!)
+    // 접힌 주장을 골라 이웃 확장해도 새로 오는 것은 숨긴 문서뿐이라 화면이 그대로다
+    await claimItem.locator('button').click()
+    await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-id', claimId)
     await pageA.getByTestId('graph-expand').click()
-    await expect(pageA.locator('[data-testid="graph-node"][data-node-type="Company"]').filter({ hasText: data.customer })).toHaveCount(1)
-    await expect(pageA.locator('[data-testid="graph-node"][data-node-type="Document"]').filter({ hasText: data.docTitle })).toHaveCount(1)
-    await expect(pageA.locator('[data-testid="graph-node"][data-node-type="Company"]').filter({ hasText: data.supplier })).toHaveCount(1)
+    await expect(pageA.getByTestId('graph-loading')).toHaveCount(0)
+    await expect(companies(data.supplier)).toHaveCount(1)
+    await expect(companies(data.customer)).toHaveCount(1)
+    await expect(documents).toHaveCount(0)
+    await expect(canvas).toHaveAttribute('data-collapsed-claims', '1')
+
+    // 주장을 따로 보면 마름모 노드와 근거 문서가 나온다
+    await pageA.getByTestId('graph-claims-as-nodes').setChecked(true)
+    await expect(canvas).toHaveAttribute('data-collapsed-claims', '0')
+    await expect(documents).toHaveCount(1)
+    await expect(claimItem).toHaveAttribute('data-collapsed', 'false')
     await shot(pageA, '04-expanded')
+
+    await pageA.getByTestId('graph-claims-as-nodes').setChecked(false)
+    await expect(canvas).toHaveAttribute('data-collapsed-claims', '1')
   })
 
   test('5) 같은 노드를 동시에 고치면 나중 저장은 409 안내 뒤 최신 값으로 바뀐다', async () => {

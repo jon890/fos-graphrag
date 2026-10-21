@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EMPTY_GRAPH, graphFromView, mergeGraph } from './graph'
+import { collapseClaims, EMPTY_GRAPH, expandedDisplay, graphFromView, mergeGraph, type GraphData } from './graph'
 import type { GraphView } from '../api/types'
 
 const limits = { maxHops: 2, maxNodes: 150, maxRelationships: 300 }
@@ -60,5 +60,61 @@ describe('mergeGraph', () => {
 
   it('limits 는 마지막 응답 값을 쓴다', () => {
     expect(mergeGraph(EMPTY_GRAPH, view({})).limits).toEqual(limits)
+  })
+})
+
+describe('collapseClaims', () => {
+  const a = { id: 'a', type: 'Company', label: 'A', reviewStatus: null }
+  const b = { id: 'b', type: 'Company', label: 'B', reviewStatus: null }
+  const c = { id: 'c', type: 'Claim', label: 'A → B 공급한다', reviewStatus: 'DRAFT' as const, predicate: 'SUPPLIES_TO' }
+  const d = { id: 'd', type: 'Document', label: 'D', reviewStatus: null }
+  const subject = { id: 'e1', type: 'SUBJECT', source: 'c', target: 'a' }
+  const object = { id: 'e2', type: 'OBJECT', source: 'c', target: 'b' }
+  const supported = { id: 'e3', type: 'SUPPORTED_BY', source: 'c', target: 'd' }
+  const base: GraphData = { nodes: [a, c, b, d], edges: [subject, object, supported], truncated: false, limits: null }
+  const ids = (nodes: { id: string }[]) => nodes.map((n) => n.id)
+
+  it('주장을 주체에서 대상으로 가는 선으로 접고 근거 문서를 숨긴다', () => {
+    const display = collapseClaims(base, 'a')
+    expect(ids(display.nodes)).toEqual(['a', 'b'])
+    expect(display.edges).toEqual([])
+    expect(display.claimEdges).toEqual([{ claimId: 'c', source: 'a', target: 'b', predicate: 'SUPPLIES_TO', reviewStatus: 'DRAFT' }])
+    expect(ids(display.listed)).toEqual(['a', 'c', 'b'])
+  })
+
+  it('대상이 그래프에 없으면 접지 않는다', () => {
+    const display = collapseClaims({ ...base, nodes: [a, c, d], edges: [subject, supported] }, 'a')
+    expect(ids(display.nodes)).toEqual(['a', 'c', 'd'])
+    expect(display.claimEdges).toEqual([])
+  })
+
+  it('접히지 않는 다른 주장이 받치는 문서는 숨기지 않는다', () => {
+    const c2 = { id: 'c2', type: 'Claim', label: 'c2', reviewStatus: null, predicate: 'SUPPLIES_TO' }
+    const display = collapseClaims(
+      { ...base, nodes: [...base.nodes, c2], edges: [...base.edges, { id: 'e4', type: 'SUPPORTED_BY', source: 'c2', target: 'd' }] },
+      'a',
+    )
+    expect(ids(display.nodes)).toContain('d')
+    expect(ids(display.nodes)).toContain('c2')
+  })
+
+  it('중심이 문서면 문서를 남기고 주장은 접는다', () => {
+    const display = collapseClaims(base, 'd')
+    expect(ids(display.nodes)).toEqual(['a', 'b', 'd'])
+    expect(display.claimEdges.map((x) => x.claimId)).toEqual(['c'])
+  })
+
+  it('중심이 주장이면 접지 않는다', () => {
+    const display = collapseClaims(base, 'c')
+    expect(ids(display.nodes)).toContain('c')
+    expect(display.claimEdges).toEqual([])
+  })
+
+  it('expandedDisplay 는 입력 그대로 돌려주고 접힌 주장이 없다', () => {
+    const display = expandedDisplay(base)
+    expect(display.nodes).toEqual(base.nodes)
+    expect(display.listed).toEqual(base.nodes)
+    expect(display.edges).toEqual(base.edges)
+    expect(display.claimEdges).toEqual([])
   })
 })

@@ -55,15 +55,16 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `graph-expand` | 선택 노드 이웃 확장(더블클릭과 같다) |
 | `graph-recenter` | 선택 노드를 새 중심으로 다시 불러온다 |
 | `graph-fit` | 화면 맞춤 |
-| `graph-status` | 「노드 N · 관계 M」 |
+| `graph-status` | 「항목 N · 관계 M」. N 은 「그래프에 나온 항목」 수, M 은 그린 관계와 접은 주장 선을 합한 수 |
+| `graph-claims-as-nodes` | 「주장을 따로 보기」 체크 상자. 켜면 주장을 노드로 그린다. 작업 공간을 떠날 때까지 남는다 |
 | `graph-loading`, `graph-error` | 로딩, 오류(서버 `message`) |
 | `graph-truncated` | 「결과가 잘렸습니다(최대 노드 N, 관계 M)」 |
 | `graph-empty` | 선택한 노드가 없음 |
 | `graph-no-neighbors` | 이웃이 없음 |
-| `graph-canvas` | Cytoscape 컨테이너. `data-layout-pending` 이 `"true"` 면 숨겨진 동안 생긴 요소의 배치를 미뤄 둔 상태이고, 다시 보여 배치를 돌리면 `"false"` 다 |
+| `graph-canvas` | Cytoscape 컨테이너. `data-layout-pending` 이 `"true"` 면 숨겨진 동안 생긴 요소의 배치를 미뤄 둔 상태이고, 다시 보여 배치를 돌리면 `"false"` 다. `data-collapsed-claims` 는 선으로 접은 주장 수이고, 「주장을 따로 보기」 를 켜면 `"0"` 이다 |
 | `graph-legend` | 타입별 색 범례 |
 | `graph-node-list` | 그래프에 올라간 노드 목록(캔버스 대신 검증용으로 쓴다) |
-| `graph-node` * | 목록 한 줄. `data-node-id`, `data-node-type`, `data-review-status`. 안의 button 을 누르면 선택된다 |
+| `graph-node` * | 목록 한 줄. `data-node-id`, `data-node-type`, `data-review-status`, `data-collapsed`(`"true"` 면 선으로 접힌 주장). 접힌 주장에만 걸린 근거 문서는 목록에 없다. 안의 button 을 누르면 선택된다 |
 
 ## 작업 공간: 오른쪽 상세
 
