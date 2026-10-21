@@ -1,0 +1,22 @@
+{
+  "name": "plan005-workbench-ui-tabs",
+  "description": "화면 구조를 다시 짜지 않을 머리글, 로그인, 목록, 사용자, 검토 대기, 변경 이력, 온톨로지 탭을 shadcn 부품으로 옮기고 옛 규칙을 줄인다",
+  "status": "pending",
+  "created_at": "2026-10-21",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "title": "머리글, 로그인, 목록, 사용자 탭",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "title": "검토 대기, 변경 이력, 온톨로지 탭",
+      "execution_profile": "standard"
+    }
+  ]
+}
