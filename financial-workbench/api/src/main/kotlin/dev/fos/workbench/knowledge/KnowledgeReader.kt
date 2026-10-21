@@ -81,7 +81,7 @@ class KnowledgeReader(
         ).bind(ids).to("ids").fetch().all().toList()
         val userIds = rows.flatMap { r ->
             val c = r["c"] as Map<String, Any?>
-            listOfNotNull(c["createdBy"], c["updatedBy"], c["reviewedBy"]).map { it as String }
+            listOfNotNull(c["createdBy"], c["updatedBy"], c["reviewedBy"], c["contentUpdatedBy"]).map { it as String }
         }
         val refs = users.findRefs(userIds)
         val byId = rows.associateBy { (it["c"] as Map<String, Any?>)["id"] as String }
@@ -100,6 +100,7 @@ class KnowledgeReader(
                 reviewedBy = (c["reviewedBy"] as String?)?.let { refs[it] },
                 reviewedAt = c["reviewedAt"] as String?,
                 reviewNote = c["reviewNote"] as String?,
+                contentUpdatedBy = (c["contentUpdatedBy"] as String?)?.let { refs[it] },
                 subject = (r["s"] as Map<String, Any?>?)?.let(::ref),
                 `object` = (r["o"] as Map<String, Any?>?)?.let(::ref),
                 documents = (r["docs"] as List<Map<String, Any?>>).map(::document),

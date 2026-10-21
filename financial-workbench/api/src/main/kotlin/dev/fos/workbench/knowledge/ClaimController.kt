@@ -27,10 +27,12 @@ class ClaimController(
     @GetMapping
     fun list(
         @RequestParam(required = false) reviewStatus: String?,
+        @RequestParam(required = false) scope: String?,
         @RequestParam(required = false, defaultValue = "false") includeArchived: Boolean,
         @RequestParam(required = false) page: Int?,
         @RequestParam(required = false) size: Int?,
-    ): Page<ClaimView> = queries.claims(reviewStatus, includeArchived, PageQuery.of(page, size))
+        @AuthenticationPrincipal user: WorkbenchPrincipal,
+    ): Page<ClaimView> = queries.claims(reviewStatus, scope, user.id, includeArchived, PageQuery.of(page, size))
 
     @GetMapping("/{id}")
     @Transactional(readOnly = true)

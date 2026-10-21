@@ -83,16 +83,28 @@ class NodeQueryService(
         return page.of(reader.nodes(rows), total)
     }
 
-    /** 검토 대기 목록은 reviewStatus=DRAFT 다. 오래된 것부터 돌려준다. */
+    /**
+     * 검토 대기 목록은 reviewStatus=DRAFT 다. 오래된 것부터 돌려준다.
+     * scope 는 요청한 사람 기준이다. reviewable 은 작성자도 마지막 내용 수정자도 아닌 것(자기 검토 금지와 같은 규칙),
+     * mine 은 둘 중 하나인 것이다.
+     */
     @Transactional(readOnly = true)
-    fun claims(reviewStatus: String?, includeArchived: Boolean, page: PageQuery): Page<ClaimView> {
+    fun claims(reviewStatus: String?, scope: String?, userId: String, includeArchived: Boolean, page: PageQuery): Page<ClaimView> {
         val params = params(
             "reviewStatus" to requireReviewStatus(reviewStatus),
+            "scope" to requireScope(scope),
+            "userId" to userId,
             "includeArchived" to includeArchived,
             "skip" to page.skip,
             "limit" to page.size,
         )
-        val where = "WHERE (${'$'}reviewStatus IS NULL OR c.reviewStatus = ${'$'}reviewStatus) AND (${'$'}includeArchived OR c.archived = false)"
+        val where = """
+            WHERE (${'$'}reviewStatus IS NULL OR c.reviewStatus = ${'$'}reviewStatus)
+              AND (${'$'}includeArchived OR c.archived = false)
+              AND (${'$'}scope IS NULL
+                   OR (${'$'}scope = 'reviewable' AND c.createdBy <> ${'$'}userId AND coalesce(c.contentUpdatedBy, c.createdBy) <> ${'$'}userId)
+                   OR (${'$'}scope = 'mine' AND (c.createdBy = ${'$'}userId OR c.contentUpdatedBy = ${'$'}userId)))
+        """
         val total = client.query("MATCH (c:Knowledge:Claim) $where RETURN count(c) AS total").bindAll(params)
             .fetch().one().map { (it["total"] as Number).toLong() }.orElse(0L)
         val ids = client.query("MATCH (c:Knowledge:Claim) $where RETURN c.id AS id ORDER BY c.createdAt, c.id SKIP ${'$'}skip LIMIT ${'$'}limit")
@@ -104,6 +116,14 @@ class NodeQueryService(
         if (value.isNullOrBlank()) return null
         if (ReviewStatus.entries.none { it.name == value }) {
             throw ValidationFailedException(mapOf("reviewStatus" to "DRAFT, REVIEWED, REJECTED 가운데 하나여야 합니다."))
+        }
+        return value
+    }
+
+    private fun requireScope(value: String?): String? {
+        if (value.isNullOrBlank()) return null
+        if (value != "reviewable" && value != "mine") {
+            throw ValidationFailedException(mapOf("scope" to "reviewable, mine 가운데 하나여야 합니다."))
         }
         return value
     }

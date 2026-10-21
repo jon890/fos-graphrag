@@ -67,7 +67,7 @@ class OntologyValidatorTest {
 
     @Test
     fun `온톨로지 파일이 스스로 일관되다`() {
-        assertThat(ontology.schemaVersion).isEqualTo("1.2.0")
+        assertThat(ontology.schemaVersion).isEqualTo("1.3.0")
         assertThat(ontology.nodeTypes.keys).containsExactlyInAnyOrder("Company", "Security", "Sector", "Document", "Claim")
         assertThat(ontology.requirePredicate("SUPPLIES_TO").subjectTypes).containsExactly("Company")
         assertThatThrownBy { ontology.requireRelationshipType("OWNS_ACCOUNT") }.isInstanceOf(OntologyViolationException::class.java)
