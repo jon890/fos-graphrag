@@ -121,6 +121,8 @@ export interface GraphNode {
   type: string
   label: string
   reviewStatus: ReviewStatus | null
+  /** Claim 일 때만 값이 있다 */
+  predicate?: string | null
 }
 
 export interface GraphEdge {
@@ -211,6 +213,8 @@ export interface ClaimPredicateDef {
   description: string
   subjectTypes: string[]
   objectTypes: string[]
+  /** 주장 문장 틀. {subject}, {object} 자리에 고르기 칸이 들어간다 */
+  sentence?: string | null
 }
 
 export interface Ontology {

@@ -3,6 +3,7 @@ import type { Ontology } from '../api/types'
 import { creatableTypes } from '../context'
 import {
   actionLabel,
+  claimSentenceParts,
   nodeDisplayLabel,
   predicateLabel,
   propertyLabel,
@@ -13,6 +14,7 @@ import {
   typeLabel,
   valueLabel,
   withEulReul,
+  withJosa,
 } from './labels'
 
 // 화면 코드에 없는 가짜 타입(Person)과 가짜 predicate(MENTORED)를 YAML 에만 더한 온톨로지다.
@@ -60,7 +62,9 @@ const ontology: Ontology = {
   },
   relationshipTypes: { WROTE: { label: '썼다', description: '', from: ['Person'], to: ['Principle'] }, KNOWS: { description: '', from: ['Person'], to: ['Person'] } },
   claimRelationships: { SUBJECT: { label: '주체', description: '', from: ['Claim'] } },
-  claimPredicates: { MENTORED: { label: '가르쳤다', description: '', subjectTypes: ['Person'], objectTypes: ['Person'] } },
+  claimPredicates: {
+    MENTORED: { label: '가르쳤다', description: '', subjectTypes: ['Person'], objectTypes: ['Person'], sentence: '{subject}이(가) {object}에 가르쳤다' },
+  },
   reviewStatuses: { DRAFT: { label: '초안' }, SEEN: { label: '확인함' } },
   changeActions: { CREATE: { label: '만들기' } },
 }
@@ -102,6 +106,7 @@ describe('표시 이름', () => {
 
   it('노드 이름이 enum 키이면(Claim) 선택지 표시 이름으로 바꾼다', () => {
     expect(nodeDisplayLabel(ontology, { type: 'Claim', label: 'MENTORED' })).toBe('가르쳤다')
+    expect(nodeDisplayLabel(ontology, { type: 'Claim', label: '가 → 나 가르쳤다' })).toBe('가 → 나 가르쳤다')
     expect(nodeDisplayLabel(ontology, { type: 'Company', label: '가상전자' })).toBe('가상전자')
     expect(nodeDisplayLabel(ontology, { type: 'Unknown', label: 'x' })).toBe('x')
   })
@@ -113,5 +118,36 @@ describe('withEulReul', () => {
     expect(withEulReul('근거 문서')).toBe('근거 문서를')
     expect(withEulReul('인물')).toBe('인물을')
     expect(withEulReul('ETF')).toBe('ETF을(를)')
+  })
+})
+
+describe('withJosa', () => {
+  it('끝소리에 맞춰 조사를 고르고 한글이 아니면 적힌 그대로 붙인다', () => {
+    expect(withJosa('가나전자', '이(가)')).toBe('가나전자가')
+    expect(withJosa('다라부품', '이(가)')).toBe('다라부품이')
+    expect(withJosa('삼성', '와(과)')).toBe('삼성과')
+    expect(withJosa('가나전자', '와(과)')).toBe('가나전자와')
+    expect(withJosa('ABC', '이(가)')).toBe('ABC이(가)')
+  })
+})
+
+describe('claimSentenceParts', () => {
+  it('문장 틀을 칸과 글로 나누고 이름이 있으면 조사를 고른다', () => {
+    expect(claimSentenceParts(ontology, 'MENTORED')).toEqual([
+      { kind: 'slot', slot: 'subject' },
+      { kind: 'text', text: '이(가) ' },
+      { kind: 'slot', slot: 'object' },
+      { kind: 'text', text: '에 가르쳤다' },
+    ])
+    expect(claimSentenceParts(ontology, 'MENTORED', { subject: '가나전자' })[1]).toEqual({ kind: 'text', text: '가 ' })
+  })
+
+  it('문장 틀이 없으면 주체 칸, 대상 칸, 관계 표시 이름 순서다', () => {
+    expect(claimSentenceParts(ontology, 'UNKNOWN')).toEqual([
+      { kind: 'slot', slot: 'subject' },
+      { kind: 'text', text: ' ' },
+      { kind: 'slot', slot: 'object' },
+      { kind: 'text', text: ' UNKNOWN' },
+    ])
   })
 })

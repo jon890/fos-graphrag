@@ -106,7 +106,7 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 | testid | 요소 |
 | --- | --- |
 | `claim-card` * | Claim 한 개. `data-claim-id`, `data-review-status` |
-| `claim-predicate`, `claim-subject`, `claim-object` | predicate, 주어, 목적어 |
+| `claim-predicate`, `claim-subject`, `claim-object` | 관계 종류의 표시 이름(예: 공급한다), 주어, 목적어 |
 | `claim-description-text`, `claim-evidence-text` | 설명, 근거 문장 |
 | `claim-document` *, `claim-document-title` * | 출처 문서와 제목 링크 |
 | `claim-valid-from`, `claim-valid-to` | 유효기간. 값이 없으면 「미상」 |

@@ -23,7 +23,7 @@ export function ReviewRow({ claim, onDone, onError, onOpen }: { claim: ClaimView
     setBusy(true)
     try {
       await api.claims.review(claim.id, claim.revision, status, note.trim() || null)
-      onDone(`${claim.subject?.label ?? '?'} → ${claim.object?.label ?? '?'} (${labels.node(claim)}) 주장을 ${labels.status(status)} 처리했습니다.`)
+      onDone(`「${labels.node(claim)}」 주장을 ${labels.status(status)} 처리했습니다.`)
     } catch (e) {
       onError(e)
     } finally {
@@ -35,7 +35,7 @@ export function ReviewRow({ claim, onDone, onError, onOpen }: { claim: ClaimView
     <TableRow data-testid="review-row" data-claim-id={claim.id}>
       <TableCell>
         <Button variant="link" className="h-auto p-0" onClick={() => onOpen(claim.id)}>
-          {labels.node(claim)}
+          {labels.predicate(String(claim.properties.predicate))}
         </Button>
       </TableCell>
       <TableCell>{claim.subject ? <><TypeBadge type={claim.subject.type} /> {claim.subject.label}</> : <span className="text-muted-foreground">(알 수 없음)</span>}</TableCell>

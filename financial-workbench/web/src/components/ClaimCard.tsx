@@ -31,7 +31,7 @@ export function ClaimCard({ claim, onOpenNode, showOpen }: Props) {
   return (
     <div className="claim-card" data-testid="claim-card" data-claim-id={claim.id} data-review-status={claim.reviewStatus}>
       <div className="claim-head">
-        <strong data-testid="claim-predicate">{labels.node(claim)}</strong>
+        <strong data-testid="claim-predicate">{labels.predicate(String(p.predicate))}</strong>
         <StatusBadge status={claim.reviewStatus} />
         {claim.archived && <span className="archived-badge">보관됨</span>}
         {showOpen && onOpenNode && (

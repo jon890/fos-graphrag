@@ -280,7 +280,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await row.getByTestId('review-row-note').fill(data.reviewNote)
     await row.getByTestId('review-row-approve').click()
 
-    await expect(pageB.getByTestId('review-message')).toBeVisible()
+    await expect(pageB.getByTestId('review-message')).toContainText(`${data.supplier} → ${data.customer} 공급한다`)
     await expect(row).toHaveCount(0)
     await shot(pageB, '03-reviewed-by-b')
   })
@@ -290,6 +290,9 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
 
     const claimNode = pageA.locator('[data-testid="graph-node"][data-node-type="Claim"][data-review-status="REVIEWED"]')
     await expect(claimNode.first()).toBeAttached()
+    // 고객사는 1홉에서도 주장의 대상으로 함께 온다
+    await expect(pageA.locator('[data-testid="graph-node"][data-node-type="Company"]').filter({ hasText: data.customer })).toHaveCount(1)
+    await expect(claimNode.filter({ hasText: `${data.supplier} → ${data.customer} 공급한다` })).toHaveCount(1)
 
     const card = pageA.getByTestId('node-claims-section').getByTestId('claim-card').filter({ hasText: data.evidence })
     await expect(card).toHaveAttribute('data-review-status', 'REVIEWED')
@@ -299,14 +302,14 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(card.getByTestId('claim-review-note')).toContainText(data.reviewNote)
     await shot(pageA, '04-graph-and-evidence')
 
-    // 고객사와 문서는 Claim 너머(2홉)에 있다. Claim 을 골라 이웃 확장하면 그래프에 합쳐진다.
+    // 고객사는 1홉에서도 주장의 대상으로 함께 온다. 문서는 주장 너머(2홉)에 있다. Claim 을 골라 이웃 확장하면 그래프에 합쳐진다.
     const claimId = await card.getAttribute('data-claim-id')
     await pageA.locator(`[data-testid="graph-node"][data-node-id="${claimId}"] button`).click()
     await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-id', claimId!)
     await pageA.getByTestId('graph-expand').click()
-    await expect(pageA.locator('[data-testid="graph-node"]').filter({ hasText: data.customer })).toHaveCount(1)
-    await expect(pageA.locator('[data-testid="graph-node"]').filter({ hasText: data.docTitle })).toHaveCount(1)
-    await expect(pageA.locator('[data-testid="graph-node"]').filter({ hasText: data.supplier })).toHaveCount(1)
+    await expect(pageA.locator('[data-testid="graph-node"][data-node-type="Company"]').filter({ hasText: data.customer })).toHaveCount(1)
+    await expect(pageA.locator('[data-testid="graph-node"][data-node-type="Document"]').filter({ hasText: data.docTitle })).toHaveCount(1)
+    await expect(pageA.locator('[data-testid="graph-node"][data-node-type="Company"]').filter({ hasText: data.supplier })).toHaveCount(1)
     await shot(pageA, '04-expanded')
   })
 
