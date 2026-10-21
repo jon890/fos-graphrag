@@ -1,6 +1,6 @@
 # data-testid 목록
 
-e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec.ts` 도 함께 고친다.
+e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec.ts` 와 `e2e/mobile.spec.ts` 도 함께 고친다.
 `*` 표시는 같은 화면에 여러 개 나오는 요소다. `filter({ hasText })` 나 `data-*` 속성으로 좁힌다.
 
 ## 로그인과 상단
@@ -18,6 +18,16 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `current-user-role` | 역할 배지. `data-role` 이 VIEWER, EDITOR, ADMIN |
 | `logout-button` | 로그아웃 |
 | `ontology-error` | 온톨로지를 받지 못했을 때 |
+
+## 작업 공간: 좁은 화면
+
+폭 1024px 미만에서만 나온다. 세 칸을 모두 그려 두고 고르지 않은 탭만 숨긴다.
+
+| testid | 요소 |
+| --- | --- |
+| `workspace-tab-search`, `workspace-tab-graph`, `workspace-tab-detail` | 검색, 그래프, 상세 탭. `aria-selected` 로 고른 탭을 본다 |
+| `graph-selection-bar` | 그래프 탭 아래의 선택 막대. 고른 노드가 그래프에 있을 때만 나온다 |
+| `graph-selection-open` | 막대의 「<이름> 상세 보기」 단추. 누르면 상세 탭으로 간다 |
 
 ## 작업 공간: 왼쪽
 
@@ -50,7 +60,7 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `graph-truncated` | 「결과가 잘렸습니다(최대 노드 N, 관계 M)」 |
 | `graph-empty` | 선택한 노드가 없음 |
 | `graph-no-neighbors` | 이웃이 없음 |
-| `graph-canvas` | Cytoscape 컨테이너 |
+| `graph-canvas` | Cytoscape 컨테이너. `data-layout-pending` 이 `"true"` 면 숨겨진 동안 생긴 요소의 배치를 미뤄 둔 상태이고, 다시 보여 배치를 돌리면 `"false"` 다 |
 | `graph-legend` | 타입별 색 범례 |
 | `graph-node-list` | 그래프에 올라간 노드 목록(캔버스 대신 검증용으로 쓴다) |
 | `graph-node` * | 목록 한 줄. `data-node-id`, `data-node-type`, `data-review-status`. 안의 button 을 누르면 선택된다 |

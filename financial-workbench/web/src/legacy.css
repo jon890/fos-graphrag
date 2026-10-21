@@ -1,0 +1,273 @@
+:root {
+  --bg: #f4f6f9;
+  --panel: #ffffff;
+  --border: #d9dee7;
+  --text: #1f2937;
+  --legacy-muted: #6b7280;
+  --primary: #1d4ed8;
+  --primary-text: #ffffff;
+  --danger: #b91c1c;
+  --success-bg: #ecfdf5;
+  --success-border: #6ee7b7;
+  --warn-bg: #fffbeb;
+  --warn-border: #fcd34d;
+  --error-bg: #fef2f2;
+  --error-border: #fca5a5;
+  --info-bg: #eff6ff;
+  --info-border: #93c5fd;
+  font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); font-size: 14px; }
+h1, h2, h3, h4 { margin: 0 0 8px; }
+h2 { font-size: 18px; }
+h3 { font-size: 15px; }
+h4 { font-size: 14px; }
+input, select, textarea, button { font: inherit; }
+/* shadcn 부품(data-slot)은 자기 class 로 꾸민다. :where 로 감싸 옛 선택자의 우선순위를 그대로 둔다 */
+:where(input, select, textarea):where(:not([data-slot])) {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 8px;
+  background: #fff;
+  min-width: 0;
+}
+textarea { width: 100%; resize: vertical; }
+:where(input, select, textarea):where(:not([data-slot]))[aria-invalid='true'] { border-color: var(--danger); }
+button:where(:not([data-slot])) {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 4px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+button:where(:not([data-slot])):disabled { opacity: 0.5; cursor: not-allowed; }
+button:where(:not([data-slot])).primary { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
+button:where(:not([data-slot])).danger { color: var(--danger); border-color: var(--error-border); }
+button:where(:not([data-slot])).link-button { border: none; background: none; padding: 0 2px; color: var(--primary); text-align: left; }
+button:where(:not([data-slot])).link-button:disabled { color: var(--text); opacity: 1; cursor: default; }
+
+.muted { color: var(--legacy-muted); }
+.small { font-size: 12px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.hint { color: var(--legacy-muted); font-size: 12px; margin-top: 2px; }
+.required { color: var(--danger); }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row > input:not([type='checkbox']) { flex: 1; }
+.center-message { padding: 48px; text-align: center; color: var(--legacy-muted); }
+
+.error-box, .warn-box, .info-box, .notice {
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin: 8px 0;
+  border: 1px solid;
+}
+.error-box, .notice-error { background: var(--error-bg); border-color: var(--error-border); color: #7f1d1d; }
+.warn-box, .notice-conflict { background: var(--warn-bg); border-color: var(--warn-border); color: #78350f; }
+.info-box { background: var(--info-bg); border-color: var(--info-border); }
+.notice-success { background: var(--success-bg); border-color: var(--success-border); color: #064e3b; }
+
+/* 로그인 */
+.login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.login-card {
+  width: 360px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.login-card h1 { font-size: 18px; }
+.login-card label { display: flex; flex-direction: column; gap: 4px; }
+
+/* 상단 */
+.app { display: flex; flex-direction: column; height: 100vh; }
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 16px;
+  height: 48px;
+  background: #0f172a;
+  color: #e2e8f0;
+  flex-shrink: 0;
+}
+.app-title { font-weight: 700; }
+.tabs { display: flex; gap: 4px; flex: 1; }
+.tab { background: transparent; border: none; color: #cbd5e1; padding: 14px 12px; border-radius: 0; }
+.tab.active { color: #fff; border-bottom: 3px solid #60a5fa; }
+.user-box { display: flex; align-items: center; gap: 4px; }
+.user-box .muted { color: #94a3b8; }
+.user-box .link-button { color: #93c5fd; margin-left: 8px; }
+.app-main { flex: 1; min-height: 0; overflow: auto; }
+
+/* 작업 공간 */
+.workspace { display: grid; grid-template-columns: 260px minmax(0, 1fr) 380px; height: 100%; }
+.pane { min-height: 0; overflow: auto; padding: 12px; background: var(--panel); }
+.pane-left { border-right: 1px solid var(--border); }
+.pane-right { border-left: 1px solid var(--border); }
+.pane-center { background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
+
+.filters { border: 1px solid var(--border); border-radius: 4px; margin: 8px 0; padding: 6px 10px; display: flex; flex-direction: column; gap: 4px; }
+.check { display: flex; align-items: center; gap: 6px; }
+.field-inline { display: inline-flex; align-items: center; gap: 6px; }
+.search-results ul { list-style: none; padding: 0; margin: 0; }
+.result-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-bottom: 1px solid #eef0f4;
+  border-radius: 0;
+  text-align: left;
+  padding: 6px 4px;
+}
+.result-item.selected { background: #e0ecff; }
+.result-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.create-box { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+.type-badge {
+  display: inline-block;
+  color: #fff;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.status-badge { font-size: 11px; padding: 1px 6px; border-radius: 3px; border: 1px solid; white-space: nowrap; }
+.status-draft { color: #374151; border-color: #9ca3af; background: #f3f4f6; }
+.status-reviewed { color: #065f46; border-color: #34d399; background: #ecfdf5; }
+.status-rejected { color: #991b1b; border-color: #f87171; background: #fef2f2; }
+.archived-badge { font-size: 11px; color: #92400e; background: #fef3c7; padding: 1px 6px; border-radius: 3px; margin-left: 4px; }
+
+/* 그래프 */
+.graph-panel { display: flex; flex-direction: column; height: 100%; padding: 8px 12px; gap: 6px; }
+.graph-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.graph-canvas-wrap { position: relative; flex: 1; min-height: 360px; background: #fff; border: 1px solid var(--border); border-radius: 6px; }
+.graph-canvas { position: absolute; inset: 0; }
+.graph-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--legacy-muted);
+  pointer-events: none;
+  padding: 24px;
+  text-align: center;
+}
+.graph-overlay.subtle { align-items: flex-end; padding-bottom: 16px; }
+.welcome { max-width: 460px; text-align: left; color: var(--text, #1f2937); }
+.welcome h2 { margin: 0 0 8px; font-size: 18px; }
+.welcome ol { padding-left: 20px; margin: 8px 0; display: grid; gap: 6px; }
+.meta-details { margin: 4px 0 8px; font-size: 12px; }
+.meta-details summary { cursor: pointer; color: var(--legacy-muted); }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; }
+.legend-item { display: inline-flex; align-items: center; gap: 4px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.graph-node-list { font-size: 12px; max-height: 160px; overflow: auto; }
+.graph-node-list ul { margin: 4px 0; padding-left: 18px; }
+
+/* 상세 */
+.detail-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.detail-head h2 { margin: 0; word-break: break-all; }
+.detail-section { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px; }
+.actions { margin: 6px 0; }
+.reason-input { flex: 1; }
+.kv { display: grid; grid-template-columns: 80px 1fr; gap: 4px 8px; margin: 6px 0; }
+.kv dt { color: var(--legacy-muted); }
+.kv dd { margin: 0; word-break: break-word; }
+.meta { font-size: 12px; }
+.field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+.field > label { font-weight: 600; font-size: 13px; }
+.field-error { color: var(--danger); font-size: 12px; }
+.prop-fields { margin-bottom: 8px; }
+.sub-form { border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin: 8px 0; background: #fafbfc; }
+.nested-box { border-left: 3px solid #fcd34d; padding-left: 8px; margin-top: 6px; }
+.picker-results { list-style: none; padding: 0; margin: 4px 0; max-height: 180px; overflow: auto; border: 1px solid var(--border); border-radius: 4px; }
+.picker-results li { padding: 4px 6px; border-bottom: 1px solid #eef0f4; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: #eef2ff; border-radius: 12px; padding: 2px 8px; margin: 2px 0; }
+.chip-list { list-style: none; padding: 0; margin: 0 0 4px; display: flex; flex-direction: column; align-items: flex-start; }
+.rel-list { list-style: none; padding: 0; margin: 0 0 8px; }
+.rel-list li { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 3px 0; }
+.rel-list li.archived { opacity: 0.6; }
+.rel-type { color: var(--legacy-muted); font-size: 12px; }
+
+.claim-card { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: #fff; }
+.claim-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.claim-triple { display: flex; align-items: center; gap: 4px; margin: 4px 0; flex-wrap: wrap; }
+.arrow { color: var(--legacy-muted); }
+blockquote { margin: 0; padding: 4px 8px; border-left: 3px solid #cbd5e1; background: #f8fafc; white-space: pre-wrap; }
+.doc-list { list-style: none; padding: 0; margin: 0; }
+.doc-list li { margin-bottom: 4px; }
+
+/* 표 탭 */
+.tab-page { padding: 16px 24px; background: var(--panel); min-height: 100%; }
+.toolbar { margin-bottom: 12px; }
+.toolbar h2 { margin: 0 8px 0 0; }
+.data-table { width: 100%; border-collapse: collapse; background: #fff; }
+.data-table th, .data-table td { border-bottom: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; }
+.data-table th { background: #f8fafc; font-weight: 600; font-size: 13px; }
+.data-table.compact td, .data-table.compact th { padding: 4px 6px; font-size: 13px; }
+.data-table tr.clickable { cursor: pointer; }
+.data-table tr.clickable:hover { background: #f1f5ff; }
+.review-actions { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; min-width: 280px; }
+.review-actions input { width: 120px; }
+.pager { display: flex; gap: 12px; align-items: center; justify-content: center; margin: 12px 0; }
+.change-list { margin: 0; padding-left: 16px; font-size: 12px; }
+.action-badge { font-size: 11px; padding: 1px 6px; border-radius: 3px; background: #e5e7eb; }
+.action-create { background: #dbeafe; }
+.action-update { background: #e0e7ff; }
+.action-review { background: #d1fae5; }
+.action-archive { background: #fef3c7; }
+.action-restore { background: #fce7f3; }
+.ontology-type { margin-bottom: 16px; }
+.ontology h3 { margin-top: 16px; }
+
+/* 1024px 미만: 작업 공간은 탭으로 나뉜다(Workspace). 머리글과 표 탭이 화면 폭을 넘지 않게 한다 */
+@media (max-width: 1023px) {
+  /* 390px 에서는 제목, 탭, 사용자 상자가 한 줄에 들어가지 않는다. 탭을 둘째 줄 전체 폭에 둔다 */
+  .app-header { gap: 8px; padding: 0 8px; flex-wrap: wrap; height: auto; }
+  .app-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1 1 0;
+    padding: 8px 0;
+  }
+  .tabs { overflow-x: auto; flex-wrap: nowrap; min-width: 0; order: 3; flex-basis: 100%; }
+  .tab { flex-shrink: 0; padding: 10px 10px; }
+  .user-box { flex-shrink: 0; }
+  .user-box [data-testid="current-user-email"] { display: none; }
+  .tab-page { padding-left: 12px; padding-right: 12px; }
+  .tab-page table { display: block; overflow-x: auto; }
+  /* 칸을 글자 하나 폭으로 꺾지 않고 표를 가로로 밀어 보게 한다 */
+  .tab-page th, .tab-page td { white-space: nowrap; }
+}
+
+/* 역할 */
+.role-badge { font-size: 11px; padding: 1px 6px; border-radius: 3px; margin-left: 6px; background: #334155; color: #e2e8f0; }
+.role-admin { background: #7c2d12; color: #ffedd5; }
+.role-editor { background: #1e3a8a; color: #dbeafe; }
+.role-viewer { background: #374151; color: #e5e7eb; }
+.data-table tr.disabled-row td { color: var(--legacy-muted); background: #f9fafb; }
+
+/* Tailwind 기본 초기화가 지운 브라우저 기본값을 옛 화면에 되살린다 */
+h1, h2, h3, h4 { font-weight: 700; }
+p { margin: 1em 0; }
+.welcome ol { list-style: decimal; }
+.graph-node-list ul, .change-list { list-style: disc; }
+body { line-height: normal; }
+a { color: revert; text-decoration: revert; }
+input[type='checkbox'], input[type='radio'] { margin: revert; }
+legend { padding: revert; }
+::placeholder { color: revert; opacity: revert; }
+button:where(:not([data-slot])), :where(input, select, textarea):where(:not([data-slot])) { color: revert; }

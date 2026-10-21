@@ -15,7 +15,8 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "allowImportingTsExtensions": false
+    "allowImportingTsExtensions": false,
+    "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src"]
 }

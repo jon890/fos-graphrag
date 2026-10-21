@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import cytoscape, { type Core, type ElementDefinition } from 'cytoscape'
 import { useApp, useLabels } from '../context'
 import { colorForType, type GraphData } from '../lib/graph'
@@ -17,6 +17,8 @@ interface Props {
   onSelect: (id: string) => void
   onExpand: (id: string) => void
   onRecenter: (id: string) => void
+  /** 탭 배치에서 그래프 탭이 숨겨져 있으면 false. 숨겨진 컨테이너는 크기가 0 이라 배치를 미룬다 */
+  visible?: boolean
 }
 
 const STYLE: cytoscape.StylesheetJson = [
@@ -76,8 +78,22 @@ function toElements(data: GraphData, ontology: Ontology): ElementDefinition[] {
   ]
 }
 
+/** 노드가 적으면 fit 이 지나치게 확대한다. 글자가 읽기 좋은 배율에서 멈춘다 */
+function limitZoom(cy: Core): void {
+  if (cy.zoom() > 1.2) {
+    cy.zoom(1.2)
+    cy.center()
+  }
+}
+
+function runLayout(cy: Core): void {
+  const layout = cy.layout({ name: 'cose', animate: false, fit: true, padding: 40, nodeRepulsion: () => 8000, idealEdgeLength: () => 90 })
+  layout.one('layoutstop', () => limitZoom(cy))
+  layout.run()
+}
+
 export function GraphPanel(props: Props) {
-  const { data, centerId, selectedId, loading, error, hops, onHopsChange } = props
+  const { data, centerId, selectedId, loading, error, hops, onHopsChange, visible = true } = props
   const { ontology } = useApp()
   const labels = useLabels()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -85,6 +101,12 @@ export function GraphPanel(props: Props) {
   // Cytoscape 이벤트는 한 번만 등록하고, 최신 콜백은 ref 로 읽는다.
   const handlers = useRef(props)
   handlers.current = props
+  // 숨겨진 동안 새 요소가 생겼으면 다시 보일 때 배치를 돌린다.
+  // effect 안에서는 ref 를 읽고, 브라우저 테스트가 보는 data-layout-pending 은 state 로 그린다.
+  const pendingLayout = useRef(false)
+  const [layoutPending, setLayoutPending] = useState(false)
+  const visibleRef = useRef(visible)
+  visibleRef.current = visible
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -119,17 +141,28 @@ export function GraphPanel(props: Props) {
       }
     })
     if (added && cy.nodes().length > 0) {
-      const layout = cy.layout({ name: 'cose', animate: false, fit: true, padding: 40, nodeRepulsion: () => 8000, idealEdgeLength: () => 90 })
-      // 노드가 적으면 fit 이 지나치게 확대한다. 글자가 읽기 좋은 배율에서 멈춘다.
-      layout.one('layoutstop', () => {
-        if (cy.zoom() > 1.2) {
-          cy.zoom(1.2)
-          cy.center()
-        }
-      })
-      layout.run()
+      if (visibleRef.current) runLayout(cy)
+      else {
+        pendingLayout.current = true
+        setLayoutPending(true)
+      }
     }
   }, [data, ontology])
+
+  // 다시 보이면 크기를 새로 재고, 미뤄 둔 배치를 돌리거나 지금 크기에 맞춘다.
+  useEffect(() => {
+    const cy = cyRef.current
+    if (!cy || !visible) return
+    cy.resize()
+    if (pendingLayout.current) {
+      pendingLayout.current = false
+      setLayoutPending(false)
+      if (cy.nodes().length > 0) runLayout(cy)
+    } else if (cy.nodes().length > 0) {
+      cy.fit(undefined, 40)
+      limitZoom(cy)
+    }
+  }, [visible])
 
   useEffect(() => {
     const cy = cyRef.current
@@ -187,7 +220,7 @@ export function GraphPanel(props: Props) {
       )}
 
       <div className="graph-canvas-wrap">
-        <div ref={containerRef} className="graph-canvas" data-testid="graph-canvas" />
+        <div ref={containerRef} className="graph-canvas" data-testid="graph-canvas" data-layout-pending={String(layoutPending)} />
         {empty === 'none' && (
           <div className="graph-overlay" data-testid="graph-empty">
             <WelcomeGuide />
