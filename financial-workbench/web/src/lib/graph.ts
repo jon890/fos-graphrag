@@ -1,4 +1,4 @@
-import type { GraphEdge, GraphLimits, GraphNode, GraphView } from '../api/types'
+import type { GraphEdge, GraphLimits, GraphNode, GraphView, ReviewStatus } from '../api/types'
 
 /** 화면이 들고 있는 합쳐진 그래프. 여러 번의 neighborhood 응답을 누적한다. */
 export interface GraphData {
@@ -56,4 +56,71 @@ export function colorForType(type: string): string {
   let hash = 0
   for (const ch of type) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
   return FALLBACK_COLORS[hash % FALLBACK_COLORS.length]
+}
+
+/** 접힌 주장 하나. 주체에서 대상으로 가는 선 하나로 그린다 */
+export interface ClaimEdge {
+  /** 주장 id */
+  claimId: string
+  source: string
+  target: string
+  predicate: string | null
+  reviewStatus: ReviewStatus | null
+}
+
+/** 화면에 그릴 그래프 */
+export interface GraphDisplay {
+  /** 그릴 노드. 접힌 주장과 접힌 주장에만 걸린 근거 문서는 빠진다 */
+  nodes: GraphNode[]
+  /** 그릴 관계. 접힌 주장에 닿은 관계는 빠진다 */
+  edges: GraphEdge[]
+  claimEdges: ClaimEdge[]
+  /** 「그래프에 나온 항목」 목록. nodes 에 접힌 주장을 더한 것이고, 순서는 data.nodes 순서다 */
+  listed: GraphNode[]
+}
+
+/** 주장을 선으로 접는다. 주체와 대상이 모두 그래프에 있는 주장만 접고, 중심 노드는 접거나 숨기지 않는다 */
+export function collapseClaims(data: GraphData, centerId: string | null): GraphDisplay {
+  const subjects = new Map<string, string>()
+  const objects = new Map<string, string>()
+  for (const e of data.edges) {
+    if (e.type === 'SUBJECT') subjects.set(e.source, e.target)
+    else if (e.type === 'OBJECT') objects.set(e.source, e.target)
+  }
+
+  const collapsed = new Map<string, ClaimEdge>()
+  for (const n of data.nodes) {
+    if (n.type !== 'Claim' || n.id === centerId) continue
+    const source = subjects.get(n.id)
+    const target = objects.get(n.id)
+    if (source === undefined || target === undefined) continue
+    collapsed.set(n.id, { claimId: n.id, source, target, predicate: n.predicate ?? null, reviewStatus: n.reviewStatus ?? null })
+  }
+
+  const touching = new Map<string, GraphEdge[]>()
+  for (const e of data.edges) {
+    for (const id of [e.source, e.target]) {
+      const list = touching.get(id)
+      if (list) list.push(e)
+      else touching.set(id, [e])
+    }
+  }
+  const hidden = (n: GraphNode): boolean => {
+    if (n.id === centerId) return false
+    const list = touching.get(n.id)
+    return !!list && list.length > 0 && list.every((e) => e.type === 'SUPPORTED_BY' && collapsed.has(e.source))
+  }
+
+  const nodes = data.nodes.filter((n) => !collapsed.has(n.id) && !hidden(n))
+  return {
+    nodes,
+    edges: data.edges.filter((e) => !collapsed.has(e.source) && !collapsed.has(e.target)),
+    claimEdges: [...collapsed.values()],
+    listed: data.nodes.filter((n) => collapsed.has(n.id) || !hidden(n)),
+  }
+}
+
+/** 접지 않은 보기. 「주장을 따로 보기」 를 켰을 때 쓴다 */
+export function expandedDisplay(data: GraphData): GraphDisplay {
+  return { nodes: data.nodes, edges: data.edges, claimEdges: [], listed: data.nodes }
 }

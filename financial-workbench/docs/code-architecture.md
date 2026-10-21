@@ -143,7 +143,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | --- | --- |
 | `web/src/api/` | fetch 래퍼, CSRF 처리, 계약 타입 |
 | `web/src/components/` | 화면 조각. 그래프, 상세 패널, 표, 폼. `ErrorBoundary` 가 탭 단위로 렌더링 오류를 붙잡아 머리글과 탭을 지키고, 앱 최상위(`main.tsx`)에도 하나 있다 |
-| `web/src/lib/` | 그래프 병합, 입력값 변환, 표시 이름 조회(`labels.ts`)처럼 화면과 무관한 함수와 단위 테스트. `utils.ts` 의 `cn` 은 Tailwind class 를 합친다. shadcn 부품도 이것을 import 한다. registry 가 내려주는 `import { cn } from "cn"` 은 `@/lib/utils` 로 바꾸고 `cn` 패키지는 들이지 않는다 |
+| `web/src/lib/` | 그래프 병합과 주장 접기(`graph.ts` 의 `collapseClaims`), 입력값 변환, 표시 이름 조회와 문장 틀 채우기(`labels.ts`)처럼 화면과 무관한 함수와 단위 테스트. `utils.ts` 의 `cn` 은 Tailwind class 를 합친다. shadcn 부품도 이것을 import 한다. registry 가 내려주는 `import { cn } from "cn"` 은 `@/lib/utils` 로 바꾸고 `cn` 패키지는 들이지 않는다 |
 | `web/src/components/ui/` | shadcn 으로 복사한 화면 부품(Button, Input, Textarea, NativeSelect, Tabs, Card, Badge, Table, Alert, Label). 저장소가 소스를 소유한다. 고칠 때는 이 폴더를 직접 고친다 |
 | `web/components.json` | shadcn CLI 설정. 부품을 더할 때 CLI 가 읽는다 |
 | `web/src/hooks/` | 화면 상태 훅. `useMediaQuery` 가 배치 경계를 판정한다 |
@@ -195,6 +195,8 @@ ADR 로 남기지 않은 작은 결정은 다음과 같다.
 - 백업은 `neo4j-admin database dump --to-stdout` 으로 받아 호스트 파일(600)에 쓴다. 호스트 디렉터리를 컨테이너에 마운트하지 않아 권한을 넓힐 필요가 없다.
 - 화면 부품은 shadcn(Radix, Tailwind)으로 만든다(2026-10-21 사용자 결정). Mantine 같은 부품 라이브러리는 라이브러리 버전에 화면이 묶이고, 직접 쓴 CSS 만으로는 접근성과 반응형을 화면마다 다시 짜야 해서 버렸다.
 - CSP 의 `style-src` 에 `'unsafe-inline'` 을 더하거나 요청마다 nonce 를 붙이는 안은 버렸다(2026-10-21 사용자 결정). 앞의 것은 CSS 주입을 막는 겹을 하나 빼고, 뒤의 것은 정적 파일을 요청마다 고쳐 내보내는 서버 필터가 생긴다. 얻는 것은 창 뒤의 스크롤 잠금뿐이다.
+- Claim 의 이름은 저장하지 않고 읽을 때 「주체 → 대상 관계」 로 만든다(2026-10-21 사용자 결정). `KnowledgeReader` 가 노드 묶음을 바꿀 때 Claim id 들의 주체와 대상 이름을 쿼리 한 번으로 함께 읽고, 그래프 조회도 같은 함수를 쓴다. 만들 때 이름을 저장하는 안은 조회가 가볍지만 기업 이름을 고치면 주장 이름이 낡고 기존 주장도 채워야 해서 버렸다.
+- 주장을 선으로 접는 일은 화면이 한다(2026-10-21 사용자 결정). 서버는 그래프 응답에 주장의 주체와 대상, `predicate` 만 더하고, 노드와 관계의 모양은 바꾸지 않는다. 접기와 펼치기가 화면의 보기 선택이라 서버 계약을 둘로 나눌 이유가 없다.
 - 반응형 경계는 1024px 하나다. 768px 에 두 칸 배치를 더하는 안은 검사할 배치가 늘어나는 데 비해 두 사람이 쓰는 도구에서 얻는 것이 작아 버렸다.
 
 - 작성자와 마지막으로 내용을 고친 사람은 그 Claim 을 검토할 수 없다. 다른 사람이 확인하는 것이 검토의 목적이다.

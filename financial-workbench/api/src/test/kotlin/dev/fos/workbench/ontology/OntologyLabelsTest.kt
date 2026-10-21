@@ -52,6 +52,16 @@ class OntologyLabelsTest {
     }
 
     @Test
+    fun `모든 predicate 에 주체와 대상 자리가 한 번씩 있는 문장 틀이 있다`() {
+        val invalid = ontology.claimPredicates.filterValues { def ->
+            val sentence = def.sentence.orEmpty()
+            sentence.split("{subject}").size != 2 || sentence.split("{object}").size != 2
+        }.keys
+        assertThat(invalid).describedAs("문장 틀이 없거나 자리가 어긋난 predicate").isEmpty()
+        assertThat(ontology.claimPredicates.getValue("SUPPLIES_TO").sentence).isEqualTo("{subject}이(가) {object}에 공급한다")
+    }
+
+    @Test
     fun `Sector scheme 설명이 쉼표에서 잘리지 않는다`() {
         val scheme = ontology.nodeTypes.getValue("Sector").properties.getValue("scheme")
         assertThat(scheme.description).isEqualTo("산업을 나눈 기준의 이름. 예: GICS, KSIC")

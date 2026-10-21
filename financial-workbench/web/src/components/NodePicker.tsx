@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react'
+import { useEffect, useState, type KeyboardEvent } from 'react'
 import { api, errorMessage } from '../api/client'
 import type { NodeView } from '../api/types'
 import { useLabels } from '../context'
@@ -12,15 +12,34 @@ interface Props {
   testIdPrefix: string
   placeholder?: string
   excludeIds?: string[]
+  /** 고를 후보가 하나도 없을 때 입력 위에 보이는 안내 */
+  emptyHint?: string
 }
 
 /** 이름이나 종목 코드로 노드를 찾아 하나 고른다. */
-export function NodePicker({ types, onPick, testIdPrefix, placeholder, excludeIds = [] }: Props) {
+export function NodePicker({ types, onPick, testIdPrefix, placeholder, excludeIds = [], emptyHint }: Props) {
   const labels = useLabels()
   const [q, setQ] = useState('')
   const [results, setResults] = useState<NodeView[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [noCandidates, setNoCandidates] = useState(false)
+
+  const typesKey = types.join(',')
+  const excludeKey = excludeIds.join(',')
+  useEffect(() => {
+    if (!emptyHint) return
+    let live = true
+    api.nodes
+      .search({ q: '', types, size: excludeIds.length + 1 })
+      .then((page) => live && setNoCandidates(page.items.every((n) => excludeIds.includes(n.id))))
+      .catch(() => live && setNoCandidates(false))
+    return () => {
+      live = false
+    }
+    // types, excludeIds 는 배열이라 키 문자열로 비교한다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emptyHint, typesKey, excludeKey])
 
   const search = async () => {
     setBusy(true)
@@ -44,6 +63,11 @@ export function NodePicker({ types, onPick, testIdPrefix, placeholder, excludeId
 
   return (
     <div className="picker">
+      {noCandidates && (
+        <div className="muted small" data-testid={`${testIdPrefix}-none`}>
+          {emptyHint}
+        </div>
+      )}
       <div className="row">
         <input
           data-testid={`${testIdPrefix}-input`}

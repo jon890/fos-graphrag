@@ -63,7 +63,7 @@ export const testOntology: Ontology = {
   },
   relationshipTypes: { ISSUES: { label: '발행한다', description: '', from: ['Company'], to: ['Security'] } },
   claimRelationships: { SUBJECT: { label: '주체', description: '' }, OBJECT: { label: '대상', description: '' } },
-  claimPredicates: { SUPPLIES_TO: { label: '공급한다', description: '', subjectTypes: ['Company'], objectTypes: ['Company'] } },
+  claimPredicates: { SUPPLIES_TO: { label: '공급한다', description: '', sentence: '{subject}이(가) {object}에 공급한다', subjectTypes: ['Company'], objectTypes: ['Company'] } },
   reviewStatuses: { DRAFT: { label: '초안' }, REVIEWED: { label: '검토 완료' }, REJECTED: { label: '반려' } },
   changeActions: { CREATE: { label: '만들기' }, ARCHIVE: { label: '보관' } },
 }

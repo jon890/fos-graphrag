@@ -109,21 +109,25 @@ claimRelationships:
 claimPredicates:
   SUPPLIES_TO:
     label: 공급한다
+    sentence: "{subject}이(가) {object}에 공급한다"
     description: 주체 기업이 대상 기업에 제품이나 서비스를 공급한다.
     subjectTypes: [Company]
     objectTypes: [Company]
   BELONGS_TO_SECTOR:
     label: 속한다
+    sentence: "{subject}이(가) {object}에 속한다"
     description: 주체가 대상 산업에 속한다.
     subjectTypes: [Company, Security]
     objectTypes: [Sector]
   COMPETES_WITH:
     label: 경쟁한다
+    sentence: "{subject}이(가) {object}와(과) 경쟁한다"
     description: 주체 기업과 대상 기업이 같은 시장에서 경쟁한다.
     subjectTypes: [Company]
     objectTypes: [Company]
   HAS_EXPOSURE_TO:
     label: 영향을 받는다
+    sentence: "{subject}의 실적이 {object}의 변화에 영향을 받는다"
     description: 주체의 실적이 대상의 변화에 영향을 받는다.
     subjectTypes: [Company, Security]
     objectTypes: [Company, Security, Sector]

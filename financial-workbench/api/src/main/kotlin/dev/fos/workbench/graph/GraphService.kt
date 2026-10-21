@@ -2,6 +2,7 @@ package dev.fos.workbench.graph
 
 import dev.fos.workbench.config.WorkbenchProperties
 import dev.fos.workbench.config.params
+import dev.fos.workbench.knowledge.ClaimService
 import dev.fos.workbench.knowledge.KnowledgeReader
 import dev.fos.workbench.knowledge.ReviewStatus
 import dev.fos.workbench.ontology.Ontology
@@ -12,7 +13,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
 
-data class GraphNode(val id: String, val type: String, val label: String, val reviewStatus: String?)
+data class GraphNode(val id: String, val type: String, val label: String, val reviewStatus: String?, val predicate: String? = null)
 
 data class GraphEdge(val id: String, val type: String, val source: String, val target: String)
 
@@ -77,8 +78,36 @@ class GraphService(
         ).bindAll(params("id" to id, "types" to types, "reviewStatus" to reviewStatus, "limit" to neighborLimit + 1L))
             .fetch().all().map { it["m"] as Map<String, Any?> }
         val nodeTruncated = neighbors.size > neighborLimit
-        val nodes = listOf(center) + neighbors.take(neighborLimit)
+        val neighborNodes = listOf(center) + neighbors.take(neighborLimit)
+        // 모은 주장의 주체와 대상은 홉 수와 상관없이 함께 돌려준다. 이웃 쿼리의 경로 필터는 건드리지 않는다
+        val claimIds = neighborNodes.filter { it["type"] == ClaimService.CLAIM }.map { it["id"] as String }
+        var endpointTruncated = false
+        var endpoints = emptyList<Map<String, Any?>>()
+        if (claimIds.isNotEmpty()) {
+            val room = limits.maxNodes - neighborNodes.size
+            val found = client.query(
+                """
+                MATCH (c:Knowledge:Claim)-[r:SUBJECT|OBJECT]->(m:Knowledge)
+                WHERE c.id IN ${'$'}claimIds AND NOT m.id IN ${'$'}ids
+                  AND r.archived = false AND m.archived = false
+                  AND (${'$'}types IS NULL OR m.type IN ${'$'}types)
+                WITH DISTINCT m
+                ORDER BY m.id
+                LIMIT ${'$'}limit
+                RETURN properties(m) AS m
+                """,
+            ).bindAll(
+                params(
+                    "claimIds" to claimIds, "ids" to neighborNodes.map { it["id"] as String },
+                    "types" to types, "limit" to room + 1L,
+                ),
+            ).fetch().all().map { it["m"] as Map<String, Any?> }
+            endpointTruncated = found.size > room
+            endpoints = found.take(room)
+        }
+        val nodes = neighborNodes + endpoints
         val ids = nodes.map { it["id"] as String }
+        val claimNames = reader.claimLabels(claimIds)
         val edges = client.query(
             """
             MATCH (a:Knowledge)-[r]->(b:Knowledge)
@@ -92,9 +121,16 @@ class GraphService(
         return GraphView(
             centerId = id,
             hops = hops,
-            nodes = nodes.map { GraphNode(it["id"] as String, it["type"] as String, ontology.labelOf(it["type"] as String, it), it["reviewStatus"] as String?) },
+            nodes = nodes.map {
+                val type = it["type"] as String
+                val nodeId = it["id"] as String
+                GraphNode(
+                    nodeId, type, claimNames[nodeId] ?: ontology.labelOf(type, it), it["reviewStatus"] as String?,
+                    if (type == ClaimService.CLAIM) it["predicate"] as String? else null,
+                )
+            },
             edges = edges.take(limits.maxRelationships),
-            truncated = nodeTruncated || edges.size > limits.maxRelationships,
+            truncated = nodeTruncated || endpointTruncated || edges.size > limits.maxRelationships,
             limits = GraphLimits(limits.maxHops, limits.maxNodes, limits.maxRelationships),
         )
     }

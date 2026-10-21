@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import cytoscape, { type Core, type ElementDefinition } from 'cytoscape'
 import { useApp, useLabels } from '../context'
-import { colorForType, type GraphData } from '../lib/graph'
+import { collapseClaims, colorForType, expandedDisplay, type GraphData, type GraphDisplay } from '../lib/graph'
 import type { Ontology } from '../api/types'
-import { nodeDisplayLabel, relationshipLabel } from '../lib/labels'
+import { nodeDisplayLabel, predicateLabel, relationshipLabel } from '../lib/labels'
 import { WelcomeGuide } from './WelcomeGuide'
 
 interface Props {
@@ -17,6 +17,8 @@ interface Props {
   onSelect: (id: string) => void
   onExpand: (id: string) => void
   onRecenter: (id: string) => void
+  claimsAsNodes: boolean
+  onClaimsAsNodesChange: (value: boolean) => void
   /** 탭 배치에서 그래프 탭이 숨겨져 있으면 false. 숨겨진 컨테이너는 크기가 0 이라 배치를 미룬다 */
   visible?: boolean
 }
@@ -62,10 +64,17 @@ const STYLE: cytoscape.StylesheetJson = [
       'text-background-padding': '1px',
     },
   },
+  {
+    selector: 'edge[kind = "claim"]',
+    style: { width: 2.5, 'line-color': '#dc2626', 'target-arrow-color': '#dc2626', 'font-size': 10 },
+  },
+  { selector: 'edge[kind = "claim"][reviewStatus = "DRAFT"]', style: { 'line-style': 'dashed' } },
+  { selector: 'edge[kind = "claim"][reviewStatus = "REJECTED"]', style: { opacity: 0.55 } },
+  { selector: 'edge.selected', style: { width: 4, 'line-color': '#111827', 'target-arrow-color': '#111827' } },
 ]
 
 /** 그래프에 그릴 요소. 노드 이름과 선 이름은 온톨로지 표시 이름으로 바꾸고, 저장된 키는 type 에 남긴다 */
-function toElements(data: GraphData, ontology: Ontology): ElementDefinition[] {
+function toElements(data: GraphDisplay, ontology: Ontology): ElementDefinition[] {
   return [
     ...data.nodes.map((n) => ({
       group: 'nodes' as const,
@@ -74,6 +83,19 @@ function toElements(data: GraphData, ontology: Ontology): ElementDefinition[] {
     ...data.edges.map((e) => ({
       group: 'edges' as const,
       data: { id: e.id, source: e.source, target: e.target, type: e.type, label: relationshipLabel(ontology, e.type) },
+    })),
+    ...data.claimEdges.map((c) => ({
+      group: 'edges' as const,
+      data: {
+        id: `claim:${c.claimId}`,
+        source: c.source,
+        target: c.target,
+        kind: 'claim',
+        claimId: c.claimId,
+        type: 'Claim',
+        label: c.predicate ? predicateLabel(ontology, c.predicate) : '',
+        reviewStatus: c.reviewStatus ?? '',
+      },
     })),
   ]
 }
@@ -87,15 +109,19 @@ function limitZoom(cy: Core): void {
 }
 
 function runLayout(cy: Core): void {
-  const layout = cy.layout({ name: 'cose', animate: false, fit: true, padding: 40, nodeRepulsion: () => 8000, idealEdgeLength: () => 90 })
-  layout.one('layoutstop', () => limitZoom(cy))
+  const layout = cy.layout({ name: 'cose', animate: false, fit: true, padding: 48, nodeRepulsion: () => 20000, idealEdgeLength: () => 140, nodeOverlap: 20, componentSpacing: 120 })
+  layout.one('layoutstop', () => {
+    cy.fit(undefined, 48)
+    limitZoom(cy)
+  })
   layout.run()
 }
 
 export function GraphPanel(props: Props) {
-  const { data, centerId, selectedId, loading, error, hops, onHopsChange, visible = true } = props
+  const { data, centerId, selectedId, loading, error, hops, onHopsChange, claimsAsNodes, visible = true } = props
   const { ontology } = useApp()
   const labels = useLabels()
+  const display = useMemo(() => (claimsAsNodes ? expandedDisplay(data) : collapseClaims(data, centerId)), [data, centerId, claimsAsNodes])
   const containerRef = useRef<HTMLDivElement>(null)
   const cyRef = useRef<Core | null>(null)
   // Cytoscape 이벤트는 한 번만 등록하고, 최신 콜백은 ref 로 읽는다.
@@ -113,6 +139,8 @@ export function GraphPanel(props: Props) {
     const cy = cytoscape({ container: containerRef.current, style: STYLE, elements: [], minZoom: 0.2, maxZoom: 3 })
     cy.on('tap', 'node', (evt) => handlers.current.onSelect(evt.target.id()))
     cy.on('dbltap', 'node', (evt) => handlers.current.onExpand(evt.target.id()))
+    cy.on('tap', 'edge[kind = "claim"]', (evt) => handlers.current.onSelect(evt.target.data('claimId')))
+    cy.on('dbltap', 'edge[kind = "claim"]', (evt) => handlers.current.onExpand(evt.target.data('claimId')))
     cyRef.current = cy
     return () => {
       cy.destroy()
@@ -124,7 +152,7 @@ export function GraphPanel(props: Props) {
   useEffect(() => {
     const cy = cyRef.current
     if (!cy) return
-    const wanted = toElements(data, ontology)
+    const wanted = toElements(display, ontology)
     const wantedIds = new Set(wanted.map((el) => el.data.id as string))
     let added = false
     cy.batch(() => {
@@ -147,7 +175,7 @@ export function GraphPanel(props: Props) {
         setLayoutPending(true)
       }
     }
-  }, [data, ontology])
+  }, [display, ontology])
 
   // 다시 보이면 크기를 새로 재고, 미뤄 둔 배치를 돌리거나 지금 크기에 맞춘다.
   useEffect(() => {
@@ -159,7 +187,7 @@ export function GraphPanel(props: Props) {
       setLayoutPending(false)
       if (cy.nodes().length > 0) runLayout(cy)
     } else if (cy.nodes().length > 0) {
-      cy.fit(undefined, 40)
+      cy.fit(undefined, 48)
       limitZoom(cy)
     }
   }, [visible])
@@ -167,10 +195,13 @@ export function GraphPanel(props: Props) {
   useEffect(() => {
     const cy = cyRef.current
     if (!cy) return
-    cy.nodes().removeClass('center selected')
+    cy.elements().removeClass('center selected')
     if (centerId) cy.getElementById(centerId).addClass('center')
-    if (selectedId) cy.getElementById(selectedId).addClass('selected')
-  }, [centerId, selectedId, data])
+    if (selectedId) {
+      cy.getElementById(selectedId).addClass('selected')
+      cy.getElementById('claim:' + selectedId).addClass('selected')
+    }
+  }, [centerId, selectedId, display])
 
   const empty = !centerId ? 'none' : !loading && !error && data.nodes.length <= 1 ? 'no-neighbors' : null
   const canExpand = !!selectedId && data.nodes.some((n) => n.id === selectedId)
@@ -195,11 +226,20 @@ export function GraphPanel(props: Props) {
         >
           선택한 항목을 중심으로
         </button>
-        <button data-testid="graph-fit" disabled={data.nodes.length === 0} onClick={() => cyRef.current?.fit(undefined, 40)}>
+        <button data-testid="graph-fit" disabled={data.nodes.length === 0} onClick={() => cyRef.current?.fit(undefined, 48)}>
           화면 맞춤
         </button>
+        <label className="field-inline">
+          <input
+            type="checkbox"
+            data-testid="graph-claims-as-nodes"
+            checked={claimsAsNodes}
+            onChange={(e) => props.onClaimsAsNodesChange(e.target.checked)}
+          />{' '}
+          주장을 따로 보기
+        </label>
         <span className="muted small" data-testid="graph-status">
-          항목 {data.nodes.length} · 관계 {data.edges.length}
+          항목 {display.listed.length} · 관계 {display.edges.length + display.claimEdges.length}
         </span>
         {loading && (
           <span className="muted small" data-testid="graph-loading">
@@ -220,7 +260,9 @@ export function GraphPanel(props: Props) {
       )}
 
       <div className="graph-canvas-wrap">
-        <div ref={containerRef} className="graph-canvas" data-testid="graph-canvas" data-layout-pending={String(layoutPending)} />
+        <div ref={containerRef} className="graph-canvas" data-testid="graph-canvas" data-layout-pending={String(layoutPending)}
+          data-collapsed-claims={String(display.claimEdges.length)}
+        />
         {empty === 'none' && (
           <div className="graph-overlay" data-testid="graph-empty">
             <WelcomeGuide />
@@ -241,15 +283,22 @@ export function GraphPanel(props: Props) {
           </span>
         ))}
         <span className="legend-item muted">
-          점선 테두리: {labels.status('DRAFT')} · 흐림: {labels.status('REJECTED')} · 더블클릭: 이웃 확장
+          점선: {labels.status('DRAFT')} · 흐림: {labels.status('REJECTED')} · 주장 선을 누르면 상세 · 더블클릭: 이웃 확장
         </span>
       </div>
 
       <details className="graph-node-list" open>
-        <summary>그래프에 나온 항목 ({data.nodes.length})</summary>
+        <summary>그래프에 나온 항목 ({display.listed.length})</summary>
         <ul data-testid="graph-node-list">
-          {data.nodes.map((n) => (
-            <li key={n.id} data-testid="graph-node" data-node-id={n.id} data-node-type={n.type} data-review-status={n.reviewStatus ?? ''}>
+          {display.listed.map((n) => (
+            <li
+              key={n.id}
+              data-testid="graph-node"
+              data-node-id={n.id}
+              data-node-type={n.type}
+              data-review-status={n.reviewStatus ?? ''}
+              data-collapsed={String(display.claimEdges.some((c) => c.claimId === n.id))}
+            >
               <button className="link-button" onClick={() => props.onSelect(n.id)}>
                 [{labels.type(n.type)}] {labels.node(n)}
                 {n.reviewStatus ? ` (${labels.status(n.reviewStatus)})` : ''}

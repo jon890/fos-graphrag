@@ -53,8 +53,8 @@ export function actionLabel(o: Ontology, action: string): string {
 }
 
 /**
- * 노드 이름을 화면용으로 바꾼다. 서버의 label 은 labelProperty 값이라, 그 속성이 enum 이면
- * (Claim 의 predicate) 저장된 키가 그대로 온다. 그때는 선택지 표시 이름으로 바꾼다.
+ * 노드 이름을 화면용으로 바꾼다. 서버의 Claim 이름은 주체 → 대상 관계로 조합한 값이라 그대로 보인다.
+ * 예전 이력처럼 이름이 선택지 키이면 표시 이름으로 바꾼다.
  */
 export function nodeDisplayLabel(o: Ontology, node: { type: string; label: string }): string {
   const def = o.nodeTypes[node.type]
@@ -62,9 +62,71 @@ export function nodeDisplayLabel(o: Ontology, node: { type: string; label: strin
   return labelDef?.type === 'enum' ? enumValueLabel(labelDef, node.label) : node.label
 }
 
+const JOSA: Record<string, [withBatchim: string, withoutBatchim: string]> = {
+  '이(가)': ['이', '가'],
+  '은(는)': ['은', '는'],
+  '을(를)': ['을', '를'],
+  '와(과)': ['과', '와'],
+}
+
+/** 낱말 끝소리에 맞춰 조사 이(가), 은(는), 을(를), 와(과) 가운데 하나를 고른다. 한글이 아니거나 모르는 조사면 적힌 그대로 붙인다 */
+export function withJosa(word: string, josa: string): string {
+  const pair = JOSA[josa]
+  const code = word.charCodeAt(word.length - 1)
+  if (!pair || code < 0xac00 || code > 0xd7a3) return `${word}${josa}`
+  return `${word}${pair[(code - 0xac00) % 28 === 0 ? 1 : 0]}`
+}
+
 /** 한글 낱말 끝소리에 맞춰 을/를을 붙인다. 한글이 아니면 「을(를)」 로 둔다 */
 export function withEulReul(word: string): string {
-  const code = word.charCodeAt(word.length - 1)
-  if (code < 0xac00 || code > 0xd7a3) return `${word}을(를)`
-  return `${word}${(code - 0xac00) % 28 === 0 ? '를' : '을'}`
+  return withJosa(word, '을(를)')
+}
+
+/** 고를 후보가 하나도 없을 때의 안내. 예: 「먼저 기업을 만드세요」 */
+export function createFirstHint(typeLabels: string[]): string {
+  return `먼저 ${withEulReul(typeLabels.join(', '))} 만드세요`
+}
+
+export type SentencePart = { kind: 'slot'; slot: 'subject' | 'object' } | { kind: 'text'; text: string }
+
+const SLOT_PATTERN = /\{(subject|object)\}/g
+const LEADING_JOSA = /^(이\(가\)|은\(는\)|을\(를\)|와\(과\))/
+
+/**
+ * predicate 의 문장 틀을 칸과 글로 나눈다. 칸 바로 뒤 글의 맨 앞 조사(이(가), 은(는), 을(를), 와(과))는
+ * names 에 그 칸의 이름이 있으면 끝소리에 맞춰 하나로 바꾸고, 없으면 적힌 그대로 둔다.
+ * 문장 틀이 없으면 subject 칸, object 칸, 관계 표시 이름 순서다.
+ */
+export function claimSentenceParts(
+  o: Ontology,
+  predicate: string,
+  names?: { subject?: string | null; object?: string | null },
+): SentencePart[] {
+  const sentence = o.claimPredicates[predicate]?.sentence
+  if (!sentence) {
+    return [
+      { kind: 'slot', slot: 'subject' },
+      { kind: 'text', text: ' ' },
+      { kind: 'slot', slot: 'object' },
+      { kind: 'text', text: ` ${predicateLabel(o, predicate)}` },
+    ]
+  }
+  const parts: SentencePart[] = []
+  let last = 0
+  let prevSlot: 'subject' | 'object' | null = null
+  const pushText = (raw: string) => {
+    let text = raw
+    const name = prevSlot ? names?.[prevSlot] : null
+    const josa = LEADING_JOSA.exec(text)
+    if (name && josa) text = withJosa(name, josa[1]).slice(name.length) + text.slice(josa[1].length)
+    if (text) parts.push({ kind: 'text', text })
+  }
+  for (const m of sentence.matchAll(SLOT_PATTERN)) {
+    pushText(sentence.slice(last, m.index))
+    prevSlot = m[1] as 'subject' | 'object'
+    parts.push({ kind: 'slot', slot: prevSlot })
+    last = m.index + m[0].length
+  }
+  pushText(sentence.slice(last))
+  return parts
 }

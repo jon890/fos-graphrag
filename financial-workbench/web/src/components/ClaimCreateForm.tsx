@@ -1,28 +1,51 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Textarea } from '@/components/ui/textarea'
 import { api, ApiError, errorMessage } from '../api/client'
-import type { NodeView } from '../api/types'
+import type { ClaimPredicateDef, ClaimView, NodeView } from '../api/types'
 import { useApp, useLabels } from '../context'
-import { withEulReul } from '../lib/labels'
+import { claimSentenceParts, createFirstHint, withEulReul } from '../lib/labels'
 import { NodeCreateForm } from './NodeCreateForm'
 import { NodePicker } from './NodePicker'
 import { fieldErrorsOf } from './PropertyFields'
 import { TypeBadge } from './TypeBadge'
 
 interface Props {
-  subject: NodeView
-  onCreated: () => void
+  /** 처음 채울 주체. 상세의 「주장 추가」 는 그 항목을 넘기고, 왼쪽 「무엇을 만들까요?」 는 넘기지 않는다 */
+  initialSubject?: NodeView | null
+  onCreated: (claim: ClaimView) => void
   onCancel: () => void
 }
 
-/** 이 항목을 주체로 하는 주장을 만든다. form 요소를 쓰지 않는다: 안에 문서 생성 form 이 들어간다. */
-export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
+/** 관계 종류가 받지 않는 타입의 주체와 대상을 비운다. 정의가 없으면 그대로 둔다 */
+export function keepAccepted(
+  def: ClaimPredicateDef | undefined,
+  subject: NodeView | null,
+  object: NodeView | null,
+): { subject: NodeView | null; object: NodeView | null } {
+  if (!def) return { subject, object }
+  return {
+    subject: subject && def.subjectTypes.includes(subject.type) ? subject : null,
+    object: object && def.objectTypes.includes(object.type) ? object : null,
+  }
+}
+
+/** 문장 채우기로 주장을 만든다. form 요소를 쓰지 않는다: 안에 문서 생성 form 이 들어간다. */
+export function ClaimCreateForm({ initialSubject = null, onCreated, onCancel }: Props) {
   const { ontology } = useApp()
   const labels = useLabels()
-  const predicates = useMemo(
-    () => Object.entries(ontology.claimPredicates).filter(([, def]) => def.subjectTypes.includes(subject.type)),
-    [ontology, subject.type],
+  const predicateNames = Object.keys(ontology.claimPredicates)
+  const [predicate, setPredicate] = useState(
+    () =>
+      (initialSubject && predicateNames.find((n) => ontology.claimPredicates[n].subjectTypes.includes(initialSubject.type))) ||
+      predicateNames[0] ||
+      '',
   )
-  const [predicate, setPredicate] = useState(predicates[0]?.[0] ?? '')
+  const [subject, setSubject] = useState<NodeView | null>(initialSubject)
   const [object, setObject] = useState<NodeView | null>(null)
   const [documents, setDocuments] = useState<NodeView[]>([])
   const [creatingDoc, setCreatingDoc] = useState(false)
@@ -35,19 +58,23 @@ export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
   const [busy, setBusy] = useState(false)
 
   const predicateDef = ontology.claimPredicates[predicate]
-  const objectTypes = predicateDef?.objectTypes ?? []
 
+  const apply = (next: { subject: NodeView | null; object: NodeView | null }) => {
+    setSubject(next.subject)
+    setObject(next.object)
+  }
   const changePredicate = (next: string) => {
     setPredicate(next)
-    // 목적어 타입 제한이 바뀌면 맞지 않는 목적어를 비운다.
-    if (object && !ontology.claimPredicates[next]?.objectTypes.includes(object.type)) setObject(null)
+    apply(keepAccepted(ontology.claimPredicates[next], subject, object))
   }
+  const swap = () => apply(keepAccepted(predicateDef, object, subject))
 
   const addDocument = (doc: NodeView) => setDocuments((prev) => (prev.some((d) => d.id === doc.id) ? prev : [...prev, doc]))
 
   const submit = async () => {
     const errs: Record<string, string> = {}
     if (!predicate) errs.predicate = `${withEulReul(labels.property('Claim', 'predicate'))} 고르세요.`
+    if (!subject) errs.subjectId = `${withEulReul(labels.relationship('SUBJECT'))} 고르세요.`
     if (!object) errs.objectId = `${withEulReul(labels.relationship('OBJECT'))} 고르세요.`
     if (documents.length === 0) errs.documentIds = `${withEulReul(labels.relationship('SUPPORTED_BY'))} 한 개 이상 고르세요.`
     if (!description.trim()) errs.description = '필수 값입니다.'
@@ -61,9 +88,9 @@ export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
     setBusy(true)
     setError(null)
     try {
-      await api.claims.create({
+      const claim = await api.claims.create({
         predicate,
-        subjectId: subject.id,
+        subjectId: subject!.id,
         objectId: object!.id,
         documentIds: documents.map((d) => d.id),
         description: description.trim(),
@@ -73,7 +100,7 @@ export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
         authoringMethod: 'MANUAL',
         extractionConfidence: null,
       })
-      onCreated()
+      onCreated(claim)
     } catch (e) {
       setError(errorMessage(e))
       if (e instanceof ApiError) setFieldErrors(fieldErrorsOf(e.details))
@@ -82,59 +109,90 @@ export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
     }
   }
 
-  if (predicates.length === 0) return null
+  if (!predicateDef) return null
+
+  const parts = claimSentenceParts(ontology, predicate, {
+    subject: subject ? labels.node(subject) : null,
+    object: object ? labels.node(object) : null,
+  })
+  const slot = (which: 'subject' | 'object') => {
+    const picked = which === 'subject' ? subject : object
+    const other = which === 'subject' ? object : subject
+    const types = which === 'subject' ? predicateDef.subjectTypes : predicateDef.objectTypes
+    if (picked) {
+      return (
+        <div key={which} className="flex items-center gap-1 rounded-md border px-2 py-1" data-testid={`claim-${which}-selected`}>
+          <TypeBadge type={picked.type} /> {labels.node(picked)}
+          <Button type="button" variant="link" size="xs" onClick={() => (which === 'subject' ? setSubject(null) : setObject(null))}>
+            다시 고르기
+          </Button>
+        </div>
+      )
+    }
+    return (
+      <div key={which} className="min-w-48">
+        <NodePicker
+          types={types}
+          onPick={which === 'subject' ? setSubject : setObject}
+          testIdPrefix={`claim-${which}-picker`}
+          excludeIds={other ? [other.id] : []}
+          emptyHint={createFirstHint(types.map(labels.type))}
+        />
+      </div>
+    )
+  }
 
   return (
-    <div className="sub-form" data-testid="claim-add-form">
-      <div className="field">
-        <label>{labels.property('Claim', 'predicate')}</label>
-        <select data-testid="claim-predicate-select" value={predicate} onChange={(e) => changePredicate(e.target.value)}>
-          {predicates.map(([name]) => (
+    <div className="grid gap-3" data-testid="claim-add-form">
+      <div className="grid gap-1">
+        <Label htmlFor="claim-predicate">{labels.property('Claim', 'predicate')}</Label>
+        <NativeSelect id="claim-predicate" data-testid="claim-predicate-select" value={predicate} onChange={(e) => changePredicate(e.target.value)}>
+          {predicateNames.map((name) => (
             <option key={name} value={name}>
               {labels.predicate(name)}
             </option>
           ))}
-        </select>
-        {predicateDef && (
-          <div className="hint">
-            {predicateDef.description} ({labels.relationship('SUBJECT')}: {predicateDef.subjectTypes.map(labels.type).join(', ')} · {labels.relationship('OBJECT')}:{' '}
-            {predicateDef.objectTypes.map(labels.type).join(', ')})
-          </div>
-        )}
+        </NativeSelect>
+        {predicateDef.description && <div className="text-xs text-muted-foreground">{predicateDef.description}</div>}
       </div>
 
-      <div className="field">
-        <label>{labels.relationship('SUBJECT')}</label>
-        <div>
-          <TypeBadge type={subject.type} /> {subject.label}
+      <div className="flex flex-wrap items-center gap-2" data-testid="claim-sentence">
+        {parts.map((part, i) => {
+          if (part.kind === 'slot') return slot(part.slot)
+          const text = part.text.trim()
+          return text ? (
+            <span key={i} data-testid="claim-sentence-text">
+              {text}
+            </span>
+          ) : null
+        })}
+      </div>
+      <div>
+        <Button type="button" variant="outline" size="sm" data-testid="claim-swap" disabled={!subject && !object} onClick={swap}>
+          주체와 대상 바꾸기
+        </Button>
+      </div>
+      {fieldErrors.subjectId && (
+        <div className="text-sm text-destructive">
+          {labels.relationship('SUBJECT')}: {fieldErrors.subjectId}
         </div>
-      </div>
+      )}
+      {fieldErrors.objectId && (
+        <div className="text-sm text-destructive">
+          {labels.relationship('OBJECT')}: {fieldErrors.objectId}
+        </div>
+      )}
 
-      <div className="field">
-        <label>{labels.relationship('OBJECT')} ({objectTypes.map(labels.type).join(', ')})</label>
-        {object ? (
-          <div className="chip" data-testid="claim-object-selected">
-            <TypeBadge type={object.type} /> {object.label}
-            <button className="link-button" onClick={() => setObject(null)}>
-              바꾸기
-            </button>
-          </div>
-        ) : (
-          <NodePicker types={objectTypes} onPick={setObject} testIdPrefix="claim-object-picker" excludeIds={[subject.id]} />
-        )}
-        {fieldErrors.objectId && <div className="field-error">{fieldErrors.objectId}</div>}
-      </div>
-
-      <div className="field">
-        <label>{labels.relationship('SUPPORTED_BY')} (1개 이상)</label>
+      <div className="grid gap-1">
+        <Label>{labels.relationship('SUPPORTED_BY')} (1개 이상)</Label>
         {documents.length > 0 && (
-          <ul className="chip-list">
+          <ul className="grid gap-1">
             {documents.map((d) => (
-              <li key={d.id} className="chip" data-testid="claim-doc-selected">
+              <li key={d.id} className="flex items-center gap-1" data-testid="claim-doc-selected">
                 <TypeBadge type="Document" /> {d.label}
-                <button className="link-button" onClick={() => setDocuments((prev) => prev.filter((x) => x.id !== d.id))}>
+                <Button type="button" variant="link" size="xs" onClick={() => setDocuments((prev) => prev.filter((x) => x.id !== d.id))}>
                   빼기
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -147,11 +205,13 @@ export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
           excludeIds={documents.map((d) => d.id)}
         />
         {!creatingDoc ? (
-          <button className="link-button" data-testid="claim-doc-create-toggle" onClick={() => setCreatingDoc(true)}>
-            + 근거 문서 새로 등록
-          </button>
+          <div>
+            <Button type="button" variant="link" size="sm" data-testid="claim-doc-create-toggle" onClick={() => setCreatingDoc(true)}>
+              + 근거 문서 새로 등록
+            </Button>
+          </div>
         ) : (
-          <div className="nested-box">
+          <div className="rounded-md border p-3">
             <NodeCreateForm
               type="Document"
               testIdPrefix="claim-doc-create"
@@ -163,62 +223,50 @@ export function ClaimCreateForm({ subject, onCreated, onCancel }: Props) {
             />
           </div>
         )}
-        {fieldErrors.documentIds && <div className="field-error">{fieldErrors.documentIds}</div>}
+        {fieldErrors.documentIds && <div className="text-sm text-destructive">{fieldErrors.documentIds}</div>}
       </div>
 
-      <div className="field">
-        <label htmlFor="claim-description">
+      <div className="grid gap-1">
+        <Label htmlFor="claim-description">
           {labels.property('Claim', 'description')}
-          <span className="required"> *</span>
-        </label>
-        <textarea
-          id="claim-description"
-          data-testid="claim-description"
-          rows={2}
-          maxLength={4000}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-        {fieldErrors.description && <div className="field-error">{fieldErrors.description}</div>}
+          <span className="text-destructive"> *</span>
+        </Label>
+        <Textarea id="claim-description" data-testid="claim-description" rows={2} maxLength={4000} value={description} onChange={(e) => setDescription(e.target.value)} />
+        {fieldErrors.description && <div className="text-sm text-destructive">{fieldErrors.description}</div>}
       </div>
-      <div className="field">
-        <label htmlFor="claim-evidence">
+      <div className="grid gap-1">
+        <Label htmlFor="claim-evidence">
           {labels.property('Claim', 'evidenceText')}
-          <span className="required"> *</span>
-        </label>
-        <textarea
-          id="claim-evidence"
-          data-testid="claim-evidence"
-          rows={3}
-          maxLength={4000}
-          value={evidenceText}
-          onChange={(e) => setEvidenceText(e.target.value)}
-        />
-        {fieldErrors.evidenceText && <div className="field-error">{fieldErrors.evidenceText}</div>}
+          <span className="text-destructive"> *</span>
+        </Label>
+        <Textarea id="claim-evidence" data-testid="claim-evidence" rows={3} maxLength={4000} value={evidenceText} onChange={(e) => setEvidenceText(e.target.value)} />
+        {fieldErrors.evidenceText && <div className="text-sm text-destructive">{fieldErrors.evidenceText}</div>}
       </div>
-      <div className="row">
-        <label className="field-inline">
-          {labels.property('Claim', 'validFrom')}
-          <input type="date" data-testid="claim-valid-from-input" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} />
-        </label>
-        <label className="field-inline">
-          {labels.property('Claim', 'validTo')}
-          <input type="date" data-testid="claim-valid-to-input" value={validTo} onChange={(e) => setValidTo(e.target.value)} />
-        </label>
+      <div className="flex flex-wrap gap-3">
+        <div className="grid gap-1">
+          <Label htmlFor="claim-valid-from">{labels.property('Claim', 'validFrom')}</Label>
+          <Input id="claim-valid-from" type="date" data-testid="claim-valid-from-input" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} />
+        </div>
+        <div className="grid gap-1">
+          <Label htmlFor="claim-valid-to">{labels.property('Claim', 'validTo')}</Label>
+          <Input id="claim-valid-to" type="date" data-testid="claim-valid-to-input" value={validTo} onChange={(e) => setValidTo(e.target.value)} />
+        </div>
       </div>
-      <div className="hint">유효기간을 모르면 비워 두세요. 「미상」 으로 표시됩니다.</div>
-      {fieldErrors.validTo && <div className="field-error">{fieldErrors.validTo}</div>}
+      <div className="text-xs text-muted-foreground">유효기간을 모르면 비워 두세요. 「미상」 으로 표시됩니다.</div>
+      {fieldErrors.validTo && <div className="text-sm text-destructive">{fieldErrors.validTo}</div>}
 
       {error && (
-        <div className="error-box" role="alert" data-testid="claim-add-error">
-          {error}
-        </div>
+        <Alert role={undefined} variant="destructive" data-testid="claim-add-error">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
-      <div className="row">
-        <button className="primary" data-testid="claim-add-submit" disabled={busy} onClick={() => void submit()}>
+      <div className="flex gap-2">
+        <Button type="button" data-testid="claim-add-submit" disabled={busy} onClick={() => void submit()}>
           {busy ? '저장 중…' : '주장 만들기'}
-        </button>
-        <button onClick={onCancel}>취소</button>
+        </Button>
+        <Button type="button" variant="outline" data-testid="claim-add-cancel" onClick={onCancel}>
+          취소
+        </Button>
       </div>
     </div>
   )

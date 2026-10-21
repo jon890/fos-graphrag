@@ -133,7 +133,7 @@ Neo4j 예외는 시간 초과(`QUERY_TIMEOUT`), 연결 불가(`DATABASE_UNAVAILA
 }
 ```
 
-`label` 은 온톨로지의 `labelProperty` 값이다. `reviewStatus` 는 Claim 일 때만 값이 있다.
+`label` 은 온톨로지의 `labelProperty` 값이다. 단 Claim 의 `label` 은 읽을 때 만든 「주체 이름 → 대상 이름 관계 표시 이름」(예: `다라부품 → 가나전자 공급한다`)이다. 주체나 대상을 찾지 못하면 그 자리를 `?` 로 둔다. `reviewStatus` 는 Claim 일 때만 값이 있다.
 
 `ClaimView`: `NodeView` 의 모든 필드에 아래를 더한다.
 
@@ -311,13 +311,18 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 {
   "centerId": "uuid",
   "hops": 1,
-  "nodes": [{ "id": "uuid", "type": "Company", "label": "가상전자", "reviewStatus": null }],
+  "nodes": [
+    { "id": "uuid", "type": "Company", "label": "가상전자", "reviewStatus": null, "predicate": null },
+    { "id": "uuid", "type": "Claim", "label": "가상부품 → 가상전자 공급한다", "reviewStatus": "DRAFT", "predicate": "SUPPLIES_TO" }
+  ],
   "edges": [{ "id": "uuid", "type": "SUBJECT", "source": "uuid", "target": "uuid" }],
   "truncated": false,
   "limits": { "maxHops": 2, "maxNodes": 150, "maxRelationships": 300 }
 }
 ```
 
+- 모은 노드에 Claim 이 있으면 그 Claim 의 주체와 대상(`SUBJECT`, `OBJECT` 끝 노드)을 홉 수와 상관없이 더한다. `types` 필터에서 빠진 타입과 보관된 노드는 더하지 않는다. 더한 노드도 `maxNodes` 에 센다.
+- `predicate` 는 Claim 일 때만 값이 있다. 화면이 주장을 선으로 접어 그릴 때 선 이름을 고르는 데 쓴다.
 - 보관된 노드와 관계는 빠진다. 보관된 중심 노드를 요청하면 `404 NOT_FOUND` 다.
 - 노드나 관계가 한도를 넘으면 한도까지만 돌려주고 `truncated` 를 `true` 로 둔다. 화면은 이것을 표시한다.
 - 조회 트랜잭션은 `workbench.graph.timeout` (기본 5초) 뒤에 끊긴다.
@@ -353,7 +358,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 
 | 메서드 | 경로 | 인증 | 응답 |
 | --- | --- | --- | --- |
-| GET | `/api/ontology` | 필요 | 온톨로지 YAML 을 그대로 옮긴 JSON. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다 |
+| GET | `/api/ontology` | 필요 | 온톨로지 YAML 을 그대로 옮긴 JSON. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`)과 주장 문장 틀(`claimPredicates.<predicate>.sentence`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다 |
 
 ## 사용자 관리
 

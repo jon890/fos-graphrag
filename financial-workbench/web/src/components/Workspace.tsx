@@ -43,6 +43,7 @@ export function Workspace({ centerId, focusSeq, selectedId, onFocus, onSelect, o
   )
   const [filters, setFilters] = useState<SearchFilters>({ q: '', types: allTypes, reviewStatus: '', includeArchived: false })
   const [hops, setHops] = useState(1)
+  const [claimsAsNodes, setClaimsAsNodes] = useState(false)
   const [graph, setGraph] = useState<GraphData>(EMPTY_GRAPH)
   const [graphLoading, setGraphLoading] = useState(false)
   const [graphError, setGraphError] = useState<string | null>(null)
@@ -137,6 +138,8 @@ export function Workspace({ centerId, focusSeq, selectedId, onFocus, onSelect, o
       onSelect={onSelect}
       onExpand={(id) => void expand(id)}
       onRecenter={onFocus}
+      claimsAsNodes={claimsAsNodes}
+      onClaimsAsNodesChange={setClaimsAsNodes}
       visible={wide || mobileTab === 'graph'}
     />
   )

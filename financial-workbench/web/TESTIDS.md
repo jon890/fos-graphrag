@@ -41,7 +41,7 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `search-result` * | 결과 한 줄. `data-node-id`, `data-node-type`. 이름은 안쪽 `.result-label` |
 | `search-empty` | 결과 없음 |
 | `search-pager-prev`, `search-pager-next`, `search-pager-info` | 결과가 2쪽 이상일 때 |
-| `new-node-type`, `new-node-button` | 새 노드 타입 select 와 만들기 버튼. VIEWER 에게는 없다 |
+| `new-node-type`, `new-node-button` | 새 노드 타입 select 와 만들기 버튼. VIEWER 에게는 없다. 값 `Claim` 을 고르면 주장 만들기 폼(`claim-add-form`)이 열린다 |
 | `viewer-create-hint` | VIEWER 에게 보이는 「노드를 만들 수 없습니다」 안내 |
 | `create-form`, `create-submit`, `create-cancel`, `create-error` | 새 노드 폼 |
 | `create-prop-<속성>` | 새 노드 폼의 속성 입력. 예: `create-prop-name`, `create-prop-market` |
@@ -55,15 +55,16 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `graph-expand` | 선택 노드 이웃 확장(더블클릭과 같다) |
 | `graph-recenter` | 선택 노드를 새 중심으로 다시 불러온다 |
 | `graph-fit` | 화면 맞춤 |
-| `graph-status` | 「노드 N · 관계 M」 |
+| `graph-status` | 「항목 N · 관계 M」. N 은 「그래프에 나온 항목」 수, M 은 그린 관계와 접은 주장 선을 합한 수 |
+| `graph-claims-as-nodes` | 「주장을 따로 보기」 체크 상자. 켜면 주장을 노드로 그린다. 작업 공간을 떠날 때까지 남는다 |
 | `graph-loading`, `graph-error` | 로딩, 오류(서버 `message`) |
 | `graph-truncated` | 「결과가 잘렸습니다(최대 노드 N, 관계 M)」 |
 | `graph-empty` | 선택한 노드가 없음 |
 | `graph-no-neighbors` | 이웃이 없음 |
-| `graph-canvas` | Cytoscape 컨테이너. `data-layout-pending` 이 `"true"` 면 숨겨진 동안 생긴 요소의 배치를 미뤄 둔 상태이고, 다시 보여 배치를 돌리면 `"false"` 다 |
+| `graph-canvas` | Cytoscape 컨테이너. `data-layout-pending` 이 `"true"` 면 숨겨진 동안 생긴 요소의 배치를 미뤄 둔 상태이고, 다시 보여 배치를 돌리면 `"false"` 다. `data-collapsed-claims` 는 선으로 접은 주장 수이고, 「주장을 따로 보기」 를 켜면 `"0"` 이다 |
 | `graph-legend` | 타입별 색 범례 |
 | `graph-node-list` | 그래프에 올라간 노드 목록(캔버스 대신 검증용으로 쓴다) |
-| `graph-node` * | 목록 한 줄. `data-node-id`, `data-node-type`, `data-review-status`. 안의 button 을 누르면 선택된다 |
+| `graph-node` * | 목록 한 줄. `data-node-id`, `data-node-type`, `data-review-status`, `data-collapsed`(`"true"` 면 선으로 접힌 주장). 접힌 주장에만 걸린 근거 문서는 목록에 없다. 안의 button 을 누르면 선택된다 |
 
 ## 작업 공간: 오른쪽 상세
 
@@ -91,22 +92,25 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 | `relationship-target-picker-*` | 대상 노드 고르기(아래 「노드 고르기」) |
 | `relationship-target-selected`, `relationship-add-submit`, `relationship-add-error` | 고른 대상, 추가, 오류 |
 | `node-claims-section` | 이 노드에 걸린 Claim 영역 |
-| `claim-add-toggle`, `claim-add-form` | 「Claim 추가」 |
+| `claim-add-toggle`, `claim-add-form` | 「주장 추가」 와 주장 만들기 폼(왼쪽 「주장」 선택지에서도 열린다) |
 | `claim-predicate-select` | predicate select |
-| `claim-object-picker-*`, `claim-object-selected` | 목적어 고르기, 고른 목적어 |
+| `claim-sentence`, `claim-sentence-text` * | 문장 틀, 문장 틀의 칸 사이 글 |
+| `claim-subject-picker-*`, `claim-subject-selected` | 주체 고르기, 고른 주체 |
+| `claim-object-picker-*`, `claim-object-selected` | 대상 고르기, 고른 대상 |
+| `claim-swap` | 「주체와 대상 바꾸기」 |
 | `claim-doc-picker-*`, `claim-doc-selected` * | 근거 문서 고르기, 고른 문서 |
 | `claim-doc-create-toggle` | 「문서 새로 등록」 |
 | `claim-doc-create-form`, `claim-doc-create-prop-<속성>`, `claim-doc-create-submit` | 그 자리에서 문서를 만드는 폼 |
 | `claim-description`, `claim-evidence` | 설명, 근거 문장 |
 | `claim-valid-from-input`, `claim-valid-to-input` | 유효기간(선택) |
-| `claim-add-submit`, `claim-add-error` | 만들기, 오류 |
+| `claim-add-submit`, `claim-add-cancel`, `claim-add-error` | 만들기, 취소, 오류 |
 
 ## Claim 카드와 Claim 노드 상세
 
 | testid | 요소 |
 | --- | --- |
 | `claim-card` * | Claim 한 개. `data-claim-id`, `data-review-status` |
-| `claim-predicate`, `claim-subject`, `claim-object` | predicate, 주어, 목적어 |
+| `claim-predicate`, `claim-subject`, `claim-object` | 관계 종류의 표시 이름(예: 공급한다), 주어, 목적어 |
 | `claim-description-text`, `claim-evidence-text` | 설명, 근거 문장 |
 | `claim-document` *, `claim-document-title` * | 출처 문서와 제목 링크 |
 | `claim-valid-from`, `claim-valid-to` | 유효기간. 값이 없으면 「미상」 |
@@ -121,13 +125,14 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 
 ## 노드 고르기(NodePicker)
 
-접두사 `<p>` 는 `relationship-target-picker`, `claim-object-picker`, `claim-doc-picker` 가운데 하나다.
+접두사 `<p>` 는 `relationship-target-picker`, `claim-subject-picker`, `claim-object-picker`, `claim-doc-picker` 가운데 하나다.
 
 | testid | 요소 |
 | --- | --- |
 | `<p>-input`, `<p>-search` | 검색어와 검색 버튼(Enter 도 된다) |
 | `<p>-result` * | 결과 한 줄. `data-node-id` |
 | `<p>-empty` | 결과 없음 |
+| `<p>-none` | 고를 후보가 하나도 없을 때의 안내(예: 「먼저 기업을 만드세요」) |
 
 ## 목록 탭
 
