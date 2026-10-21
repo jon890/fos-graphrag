@@ -27,7 +27,8 @@ h2 { font-size: 18px; }
 h3 { font-size: 15px; }
 h4 { font-size: 14px; }
 input, select, textarea, button { font: inherit; }
-input, select, textarea {
+/* shadcn 부품(data-slot)은 자기 class 로 꾸민다. :where 로 감싸 옛 선택자의 우선순위를 그대로 둔다 */
+:where(input, select, textarea):where(:not([data-slot])) {
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 5px 8px;
@@ -35,19 +36,19 @@ input, select, textarea {
   min-width: 0;
 }
 textarea { width: 100%; resize: vertical; }
-input[aria-invalid='true'], select[aria-invalid='true'], textarea[aria-invalid='true'] { border-color: var(--danger); }
-button {
+:where(input, select, textarea):where(:not([data-slot]))[aria-invalid='true'] { border-color: var(--danger); }
+button:where(:not([data-slot])) {
   border: 1px solid var(--border);
   background: #fff;
   border-radius: 4px;
   padding: 5px 12px;
   cursor: pointer;
 }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
-button.primary { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
-button.danger { color: var(--danger); border-color: var(--error-border); }
-button.link-button { border: none; background: none; padding: 0 2px; color: var(--primary); text-align: left; }
-button.link-button:disabled { color: var(--text); opacity: 1; cursor: default; }
+button:where(:not([data-slot])):disabled { opacity: 0.5; cursor: not-allowed; }
+button:where(:not([data-slot])).primary { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
+button:where(:not([data-slot])).danger { color: var(--danger); border-color: var(--error-border); }
+button:where(:not([data-slot])).link-button { border: none; background: none; padding: 0 2px; color: var(--primary); text-align: left; }
+button:where(:not([data-slot])).link-button:disabled { color: var(--text); opacity: 1; cursor: default; }
 
 .muted { color: var(--legacy-muted); }
 .small { font-size: 12px; }
@@ -248,6 +249,8 @@ blockquote { margin: 0; padding: 4px 8px; border-left: 3px solid #cbd5e1; backgr
   .user-box [data-testid="current-user-email"] { display: none; }
   .tab-page { padding-left: 12px; padding-right: 12px; }
   .tab-page table { display: block; overflow-x: auto; }
+  /* 칸을 글자 하나 폭으로 꺾지 않고 표를 가로로 밀어 보게 한다 */
+  .tab-page th, .tab-page td { white-space: nowrap; }
 }
 
 /* 역할 */
@@ -267,4 +270,4 @@ a { color: revert; text-decoration: revert; }
 input[type='checkbox'], input[type='radio'] { margin: revert; }
 legend { padding: revert; }
 ::placeholder { color: revert; opacity: revert; }
-button, input, select, textarea { color: revert; }
+button:where(:not([data-slot])), :where(input, select, textarea):where(:not([data-slot])) { color: revert; }

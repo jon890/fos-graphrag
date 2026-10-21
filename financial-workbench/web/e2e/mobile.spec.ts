@@ -28,7 +28,7 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
 }
 
 /** 검색 탭의 「새 노드 만들기」 폼으로 노드를 만든다. 만들면 상세 탭으로 넘어간다 */
-async function createNode(page: Page, type: string, label: string, props: Record<string, string>): Promise<void> {
+async function createNodeOnMobile(page: Page, type: string, label: string, props: Record<string, string>): Promise<void> {
   await page.getByTestId('workspace-tab-search').click()
   await page.getByTestId('new-node-type').selectOption(type)
   await page.getByTestId('new-node-button').click()
@@ -57,8 +57,8 @@ test('휴대폰 폭에서 노드를 만들고 그래프에서 골라 상세를 �
   await expect(page.getByTestId('graph-canvas')).toBeHidden()
 
   // 3. 노드를 만들면 상세 탭으로 넘어간다. 그래프에 두 노드가 함께 오르도록 종목을 만들고 기업과 ISSUES 로 잇는다.
-  await createNode(page, 'Company', company, { name: company })
-  await createNode(page, 'Security', security, {
+  await createNodeOnMobile(page, 'Company', company, { name: company })
+  await createNodeOnMobile(page, 'Security', security, {
     market: 'KRX_KOSPI',
     ticker: `M${suffix.slice(-10)}`,
     name: security,
