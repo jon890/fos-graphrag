@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import type { NodeView } from '../api/types'
+import type { ClaimView, NodeView } from '../api/types'
+import { ReviewControls } from './ClaimEditor'
+import { CopyLinkButton } from './CopyLinkButton'
 import { NodeCreateForm } from './NodeCreateForm'
 import { NodeEditForm } from './NodeEditForm'
 import { PropertyFields } from './PropertyFields'
@@ -143,5 +145,36 @@ describe('노드 편집 409 뒤 입력 지키기', () => {
     expect(html).toContain('data-kind="both"')
     expect(html).toMatch(/<input[^>]*data-testid="edit-conflict-choice-name-latest"[^>]*checked/)
     expect(html).not.toMatch(/<input[^>]*data-testid="edit-conflict-choice-name-mine"[^>]*checked/)
+  })
+})
+
+describe('CopyLinkButton', () => {
+  it('단추만 그리고 복사 결과 요소는 아직 없다', () => {
+    const html = renderToStaticMarkup(<CopyLinkButton nodeId="n1" testId="x-link" />)
+    expect(html).toMatch(/<button[^>]*data-testid="x-link"/)
+    expect(html).not.toContain('x-link-done')
+    expect(html).not.toContain('x-link-fallback')
+  })
+})
+
+describe('ReviewControls 의 자기 검토 안내', () => {
+  const other = { id: 'other', email: 'o@example.com', displayName: 'Other' }
+  const me = { id: 'u1', email: 'a@example.com', displayName: 'A' }
+  const claim = (createdBy: typeof me, contentUpdatedBy: typeof me | null) =>
+    ({ id: 'c1', revision: 1, archived: false, reviewStatus: 'DRAFT', documents: [{ archived: false }], createdBy, contentUpdatedBy }) as unknown as ClaimView
+  const render = (c: ClaimView) => renderToStaticMarkup(withApp(<ReviewControls claim={c} onDone={() => {}} onError={() => {}} />))
+
+  it('마지막으로 내용을 고친 사람이면 안내와 링크 복사가 있고 검토 단추가 꺼진다', () => {
+    const html = render(claim(other, me))
+    expect(html).toContain('data-testid="self-review-hint"')
+    expect(html).toContain('data-testid="self-review-copy-link"')
+    expect(html).toMatch(/<button[^>]*data-testid="review-approve"[^>]*disabled/)
+  })
+
+  it('작성자와 수정자가 모두 다른 사람이면 안내가 없다', () => {
+    const html = render(claim(other, null))
+    expect(html).not.toContain('self-review-hint')
+    expect(html).not.toContain('self-review-copy-link')
+    expect(html).not.toMatch(/<button[^>]*data-testid="review-approve"[^>]*disabled/)
   })
 })

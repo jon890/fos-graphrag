@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import type { ClaimView, Page } from '../api/types'
+import type { ClaimView, CurrentUser, Page } from '../api/types'
 import { ListTab } from './ListTab'
 import { LoginView } from './LoginView'
 import { ChangesTab } from './ChangesTab'
@@ -8,7 +8,7 @@ import { OntologyTab } from './OntologyTab'
 import { Pager } from './Pager'
 import { ReviewRow, ReviewTab } from './ReviewTab'
 import { UsersTab } from './UsersTab'
-import { withApp } from './testSupport'
+import { testOntology, withApp } from './testSupport'
 
 describe('머리글 밖 탭의 첫 렌더', () => {
   it('LoginView 는 거절 안내와 로그인 버튼을 보이고 옛 카드 class 를 쓰지 않는다', () => {
@@ -67,6 +67,42 @@ describe('머리글 밖 탭의 첫 렌더', () => {
     expect(html).toContain('data-testid="review-tab"')
     expect(html).toContain('data-slot="table"')
     expect(html).not.toContain('data-table')
+    expect(html).toContain('data-testid="review-section-reviewable"')
+    expect(html).toContain('data-testid="review-section-mine"')
+    expect(html).toContain('내가 검토할 주장')
+    expect(html).toContain('내가 쓰거나 고친 주장')
+  })
+
+  it('ReviewTab 은 열람자에게 구역 없이 한 목록만 보인다', () => {
+    const viewer: CurrentUser = { id: 'v1', email: 'v@example.com', displayName: 'V', role: 'VIEWER' }
+    const html = renderToStaticMarkup(withApp(<ReviewTab onOpen={() => {}} />, testOntology, viewer))
+    expect(html).not.toContain('review-section-')
+    expect(html).toContain('data-testid="review-table"')
+  })
+
+  it('ReviewRow 는 마지막으로 내용을 고친 사람에게 승인을 막고 안내한다', () => {
+    const claim = {
+      id: 'c2',
+      revision: 1,
+      type: 'Claim',
+      properties: { predicate: 'SUPPLIES', evidenceText: '근거' },
+      createdBy: { id: 'other', email: 'o@example.com', displayName: 'Other' },
+      contentUpdatedBy: { id: 'u1', email: 'a@example.com', displayName: 'A' },
+      createdAt: '2026-10-20T03:15:00Z',
+      subject: null,
+      object: null,
+    } as unknown as ClaimView
+    const html = renderToStaticMarkup(
+      withApp(
+        <table>
+          <tbody>
+            <ReviewRow claim={claim} onDone={() => {}} onError={() => {}} onOpen={() => {}} />
+          </tbody>
+        </table>,
+      ),
+    )
+    expect(html).toContain('data-testid="review-own-hint"')
+    expect(html).toMatch(/<button[^>]*data-testid="review-row-approve"[^>]*disabled/)
   })
 
   it('ReviewRow 는 승인과 반려 버튼을 shadcn 버튼으로 그리고 옛 class 를 쓰지 않는다', () => {

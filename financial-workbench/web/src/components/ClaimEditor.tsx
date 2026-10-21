@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { api } from '../api/client'
 import type { ClaimView, PatchClaimRequest, ReviewStatus } from '../api/types'
 import { useApp, useLabels } from '../context'
+import { CopyLinkButton } from './CopyLinkButton'
 
 interface ReviewProps {
   claim: ClaimView
@@ -15,7 +16,7 @@ export function ReviewControls({ claim, onDone, onError }: ReviewProps) {
   const labels = useLabels()
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
-  const own = claim.createdBy?.id === user.id
+  const own = claim.createdBy?.id === user.id || claim.contentUpdatedBy?.id === user.id
   const disabled = busy || own || claim.archived
 
   const review = async (status: ReviewStatus) => {
@@ -36,7 +37,10 @@ export function ReviewControls({ claim, onDone, onError }: ReviewProps) {
       <h4>검토</h4>
       {own && (
         <div className="info-box" data-testid="self-review-hint">
-          본인이 작성한 주장은 다른 사용자가 검토해야 합니다.
+          내가 쓰거나 마지막으로 고친 주장은 다른 편집자가 검토합니다. 링크를 복사해 검토를 요청하세요.
+          <div>
+            <CopyLinkButton nodeId={claim.id} testId="self-review-copy-link" />
+          </div>
         </div>
       )}
       {claim.archived && <div className="info-box">보관된 주장은 검토할 수 없습니다.</div>}

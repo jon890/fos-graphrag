@@ -7,6 +7,7 @@ import { formatDateTime, userName } from '../lib/format'
 import { ClaimCard } from './ClaimCard'
 import { ClaimCreateForm } from './ClaimCreateForm'
 import { ClaimEditForm, ReviewControls } from './ClaimEditor'
+import { CopyLinkButton } from './CopyLinkButton'
 import { NodeEditForm } from './NodeEditForm'
 import { RelationshipSection } from './RelationshipSection'
 import { StatusBadge, TypeBadge } from './TypeBadge'
@@ -175,6 +176,7 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
         <button className="link-button" data-testid="node-center-graph" onClick={() => onFocus(node.id)}>
           그래프 중심으로
         </button>
+        <CopyLinkButton nodeId={node.id} testId="node-copy-link" />
         {canEdit && !node.archived && (
           <input
             className="reason-input"

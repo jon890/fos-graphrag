@@ -84,6 +84,8 @@ export interface ClaimView extends NodeView {
   subject: NodeRef | null
   object: NodeRef | null
   documents: DocumentSummary[]
+  /** 마지막으로 내용을 고친 사람. 이 사람과 작성자는 검토할 수 없다 */
+  contentUpdatedBy: UserRef | null
 }
 
 export interface RelationshipView {
