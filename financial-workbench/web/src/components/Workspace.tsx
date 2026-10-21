@@ -50,7 +50,7 @@ export function Workspace({ centerId, focusSeq, selectedId, onFocus, onSelect, o
   // 상세에서 무언가 바꾸면 올려서 그래프와 검색 결과를 다시 읽게 한다.
   const [changeTick, setChangeTick] = useState(0)
   // 노드를 만든 직후 상세 위에 보일 성공 안내. 다른 노드를 고르면 사라진다.
-  const [flash, setFlash] = useState<{ id: string; text: string } | null>(null)
+  const [flash, setFlash] = useState<{ id: string; text: string; kind?: 'success' | 'error' } | null>(null)
   useEffect(() => {
     if (flash && flash.id !== selectedId) setFlash(null)
   }, [flash, selectedId])
@@ -117,8 +117,8 @@ export function Workspace({ centerId, focusSeq, selectedId, onFocus, onSelect, o
         onFocus(id)
         setMobileTab('detail')
       }}
-      onCreated={(node, message) => {
-        setFlash({ id: node.id, text: message })
+      onCreated={(node, message, kind) => {
+        setFlash({ id: node.id, text: message, kind })
         onFocus(node.id)
         setMobileTab('detail')
       }}

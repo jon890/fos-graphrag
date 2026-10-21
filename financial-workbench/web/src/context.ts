@@ -1,8 +1,9 @@
 import { createContext, useContext, useMemo } from 'react'
-import type { CurrentUser, Ontology } from './api/types'
+import type { CurrentUser, NodeView, Ontology } from './api/types'
 import {
   actionLabel,
   nodeDisplayLabel,
+  nodeHint,
   predicateLabel,
   propertyDef,
   propertyLabel,
@@ -46,6 +47,7 @@ export function useLabels() {
       status: (status: string) => reviewStatusLabel(ontology, status),
       action: (action: string) => actionLabel(ontology, action),
       node: (node: { type: string; label: string }) => nodeDisplayLabel(ontology, node),
+      hint: (node: Pick<NodeView, 'type' | 'properties' | 'createdAt'>) => nodeHint(ontology, node),
     }),
     [ontology],
   )

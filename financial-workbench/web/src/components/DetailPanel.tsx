@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, errorMessage } from '../api/client'
 import type { NodeDetail } from '../api/types'
 import { useApp, useLabels } from '../context'
+import type { EditDraft } from '../lib/conflict'
 import { formatDateTime, userName } from '../lib/format'
 import { ClaimCard } from './ClaimCard'
 import { ClaimCreateForm } from './ClaimCreateForm'
@@ -17,15 +18,15 @@ interface Props {
   /** 저장, 보관처럼 서버 상태를 바꾼 뒤 부른다. 그래프와 검색 결과를 다시 읽는다 */
   onChanged: () => void
   /** 방금 만든 노드를 열었을 때 상세 위에 보일 성공 안내 */
-  flash?: { id: string; text: string } | null
+  flash?: { id: string; text: string; kind?: 'success' | 'error' } | null
   onFocus: (id: string) => void
   onSelect: (id: string) => void
   onOpenHistory: (id: string) => void
 }
 
-type Notice = { kind: 'success' | 'conflict' | 'error'; text: string; sub?: string; actions?: { label: string; onClick: () => void }[] }
+type Notice = { kind: 'success' | 'conflict' | 'error'; text: string; actions?: { label: string; onClick: () => void }[] }
 
-export const CONFLICT_TEXT = '다른 사용자가 먼저 수정했습니다. 최신 내용을 불러왔습니다. 확인한 뒤 다시 수정하세요.'
+export const CONFLICT_TEXT = '다른 탭이나 다른 사용자가 먼저 저장했습니다. 최신 내용을 불러왔습니다.'
 
 export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus, onSelect, onOpenHistory }: Props) {
   const { ontology, canEdit } = useApp()
@@ -37,11 +38,13 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
   const [reloadKey, setReloadKey] = useState(0)
   const [archiveReason, setArchiveReason] = useState('')
   const [addingClaim, setAddingClaim] = useState(false)
+  const [draft, setDraft] = useState<EditDraft | null>(null)
 
   useEffect(() => {
-    setNotice(flash && flash.id === selectedId ? { kind: 'success', text: flash.text } : null)
+    setNotice(flash && flash.id === selectedId ? { kind: flash.kind ?? 'success', text: flash.text } : null)
     setAddingClaim(false)
     setArchiveReason('')
+    setDraft(null)
   }, [selectedId, flash])
 
   useEffect(() => {
@@ -83,7 +86,7 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
     (e: unknown) => {
       if (e instanceof ApiError && e.code === 'REVISION_CONFLICT') {
         // 덮어쓰지 않는다. 최신 상세를 다시 읽어 폼을 새 값으로 바꾼다.
-        setNotice({ kind: 'conflict', text: CONFLICT_TEXT, sub: e.message })
+        setNotice({ kind: 'conflict', text: CONFLICT_TEXT })
         setReloadKey((k) => k + 1)
         return
       }
@@ -153,7 +156,6 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
       {notice && (
         <div className={`notice notice-${notice.kind}`} role="status" data-testid="detail-notice" data-kind={notice.kind}>
           {notice.text}
-          {notice.sub && notice.sub !== notice.text && <div className="small muted">서버 응답: {notice.sub}</div>}
           {notice.actions && notice.actions.length > 0 && (
             <div className="row">
               {notice.actions.map((a) => (
@@ -202,11 +204,11 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
       <dl className="kv meta" data-testid="node-meta">
         <dt>생성</dt>
         <dd>
-          {userName(node.createdBy, '알 수 없음')} · {formatDateTime(node.createdAt)}
+          {userName(node.createdBy)} · {formatDateTime(node.createdAt)}
         </dd>
         <dt>수정</dt>
         <dd data-testid="node-updated-by">
-          {userName(node.updatedBy, '알 수 없음')} · {formatDateTime(node.updatedAt)}
+          {userName(node.updatedBy)} · {formatDateTime(node.updatedAt)}
         </dd>
         {node.archivedAt && (
           <>
@@ -243,8 +245,14 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
           <NodeEditForm
             key={`${node.id}:${node.revision}`}
             node={node}
-            onSaved={() => succeed('저장했습니다.')}
+            onSaved={() => {
+              setDraft(null)
+              succeed('저장했습니다.')
+            }}
             onError={fail}
+            draft={draft}
+            onConflict={setDraft}
+            onDraftDone={() => setDraft(null)}
           />
         </section>
       )}

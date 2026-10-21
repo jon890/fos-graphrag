@@ -68,6 +68,13 @@ export function fromInputValue(def: PropertyDef, raw: string): ConvertResult {
       return /^\d{4}-\d{2}-\d{2}$/.test(text)
         ? { value: text, error: null }
         : { value: null, error: 'YYYY-MM-DD 형식이어야 합니다.' }
+    case 'url': {
+      const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`
+      if (def.maxLength !== undefined && withScheme.length > def.maxLength) {
+        return { value: withScheme, error: `${def.maxLength}자 이하여야 합니다.` }
+      }
+      return { value: withScheme, error: null }
+    }
     case 'enum':
       if (def.values && !def.values.includes(text)) return { value: null, error: '허용된 값이 아닙니다.' }
       return { value: text, error: null }
@@ -105,6 +112,8 @@ export function buildPatchProperties(
   const properties: Record<string, PropertyValue> = {}
   const errors: Record<string, string> = {}
   for (const [name, def] of Object.entries(defs)) {
+    // 바꾸지 않은 칸은 검사하지 않는다. 목록 밖 예전 값이 남아도 다른 칸을 저장할 수 있다
+    if ((values[name] ?? '') === toInputValue(def, original[name])) continue
     const { value, error } = fromInputValue(def, values[name] ?? '')
     if (error) {
       errors[name] = error
@@ -123,5 +132,14 @@ export function buildPatchProperties(
 export function initialFormValues(defs: Record<string, PropertyDef>, properties: Record<string, PropertyValue> = {}): FormValues {
   const values: FormValues = {}
   for (const [name, def] of Object.entries(defs)) values[name] = toInputValue(def, properties[name])
+  return values
+}
+
+/** 새 노드 폼의 처음 값. 필수 datetime 칸은 지금 시각(로컬, 분 단위)으로 채운다 */
+export function initialCreateValues(defs: Record<string, PropertyDef>, now: Date = new Date()): FormValues {
+  const values = initialFormValues(defs)
+  for (const [name, def] of Object.entries(defs)) {
+    if (def.type === 'datetime' && def.required) values[name] = isoToLocalInput(now.toISOString())
+  }
   return values
 }

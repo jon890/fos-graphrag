@@ -197,6 +197,7 @@ Neo4j 예외는 시간 초과(`QUERY_TIMEOUT`), 연결 불가(`DATABASE_UNAVAILA
 수정, 검토, 보관, 복원 요청은 본문에 `expectedRevision` 을 담는다.
 서버는 대상에 쓰기 잠금을 먼저 걸고 revision 을 비교한 뒤 같은 트랜잭션에서 갱신하고 변경 이력을 남긴다.
 값이 다르면 아무것도 바꾸지 않고 `409 REVISION_CONFLICT` 를 낸다. 클라이언트는 최신 상태를 다시 읽어 사용자에게 보여 준다.
+409 응답에는 서버의 현재 값을 담지 않는다. 웹은 상세를 다시 읽어 편집 시작 값, 내 입력, 최신 값을 칸마다 비교한다. 화면 동작은 [흐름](flow.md) 의 「동시 수정」 이다.
 
 바뀐 값이 없는 수정(노드 `PATCH`, Claim `PATCH`, 같은 상태와 메모의 검토, 사용자 `PATCH`)은 `200` 과 현재 표현을 돌려준다.
 revision 은 그대로이고 ChangeEvent 도 만들지 않는다. `expectedRevision` 검사는 그대로 해서, 낡은 revision 이면 바뀐 값이 없어도 `409` 다.
@@ -358,7 +359,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 
 | 메서드 | 경로 | 인증 | 응답 |
 | --- | --- | --- | --- |
-| GET | `/api/ontology` | 필요 | 온톨로지 YAML 을 그대로 옮긴 JSON. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`)과 주장 문장 틀(`claimPredicates.<predicate>.sentence`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다 |
+| GET | `/api/ontology` | 필요 | 온톨로지 YAML 을 그대로 옮긴 JSON. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`), 주장 문장 틀(`claimPredicates.<predicate>.sentence`), 만들기 폼 정보(`nodeTypes.<타입>.hintProperties`, `relationshipTypes.<관계>.createPicker`), 예전 값 별칭(`valueAliases`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다. 뜻은 [데이터 스키마](data-schema.md) 의 「표시 이름」 과 그 아래 절이다 |
 
 ## 사용자 관리
 

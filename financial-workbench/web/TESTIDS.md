@@ -39,6 +39,7 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `filter-include-archived` | 「보관 포함」 체크 |
 | `search-results` | 결과 영역 |
 | `search-result` * | 결과 한 줄. `data-node-id`, `data-node-type`. 이름은 안쪽 `.result-label` |
+| `search-result-hint` * | 결과 한 줄의 구분 정보(`hintProperties` 값과 만든 날) |
 | `search-empty` | 결과 없음 |
 | `search-pager-prev`, `search-pager-next`, `search-pager-info` | 결과가 2쪽 이상일 때 |
 | `new-node-type`, `new-node-button` | 새 노드 타입 select 와 만들기 버튼. VIEWER 에게는 없다. 값 `Claim` 을 고르면 주장 만들기 폼(`claim-add-form`)이 열린다 |
@@ -46,6 +47,15 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `create-form`, `create-submit`, `create-cancel`, `create-error` | 새 노드 폼 |
 | `create-prop-<속성>` | 새 노드 폼의 속성 입력. 예: `create-prop-name`, `create-prop-market` |
 | `create-prop-<속성>-error` | 그 속성의 오류 |
+| `create-duplicate` | 같은 이름 경고(`role=status`). 저장 전에 같은 이름이 있으면 나온다 |
+| `create-duplicate-item` * | 경고의 후보 한 줄. `data-node-id` |
+| `create-duplicate-open` | 후보의 「열기」 단추. `claim-doc-create-` 에서는 「이 문서 고르기」 |
+| `create-duplicate-confirm` | 「그래도 만들기」 단추 |
+| `create-link-<관계>-picker-*` | 만들기 폼의 시작 노드 고르기(NodePicker). 예: `create-link-ISSUES-picker-input` |
+| `create-link-<관계>-selected` | 고른 시작 노드 |
+| `create-link-<관계>-clear` | 「다시 고르기」 단추 |
+
+`create-duplicate*` 와 `create-link-*` 는 근거 문서 등록 폼에서 `claim-doc-create-` 접두사로도 생긴다.
 
 ## 작업 공간: 가운데 그래프
 
@@ -83,7 +93,9 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 | `node-restore-button` | 복원 버튼(보관된 노드) |
 | `node-meta`, `node-revision`, `node-updated-by` | 메타 정보 |
 | `node-edit-form`, `node-save`, `node-edit-local-message` | 속성 수정 폼(Claim 이 아닌 노드) |
+| `edit-conflict`, `edit-conflict-field` *(`data-field`, `data-kind` 가 `theirs`, `mine`, `both`)*, `edit-conflict-choice-<속성>-mine`, `edit-conflict-choice-<속성>-latest`, `edit-conflict-apply`, `edit-conflict-discard` | 409 뒤 내 입력과 최신 값의 칸별 비교. 다시 읽은 뒤 되살릴 입력이 있을 때만 나온다 |
 | `edit-prop-<속성>` | 수정 폼의 속성 입력. 예: `edit-prop-description` |
+| `edit-prop-<속성>-unlisted` | 저장된 값이 목록 밖일 때만 나오는 선택지 |
 | `relationship-section` | 관계 영역 |
 | `relationship-row` * | 관계 한 줄. `data-rel-type` |
 | `relationship-archive-toggle` * | 관계 보관 또는 복원 |
@@ -125,12 +137,13 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 
 ## 노드 고르기(NodePicker)
 
-접두사 `<p>` 는 `relationship-target-picker`, `claim-subject-picker`, `claim-object-picker`, `claim-doc-picker` 가운데 하나다.
+접두사 `<p>` 는 `relationship-target-picker`, `claim-subject-picker`, `claim-object-picker`, `claim-doc-picker`, `create-link-ISSUES-picker` 가운데 하나다.
 
 | testid | 요소 |
 | --- | --- |
 | `<p>-input`, `<p>-search` | 검색어와 검색 버튼(Enter 도 된다) |
 | `<p>-result` * | 결과 한 줄. `data-node-id` |
+| `<p>-result-hint` * | 결과 한 줄의 구분 정보 |
 | `<p>-empty` | 결과 없음 |
 | `<p>-none` | 고를 후보가 하나도 없을 때의 안내(예: 「먼저 기업을 만드세요」) |
 

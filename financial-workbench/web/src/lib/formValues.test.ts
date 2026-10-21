@@ -5,6 +5,7 @@ import {
   fromInputValue,
   initialFormValues,
   isoToLocalInput,
+  initialCreateValues,
   localInputToIso,
   toInputValue,
 } from './formValues'
@@ -79,5 +80,49 @@ describe('buildCreateProperties / buildPatchProperties', () => {
     expect(values).toEqual({ name: '가상전자', country: 'KR', score: '0.5' })
     const r = buildPatchProperties(defs, original, { ...values, country: '', score: '0.5' })
     expect(r.properties).toEqual({ country: null })
+  })
+})
+
+describe('url 입력', () => {
+  const url: PropertyDef = { type: 'url', required: true, maxLength: 2000 }
+
+  it('scheme 이 없으면 https:// 를 붙이고 있으면 그대로 둔다', () => {
+    expect(fromInputValue(url, 'example.com/a')).toEqual({ value: 'https://example.com/a', error: null })
+    expect(fromInputValue(url, 'http://example.com')).toEqual({ value: 'http://example.com', error: null })
+    expect(fromInputValue(url, 'HTTPS://x.io')).toEqual({ value: 'HTTPS://x.io', error: null })
+  })
+
+  it('공백만 있으면 필수 오류다', () => {
+    expect(fromInputValue(url, '   ')).toEqual({ value: null, error: '필수 값입니다.' })
+  })
+})
+
+describe('buildPatchProperties 의 바꾸지 않은 칸', () => {
+  const defs: Record<string, PropertyDef> = {
+    en: { type: 'enum', required: false, values: ['KRX_KOSPI', 'NYSE'] },
+    note: { type: 'string', required: false, maxLength: 20 },
+  }
+
+  it('목록 밖 예전 값이 남아도 바꾼 칸만 담긴다', () => {
+    const r = buildPatchProperties(defs, { en: 'KOR', note: 'a' }, { en: 'KOR', note: 'b' })
+    expect(r.errors).toEqual({})
+    expect(r.properties).toEqual({ note: 'b' })
+  })
+
+  it('그 칸을 목록 안 값으로 바꾸면 담긴다', () => {
+    const r = buildPatchProperties(defs, { en: 'KOR', note: 'a' }, { en: 'NYSE', note: 'a' })
+    expect(r.properties).toEqual({ en: 'NYSE' })
+  })
+})
+
+describe('initialCreateValues', () => {
+  it('필수 datetime 칸만 지금 시각으로 채운다', () => {
+    const defs: Record<string, PropertyDef> = {
+      at: { type: 'datetime', required: true },
+      opt: { type: 'datetime', required: false },
+    }
+    const r = initialCreateValues(defs, new Date('2026-10-21T03:04:00Z'))
+    expect(r.at).toBe(isoToLocalInput('2026-10-21T03:04:00Z'))
+    expect(r.opt).toBe('')
   })
 })

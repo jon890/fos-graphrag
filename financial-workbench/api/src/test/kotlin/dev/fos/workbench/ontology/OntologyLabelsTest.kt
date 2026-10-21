@@ -42,6 +42,47 @@ class OntologyLabelsTest {
         assertThat(market.values).containsExactly("KRX_KOSPI", "KRX_KOSDAQ", "NASDAQ", "NYSE", "OTHER")
         assertThat(market.valueLabels).containsEntry("KRX_KOSPI", "코스피").containsEntry("KRX_KOSDAQ", "코스닥")
         assertThat(ontology.claimPredicates.keys).containsExactly("SUPPLIES_TO", "BELONGS_TO_SECTOR", "COMPETES_WITH", "HAS_EXPOSURE_TO")
+        val country = ontology.nodeTypes.getValue("Company").properties.getValue("country")
+        assertThat(country.type).isEqualTo(PropertyType.ENUM)
+        assertThat(country.values).containsExactly("KR", "US", "JP", "CN", "TW", "HK", "NL", "DE", "GB", "FR", "OTHER")
+        assertThat(country.valueLabels).containsEntry("KR", "대한민국 (KR)")
+        val currency = ontology.nodeTypes.getValue("Security").properties.getValue("currency")
+        assertThat(currency.type).isEqualTo(PropertyType.ENUM)
+        assertThat(currency.valueAliases?.get("KRW")).contains("원")
+    }
+
+    @Test
+    fun `목록 밖 값은 공백, 대소문자, 별칭으로 목록 값에 맞춘다`() {
+        val currency = ontology.nodeTypes.getValue("Security").properties.getValue("currency")
+        assertThat(currency.canonicalEnumValue(" 원 ")).isEqualTo("KRW")
+        assertThat(currency.canonicalEnumValue("usd")).isEqualTo("USD")
+        assertThat(currency.canonicalEnumValue("   ")).isNull()
+        assertThat(currency.canonicalEnumValue("KRW")).isEqualTo("KRW")
+        assertThat(currency.canonicalEnumValue("루피")).isEqualTo("루피")
+    }
+
+    @Test
+    fun `별칭과 구분 정보가 잘못되면 읽지 않는다`() {
+        val invalid = mapOf(
+            "키가 values 밖" to minimal("{ type: enum, values: [A], valueAliases: { B: [b] } }"),
+            "두 값에 같은 별칭" to minimal("{ type: enum, values: [A, B], valueAliases: { A: [x], B: [\" X \"] } }"),
+            "별칭이 값과 같음" to minimal("{ type: enum, values: [A], valueAliases: { A: [\" a \"] } }"),
+        )
+        invalid.forEach { (case, yaml) ->
+            assertThatThrownBy { OntologyLoader.load(yaml.byteInputStream()) }
+                .describedAs(case).isInstanceOf(IllegalArgumentException::class.java)
+        }
+        assertThatThrownBy { OntologyLoader.load(minimal("{ type: string, valueAliases: { A: [a] } }").byteInputStream()) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("enum 이 아닌")
+        val strayHint = minimal("{ type: string }").replace("    labelProperty: name\n", "    labelProperty: name\n    hintProperties: [nope]\n")
+        assertThat(strayHint).contains("hintProperties: [nope]")
+        assertThatThrownBy { OntologyLoader.load(strayHint.byteInputStream()) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("nope")
+    }
+
+    @Test
+    fun `발행 관계는 종목 만들기 폼에 발행 기업 칸을 둔다`() {
+        assertThat(ontology.relationshipTypes.getValue("ISSUES").createPicker?.label).isEqualTo("발행 기업")
     }
 
     @Test

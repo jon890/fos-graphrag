@@ -216,6 +216,11 @@ export function ClaimCreateForm({ initialSubject = null, onCreated, onCancel }: 
               type="Document"
               testIdPrefix="claim-doc-create"
               onCancel={() => setCreatingDoc(false)}
+              useExistingLabel="이 문서 고르기"
+              onUseExisting={(doc) => {
+                addDocument(doc)
+                setCreatingDoc(false)
+              }}
               onCreated={(doc) => {
                 addDocument(doc)
                 setCreatingDoc(false)

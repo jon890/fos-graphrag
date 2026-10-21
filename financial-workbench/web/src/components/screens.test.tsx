@@ -1,10 +1,13 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import type { NodeView } from '../api/types'
 import { NodeCreateForm } from './NodeCreateForm'
+import { NodeEditForm } from './NodeEditForm'
+import { PropertyFields } from './PropertyFields'
 import { SearchPanel } from './SearchPanel'
 import { StatusBadge, TypeBadge } from './TypeBadge'
 import { WelcomeGuide } from './WelcomeGuide'
-import { withApp } from './testSupport'
+import { testOntology, withApp } from './testSupport'
 
 // 「Person」 은 화면 코드에 없는 타입이다. 온톨로지에만 있어도 화면이 따라오는지 본다.
 describe('온톨로지에 새로 더한 타입', () => {
@@ -23,6 +26,32 @@ describe('온톨로지에 새로 더한 타입', () => {
     const html = renderToStaticMarkup(withApp(<NodeCreateForm type="Security" testIdPrefix="create" onCreated={() => {}} onCancel={() => {}} />))
     expect(html).toContain('<option value="KRX_KOSPI">코스피</option>')
     expect(html).toContain('<option value="KRX_KOSDAQ">코스닥</option>')
+  })
+
+  it('종목 만들기 폼에만 발행 기업 고르기 칸이 있다', () => {
+    const security = renderToStaticMarkup(withApp(<NodeCreateForm type="Security" testIdPrefix="create" onCreated={() => {}} onCancel={() => {}} />))
+    expect(security).toContain('발행 기업')
+    expect(security).toContain('create-link-ISSUES-picker-input')
+    const company = renderToStaticMarkup(withApp(<NodeCreateForm type="Company" testIdPrefix="create" onCreated={() => {}} onCancel={() => {}} />))
+    expect(company).not.toContain('create-link-ISSUES-picker-input')
+  })
+
+  it('저장된 값이 목록 밖인 enum 칸은 선택지로 보인다', () => {
+    const defs = testOntology.nodeTypes.Company.properties
+    const render = (country: string) =>
+      renderToStaticMarkup(
+        <PropertyFields defs={defs} values={{ name: 'x', country }} testIdPrefix="edit-prop" onChange={() => {}} />,
+      )
+    const unlisted = render('KOR')
+    expect(unlisted).toContain('목록에 없는 값: KOR')
+    expect(unlisted).toContain('edit-prop-country-unlisted')
+    expect(render('KR')).not.toContain('edit-prop-country-unlisted')
+  })
+
+  it('주소 입력칸은 브라우저 형식 검사를 받지 않는다', () => {
+    const html = renderToStaticMarkup(withApp(<NodeCreateForm type="Document" testIdPrefix="claim-doc-create" onCreated={() => {}} onCancel={() => {}} />))
+    expect(html).toContain('inputMode="url"')
+    expect(html).not.toContain('type="url"')
   })
 
   it('검색 패널의 종류 필터와 만들기 선택지에 새 타입이 나온다', () => {
@@ -65,5 +94,54 @@ describe('첫 화면 안내', () => {
     expect(html).toContain('주장 추가')
     // 소개 문장은 종목에만 묶이지 않는다.
     expect(html).not.toContain('종목을')
+  })
+})
+
+describe('노드 편집 409 뒤 입력 지키기', () => {
+  const node = (over: Partial<NodeView> = {}): NodeView => ({
+    id: 'n1',
+    type: 'Company',
+    label: 'x',
+    properties: { name: 'x', country: 'KR' },
+    revision: 3,
+    archived: false,
+    archivedAt: null,
+    createdAt: '2026-01-01T00:00:00Z',
+    createdBy: null,
+    updatedAt: '2026-01-01T00:00:00Z',
+    updatedBy: null,
+    reviewStatus: null,
+    ...over,
+  })
+  const draft = (over: Record<string, unknown> = {}) => ({
+    nodeId: 'n1',
+    revision: 2,
+    base: { name: 'x', country: 'KR' },
+    mine: { name: 'y', country: 'KR' },
+    ...over,
+  })
+  const render = (n: NodeView, d: ReturnType<typeof draft>) =>
+    renderToStaticMarkup(withApp(<NodeEditForm node={n} draft={d} onSaved={() => {}} onError={() => {}} />))
+
+  it('다시 읽은 뒤 내 입력이 있으면 나만 바꾼 칸을 보인다', () => {
+    const html = render(node(), draft())
+    expect(html).toContain('data-testid="edit-conflict"')
+    expect(html).toContain('data-kind="mine"')
+  })
+
+  it('아직 다시 읽지 않았거나 다른 노드의 draft 이면 비교가 없다', () => {
+    expect(render(node(), draft({ revision: 3 }))).not.toContain('edit-conflict')
+    expect(render(node(), draft({ nodeId: 'other' }))).not.toContain('edit-conflict')
+  })
+
+  it('보관된 노드에는 비교가 없다', () => {
+    expect(render(node({ archived: true }), draft())).not.toContain('edit-conflict')
+  })
+
+  it('둘 다 바꾼 칸은 최신 값이 기본으로 골라진다', () => {
+    const html = render(node({ properties: { name: 'z', country: 'KR' } }), draft())
+    expect(html).toContain('data-kind="both"')
+    expect(html).toMatch(/<input[^>]*data-testid="edit-conflict-choice-name-latest"[^>]*checked/)
+    expect(html).not.toMatch(/<input[^>]*data-testid="edit-conflict-choice-name-mine"[^>]*checked/)
   })
 })

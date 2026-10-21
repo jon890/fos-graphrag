@@ -11,6 +11,10 @@ const data = {
   customer: `가상전자-${suffix}`,
   security: `가상전자 보통주-${suffix}`,
   ticker: `T${suffix.slice(-10)}`,
+  issuerSecurity: `가상발행 우선주-${suffix}`,
+  issuerTicker: `I${suffix.slice(-10)}`,
+  failedSecurity: `가상실패 보통주-${suffix}`,
+  failedTicker: `F${suffix.slice(-10)}`,
   docTitle: `가상부품 사업보고서-${suffix}`,
   docUrl: `https://example.com/financial-workbench/${suffix}`,
   description: `가상부품-${suffix} 이 가상전자-${suffix} 에 메모리 기판을 공급한다.`,
@@ -23,6 +27,7 @@ const data = {
   reviewNote: '공시 원문과 대조함',
   editByA: `A 가 고친 메모 ${suffix}`,
   editByB: `B 가 고친 메모 ${suffix}`,
+  registrationByB: `110111-${suffix.slice(-7)}`,
 }
 
 const editorA: TestUser = { sub: `editor-a-${suffix}`, email: `editor-a-${suffix}@example.com`, name: '편집자A' }
@@ -197,7 +202,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     const company = pageAdmin.getByTestId('create-form')
     await expect(company).toContainText('기업 이름')
     await expect(company).toContainText('국가')
-    await expect(company).toContainText('두 글자 국가 코드. 예: KR, US')
+    await expect(company).toContainText('기업이 등록된 나라')
+    await expect(pageAdmin.getByTestId('create-prop-country').locator('option[value="KR"]')).toHaveText('대한민국 (KR)')
     await expect(company).not.toContainText('문자열')
     await expect(company).not.toContainText('registrationNumber')
     await shot(pageAdmin, '00e-company-form')
@@ -241,6 +247,80 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(row).toHaveAttribute('data-rel-type', 'ISSUES')
     await expect(pageA.locator('[data-testid="graph-node"]').filter({ hasText: data.customer })).toHaveCount(1)
     await shot(pageA, '01-issues')
+  })
+
+  test('1b) 같은 이름은 저장 전에 경고하고, 종목을 만들며 고른 발행 기업이 이어진다', async () => {
+    await pageA.getByTestId('tab-workspace').click()
+    await pageA.getByTestId('new-node-type').selectOption('Company')
+    await pageA.getByTestId('new-node-button').click()
+    await pageA.getByTestId('create-prop-name').fill(data.supplier)
+    await pageA.getByTestId('create-submit').click()
+    await expect(pageA.getByTestId('create-duplicate')).toBeVisible()
+    await expect(pageA.getByTestId('create-duplicate-item')).toHaveCount(1)
+    await expect(pageA.getByTestId('create-duplicate-item')).toContainText('대한민국 (KR)')
+    await shot(pageA, '01b-duplicate')
+    await pageA.getByTestId('create-duplicate-open').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
+
+    // 그래도 만들면 같은 이름의 기업이 둘이 된다.
+    await pageA.getByTestId('new-node-button').click()
+    await pageA.getByTestId('create-prop-name').fill(data.supplier)
+    await pageA.getByTestId('create-submit').click()
+    await expect(pageA.getByTestId('create-duplicate')).toBeVisible()
+    await pageA.getByTestId('create-duplicate-confirm').click()
+    await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
+    const secondId = (await pageA.getByTestId('detail-panel').getAttribute('data-node-id'))!
+    await pageA.getByTestId('search-input').fill(data.supplier)
+    await pageA.getByTestId('search-submit').click()
+    const same = pageA.getByTestId('search-result').filter({ has: pageA.locator('.result-label', { hasText: exact(data.supplier) }) })
+    await expect(same).toHaveCount(2)
+    for (const hint of await same.getByTestId('search-result-hint').allTextContents()) expect(hint.trim()).not.toBe('')
+    // 뒤 테스트의 검색과 고르기에 섞이지 않게 두 번째 기업을 보관한다.
+    await pageA.locator(`[data-testid="search-result"][data-node-id="${secondId}"]`).click()
+    await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-id', secondId)
+    await pageA.getByTestId('node-archive-button').click()
+    await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
+
+    // 종목을 만들면서 발행 기업을 고르면 ISSUES 관계가 함께 이어진다.
+    await pageA.getByTestId('new-node-type').selectOption('Security')
+    await pageA.getByTestId('new-node-button').click()
+    await pageA.getByTestId('create-prop-market').selectOption('KRX_KOSDAQ')
+    await pageA.getByTestId('create-prop-ticker').fill(data.issuerTicker)
+    await pageA.getByTestId('create-prop-name').fill(data.issuerSecurity)
+    await pageA.getByTestId('create-prop-securityType').selectOption('COMMON')
+    await pageA.getByTestId('create-prop-currency').selectOption('USD')
+    await pick(pageA, 'create-link-ISSUES-picker', data.customer)
+    await expect(pageA.getByTestId('create-link-ISSUES-selected')).toContainText(data.customer)
+    await pageA.getByTestId('create-submit').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.issuerSecurity)
+    await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
+    const row = pageA.getByTestId('relationship-row').filter({ hasText: data.customer })
+    await expect(row).toBeVisible()
+    await expect(row).toHaveAttribute('data-rel-type', 'ISSUES')
+    await shot(pageA, '01b-issuer-linked')
+
+    // 관계만 실패하면 종목은 남고 안내가 오류로 나온다.
+    await pageA.route('**/api/relationships', (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 'INTERNAL_ERROR', message: '테스트로 만든 실패', details: null }),
+      }),
+    )
+    await pageA.getByTestId('new-node-type').selectOption('Security')
+    await pageA.getByTestId('new-node-button').click()
+    await pageA.getByTestId('create-prop-market').selectOption('KRX_KOSDAQ')
+    await pageA.getByTestId('create-prop-ticker').fill(data.failedTicker)
+    await pageA.getByTestId('create-prop-name').fill(data.failedSecurity)
+    await pageA.getByTestId('create-prop-securityType').selectOption('COMMON')
+    await pageA.getByTestId('create-prop-currency').selectOption('USD')
+    await pick(pageA, 'create-link-ISSUES-picker', data.customer)
+    await pageA.getByTestId('create-submit').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.failedSecurity)
+    await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'error')
+    await expect(pageA.getByTestId('detail-notice')).toContainText('발행 기업을 잇지 못했습니다')
+    await pageA.unroute('**/api/relationships')
   })
 
   test('2) A 가 문서를 등록하고 SUPPLIES_TO Claim 을 만든다', async () => {
@@ -391,7 +471,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(canvas).toHaveAttribute('data-collapsed-claims', '1')
   })
 
-  test('5) 같은 노드를 동시에 고치면 나중 저장은 409 안내 뒤 최신 값으로 바뀐다', async () => {
+  test('5) 같은 노드를 동시에 고치면 나중 저장은 409 안내 뒤 최신 값을 보이고, 내 입력을 골라 다시 적용해 저장한다', async () => {
     await searchAndOpen(pageA, data.customer)
     await searchAndOpen(pageB, data.customer)
     const revisionBefore = Number(await pageB.getByTestId('node-revision').textContent())
@@ -405,14 +485,31 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     // B 는 아직 예전 revision 을 들고 있다.
     await expect(pageB.getByTestId('node-revision')).toHaveText(String(revisionBefore))
     await pageB.getByTestId('edit-prop-description').fill(data.editByB)
+    await pageB.getByTestId('edit-prop-registrationNumber').fill(data.registrationByB)
     await pageB.getByTestId('node-save').click()
 
     const notice = pageB.getByTestId('detail-notice')
     await expect(notice).toHaveAttribute('data-kind', 'conflict')
-    await expect(notice).toContainText('다른 사용자가 먼저 수정했습니다')
+    await expect(notice).toContainText('다른 탭이나 다른 사용자가 먼저 저장했습니다')
+    await expect(notice).not.toContainText('서버 응답')
     await expect(pageB.getByTestId('edit-prop-description')).toHaveValue(data.editByA)
+    await expect(pageB.locator('[data-testid="edit-conflict-field"][data-field="description"]')).toHaveAttribute('data-kind', 'both')
+    await expect(pageB.locator('[data-testid="edit-conflict-field"][data-field="registrationNumber"]')).toHaveAttribute('data-kind', 'mine')
     await expect(pageB.getByTestId('node-revision')).toHaveText(String(revisionBefore + 1))
     await shot(pageB, '05-conflict-b')
+
+    await pageB.getByTestId('edit-conflict-choice-description-mine').check()
+    await pageB.getByTestId('edit-conflict-apply').click()
+    await expect(pageB.getByTestId('edit-prop-description')).toHaveValue(data.editByB)
+    await expect(pageB.getByTestId('edit-prop-registrationNumber')).toHaveValue(data.registrationByB)
+    await expect(pageB.getByTestId('edit-conflict')).toHaveCount(0)
+    // 단추가 폼을 제출하지 않았다는 근거다.
+    await expect(pageB.getByTestId('node-edit-local-message')).toContainText('내 입력을 다시 넣었습니다')
+    await expect(pageB.getByTestId('node-edit-local-message')).not.toContainText('바뀐 내용이 없습니다')
+    await shot(pageB, '05-reapplied-b')
+    await pageB.getByTestId('node-save').click()
+    await expect(pageB.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
+    await expect(pageB.getByTestId('node-revision')).toHaveText(String(revisionBefore + 2))
   })
 
   test('6) 보관하면 기본 검색에서 빠지고, 복원하면 이력에 ARCHIVE 와 RESTORE 가 남는다', async () => {
