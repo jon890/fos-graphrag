@@ -161,9 +161,11 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
                   onClick={() => onFocus(n.id)}
                 >
                   <TypeBadge type={n.type} />
-                  <span className="result-label">{labels.node(n)}</span>
-                  <span className="result-hint text-xs text-muted-foreground" data-testid="search-result-hint">
-                    {labels.hint(n)}
+                  <span className="result-text">
+                    <span className="result-label">{labels.node(n)}</span>
+                    <span className="result-hint text-xs text-muted-foreground" data-testid="search-result-hint">
+                      {labels.hint(n)}
+                    </span>
                   </span>
                   <StatusBadge status={n.reviewStatus} />
                   {n.archived && <span className="archived-badge">보관됨</span>}
