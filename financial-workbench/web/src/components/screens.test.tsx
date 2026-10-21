@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import type { NodeView } from '../api/types'
 import { NodeCreateForm } from './NodeCreateForm'
+import { NodeEditForm } from './NodeEditForm'
 import { PropertyFields } from './PropertyFields'
 import { SearchPanel } from './SearchPanel'
 import { StatusBadge, TypeBadge } from './TypeBadge'
@@ -92,5 +94,54 @@ describe('첫 화면 안내', () => {
     expect(html).toContain('주장 추가')
     // 소개 문장은 종목에만 묶이지 않는다.
     expect(html).not.toContain('종목을')
+  })
+})
+
+describe('노드 편집 409 뒤 입력 지키기', () => {
+  const node = (over: Partial<NodeView> = {}): NodeView => ({
+    id: 'n1',
+    type: 'Company',
+    label: 'x',
+    properties: { name: 'x', country: 'KR' },
+    revision: 3,
+    archived: false,
+    archivedAt: null,
+    createdAt: '2026-01-01T00:00:00Z',
+    createdBy: null,
+    updatedAt: '2026-01-01T00:00:00Z',
+    updatedBy: null,
+    reviewStatus: null,
+    ...over,
+  })
+  const draft = (over: Record<string, unknown> = {}) => ({
+    nodeId: 'n1',
+    revision: 2,
+    base: { name: 'x', country: 'KR' },
+    mine: { name: 'y', country: 'KR' },
+    ...over,
+  })
+  const render = (n: NodeView, d: ReturnType<typeof draft>) =>
+    renderToStaticMarkup(withApp(<NodeEditForm node={n} draft={d} onSaved={() => {}} onError={() => {}} />))
+
+  it('다시 읽은 뒤 내 입력이 있으면 나만 바꾼 칸을 보인다', () => {
+    const html = render(node(), draft())
+    expect(html).toContain('data-testid="edit-conflict"')
+    expect(html).toContain('data-kind="mine"')
+  })
+
+  it('아직 다시 읽지 않았거나 다른 노드의 draft 이면 비교가 없다', () => {
+    expect(render(node(), draft({ revision: 3 }))).not.toContain('edit-conflict')
+    expect(render(node(), draft({ nodeId: 'other' }))).not.toContain('edit-conflict')
+  })
+
+  it('보관된 노드에는 비교가 없다', () => {
+    expect(render(node({ archived: true }), draft())).not.toContain('edit-conflict')
+  })
+
+  it('둘 다 바꾼 칸은 최신 값이 기본으로 골라진다', () => {
+    const html = render(node({ properties: { name: 'z', country: 'KR' } }), draft())
+    expect(html).toContain('data-kind="both"')
+    expect(html).toMatch(/<input[^>]*data-testid="edit-conflict-choice-name-latest"[^>]*checked/)
+    expect(html).not.toMatch(/<input[^>]*data-testid="edit-conflict-choice-name-mine"[^>]*checked/)
   })
 })

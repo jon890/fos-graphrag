@@ -93,6 +93,7 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 | `node-restore-button` | 복원 버튼(보관된 노드) |
 | `node-meta`, `node-revision`, `node-updated-by` | 메타 정보 |
 | `node-edit-form`, `node-save`, `node-edit-local-message` | 속성 수정 폼(Claim 이 아닌 노드) |
+| `edit-conflict`, `edit-conflict-field` *(`data-field`, `data-kind` 가 `theirs`, `mine`, `both`)*, `edit-conflict-choice-<속성>-mine`, `edit-conflict-choice-<속성>-latest`, `edit-conflict-apply`, `edit-conflict-discard` | 409 뒤 내 입력과 최신 값의 칸별 비교. 다시 읽은 뒤 되살릴 입력이 있을 때만 나온다 |
 | `edit-prop-<속성>` | 수정 폼의 속성 입력. 예: `edit-prop-description` |
 | `edit-prop-<속성>-unlisted` | 저장된 값이 목록 밖일 때만 나오는 선택지 |
 | `relationship-section` | 관계 영역 |

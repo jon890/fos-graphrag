@@ -27,6 +27,7 @@ const data = {
   reviewNote: '공시 원문과 대조함',
   editByA: `A 가 고친 메모 ${suffix}`,
   editByB: `B 가 고친 메모 ${suffix}`,
+  registrationByB: `110111-${suffix.slice(-7)}`,
 }
 
 const editorA: TestUser = { sub: `editor-a-${suffix}`, email: `editor-a-${suffix}@example.com`, name: '편집자A' }
@@ -470,7 +471,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(canvas).toHaveAttribute('data-collapsed-claims', '1')
   })
 
-  test('5) 같은 노드를 동시에 고치면 나중 저장은 409 안내 뒤 최신 값으로 바뀐다', async () => {
+  test('5) 같은 노드를 동시에 고치면 나중 저장은 409 안내 뒤 최신 값을 보이고, 내 입력을 골라 다시 적용해 저장한다', async () => {
     await searchAndOpen(pageA, data.customer)
     await searchAndOpen(pageB, data.customer)
     const revisionBefore = Number(await pageB.getByTestId('node-revision').textContent())
@@ -484,14 +485,31 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     // B 는 아직 예전 revision 을 들고 있다.
     await expect(pageB.getByTestId('node-revision')).toHaveText(String(revisionBefore))
     await pageB.getByTestId('edit-prop-description').fill(data.editByB)
+    await pageB.getByTestId('edit-prop-registrationNumber').fill(data.registrationByB)
     await pageB.getByTestId('node-save').click()
 
     const notice = pageB.getByTestId('detail-notice')
     await expect(notice).toHaveAttribute('data-kind', 'conflict')
-    await expect(notice).toContainText('다른 사용자가 먼저 수정했습니다')
+    await expect(notice).toContainText('다른 탭이나 다른 사용자가 먼저 저장했습니다')
+    await expect(notice).not.toContainText('서버 응답')
     await expect(pageB.getByTestId('edit-prop-description')).toHaveValue(data.editByA)
+    await expect(pageB.locator('[data-testid="edit-conflict-field"][data-field="description"]')).toHaveAttribute('data-kind', 'both')
+    await expect(pageB.locator('[data-testid="edit-conflict-field"][data-field="registrationNumber"]')).toHaveAttribute('data-kind', 'mine')
     await expect(pageB.getByTestId('node-revision')).toHaveText(String(revisionBefore + 1))
     await shot(pageB, '05-conflict-b')
+
+    await pageB.getByTestId('edit-conflict-choice-description-mine').check()
+    await pageB.getByTestId('edit-conflict-apply').click()
+    await expect(pageB.getByTestId('edit-prop-description')).toHaveValue(data.editByB)
+    await expect(pageB.getByTestId('edit-prop-registrationNumber')).toHaveValue(data.registrationByB)
+    await expect(pageB.getByTestId('edit-conflict')).toHaveCount(0)
+    // 단추가 폼을 제출하지 않았다는 근거다.
+    await expect(pageB.getByTestId('node-edit-local-message')).toContainText('내 입력을 다시 넣었습니다')
+    await expect(pageB.getByTestId('node-edit-local-message')).not.toContainText('바뀐 내용이 없습니다')
+    await shot(pageB, '05-reapplied-b')
+    await pageB.getByTestId('node-save').click()
+    await expect(pageB.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
+    await expect(pageB.getByTestId('node-revision')).toHaveText(String(revisionBefore + 2))
   })
 
   test('6) 보관하면 기본 검색에서 빠지고, 복원하면 이력에 ARCHIVE 와 RESTORE 가 남는다', async () => {
