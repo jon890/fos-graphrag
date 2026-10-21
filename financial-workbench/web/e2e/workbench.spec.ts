@@ -562,7 +562,48 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA.getByTestId('changes-tab')).toBeVisible()
     await expect(pageA.locator('[data-testid="change-row"][data-action="ARCHIVE"]')).toHaveCount(1)
     await expect(pageA.locator('[data-testid="change-row"][data-action="RESTORE"]')).toHaveCount(1)
+    await expect(pageA.locator('[data-testid="change-row"][data-action="ARCHIVE"] li').filter({ hasText: '보관: 아니오 → 예' })).toHaveCount(1)
     await shot(pageA, '06-archive-restore-history')
+  })
+
+  test('6c) 변경 이력에서 사용자를 표시 이름으로 고르고 주장 이력의 주체와 대상이 이름으로 보인다', async () => {
+    await pageA.getByTestId('tab-changes').click()
+    await expect(pageA.getByTestId('changes-tab')).toBeVisible()
+    const clear = pageA.getByTestId('changes-filter-clear')
+    if (await clear.isVisible()) await clear.click()
+
+    const actorSelect = pageA.getByTestId('changes-actor-filter')
+    await expect(actorSelect).toContainText(editorA.name)
+    await actorSelect.selectOption({ value: editorA.email })
+    const rows = pageA.getByTestId('change-row')
+    await expect(rows.first()).toBeVisible()
+    await expect
+      .poll(async () => [...new Set(await pageA.getByTestId('change-actor').allTextContents())].join('|'))
+      .toBe(editorA.name)
+
+    await actorSelect.selectOption({ value: '' })
+    await pageA.getByTestId('changes-target-picker-input').fill(data.supplier)
+    await pageA.getByTestId('changes-target-picker-search').click()
+    await pageA.getByTestId('changes-target-picker-result').filter({ hasText: data.supplier }).first().click()
+    await expect(pageA.getByTestId('changes-target-selected')).toContainText(data.supplier)
+    await expect(rows.first()).toBeVisible()
+    await expect
+      .poll(async () => new Set(await rows.evaluateAll((els) => els.map((e) => e.getAttribute('data-target-id')))).size)
+      .toBe(1)
+
+    // 주장은 기업 이름으로 검색되지 않으므로(docs/prd.md 「남은 한계」) 링크로 연다.
+    await pageA.goto('/?node=' + supplyClaimId)
+    await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-id', supplyClaimId)
+    await expect(pageA).not.toHaveURL(/node=/)
+    await pageA.getByTestId('node-history-link').click()
+    const created = pageA.locator('[data-testid="change-row"][data-action="CREATE"]')
+    await expect(created).toHaveCount(1)
+    await expect(created).toContainText('주체')
+    await expect(created).toContainText(data.supplier)
+    await expect(created).toContainText('대상')
+    await expect(created).toContainText(data.customer)
+    await expect(created).not.toContainText(/[0-9a-f]{8}-[0-9a-f]{4}-/)
+    await shot(pageA, '06c-changes-names')
   })
 
   test('6b) 유일한 근거 문서를 보관하려 하면 해당 주장을 여는 버튼이 나온다', async () => {

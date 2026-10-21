@@ -181,8 +181,11 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 | testid | 요소 |
 | --- | --- |
 | `changes-tab`, `changes-table` | 탭과 표 |
-| `changes-target-filter`, `changes-actor-filter`, `changes-filter-submit`, `changes-filter-clear` | targetId 필터, actor(이메일) 필터 |
-| `change-row` * | 행. `data-action`(CREATE, UPDATE, REVIEW, ARCHIVE, RESTORE), `data-target-id` |
+| `changes-target-picker-input`, `changes-target-picker-search`, `changes-target-picker-result` *(`data-node-id`)*, `changes-target-picker-empty`, `changes-target-picker-none` | 대상 고르기. 대상이 골라지지 않았을 때만 보인다. 이름이나 종목 코드로 찾는다 |
+| `changes-target-selected`, `changes-filter-clear` | 고른 대상(타입 배지와 이름)과 「지우기」 |
+| `changes-actor-filter` | 사용자 select. 선택지는 표시 이름이고 값은 이메일, `''` 은 「(모두)」 |
+| `change-row` * | 행. `data-action`(CREATE, UPDATE, REVIEW, ARCHIVE, RESTORE), `data-target-id`. 수정 번호는 열이 아니라 행 `title` 에 있다 |
+| `change-actor` * | 행의 사용자 칸 |
 | `change-action` * | action 칸 |
 | `changes-empty` | 이력 없음 |
 | `changes-pager-prev`, `changes-pager-next`, `changes-pager-info` | 페이지 이동 |

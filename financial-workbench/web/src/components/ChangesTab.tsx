@@ -1,27 +1,22 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { api, errorMessage } from '../api/client'
-import type { ChangeEventView, Ontology, Page } from '../api/types'
+import type { ChangeEventView, NodeView, Page, UserRef } from '../api/types'
 import { useApp, useLabels } from '../context'
-import { formatDateTime, summarizeValue, userName } from '../lib/format'
-import { enumValueLabel, propertyDef, propertyLabel } from '../lib/labels'
+import { changeFieldLabel, changeValueText, REF_KEYS } from '../lib/changes'
+import { formatDateTime, userName } from '../lib/format'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { NodePicker } from './NodePicker'
 import { Pager } from './Pager'
+import { TypeBadge } from './TypeBadge'
 
 interface Props {
   targetId: string
   onTargetIdChange: (id: string) => void
   onOpen: (id: string) => void
-}
-
-/** 변경 내용 한 줄. 속성 이름과 enum 값은 온톨로지 표시 이름으로 바꾸고, 온톨로지에 없는 키(archived 등)는 그대로 둔다 */
-function changeLine(ontology: Ontology, targetType: string, key: string, diff: { before: unknown; after: unknown } | undefined) {
-  const def = propertyDef(ontology, targetType, key)
-  const show = (v: unknown) => (def?.type === 'enum' && typeof v === 'string' ? enumValueLabel(def, v) : summarizeValue(v))
-  return `${show(diff?.before)} → ${show(diff?.after)}`
 }
 
 const ACTION_BADGE: Record<string, { variant: 'secondary' | 'outline'; className?: string }> = {
@@ -39,15 +34,30 @@ function ActionBadge({ action, children }: { action: string; children: ReactNode
   )
 }
 
+/** 값 하나. 노드 ID 한 개이고 이름을 알면 누르면 그 노드를 여는 링크로, 아니면 글자로 보인다 */
+function ChangeValue({ c, k, value, onOpen }: { c: ChangeEventView; k: string; value: unknown; onOpen: (id: string) => void }) {
+  const { ontology } = useApp()
+  const text = changeValueText(ontology, c.targetType, k, value, c.refs)
+  const ref = typeof value === 'string' ? c.refs[value] : undefined
+  if (ref && ref.type !== 'User' && REF_KEYS.has(k)) {
+    return (
+      <Button variant="link" className="h-auto p-0 text-xs" onClick={() => onOpen(ref.id)}>
+        {text}
+      </Button>
+    )
+  }
+  return <>{text}</>
+}
+
 export function ChangeRows({ items, onOpen }: { items: ChangeEventView[]; onOpen: (id: string) => void }) {
   const { ontology } = useApp()
   const labels = useLabels()
   return (
     <>
       {items.map((c) => (
-        <TableRow key={c.id} data-testid="change-row" data-action={c.action} data-target-id={c.targetId}>
+        <TableRow key={c.id} data-testid="change-row" data-action={c.action} data-target-id={c.targetId} title={`수정 번호 ${c.revision}`}>
           <TableCell>{formatDateTime(c.at)}</TableCell>
-          <TableCell title={c.actor?.email}>{userName(c.actor)}</TableCell>
+          <TableCell data-testid="change-actor" title={c.actor?.email}>{userName(c.actor)}</TableCell>
           <TableCell data-testid="change-action">
             <ActionBadge action={c.action}>{labels.action(c.action)}</ActionBadge>
           </TableCell>
@@ -64,13 +74,12 @@ export function ChangeRows({ items, onOpen }: { items: ChangeEventView[]; onOpen
               c.targetLabel
             )}
           </TableCell>
-          <TableCell>{c.revision}</TableCell>
           <TableCell>
             <ul className="m-0 list-disc pl-4 text-xs">
               {Object.entries(c.changes ?? {}).map(([key, diff]) => (
                 <li key={key}>
-                  <span className={propertyDef(ontology, c.targetType, key) ? undefined : 'font-mono'}>{propertyLabel(ontology, c.targetType, key)}</span>:{' '}
-                  {changeLine(ontology, c.targetType, key, diff)}
+                  {changeFieldLabel(ontology, c.targetType, key)}: <ChangeValue c={c} k={key} value={diff?.before} onOpen={onOpen} /> →{' '}
+                  <ChangeValue c={c} k={key} value={diff?.after} onOpen={onOpen} />
                 </li>
               ))}
             </ul>
@@ -83,15 +92,43 @@ export function ChangeRows({ items, onOpen }: { items: ChangeEventView[]; onOpen
 }
 
 export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
-  const [targetInput, setTargetInput] = useState(targetId)
+  const labels = useLabels()
   const [actor, setActor] = useState('')
-  const [actorInput, setActorInput] = useState('')
+  const [actors, setActors] = useState<UserRef[]>([])
+  const [target, setTarget] = useState<NodeView | null>(null)
+  /** 고른 대상이 노드가 아니거나(사용자, 관계 ID) 읽지 못했을 때 true */
+  const [targetUnknown, setTargetUnknown] = useState(false)
   const [pageNo, setPageNo] = useState(0)
   const [page, setPage] = useState<Page<ChangeEventView> | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => setTargetInput(targetId), [targetId])
+  useEffect(() => {
+    let live = true
+    api.changes
+      .actors()
+      .then((list) => live && setActors(list))
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [])
+
+  // 상세에서 들어와 이름을 모르는 대상은 노드로 읽는다. 방금 고른 노드는 이미 이름을 안다.
+  useEffect(() => {
+    if (!targetId || target?.id === targetId) return
+    let live = true
+    setTargetUnknown(false)
+    api.nodes
+      .get(targetId)
+      .then((d) => live && setTarget(d.node))
+      .catch(() => live && (setTarget(null), setTargetUnknown(true)))
+    return () => {
+      live = false
+    }
+    // target 은 읽은 결과를 담는 값이라 의존하지 않는다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetId])
 
   useEffect(() => {
     let cancelled = false
@@ -107,42 +144,66 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
     }
   }, [targetId, actor, pageNo])
 
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    setPageNo(0)
-    setActor(actorInput.trim())
-    onTargetIdChange(targetInput.trim())
-  }
-
   return (
     <div className="min-h-full bg-card px-3 py-4 lg:px-6" data-testid="changes-tab">
-      <form className="mb-3 flex flex-wrap items-center gap-2" onSubmit={submit}>
-        <label className="inline-flex items-center gap-1.5">
-          대상 ID
-          <Input data-testid="changes-target-filter" className="w-80 font-mono" value={targetInput} onChange={(e) => setTargetInput(e.target.value)} />
-        </label>
-        <label className="inline-flex items-center gap-1.5">
-          사용자 이메일
-          <Input data-testid="changes-actor-filter" className="w-56" type="email" placeholder="alice@example.com" value={actorInput} onChange={(e) => setActorInput(e.target.value)} />
-        </label>
-        <Button type="submit" variant="outline" data-testid="changes-filter-submit">
-          조회
-        </Button>
-        {targetId && (
-          <Button
-            type="button"
-            variant="outline"
-            data-testid="changes-filter-clear"
-            onClick={() => {
+      <div className="mb-3 flex flex-wrap items-start gap-3">
+        {targetId ? (
+          <div className="inline-flex items-center gap-2" data-testid="changes-target-selected">
+            {target?.id === targetId ? (
+              <>
+                <TypeBadge type={target.type} />
+                <span>{labels.node(target)}</span>
+              </>
+            ) : (
+              <span>{targetUnknown ? '선택한 항목' : '불러오는 중…'}</span>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="changes-filter-clear"
+              onClick={() => {
+                setPageNo(0)
+                setTarget(null)
+                onTargetIdChange('')
+              }}
+            >
+              지우기
+            </Button>
+          </div>
+        ) : (
+          <NodePicker
+            types={[]}
+            testIdPrefix="changes-target-picker"
+            placeholder="이름이나 종목 코드로 대상 찾기"
+            onPick={(node) => {
               setPageNo(0)
-              onTargetIdChange('')
+              setTarget(node)
+              onTargetIdChange(node.id)
             }}
-          >
-            대상 필터 해제
-          </Button>
+          />
+        )}
+        {actors.length > 0 && (
+          <label className="inline-flex items-center gap-1.5">
+            사용자
+            <NativeSelect
+              data-testid="changes-actor-filter"
+              value={actor}
+              onChange={(e) => {
+                setPageNo(0)
+                setActor(e.target.value)
+              }}
+            >
+              <NativeSelectOption value="">(모두)</NativeSelectOption>
+              {actors.map((u) => (
+                <NativeSelectOption key={u.id} value={u.email}>
+                  {u.displayName}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </label>
         )}
         {loading && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
-      </form>
+      </div>
       {error && (
         <Alert role={undefined} variant="destructive" className="my-2">
           <AlertDescription>{error}</AlertDescription>
@@ -156,7 +217,6 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
             <TableHead>작업</TableHead>
             <TableHead>대상 종류</TableHead>
             <TableHead>대상 이름</TableHead>
-            <TableHead>수정 번호</TableHead>
             <TableHead>변경 내용</TableHead>
             <TableHead>메모</TableHead>
           </TableRow>
@@ -165,7 +225,7 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
           {page && <ChangeRows items={page.items} onOpen={onOpen} />}
           {page && page.items.length === 0 && (
             <TableRow>
-              <TableCell colSpan={8} className="text-muted-foreground" data-testid="changes-empty">
+              <TableCell colSpan={7} className="text-muted-foreground" data-testid="changes-empty">
                 변경 이력이 없습니다.
               </TableCell>
             </TableRow>

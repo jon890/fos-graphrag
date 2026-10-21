@@ -131,9 +131,10 @@ describe('머리글 밖 탭의 첫 렌더', () => {
     expect(html).not.toContain('review-actions')
   })
 
-  it('ChangesTab 은 대상 필터를 input 으로 그리고 옛 표 class 를 쓰지 않는다', () => {
+  it('ChangesTab 은 대상 고르기 칸을 그리고 옛 표 class 를 쓰지 않는다', () => {
     const html = renderToStaticMarkup(withApp(<ChangesTab targetId="" onTargetIdChange={() => {}} onOpen={() => {}} />))
-    expect(html).toMatch(/<input[^>]*data-testid="changes-target-filter"/)
+    expect(html).toMatch(/<input[^>]*data-testid="changes-target-picker-input"/)
+    expect(html).not.toContain('changes-target-filter')
     expect(html).not.toContain('data-table')
   })
 })

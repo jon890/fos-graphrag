@@ -16,6 +16,7 @@ import type {
   ReviewStatus,
   CurrentUser,
   Role,
+  UserRef,
   UserView,
 } from './types'
 
@@ -207,6 +208,7 @@ export const api = {
         'GET',
         `/api/changes${buildQuery({ targetId: p.targetId?.trim(), actor: p.actor?.trim(), page: p.page, size: p.size })}`,
       ),
+    actors: () => request<UserRef[]>('GET', '/api/changes/actors'),
   },
 }
 

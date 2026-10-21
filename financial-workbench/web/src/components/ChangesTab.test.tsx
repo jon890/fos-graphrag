@@ -17,6 +17,7 @@ function event(overrides: Partial<ChangeEventView>): ChangeEventView {
     revision: 1,
     changes: { name: { before: null, after: '가상전자' } },
     note: null,
+    refs: {},
     ...overrides,
   }
 }
@@ -60,5 +61,22 @@ describe('ChangeRows', () => {
     expect(html).toContain('>UPDATE<')
     expect(html).toContain('Mystery')
     expect(html).toContain('archived')
+  })
+
+  it('주장 이력의 주체는 이름으로 보이고 ID 와 영문 키, 수정 번호 열은 없다', () => {
+    const html = render([
+      event({
+        targetType: 'Claim',
+        targetLabel: 'SUPPLIES_TO',
+        changes: { subjectId: { before: null, after: 'c1' } },
+        refs: { c1: { id: 'c1', type: 'Company', label: '가나전자', archived: false } },
+      }),
+    ])
+    const text = html.replace(/<[^>]*>/g, '|')
+    expect(html).toContain('가나전자')
+    expect(text).not.toContain('|c1|')
+    expect(html).not.toContain('font-mono')
+    expect(html).not.toContain('수정 번호</')
+    expect(html).toContain('title="수정 번호 1"')
   })
 })
