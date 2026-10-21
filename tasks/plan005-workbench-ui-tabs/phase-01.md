@@ -124,3 +124,4 @@ cd financial-workbench && NEO4J_PASSWORD=e2e-local-password COMPOSE_PROJECT_NAME
 | `financial-workbench/web/src/components/Pager.tsx` | 수정 |
 | `financial-workbench/web/src/legacy.css` | 수정 |
 | `financial-workbench/web/src/components/tabs.test.tsx` | 신규 |
+| `financial-workbench/web/src/components/ui/table.tsx` | 수정 |
