@@ -40,7 +40,9 @@ check() {
 : >"$log"
 FAKE_DUMP_SLEEP=1 bash "$work/fw/scripts/backup.sh" >"$work/backup.out" 2>&1 &
 pid=$!
-for _ in $(seq 1 50); do ls "$work/fw/backups/"*.partial >/dev/null 2>&1 && break; sleep 0.1; done
+# 가짜 docker 가 덤프 도중의 sleep 에 닿을 때까지 기다린다. .partial 은 그보다 먼저 리다이렉션이 만든다.
+# 부하가 높으면 서비스를 멈추고 덤프를 시작하기까지 5초를 넘긴 적이 있어 상한을 30초로 둔다
+for _ in $(seq 1 300); do pgrep -P "$pid" -x sleep >/dev/null && break; sleep 0.1; done
 check "덤프 중에는 .partial 이 생긴다" bash -c "ls '$work/fw/backups/'*.partial >/dev/null 2>&1"
 # 터미널의 Ctrl-C 처럼 스크립트와 자식 프로세스에 함께 신호를 보낸다
 pkill -TERM -P "$pid" sleep 2>/dev/null
