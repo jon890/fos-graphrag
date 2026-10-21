@@ -8,7 +8,9 @@
 검색 결과와 고르기 후보와 같은 이름 경고에 구분 정보(`hintProperties` 의 값과 만든 날)를 보인다.
 목록에 없는 예전 값이 남은 칸은 선택지로 보여, 그 칸을 바꾸지 않으면 다른 칸을 저장할 수 있게 한다.
 
-**범위 외**: 노드 편집 409 때 입력 지키기는 phase 03 이다. 이 phase 는 `NodeEditForm.tsx` 의 409 처리와 `DetailPanel.tsx` 의 `fail()` 을 고치지 않는다. 주장 만들기 폼(`ClaimCreateForm.tsx`)은 근거 문서 등록 폼에 넘기는 prop 하나만 고친다.
+**선행 조건**: plan006 이 머지된 `main` 위에서 시작한다. 이 phase 는 그 계획이 만든 `withJosa`(`labels.ts`)와 다시 쓴 주장 만들기 폼(`ClaimCreateForm.tsx`)을 쓴다.
+
+**범위 외**: 노드 편집 409 때 입력 지키기는 phase 03 이다. 이 phase 는 `NodeEditForm.tsx` 의 409 처리와 `DetailPanel.tsx` 의 `fail()` 을 고치지 않는다. 주장 만들기 폼(`ClaimCreateForm.tsx`)은 근거 문서 등록 폼에 넘기는 prop 둘(`onUseExisting`, `useExistingLabel`)만 고친다.
 
 ## 컨텍스트
 
@@ -20,7 +22,7 @@
   - `initialFormValues(defs, properties)` 는 만들기와 편집이 함께 쓴다.
 - 속성 입력칸은 `financial-workbench/web/src/components/PropertyFields.tsx` 다. enum 은 `<select>` 에 `''` 선택지와 `def.values` 를 그리고, `url` 은 `type="url"` 이라 브라우저가 `scheme://` 없는 값을 제출 전에 막는다.
 - 만들기 폼은 `financial-workbench/web/src/components/NodeCreateForm.tsx` 다. `Props` 는 `type`, `onCreated(node)`, `onCancel()`, `testIdPrefix` 다. `buildCreateProperties` 로 바꾼 뒤 `api.nodes.create(type, properties)` 를 부르고, 오류는 `${prefix}-error` 와 칸별 `fieldErrorsOf` 로 보인다.
-  - 쓰는 곳은 둘이다. 왼쪽 검색 패널(`financial-workbench/web/src/components/SearchPanel.tsx`, `testIdPrefix="create"`)과 주장 만들기 폼의 「근거 문서 새로 등록」(`financial-workbench/web/src/components/ClaimCreateForm.tsx`, `testIdPrefix="claim-doc-create"`)이다. 화면 테스트 `financial-workbench/web/src/components/screens.test.tsx` 도 `onCreated`, `onCancel` 만 넘겨 그린다. 새 prop 은 모두 선택으로 둔다.
+  - 쓰는 곳은 둘이다. 왼쪽 검색 패널(`financial-workbench/web/src/components/SearchPanel.tsx`, `testIdPrefix="create"`)과 주장 만들기 폼의 「근거 문서 새로 등록」(`financial-workbench/web/src/components/ClaimCreateForm.tsx`, `testIdPrefix="claim-doc-create"`)이다. 주장 만들기 폼은 문장 채우기 폼이고, 근거 문서 칸의 고른 문서 목록(`claim-doc-selected`), `NodePicker`(`claim-doc-picker`), 「+ 근거 문서 새로 등록」(`claim-doc-create-toggle`)과 그 자리의 `NodeCreateForm` 이 있다. `NodeCreateForm` 의 `onCreated` 가 새 문서를 고른 문서 목록에 더하고 등록 폼을 닫는다. 정확한 함수 이름은 파일을 열어 확인한다. 화면 테스트 `financial-workbench/web/src/components/screens.test.tsx` 도 `onCreated`, `onCancel` 만 넘겨 그린다. 새 prop 은 모두 선택으로 둔다.
   - `SearchPanel` 의 `onCreated` 는 `onCreated(node, \`「${labels.node(node)}」 ${withEulReul(labels.type(node.type))} 만들었습니다.\`)` 로 부모에 넘긴다. 부모 `financial-workbench/web/src/components/Workspace.tsx` 는 `setFlash({ id: node.id, text: message })` 뒤 그 노드를 연다. `DetailPanel` 은 `flash` 를 받아 첫 `useEffect` 에서 `{ kind: 'success', text: flash.text }` 안내로 바꾼다.
 - 노드 고르기는 `financial-workbench/web/src/components/NodePicker.tsx` 다. 후보 한 줄은 `${prefix}-result` 단추이고 `TypeBadge` 와 `labels.node(n)` 를 보인다. 검색 결과 한 줄은 `SearchPanel` 의 `search-result` 단추이고 이름은 `.result-label` 안에 있다. 브라우저 테스트의 `searchResult()` 도우미가 `.result-label` 의 정확한 글자로 고르므로 구분 정보는 `.result-label` 밖에 둔다.
 - 관계 API 는 `api.relationships.create(type, fromId, toId)`(`financial-workbench/web/src/api/client.ts`)다. 검색은 `api.nodes.search({ q, types, size })` 이고 `size` 최댓값은 100 이다. 서버는 `q` 를 소문자로 바꿔 `searchText` 에서 부분 일치로 찾고 보관된 노드는 뺀다.
@@ -42,6 +44,7 @@
 
 ## Blocked 조건
 
+- `financial-workbench/web/src/lib/labels.ts` 에 `withJosa` 가 없으면 `PHASE_BLOCKED: plan006 미머지` 를 출력하고 멈춘다.
 - 8081 이나 8090 포트를 다른 스택이 쓰고 있으면 그 스택을 내리지 말고 `PHASE_BLOCKED: 8081 또는 8090 사용 중` 을 출력하고 멈춘다.
 
 ## 작업 항목
@@ -72,7 +75,7 @@
   ```ts
   /** hintProperties 의 표시 값과 만든 날을 「 · 」 로 잇는다. 값이 빈 속성은 뺀다. 예: 「대한민국 (KR) · 2026. 10. 21.」 */
   export function nodeHint(o: Ontology, node: Pick<NodeView, 'type' | 'properties' | 'createdAt'>): string
-  /** 앞뒤 공백을 지우고 연속 공백을 하나로 줄이고 소문자로 바꿔 같으면 같은 이름이다 */
+  /** 앞뒤 공백을 지우고 소문자로 바꿔 같으면 같은 이름이다. 서버 검색(CONTAINS)과 같은 규칙이라 가운데 공백은 그대로 비교한다 */
   export function sameName(a: string, b: string): boolean
   ```
   표시 값은 `valueLabel(o, type, prop, value)` 이고 `date` 속성은 저장된 문자열 그대로다. 만든 날은 `formatDate(node.createdAt)` 다.
@@ -95,24 +98,27 @@
   ```
   `onCreated` 는 `(node: NodeView, linkError?: string) => void` 로 바꾼다. `linkError` 는 시작 노드 관계만 실패했을 때의 이유다. 기존 호출부는 둘째 인자를 받지 않아도 컴파일된다.
 - 처음 값은 `initialCreateValues(defs)` 다.
+- 폼 안에 새로 두는 단추(「다시 고르기」, 「열기」, 「그래도 만들기」)는 모두 `type="button"` 이다. 이 폼은 `<form onSubmit={submit}>` 이라 type 이 없는 단추는 폼을 제출한다.
 - 시작 노드 고르기 칸: `Object.entries(ontology.relationshipTypes)` 가운데 `createPicker` 가 있고 `to` 에 이 `type` 이 든 관계마다 `PropertyFields` 아래에 칸 하나를 그린다.
   - 칸 제목은 `createPicker.label`, 도움말은 `createPicker.description` 이다. 고르지 않아도 된다.
   - 고르기 전에는 `NodePicker`(`types={rel.from}`, `testIdPrefix={\`${testIdPrefix}-link-${relType}-picker\`}`)를, 고른 뒤에는 `div[data-testid="${testIdPrefix}-link-${relType}-selected"]` 에 `TypeBadge`, 이름, 「다시 고르기」 단추(`${testIdPrefix}-link-${relType}-clear`)를 보인다.
+- 저장은 `save({ skipDuplicateCheck }: { skipDuplicateCheck: boolean })` 함수 하나로 둔다. 폼 제출(`submit`)은 `save({ skipDuplicateCheck: false })` 를, 「그래도 만들기」 는 `save({ skipDuplicateCheck: true })` 를 바로 부른다. 같은 렌더에서 막 바꾼 상태를 읽지 않게 하려는 것이다. `busy` 는 같은 이름 검사부터 관계 만들기까지 켜 두어 저장 단추를 막는다.
 - 저장 순서
   1. `buildCreateProperties` 의 칸 오류가 있으면 지금처럼 멈춘다.
-  2. 같은 이름 검사: `confirmedName`(「그래도 만들기」 를 누른 이름) 상태와 지금 이름(`values[labelProperty]`)이 `sameName` 이 아니면 `api.nodes.search({ q: 이름, types: [type], size: 100 })` 를 부르고 `items` 가운데 `sameName(n.label, 이름)` 인 것을 `duplicates` 상태에 넣는다. 하나 이상이면 저장하지 않고 멈춘다. 검색이 실패하면 검사 없이 3 으로 간다.
+  2. 같은 이름 검사: `skipDuplicateCheck` 가 거짓이면 `api.nodes.search({ q: 이름.trim(), types: [type], size: 100 })` 를 부르고(이름은 `values[labelProperty]`) `items` 가운데 `sameName(n.label, 이름)` 인 것을 `duplicates` 상태에 넣는다. 하나 이상이면 저장하지 않고 멈춘다. 검색이 실패하면 검사 없이 3 으로 간다.
   3. `api.nodes.create(type, properties)` 뒤 고른 시작 노드마다 `api.relationships.create(relType, picked.id, created.id)` 를 차례로 부른다. 관계가 실패하면 그 오류의 `errorMessage(e)` 를 `linkError` 로 모은다(여럿이면 줄바꿈으로 잇는다). 생성은 성공했으므로 `onCreated(created, linkError)` 를 부른다.
-  - 이름 칸(`labelProperty`)을 고치면 `duplicates` 를 비우고 `confirmedName` 을 지운다.
+  - 이름 입력칸(`labelProperty`)을 고치면 `duplicates` 를 비운다.
 - 같은 이름 경고: `duplicates` 가 있으면 `div[data-testid="${testIdPrefix}-duplicate"][role="status"]` 에 「같은 이름의 {타입 이름}이(가) 이미 있습니다.」 와 후보 목록을 보인다. 조사는 `labels.ts` 의 조사 함수(`withJosa(word, '이(가)')`)를 쓴다.
   - 후보 한 줄은 `li[data-testid="${testIdPrefix}-duplicate-item"][data-node-id]` 이고, `TypeBadge`, `labels.node(n)`, `labels.hint(n)`, `onUseExisting` 이 있으면 `useExistingLabel ?? '열기'` 단추(`${testIdPrefix}-duplicate-open`)다.
-  - 목록 아래 「그래도 만들기」 단추(`${testIdPrefix}-duplicate-confirm`)는 `confirmedName` 을 지금 이름으로 두고 저장을 다시 시작한다.
+  - 목록 아래 「그래도 만들기」 단추(`${testIdPrefix}-duplicate-confirm`)는 `save({ skipDuplicateCheck: true })` 를 부른다.
 
 ### 6. `SearchPanel.tsx`, `NodePicker.tsx`, `ClaimCreateForm.tsx`, `Workspace.tsx`, `DetailPanel.tsx`
 
 - `SearchPanel`
   - `search-result` 단추 안, `.result-label` 다음에 `<span className="result-hint" data-testid="search-result-hint">{labels.hint(n)}</span>` 를 둔다.
   - `NodeCreateForm` 에 `onUseExisting={(n) => { setCreating(false); onFocus(n.id) }}` 를 넘긴다.
-  - `onCreated` 에 넘기는 안내: `linkError` 가 없으면 지금 문장 그대로이고 `kind` 는 `'success'` 다. 있으면 「「이름」 {타입}을(를) 만들었지만 {관계의 createPicker.label}을(를) 잇지 못했습니다. 상세의 관계 추가로 다시 이으세요. ({linkError})」 이고 `kind` 는 `'error'` 다. 이를 위해 `Props.onCreated` 를 `(node: NodeView, message: string, kind?: 'success' | 'error') => void` 로 바꾼다. 관계 이름은 이 타입을 끝으로 받는 `createPicker` 관계의 `label` 을 쓴다.
+  - `onCreated` 에 넘기는 안내: `linkError` 가 없으면 지금 문장 그대로이고 `kind` 는 `'success'` 다. 있으면 「「이름」 {타입 이름}을(를) 만들었지만 {칸 이름}을(를) 잇지 못했습니다. 상세의 관계 추가로 다시 이으세요. ({linkError})」 이고 `kind` 는 `'error'` 다. 칸 이름은 관계의 `label`(「발행한다」)이 아니라 `createPicker.label`(「발행 기업」)이다. 조사는 `withJosa` 로 고른다. 종목이면 「「이름」 종목을 만들었지만 발행 기업을 잇지 못했습니다. …」 가 되어 `docs/flow.md` 「노드 만들기」 와 같다. 이를 위해 `Props.onCreated` 를 `(node: NodeView, message: string, kind?: 'success' | 'error') => void` 로 바꾼다.
+- `DetailPanel` 의 수정자 표시 `userName(node.updatedBy, '알 수 없음')` 과 생성자 표시를 `userName(node.updatedBy)` 처럼 기본값(「시스템」)으로 바꾼다. 사용자를 지우는 API 가 없어 `null` 은 서버가 남긴 변경(`system`)뿐이다. 예전 값 정리 뒤 상세에 「알 수 없음」 이 나오지 않게 하려는 것이다.
 - `Workspace` 의 `flash` 상태에 `kind?: 'success' | 'error'` 를 더하고 `onCreated` 의 셋째 인자를 담는다. `DetailPanel` 의 `flash` prop 타입도 같게 바꾸고, 첫 `useEffect` 가 `{ kind: flash.kind ?? 'success', text: flash.text }` 로 안내를 만든다.
 - `NodePicker` 의 `${prefix}-result` 단추 안, 이름 뒤에 `<span className="result-hint" data-testid={\`${testIdPrefix}-result-hint\`}>{labels.hint(n)}</span>` 를 둔다.
 - `ClaimCreateForm` 의 「근거 문서 새로 등록」 `NodeCreateForm`(`testIdPrefix="claim-doc-create"`)에 `onUseExisting` 과 `useExistingLabel="이 문서 고르기"` 를 넘긴다. `onUseExisting` 은 그 문서를 고른 문서 목록에 더하고 등록 폼을 닫는다. 지금 `onCreated` 가 새 문서를 목록에 더하는 코드와 같은 함수를 쓴다.
@@ -120,7 +126,8 @@
 
 ### 7. `financial-workbench/web/TESTIDS.md`
 
-- 「작업 공간: 왼쪽」 표에 `search-result-hint`, `create-prop-<속성>-unlisted`, `create-duplicate`, `create-duplicate-item` *, `create-duplicate-open`, `create-duplicate-confirm`, `create-link-<관계>-picker-*`, `create-link-<관계>-selected`, `create-link-<관계>-clear` 를 더한다. 같은 접미사가 `claim-doc-create-` 접두사에도 생긴다고 적는다.
+- 「작업 공간: 오른쪽 상세」 표에 `edit-prop-<속성>-unlisted`(저장된 값이 목록 밖일 때만 나오는 선택지)를 더한다.
+- 「작업 공간: 왼쪽」 표에 `search-result-hint`, `create-duplicate`, `create-duplicate-item` *, `create-duplicate-open`, `create-duplicate-confirm`, `create-link-<관계>-picker-*`, `create-link-<관계>-selected`, `create-link-<관계>-clear` 를 더한다. 같은 접미사가 `claim-doc-create-` 접두사에도 생긴다고 적는다.
 - 「노드 고르기(NodePicker)」 표에 `<p>-result-hint` * 를 더하고 접두사 목록에 `create-link-ISSUES-picker` 를 더한다.
 
 ### 8. 이 phase 를 검증하는 테스트
@@ -131,18 +138,20 @@
   - `initialCreateValues` 에 `new Date('2026-10-21T03:04:00Z')` 를 넘기면 필수 `datetime` 입력칸이 `isoToLocalInput('2026-10-21T03:04:00Z')` 이고, 필수가 아닌 `datetime` 입력칸은 `''` 이다.
 - `financial-workbench/web/src/lib/labels.test.ts`
   - `nodeHint(testOntology, { type: 'Company', properties: { country: 'KR' }, createdAt: '2026-10-21T00:00:00Z' })` 가 `대한민국 (KR) · ` 로 시작한다. 속성이 비면 만든 날만이다. `hintProperties` 가 없는 타입(`Person`)도 만든 날만이다.
-  - `sameName(' 가나 전자 ', '가나  전자')` 는 참, `sameName('ABC', 'abc')` 는 참, `sameName('가나', '가나전자')` 는 거짓이다.
+  - `sameName(' 가나 전자 ', '가나 전자')` 는 참, `sameName('ABC', 'abc')` 는 참, `sameName('가나', '가나전자')` 와 `sameName('가나 전자', '가나  전자')` 는 거짓이다.
 - `financial-workbench/web/src/components/testSupport.tsx`: Company 의 `country` 를 `{ type: 'enum', label: '국가', required: false, values: ['KR', 'US'], valueLabels: { KR: '대한민국 (KR)', US: '미국 (US)' }, description: '기업이 등록된 나라' }` 로, Company 에 `hintProperties: ['country']`, Security 에 `hintProperties: ['market']` 를, `ISSUES` 에 `createPicker: { label: '발행 기업' }` 을 더한다.
 - `financial-workbench/web/src/components/screens.test.tsx` 에 테스트를 더한다.
   - 종목 만들기 폼(`<NodeCreateForm type="Security" ... />`)에 「발행 기업」 과 `create-link-ISSUES-picker-input` 이 있고, 기업 폼에는 없다.
   - 저장된 값이 목록 밖인 enum 칸: `<PropertyFields defs={Company 속성} values={{ name: 'x', country: 'KOR' }} testIdPrefix="edit-prop" onChange={() => {}} />` 에 `목록에 없는 값: KOR` 와 `edit-prop-country-unlisted` 가 있다. `country: 'KR'` 이면 없다.
-  - 근거 문서 폼의 `url` 입력칸이 `type="url"` 이 아니라 `inputmode="url"` 을 가진다. `testOntology` 의 Document 에 `url` 속성(`{ type: 'url', label: '주소', required: true }`)을 더해 확인한다. 더한 속성 때문에 기존 테스트의 기대값이 바뀌면 그 기대값도 고친다.
+  - 근거 문서 폼의 `url` 입력칸이 `type="url"` 이 아니라 `inputMode="url"` 을 가진다. `renderToStaticMarkup` 은 이 속성을 camelCase 로 낸다. `testOntology` 의 Document 에 `url` 속성(`{ type: 'url', label: '주소', required: true }`)을 더해 확인한다. 더한 속성 때문에 기존 테스트의 기대값이 바뀌면 그 기대값도 고친다.
 - `financial-workbench/web/e2e/workbench.spec.ts` 의 `1)` 다음에 `1b)` 를 더한다.
   - 제목: `1b) 같은 이름은 저장 전에 경고하고, 종목을 만들며 고른 발행 기업이 이어진다`.
-  - `pageA` 로 `tab-workspace`, `new-node-type` 에서 `Company`, `create-prop-name` 에 `data.supplier` 를 넣고 `create-submit` 을 누른다. `create-duplicate` 가 보이고 `create-duplicate-item` 이 하나이며 「대한민국 (KR)」 을 담는다. `create-duplicate-open` 을 누르면 `detail-label` 이 `data.supplier` 다. `shot(pageA, '01b-duplicate')` 를 남긴다.
-  - 다시 기업 폼을 열어 같은 이름을 넣고 `create-duplicate-confirm` 을 누르면 성공 안내가 나온다. `search-input` 에 `data.supplier` 를 넣고 `search-submit` 을 누르면 `search-result` 가운데 `.result-label` 이 `data.supplier` 인 것이 둘이며, 각 줄의 `search-result-hint` 가 비어 있지 않다. 만든 두 번째 기업은 `node-archive-button` 으로 보관해 뒤 테스트의 검색과 고르기에 섞이지 않게 한다.
+  - `pageA` 로 `tab-workspace`, `new-node-type` 에서 `Company`, `new-node-button`, `create-prop-name` 에 `data.supplier` 를 넣고 `create-submit` 을 누른다. `create-duplicate` 가 보이고 `create-duplicate-item` 이 하나이며 「대한민국 (KR)」 을 담는다. `create-duplicate-open` 을 누르면 `detail-label` 이 `data.supplier` 다. `shot(pageA, '01b-duplicate')` 를 남긴다.
+  - 다시 기업 폼을 열어 같은 이름을 넣고 `create-submit` 을 누른다. 경고가 다시 나오면 `create-duplicate-confirm` 을 누른다. 성공 안내가 나오고 상세는 새 기업이다. 그 `detail-panel` 의 `data-node-id` 를 적어 둔다. `search-input` 에 `data.supplier` 를 넣고 `search-submit` 을 누르면 `search-result` 가운데 `.result-label` 이 `data.supplier` 인 것이 둘이며, 각 줄의 `search-result-hint` 가 비어 있지 않다. 그 뒤 적어 둔 id 의 `search-result`(`[data-node-id="..."]`)를 눌러 두 번째 기업을 열고 `node-archive-button` 으로 보관한다. 뒤 테스트의 검색과 고르기에 섞이지 않게 하려는 것이다.
   - 종목 폼을 열어 `market` `KRX_KOSDAQ`, `ticker` 는 `data.ticker` 와 다른 값, `name` 은 새 이름, `currency` `USD` 를 넣고 `create-link-ISSUES-picker-input` 에 `data.customer` 를 넣어 `create-link-ISSUES-picker-search`, 그 결과(`create-link-ISSUES-picker-result`, `hasText: data.customer`)를 누른다. `create-link-ISSUES-selected` 에 `data.customer` 가 보인다. `create-submit` 뒤 성공 안내가 나오고 상세의 `relationship-row`(`hasText: data.customer`)가 `data-rel-type="ISSUES"` 다. `shot(pageA, '01b-issuer-linked')` 를 남긴다.
-  - `data` 객체에 새 종목 이름과 종목 코드를 더한다. 이름은 다른 값과 같은 방식으로 접미사를 붙인다.
+  - 관계만 실패하는 경로: `pageA.route('**/api/relationships', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: 'INTERNAL_ERROR', message: '테스트로 만든 실패', details: null }) }))` 를 걸고 종목을 하나 더 만든다(`data.customer` 를 발행 기업으로 고른다). `detail-notice` 의 `data-kind` 가 `error` 이고 「발행 기업을 잇지 못했습니다」 를 담으며 상세는 새 종목이다. 끝나면 `pageA.unroute('**/api/relationships')` 로 푼다. 오류 응답의 모양은 `financial-workbench/docs/api-contract.md` 「오류 형식」 을 따른다.
+  - `data` 객체에 새 종목 둘의 이름과 종목 코드를 더한다. 이름은 다른 값과 같은 방식으로 접미사를 붙이고, `data.customer`, `data.supplier` 를 담지 않는다. 담으면 `6)` 의 「보관하면 검색에서 빠진다」 가 새 종목을 찾아 깨진다.
+- `financial-workbench/web/e2e/mobile.spec.ts` 의 7 단계(목록 탭) 앞에 단계를 더한다. `workspace-tab-search` 를 누르고 `search-input` 에 `company` 를 넣어 `search-submit` 을 누른 뒤, 첫 `search-result` 의 `search-result-hint` 가 보이는지 확인하고 `expectNoHorizontalOverflow(page)` 와 `shot(page, 'mobile-search-hint')` 를 부른다.
 - 위 브라우저 테스트가 쓰는 테스트 데이터 이름에 다른 테스트가 기대는 개수(예: `4)` 의 `graph-node` 개수)가 바뀌지 않는지 확인한다. 새 종목은 고객사와 `ISSUES` 로 이어지므로 고객사 주변 그래프에 노드가 하나 늘어난다. `4)` 이후 테스트가 고객사 주변 노드 개수를 세면 기대값을 고치고, 고친 줄과 이유를 커밋 메시지에 적는다.
 
 ## 검증
@@ -160,7 +169,7 @@ cd financial-workbench && NEO4J_PASSWORD=e2e-local-password COMPOSE_PROJECT_NAME
 ```
 
 - 두 project 가 모두 통과해야 한다.
-- `01b-duplicate.png` 에서 경고와 후보의 구분 정보가 겹치지 않고, `01b-issuer-linked.png` 에서 발행 관계가 상세에 보이는지 눈으로 본다. 휴대폰 폭의 `mobile` 스크린샷에서 검색 결과의 구분 정보가 줄을 넘쳐 가로 스크롤을 만들지 않는지 본다.
+- `01b-duplicate.png` 에서 경고와 후보의 구분 정보가 겹치지 않고, `01b-issuer-linked.png` 에서 발행 관계가 상세에 보이는지 눈으로 본다. `mobile-search-hint.png` 에서 검색 결과의 구분 정보가 줄바꿈되어 가로로 넘치지 않는지 본다.
 - 8081 이나 8090 포트를 다른 스택이 쓰고 있으면 그 스택을 내리지 말고 `PHASE_BLOCKED: 8081 또는 8090 사용 중` 을 출력하고 멈춘다.
 
 ## 변경 파일
@@ -185,3 +194,4 @@ cd financial-workbench && NEO4J_PASSWORD=e2e-local-password COMPOSE_PROJECT_NAME
 | `financial-workbench/web/src/components/screens.test.tsx` | 수정 |
 | `financial-workbench/web/TESTIDS.md` | 수정 |
 | `financial-workbench/web/e2e/workbench.spec.ts` | 수정 |
+| `financial-workbench/web/e2e/mobile.spec.ts` | 수정 |

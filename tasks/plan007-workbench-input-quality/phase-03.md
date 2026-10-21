@@ -7,6 +7,8 @@
 노드 편집 폼이 `409 REVISION_CONFLICT` 를 받아도 내 입력을 버리지 않게 한다.
 최신 값을 다시 읽은 뒤 편집 시작 값, 내 입력, 최신 값을 칸마다 비교해 「다른 쪽만 바꿈」, 「나만 바꿈」, 「둘 다 다르게 바꿈」 을 보이고, 「다시 적용」 으로 내 입력을 다시 넣게 한다.
 
+**선행 조건**: plan006 이 머지된 `main` 위에서 시작하고, 이 계획의 phase 01 과 02 가 끝난 상태다.
+
 **범위 외**: 주장 내용 수정 폼(`ClaimEditForm`), 검토, 보관, 복원의 409 는 지금처럼 최신 값을 다시 읽기만 한다. 서버 409 응답은 바꾸지 않는다. 만들기 폼은 앞 phase 에서 끝났다.
 
 ## 컨텍스트
@@ -93,7 +95,7 @@ export function hasReapplicable(fields: ConflictField[]): boolean
 
 ### 2. `financial-workbench/web/src/components/NodeEditForm.tsx`
 
-- `Props` 에 둘을 더한다.
+- `Props` 에 셋을 더한다.
 
   ```ts
   /** 409 로 남은 내 입력. 이 노드이고 node.revision 이 draft.revision 과 다를 때만 비교를 보인다 */
@@ -104,15 +106,15 @@ export function hasReapplicable(fields: ConflictField[]): boolean
   onDraftDone?: () => void
   ```
 - `submit` 의 `catch` 에서 `err instanceof ApiError && err.code === 'REVISION_CONFLICT'` 이면 `onConflict?.({ nodeId: node.id, revision: node.revision, base: node.properties, mine: values })` 를 먼저 부르고 `onError(err)` 를 부른다.
-- `draft` 가 보일 조건(`draft.nodeId === node.id && draft.revision !== node.revision`)이면 `fields = compareConflict(defs, draft.base, draft.mine, node.properties)` 를 구한다. `hasReapplicable(fields)` 가 거짓이면 비교를 보이지 않는다.
+- `draft` 가 보일 조건(`draft.nodeId === node.id && draft.revision !== node.revision && !node.archived`)이면 `fields = compareConflict(defs, draft.base, draft.mine, node.properties)` 를 구한다. `hasReapplicable(fields)` 가 거짓이면 비교를 보이지 않는다. 다른 사람이 보관해 revision 이 바뀐 경우에는 폼이 비활성이라 다시 적용할 수 없으므로 비교를 보이지 않는다.
 - 비교 상자는 `PropertyFields` 위에 둔다. `div[data-testid="edit-conflict"]` 이다.
   - 머리 문장: 「저장하지 못한 내 입력이 있습니다. 칸마다 확인하고 다시 적용하세요.」
   - 칸 한 줄은 `li[data-testid="edit-conflict-field"][data-field={name}][data-kind={kind}]` 다. 칸 이름은 `labels.property(node.type, name)` 이다.
     - `theirs`: 「다른 쪽이 바꿈: {최신 값}」
     - `mine`: 「내 입력: {내 값}」
-    - `both`: 「둘 다 바꿈」 아래에 라디오 둘. `input[type=radio][data-testid="edit-conflict-choice-{name}-mine"]` 의 이름표는 「내 값: {내 값}」, `-latest` 는 「최신 값: {최신 값}」 이다. 기본은 `latest` 다.
+    - `both`: 「둘 다 바꿈」 아래에 라디오 둘. 두 라디오는 `name={\`conflict-${name}\`}` 로 묶는다. `input[type=radio][data-testid="edit-conflict-choice-{name}-mine"]` 의 이름표는 「내 값: {내 값}」, `-latest` 는 「최신 값: {최신 값}」 이다. 기본은 `latest` 다.
     - 값 표시는 enum 이면 `labels.value(node.type, name, 값)`, 빈 값이면 「(비어 있음)」, 120자를 넘으면 `truncate`(`financial-workbench/web/src/lib/format.ts`)로 줄인다.
-  - 단추 둘: 「다시 적용」(`edit-conflict-apply`)은 `setValues(applyConflict(values, fields, choices))`, `onDraftDone?.()`, 폼 안내 「내 입력을 다시 넣었습니다. 확인한 뒤 저장하세요.」(`node-edit-local-message`)다. 「버리기」(`edit-conflict-discard`)는 `onDraftDone?.()` 만 부른다.
+  - 단추 둘은 모두 `type="button"` 이다. 비교 상자는 `<form onSubmit={submit}>` 안에 있어 type 이 없으면 누를 때 폼이 제출된다. 「다시 적용」(`edit-conflict-apply`)은 `setValues(applyConflict(values, fields, choices))`, `onDraftDone?.()`, 폼 안내 「내 입력을 다시 넣었습니다. 확인한 뒤 저장하세요.」(`node-edit-local-message`)다. 「버리기」(`edit-conflict-discard`)는 `onDraftDone?.()` 만 부른다.
 - 비교 상자를 고르기 상태(`choices`)와 함께 컴포넌트 안에 두면 렌더링 함수가 길어진다. 같은 파일에 `ConflictBox` 컴포넌트를 따로 둔다.
 
 ### 3. `financial-workbench/web/src/components/DetailPanel.tsx`
@@ -134,12 +136,13 @@ export function hasReapplicable(fields: ConflictField[]): boolean
   - `applyConflict` 가 `c` 와, `choices.e = 'mine'` 일 때의 `e` 만 내 값으로 바꾸고 `b` 는 최신 값으로 둔다. `choices` 가 비면 `e` 는 최신 값이다.
   - `theirs` 만 있으면 `hasReapplicable` 이 거짓이다.
 - `financial-workbench/web/src/components/screens.test.tsx` 에 테스트를 더한다.
-  - `<NodeEditForm node={revision 3 인 Company} draft={{ nodeId 같음, revision: 2, base: { name: 'x', country: 'KR' }, mine: { name: 'y', country: 'KR' } }} ... />` 를 `withApp` 으로 그리면 `edit-conflict` 와 `data-kind="mine"` 줄이 있다. 같은 draft 의 `revision` 이 3 이면(아직 다시 읽지 않음) 비교가 없다. `nodeId` 가 다르면 비교가 없다.
-  - 최신 값의 `name` 도 바뀐 노드(`name: 'z'`)를 그리면 `data-kind="both"` 줄과 `edit-conflict-choice-name-latest` 라디오가 `checked` 다.
+  - `<NodeEditForm node={revision 3 이고 properties 가 { name: 'x', country: 'KR' } 인 Company} draft={{ nodeId 같음, revision: 2, base: { name: 'x', country: 'KR' }, mine: { name: 'y', country: 'KR' } }} ... />` 를 `withApp` 으로 그리면 `edit-conflict` 와 `data-kind="mine"` 줄이 있다. 같은 draft 의 `revision` 이 3 이면(아직 다시 읽지 않음) 비교가 없다. `nodeId` 가 다르면 비교가 없다.
+  - 같은 draft 로 `archived: true` 인 노드를 그리면 비교가 없다.
+  - 최신 값의 `name` 도 바뀐 노드(`properties: { name: 'z', country: 'KR' }`)를 그리면 `data-kind="both"` 줄과 `edit-conflict-choice-name-latest` 라디오가 `checked` 다.
 - `financial-workbench/web/e2e/workbench.spec.ts` 의 `5)` 를 고친다. 제목은 `5) 같은 노드를 동시에 고치면 나중 저장은 409 안내 뒤 최신 값을 보이고, 내 입력을 골라 다시 적용해 저장한다` 다.
   - B 는 `description` 을 `data.editByB` 로, `registrationNumber` 를 `data.registrationByB`(새 값, `data` 객체에 더한다)로 바꿔 저장한다.
   - 409 뒤 기대값: `detail-notice` 의 `data-kind` 가 `conflict` 이고 「다른 탭이나 다른 사용자가 먼저 저장했습니다」 를 담는다. 「서버 응답」 을 담지 않는다. `edit-prop-description` 이 `data.editByA` 다. `edit-conflict-field[data-field="description"]` 의 `data-kind` 가 `both`, `[data-field="registrationNumber"]` 가 `mine` 이다. `node-revision` 은 `revisionBefore + 1` 이다. `shot(pageB, '05-conflict-b')` 를 남긴다.
-  - B 가 `edit-conflict-choice-description-mine` 을 고르고 `edit-conflict-apply` 를 누르면 `edit-prop-description` 이 `data.editByB`, `edit-prop-registrationNumber` 가 `data.registrationByB` 이고 `edit-conflict` 가 사라진다. `node-save` 뒤 `detail-notice` 가 `success`, `node-revision` 이 `revisionBefore + 2` 다. `shot(pageB, '05-reapplied-b')` 를 남긴다.
+  - B 가 `edit-conflict-choice-description-mine` 을 고르고 `edit-conflict-apply` 를 누르면 `edit-prop-description` 이 `data.editByB`, `edit-prop-registrationNumber` 가 `data.registrationByB` 이고 `edit-conflict` 가 사라지고, `node-edit-local-message` 가 「내 입력을 다시 넣었습니다」 를 담는다. 「바뀐 내용이 없습니다」 가 아니어야 한다. 단추가 폼을 제출하지 않았다는 근거다. `node-save` 뒤 `detail-notice` 가 `success`, `node-revision` 이 `revisionBefore + 2` 다. `shot(pageB, '05-reapplied-b')` 를 남긴다.
   - 뒤 테스트가 고객사 `description` 값에 기대면 그 기대값을 `data.editByB` 로 고친다. 고친 곳이 없으면 그대로 둔다.
 
 ## 검증

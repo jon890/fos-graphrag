@@ -8,6 +8,8 @@ Company 의 `country` 와 Security 의 `currency` 를 목록 선택(enum)으로 
 온톨로지에 만들기 폼과 목록이 쓸 정보(`hintProperties`, `createPicker`)와 예전 값 별칭(`valueAliases`)을 더하고, 로더가 그 값을 시작할 때 검사한다.
 다음 phase 의 만들기 폼과 그 다음 phase 의 충돌 화면이 이 정의를 읽는다.
 
+**선행 조건**: plan006(그래프 주장 접기와 문장 채우기 주장 폼)이 `main` 에 머지된 뒤, 그 `main` 위에서 시작한다. 같은 파일(`Ontology.kt`, YAML, `labels.ts`, `ClaimCreateForm.tsx` 등)을 그 계획이 먼저 고친다.
+
 **범위 외**: 웹 화면은 phase 02 와 phase 03 이다. 이 phase 는 `financial-workbench/web/src/` 를 고치지 않는다. 브라우저 테스트의 기대 문구 한 곳만 고친다(작업 항목 6).
 
 ## 컨텍스트
@@ -36,11 +38,13 @@ Company 의 `country` 와 Security 의 `currency` 를 목록 선택(enum)으로 
 
 - 별칭을 Kotlin 상수로 두는 안은 버렸다. 표시 이름과 선택지를 YAML 이 소유한다는 규칙(ADR-005)과 어긋나고, 다음에 enum 을 더할 때 코드를 함께 고쳐야 한다.
 - 보관된 노드와 `managedBy` 가 있는 타입(Claim)은 정리하지 않는다. 보관된 노드는 수정할 수 없다는 규칙과 검토 규칙의 `contentUpdatedBy` 를 지키기 위해서다.
+- 정리는 노드마다 따로 커밋한다. 중간에 실패하면 그 앞 노드는 고쳐진 채 남고, 다음 시작 때 남은 노드부터 다시 고친다. 여러 번 돌아도 결과가 같으므로 문제가 없다.
 - 정리는 `searchText` 를 다시 만들지 않는다. 정리 대상은 enum 속성이고 `searchText` 는 `labelProperty` 와 `ticker` 로만 만든다. Claim 의 `labelProperty`(`predicate`)가 enum 이지만 Claim 은 대상이 아니다.
 - 국가에는 「기타」(`OTHER`)를 두고 통화에는 두지 않는다(사용자 결정 2026-10-21). enum 은 `maxLength` 를 쓰지 않으므로 두 속성에서 지운다.
 
 ## Blocked 조건
 
+- `financial-workbench/web/src/lib/labels.ts` 에 `withJosa` 가 없으면 plan006 이 머지되지 않은 것이다. `PHASE_BLOCKED: plan006 미머지` 를 출력하고 멈춘다.
 - Docker 가 돌지 않아 Testcontainers 가 Neo4j 를 띄우지 못하면 `PHASE_BLOCKED: Docker 를 쓸 수 없음` 을 출력하고 멈춘다.
 - 8081 이나 8090 포트를 다른 스택이 쓰고 있으면 그 스택을 내리지 말고 `PHASE_BLOCKED: 8081 또는 8090 사용 중` 을 출력하고 멈춘다.
 
@@ -74,6 +78,7 @@ Company 의 `country` 와 Security 의 `currency` 를 목록 선택(enum)으로 
   | `label`, `required` | 지금 값(`거래 통화`, `false`) |
   | `description` | `종목이 거래되는 통화` |
 - 노드 타입마다 `hintProperties` 를 더한다. Company `[country]`, Security `[market, ticker]`, Sector `[scheme, code]`, Document `[publisher, publishedAt]`. Claim 에는 두지 않는다.
+- `Document.url` 의 `description` 을 `"자료 주소. https:// 를 빼고 적으면 저장할 때 붙인다"` 로 바꾼다.
 - `relationshipTypes.ISSUES` 에 `createPicker: { label: 발행 기업, description: "이 종목을 발행한 기업. 고르면 종목을 만든 뒤 발행 관계를 함께 만든다. 몰라도 비워 둘 수 있다" }` 를 더한다.
 
 ### 2. `Ontology.kt` 와 `OntologyLoader.kt`
@@ -99,9 +104,9 @@ Company 의 `country` 와 Security 의 `currency` 를 목록 선택(enum)으로 
   fun canonicalEnumValue(raw: String): String?
   ```
 - `OntologyLoader.checkConsistency` 의 속성 반복 안에 검사를 더한다. 메시지 형식은 기존 `valueLabels` 검사와 같게 `"$name.$prop ..."` 로 쓴다.
+  - `valueAliases` 가 enum 이 아닌 속성에 있으면 `"$name.$prop 의 valueAliases 는 enum 이 아닌 속성에 둘 수 없다"` 로 멈춘다. 이 검사를 아래 둘보다 먼저 한다.
   - `valueAliases` 의 키가 `values` 밖이면 멈춘다.
-  - 한 속성 안의 별칭을 `trim().lowercase()` 로 모았을 때 겹치거나, 어떤 별칭이 그 속성의 `values` 가운데 하나와 같으면 멈춘다. 메시지에 겹친 별칭을 넣는다.
-  - `valueAliases` 가 enum 이 아닌 속성에 있으면 멈춘다.
+  - 별칭과 `values` 를 모두 `trim().lowercase()` 로 바꿔 비교한다. 한 속성 안에서 별칭이 겹치거나 어떤 별칭이 `values` 가운데 하나와 같으면 멈춘다. 메시지에 겹친 별칭을 넣는다.
 - 노드 타입 반복 안에서 `hintProperties` 가 그 타입의 `properties` 에 없으면 `"$name 의 hintProperties 가 속성에 없는 이름을 가리킨다: ..."` 로 멈춘다.
 
 ### 3. `financial-workbench/api/src/main/kotlin/dev/fos/workbench/knowledge/LegacyValueCleanup.kt` 신규
@@ -117,14 +122,16 @@ class LegacyValueCleanup(
     private val ontology: Ontology,
     private val guard: RevisionGuard,
     private val recorder: ChangeEventRecorder,
+    transactionManager: PlatformTransactionManager,
 ) {
-    /** 고친 노드 수를 돌려준다. 여러 번 불러도 결과가 같다 */
-    @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
+    /** 고친 노드 수를 돌려준다. 여러 번 불러도 결과가 같다. 노드마다 트랜잭션 하나다 */
     fun run(): Int
 }
 ```
 
-- 대상은 `managedBy == null` 인 노드 타입의 enum 속성이다. 타입마다 아래 쿼리로 후보 id 를 읽는다. 타입 이름은 `ontology.nodeTypes` 의 키라 허용 목록 안이다.
+- 대상은 `managedBy == null` 인 노드 타입의 enum 속성 가운데 `valueAliases` 가 있는 것이다. 지금은 Company `country` 와 Security `currency` 둘이다. 처음부터 enum 이던 `market` 같은 속성은 건드리지 않는다. `market` 을 고치면 (market, ticker) 유일성 제약에 걸려 시작이 멈출 수 있기 때문이다.
+- 후보 읽기는 읽기 전용 트랜잭션 하나에서 한 번 하고, 고치기는 노드마다 `TransactionTemplate`(`timeout = Limits.WRITE_TIMEOUT_SECONDS`)으로 따로 커밋한다. 정리 전체를 트랜잭션 하나로 묶으면 대상이 많을 때 시간 제한을 넘어 롤백되고, 시작할 때마다 같은 실패가 되풀이된다.
+- 타입마다 아래 쿼리로 후보 id 를 읽는다. 타입 이름은 `ontology.nodeTypes` 의 키라 허용 목록 안이다.
 
   ```cypher
   MATCH (n:Knowledge)
@@ -132,9 +139,9 @@ class LegacyValueCleanup(
     AND any(p IN $props WHERE n[p] IS NOT NULL AND NOT n[p] IN $allowed[p])
   RETURN n.id AS id ORDER BY id
   ```
-  `$props` 는 그 타입의 enum 속성 이름 목록, `$allowed` 는 `{속성: values}` 맵이다. enum 속성이 없는 타입은 건너뛴다.
-- 후보마다 `guard.lockNode(id)` 로 잠그고 다시 읽은 값으로 판정한다. 잠근 뒤 `archived == true` 면 `guard.unlockNode(id)` 하고 건너뛴다.
-  - 속성마다 값이 문자열이고 `values` 밖이면 `canonicalEnumValue` 를 부른다. 결과가 원래 값과 다를 때만 `changes[속성] = 결과` 다(결과 `null` 은 지우기).
+  `$props` 는 그 타입에서 대상인 속성 이름 목록, `$allowed` 는 `{속성: values}` 맵이다. 대상 속성이 없는 타입은 건너뛴다.
+- 후보마다 그 노드의 트랜잭션에서 `guard.lockNode(id)` 로 잠그고 다시 읽은 값으로 판정한다. 잠근 뒤 `archived == true` 면 `guard.unlockNode(id)` 하고 건너뛴다.
+  - 대상 속성마다 값이 문자열이고 `values` 밖이면 `canonicalEnumValue` 를 부른다. 결과가 원래 값과 다를 때만 `changes[속성] = 결과` 다(결과 `null` 은 지우기).
   - `changes` 가 비면 `guard.unlockNode(id)` 하고 넘어간다.
   - 있으면 `guard.updateNode(id, changes, BootstrapAdmin.SYSTEM_ACTOR)` 뒤에 `ChangeEventDraft(BootstrapAdmin.SYSTEM_ACTOR, ChangeAction.UPDATE, id, TargetKind.NODE, type, ontology.labelOf(type, after), revision, diff(before, changes), "온톨로지 목록에 맞춰 예전 값을 고쳤다")` 를 남긴다. `revision` 은 `(after["revision"] as Number).toLong()` 이다.
 - 고친 노드가 하나 이상이면 `LoggerFactory.getLogger` 로 `info` 한 줄(고친 노드 수)을 남긴다. 속성 값은 로그에 쓰지 않는다.
@@ -144,17 +151,19 @@ class LegacyValueCleanup(
 - 생성자에 `private val legacyValueCleanup: LegacyValueCleanup` 을 더한다.
 - `afterSingletonsInstantiated()` 는 `initialize()`, `legacyValueCleanup.run()`, `bootstrapAdmin.ifAvailable { it.ensureAdmin() }` 순서로 부른다. 클래스 주석의 「제약 조건과 인덱스를 만든다」 아래에 「그다음 목록 밖 enum 값을 고친다(`LegacyValueCleanup`)」 를 더한다.
 - `ReviewFixIntegrationTest` 는 이 빈을 `@Autowired` 로 받아 `initialize()` 만 부르므로 고칠 것이 없다.
+- `schemaVersion` 을 단언하는 기존 테스트 둘을 고친다. `financial-workbench/api/src/test/kotlin/dev/fos/workbench/AuthIntegrationTest.kt` 의 `/api/ontology` 응답 단언과 `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyValidatorTest.kt` 의 「온톨로지 파일이 스스로 일관되다」 가 `"1.1.0"` 을 본다. 둘 다 `"1.2.0"` 으로 바꾼다.
+- `AuthIntegrationTest` 의 같은 자리에 응답 단언을 셋 더한다. `nodeTypes.Company.hintProperties[0]` 이 `country`, `relationshipTypes.ISSUES.createPicker.label` 이 `발행 기업`, `nodeTypes.Security.properties.currency.valueAliases.KRW` 가 배열이다. `docs/api-contract.md` 「온톨로지」 의 새 필드를 응답으로 확인하는 것이다.
 
 ### 5. 이 phase 를 검증하는 테스트
 
 - `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyLabelsTest.kt`
   - 「저장되는 값은 표시 이름과 상관없이 그대로다」 에 국가와 통화 목록을 더한다. `country.values` 가 작업 항목 1 의 11개와 같고, `valueLabels["KR"]` 이 `대한민국 (KR)`, `currency.valueAliases?.get("KRW")` 에 `원` 이 든다.
   - 새 테스트 「목록 밖 값은 공백, 대소문자, 별칭으로 목록 값에 맞춘다」: 기본 온톨로지의 `currency` 로 `" 원 "` 이 `KRW`, `"usd"` 가 `USD`, `"   "` 이 `null`, `"KRW"` 가 `KRW`, `"루피"` 가 `루피` 인지 본다.
-  - 새 테스트 「별칭과 구분 정보가 잘못되면 읽지 않는다」: `minimal(...)` 로 세 YAML 을 만든다. 키가 `values` 밖인 `valueAliases`(`{ type: enum, values: [A], valueAliases: { B: [b] } }`), 두 값에 같은 별칭(`{ type: enum, values: [A, B], valueAliases: { A: [x], B: [" X "] } }`), enum 이 아닌 속성의 별칭(`{ type: string, valueAliases: { A: [a] } }`)은 모두 `IllegalArgumentException` 이다. `hintProperties: [nope]` 는 `minimal` 의 Company 아래에 줄을 더한 문자열로 만들고 `nope` 이 메시지에 든다.
+  - 새 테스트 「별칭과 구분 정보가 잘못되면 읽지 않는다」: `minimal(...)` 로 세 YAML 을 만든다. 키가 `values` 밖인 `valueAliases`(`{ type: enum, values: [A], valueAliases: { B: [b] } }`), 두 값에 같은 별칭(`{ type: enum, values: [A, B], valueAliases: { A: [x], B: [" X "] } }`), enum 이 아닌 속성의 별칭(`{ type: string, valueAliases: { A: [a] } }`)은 모두 `IllegalArgumentException` 이다. 세 번째는 `hasMessageContaining("enum 이 아닌")` 으로 그 검사가 막았는지 본다. 별칭이 값과 같은 경우(`{ type: enum, values: [A], valueAliases: { A: [" a "] } }`)도 넣는다. `hintProperties: [nope]` 는 `minimal` 의 Company 아래에 줄을 더한 문자열로 만들고 `nope` 이 메시지에 든다.
   - 새 테스트 「발행 관계는 종목 만들기 폼에 발행 기업 칸을 둔다」: `ontology.relationshipTypes.getValue("ISSUES").createPicker?.label` 이 `발행 기업` 이다.
 - `financial-workbench/api/src/test/kotlin/dev/fos/workbench/knowledge/LegacyValueCleanupIntegrationTest.kt` 신규. `IntegrationTest` 를 상속하고 `@Autowired lateinit var cleanup: LegacyValueCleanup` 을 받는다.
   - 「목록 밖 국가와 통화를 고치고 system 이력을 남긴다」: `Fixtures(loggedIn(ALICE))` 로 기업과 종목을 만든 뒤 `neo4j` 로 기업 `country` 를 `" 한국 "`, 종목 `currency` 를 `"원"` 으로 직접 바꾼다(`MATCH (n:Knowledge {id: $id}) SET n.country = $v`). `cleanup.run()` 이 2 이상이다. 두 노드의 값이 `KR`, `KRW` 이고 revision 이 2 다. `/api/changes?targetId=<id>` 의 첫 항목이 `UPDATE`, `actor` 가 비어 있고 `note` 가 「온톨로지 목록에 맞춰 예전 값을 고쳤다」, `changes.country.before` 가 `" 한국 "` 이다.
-  - 「다시 돌려도 바꾸지 않고, 맞지 않는 값과 보관된 노드는 그대로 둔다」: 기업 하나는 `country` 를 `"루피아"` 로, 다른 기업은 `"한국"` 으로 바꾸고 `archived = true` 로 둔다. `run()` 뒤 두 노드의 값과 revision 이 그대로다. 앞 테스트에서 고친 노드도 두 번째 `run()` 에서 revision 이 오르지 않는다. 같은 컨테이너의 다른 테스트 데이터가 있으므로 반환값이 아니라 이 테스트가 만든 노드의 값과 revision 으로 판정한다.
+  - 「다시 돌려도 바꾸지 않고, 맞지 않는 값과 보관된 노드와 처음부터 enum 이던 속성은 그대로 둔다」: 이 테스트 안에서 노드를 만든다. 기업 하나는 `country` 를 `"한국"` 으로 바꾸고, 다른 기업은 `"루피아"` 로, 세 번째 기업은 `"한국"` 으로 바꾸고 `archived = true` 로 둔다. 종목 하나는 `market` 을 `"krx_kospi"` 로 바꾼다. `run()` 을 두 번 부른다. 첫 기업은 `KR`, revision 2 이고 두 번째 `run()` 뒤에도 revision 2 다. 나머지 셋은 값과 revision 이 처음 그대로다. 같은 컨테이너의 다른 테스트 데이터가 있으므로 반환값이 아니라 이 테스트가 만든 노드의 값과 revision 으로 판정한다. 테스트 사이 순서에 기대지 않는다.
   - 이력 응답(`history/ChangeController.kt`)의 `actor` 는 `users.findRefs` 로 찾은 `UserRef?` 라서 `system` 이면 비어 있다. `latest["actor"] == null || latest["actor"].isNull` 로 본다. `note` 는 `latest["note"].asString()` 이다.
 
 ### 6. 브라우저 테스트의 도움말 문구
@@ -168,7 +177,7 @@ await expect(pageAdmin.getByTestId('create-prop-country').locator('option[value=
 ## 검증
 
 ```bash
-cd financial-workbench/api && ./gradlew test --tests 'dev.fos.workbench.ontology.OntologyLabelsTest' --tests 'dev.fos.workbench.knowledge.LegacyValueCleanupIntegrationTest'
+cd financial-workbench/api && ./gradlew test --tests 'dev.fos.workbench.ontology.OntologyLabelsTest' --tests 'dev.fos.workbench.ontology.OntologyValidatorTest' --tests 'dev.fos.workbench.AuthIntegrationTest' --tests 'dev.fos.workbench.knowledge.LegacyValueCleanupIntegrationTest'
 cd financial-workbench/api && ./gradlew test
 grep -q 'valueAliases' financial-workbench/ontology/financial-ontology.yaml
 grep -q 'legacyValueCleanup.run()' financial-workbench/api/src/main/kotlin/dev/fos/workbench/config/Neo4jSchemaInitializer.kt
@@ -177,7 +186,7 @@ cd financial-workbench/web && npm ci && WORKBENCH_URL=http://127.0.0.1:8081 E2E_
 cd financial-workbench && NEO4J_PASSWORD=e2e-local-password COMPOSE_PROJECT_NAME=wb-plan007 COMPOSE_FILE=compose.yml:compose.e2e.yml docker compose down -v
 ```
 
-- 전체 `./gradlew test` 가 통과해야 한다. 기존 통합 테스트의 국가와 통화 값은 새 목록 안이다.
+- 전체 `./gradlew test` 가 통과해야 한다. 기존 통합 테스트의 국가와 통화 값은 새 목록 안이고, `schemaVersion` 단언 둘은 작업 항목 4 에서 고쳤다.
 - 브라우저 테스트 두 project 가 모두 통과해야 한다. 웹은 이 phase 에서 바뀌지 않았으므로 국가와 통화가 선택 칸으로 보이는 것은 `PropertyFields` 가 enum 을 이미 선택 칸으로 그리기 때문이다.
 - 8081 이나 8090 포트를 다른 스택이 쓰고 있으면 그 스택을 내리지 말고 `PHASE_BLOCKED: 8081 또는 8090 사용 중` 을 출력하고 멈춘다.
 
@@ -191,5 +200,7 @@ cd financial-workbench && NEO4J_PASSWORD=e2e-local-password COMPOSE_PROJECT_NAME
 | `financial-workbench/api/src/main/kotlin/dev/fos/workbench/knowledge/LegacyValueCleanup.kt` | 신규 |
 | `financial-workbench/api/src/main/kotlin/dev/fos/workbench/config/Neo4jSchemaInitializer.kt` | 수정 |
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyLabelsTest.kt` | 수정 |
+| `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyValidatorTest.kt` | 수정 |
+| `financial-workbench/api/src/test/kotlin/dev/fos/workbench/AuthIntegrationTest.kt` | 수정 |
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/knowledge/LegacyValueCleanupIntegrationTest.kt` | 신규 |
 | `financial-workbench/web/e2e/workbench.spec.ts` | 수정 |
