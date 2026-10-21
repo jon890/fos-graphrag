@@ -51,6 +51,8 @@ data class NodeTypeDef(
     val labelProperty: String,
     val managedBy: String? = null,
     val properties: Map<String, PropertyDef>,
+    /** 검색 결과와 고르기 후보에서 이름 옆에 함께 보일 속성 */
+    val hintProperties: List<String> = emptyList(),
 )
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -62,10 +64,28 @@ data class PropertyDef(
     val values: List<String>? = null,
     /** enum 값의 표시 이름. 키는 [values] 안에 있어야 한다. 저장되는 값은 바뀌지 않는다 */
     val valueLabels: Map<String, String>? = null,
+    /** enum 값의 예전 표기. 키는 [values] 안에 있어야 한다. 시작할 때 목록 밖 값을 고치는 데 쓴다 */
+    val valueAliases: Map<String, List<String>>? = null,
     val min: Double? = null,
     val max: Double? = null,
     val description: String = "",
-)
+) {
+    /**
+     * 목록 밖 enum 값을 목록 값으로 바꾼다. 앞뒤 공백과 대소문자를 무시하고 values 나 valueAliases 와 비교한다.
+     * 이미 목록 값이면 그대로, 공백뿐이면 null(속성을 지운다), 어디에도 맞지 않으면 원래 값을 돌려준다.
+     */
+    fun canonicalEnumValue(raw: String): String? {
+        val allowed = values.orEmpty()
+        if (raw in allowed) return raw
+        val key = raw.trim().lowercase()
+        if (key.isEmpty()) return null
+        allowed.firstOrNull { it.trim().lowercase() == key }?.let { return it }
+        valueAliases.orEmpty().forEach { (value, aliases) ->
+            if (aliases.any { it.trim().lowercase() == key }) return value
+        }
+        return raw
+    }
+}
 
 enum class PropertyType(@get:JsonValue val yaml: String) {
     STRING("string"),
@@ -84,6 +104,14 @@ data class RelationshipTypeDef(
     val description: String,
     val from: List<String>,
     val to: List<String>,
+    /** 끝(to) 타입 만들기 폼에 시작(from) 노드를 고르는 칸. 없으면 칸이 없다 */
+    val createPicker: CreatePickerDef? = null,
+)
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
+data class CreatePickerDef(
+    val label: String,
+    val description: String? = null,
 )
 
 data class ClaimRelationshipDef(

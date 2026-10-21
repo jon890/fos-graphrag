@@ -57,15 +57,33 @@ object OntologyLoader {
             require(def.labelProperty in def.properties) { "$name 의 labelProperty 가 속성에 없다" }
             val reserved = def.properties.keys.filter { it in RESERVED_PROPERTIES || it.startsWith("_") }
             require(reserved.isEmpty()) { "$name 이 시스템 속성 이름을 사용자 속성으로 정의한다: $reserved" }
+            val strayHints = def.hintProperties.filterNot { it in def.properties }
+            require(strayHints.isEmpty()) { "$name 의 hintProperties 가 속성에 없는 이름을 가리킨다: $strayHints" }
             def.properties.forEach { (prop, p) ->
                 require(p.type != PropertyType.ENUM || !p.values.isNullOrEmpty()) { "$name.$prop enum 에 values 가 없다" }
                 val stray = p.valueLabels.orEmpty().keys.filterNot { it in p.values.orEmpty() }
                 require(stray.isEmpty()) { "$name.$prop 의 valueLabels 가 values 에 없는 값을 가리킨다: $stray" }
+                checkAliases(name, prop, p)
             }
         }
         require(Regex("[A-Za-z][A-Za-z0-9_]*").let { r -> (types + o.allRelationshipTypes).all { r.matches(it) } }) {
             "타입과 관계 이름은 영문자, 숫자, 밑줄만 쓴다"
         }
+    }
+
+    /** 예전 값 정리가 한 표기를 두 값으로 고치거나 목록 값을 다른 값으로 바꾸지 않게, 별칭이 서로와 values 와 겹치지 않는지 본다. */
+    private fun checkAliases(name: String, prop: String, p: PropertyDef) {
+        val aliases = p.valueAliases ?: return
+        require(p.type == PropertyType.ENUM) { "$name.$prop 의 valueAliases 는 enum 이 아닌 속성에 둘 수 없다" }
+        val stray = aliases.keys.filterNot { it in p.values.orEmpty() }
+        require(stray.isEmpty()) { "$name.$prop 의 valueAliases 가 values 에 없는 값을 가리킨다: $stray" }
+        val normalizedValues = p.values.orEmpty().map { it.trim().lowercase() }.toSet()
+        val seen = mutableSetOf<String>()
+        val clashes = aliases.values.flatten().filter { alias ->
+            val key = alias.trim().lowercase()
+            key in normalizedValues || !seen.add(key)
+        }
+        require(clashes.isEmpty()) { "$name.$prop 의 valueAliases 가 겹치거나 values 와 같은 표기를 가진다: $clashes" }
     }
 }
 
