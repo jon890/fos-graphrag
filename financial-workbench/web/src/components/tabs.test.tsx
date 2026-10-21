@@ -1,9 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import type { Page } from '../api/types'
+import type { ClaimView, Page } from '../api/types'
 import { ListTab } from './ListTab'
 import { LoginView } from './LoginView'
+import { ChangesTab } from './ChangesTab'
+import { OntologyTab } from './OntologyTab'
 import { Pager } from './Pager'
+import { ReviewRow, ReviewTab } from './ReviewTab'
 import { UsersTab } from './UsersTab'
 import { withApp } from './testSupport'
 
@@ -51,5 +54,50 @@ describe('머리글 밖 탭의 첫 렌더', () => {
     expect(first).toMatch(/<button[^>]*data-testid="p-prev"[^>]*disabled/)
     const last = renderToStaticMarkup(<Pager page={{ ...base, page: 2 }} onPage={() => {}} testIdPrefix="p" />)
     expect(last).toMatch(/<button[^>]*data-testid="p-next"[^>]*disabled/)
+  })
+
+  it('OntologyTab 은 버전 표시를 그리고 옛 타입 구역 class 를 쓰지 않는다', () => {
+    const html = renderToStaticMarkup(withApp(<OntologyTab />))
+    expect(html).toContain('data-testid="ontology-version"')
+    expect(html).not.toContain('ontology-type')
+  })
+
+  it('ReviewTab 은 첫 렌더에 shadcn 표를 그리고 옛 표 class 를 쓰지 않는다', () => {
+    const html = renderToStaticMarkup(withApp(<ReviewTab onOpen={() => {}} />))
+    expect(html).toContain('data-testid="review-tab"')
+    expect(html).toContain('data-slot="table"')
+    expect(html).not.toContain('data-table')
+  })
+
+  it('ReviewRow 는 승인과 반려 버튼을 shadcn 버튼으로 그리고 옛 class 를 쓰지 않는다', () => {
+    const claim = {
+      id: 'c1',
+      revision: 1,
+      type: 'Claim',
+      properties: { predicate: 'SUPPLIES', evidenceText: '근거' },
+      createdBy: { id: 'other', email: 'o@example.com', displayName: 'Other' },
+      createdAt: '2026-10-20T03:15:00Z',
+      subject: null,
+      object: null,
+    } as unknown as ClaimView
+    const html = renderToStaticMarkup(
+      withApp(
+        <table>
+          <tbody>
+            <ReviewRow claim={claim} onDone={() => {}} onError={() => {}} onOpen={() => {}} />
+          </tbody>
+        </table>,
+      ),
+    )
+    expect(html).toMatch(/<button[^>]*data-testid="review-row-approve"/)
+    expect(html).toMatch(/<button[^>]*data-testid="review-row-reject"/)
+    expect(html).toMatch(/<input[^>]*data-testid="review-row-note"/)
+    expect(html).not.toContain('review-actions')
+  })
+
+  it('ChangesTab 은 대상 필터를 input 으로 그리고 옛 표 class 를 쓰지 않는다', () => {
+    const html = renderToStaticMarkup(withApp(<ChangesTab targetId="" onTargetIdChange={() => {}} onOpen={() => {}} />))
+    expect(html).toMatch(/<input[^>]*data-testid="changes-target-filter"/)
+    expect(html).not.toContain('data-table')
   })
 })
