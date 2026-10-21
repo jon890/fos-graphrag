@@ -3,6 +3,12 @@ import { api, errorMessage } from '../api/client'
 import { ROLES, type PatchUserRequest, type Role, type UserView } from '../api/types'
 import { ROLE_LABEL, useApp } from '../context'
 import { formatDateTime } from '../lib/format'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { cn } from '@/lib/utils'
 
 type Message = { kind: 'success' | 'error'; text: string }
 
@@ -27,53 +33,64 @@ function UserRow({ user, isSelf, onPatch, onOpenHistory }: RowProps) {
   }
 
   return (
-    <tr data-testid="users-row" data-email={user.email} data-enabled={String(user.enabled)} className={user.enabled ? '' : 'disabled-row'}>
-      <td className="mono">
+    <TableRow data-testid="users-row" data-email={user.email} data-enabled={String(user.enabled)} className={cn(!user.enabled && 'bg-gray-50 text-muted-foreground')}>
+      <TableCell className="font-mono">
         {user.email}
-        {isSelf && <span className="muted small"> (나)</span>}
-      </td>
-      <td>{user.displayName}</td>
-      <td>
-        <div className="row">
-          <select data-testid="users-row-role" value={role} disabled={busy} onChange={(e) => setRole(e.target.value as Role)}>
+        {isSelf && <span className="text-xs text-muted-foreground"> (나)</span>}
+      </TableCell>
+      <TableCell>{user.displayName}</TableCell>
+      <TableCell>
+        <div className="flex flex-wrap items-center gap-2">
+          <NativeSelect size="sm" data-testid="users-row-role" value={role} disabled={busy} onChange={(e) => setRole(e.target.value as Role)}>
             {ROLES.map((r) => (
               <option key={r} value={r}>
                 {ROLE_LABEL[r]}
               </option>
             ))}
-          </select>
-          <button
+          </NativeSelect>
+          <Button
+            variant="outline"
+            size="sm"
             data-testid="users-row-save"
             disabled={busy || role === user.role}
             onClick={() => void run({ role }, `${user.email} 의 역할을 바꿨습니다. 새 역할: ${ROLE_LABEL[role]}`)}
           >
             저장
-          </button>
+          </Button>
         </div>
-      </td>
-      <td data-testid="users-row-enabled">{user.enabled ? '활성' : '비활성'}</td>
-      <td data-testid="users-row-linked">{user.linked ? '로그인함' : '첫 로그인 전'}</td>
-      <td>{formatDateTime(user.lastLoginAt)}</td>
-      <td className="row">
-        {user.enabled ? (
-          <button
-            className="danger"
-            data-testid="users-row-disable"
-            disabled={busy}
-            onClick={() => void run({ enabled: false }, `${user.email} 을 비활성화했습니다. 다음 요청부터 세션이 끊깁니다.`)}
-          >
-            비활성화
-          </button>
-        ) : (
-          <button data-testid="users-row-enable" disabled={busy} onClick={() => void run({ enabled: true }, `${user.email} 을 다시 활성화했습니다.`)}>
-            다시 활성화
-          </button>
-        )}
-        <button className="link-button small" data-testid="users-row-history" onClick={() => onOpenHistory(user.id)}>
-          이력
-        </button>
-      </td>
-    </tr>
+      </TableCell>
+      <TableCell data-testid="users-row-enabled">{user.enabled ? '활성' : '비활성'}</TableCell>
+      <TableCell data-testid="users-row-linked">{user.linked ? '로그인함' : '첫 로그인 전'}</TableCell>
+      <TableCell>{formatDateTime(user.lastLoginAt)}</TableCell>
+      <TableCell>
+        <div className="flex flex-wrap items-center gap-2">
+          {user.enabled ? (
+            <Button
+              variant="destructive"
+              size="sm"
+              data-testid="users-row-disable"
+              disabled={busy}
+              onClick={() => void run({ enabled: false }, `${user.email} 을 비활성화했습니다. 다음 요청부터 세션이 끊깁니다.`)}
+            >
+              비활성화
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="users-row-enable"
+              disabled={busy}
+              onClick={() => void run({ enabled: true }, `${user.email} 을 다시 활성화했습니다.`)}
+            >
+              다시 활성화
+            </Button>
+          )}
+          <Button variant="link" size="sm" className="px-1" data-testid="users-row-history" onClick={() => onOpenHistory(user.id)}>
+            이력
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
   )
 }
 
@@ -136,64 +153,70 @@ export function UsersTab({ onOpenHistory }: { onOpenHistory: (id: string) => voi
   }
 
   return (
-    <div className="tab-page" data-testid="users-tab">
-      <div className="row toolbar">
-        <h2>사용자</h2>
-        <button data-testid="users-refresh" onClick={() => void load()}>
+    <div className="min-h-full bg-card px-3 py-4 lg:px-6" data-testid="users-tab">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <h2 className="m-0 mr-2 text-lg font-bold">사용자</h2>
+        <Button variant="outline" data-testid="users-refresh" onClick={() => void load()}>
           새로고침
-        </button>
-        {loading && <span className="muted small">불러오는 중…</span>}
+        </Button>
+        {loading && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
       </div>
-      <p className="hint">
+      <p className="my-2 text-xs text-muted-foreground">
         목록에 있는 활성 사용자만 Google 로 로그인할 수 있습니다. 이메일은 바꿀 수 없으니 잘못 넣었으면 비활성화하고 새로 추가하세요.
       </p>
 
-      <form className="row toolbar sub-form" onSubmit={add} data-testid="users-add-form">
-        <input data-testid="users-add-email" type="email" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <input data-testid="users-add-name" placeholder="표시 이름" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-        <select data-testid="users-add-role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
+      <form className="my-2 mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-slate-50 p-2.5" onSubmit={add} data-testid="users-add-form">
+        <Input className="min-w-48 flex-1" data-testid="users-add-email" type="email" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Input className="min-w-48 flex-1" data-testid="users-add-name" placeholder="표시 이름" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+        <NativeSelect data-testid="users-add-role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
           {ROLES.map((r) => (
             <option key={r} value={r}>
               {ROLE_LABEL[r]}
             </option>
           ))}
-        </select>
-        <button type="submit" className="primary" data-testid="users-add-submit" disabled={adding}>
+        </NativeSelect>
+        <Button type="submit" data-testid="users-add-submit" disabled={adding}>
           사용자 추가
-        </button>
+        </Button>
       </form>
 
       {message && (
-        <div className={`notice notice-${message.kind}`} role="status" data-testid="users-message" data-kind={message.kind}>
-          {message.text}
-        </div>
+        <Alert
+          role="status"
+          variant={message.kind === 'error' ? 'destructive' : 'default'}
+          className={cn('my-2', message.kind === 'success' && 'border-emerald-300 bg-emerald-50')}
+          data-testid="users-message"
+          data-kind={message.kind}
+        >
+          <AlertDescription className={cn(message.kind === 'success' && 'text-emerald-900')}>{message.text}</AlertDescription>
+        </Alert>
       )}
 
-      <table className="data-table" data-testid="users-table">
-        <thead>
-          <tr>
-            <th>이메일</th>
-            <th>표시 이름</th>
-            <th>역할</th>
-            <th>활성</th>
-            <th>로그인 연결</th>
-            <th>마지막 로그인</th>
-            <th>관리</th>
-          </tr>
-        </thead>
-        <tbody>
+      <Table data-testid="users-table">
+        <TableHeader>
+          <TableRow className="bg-slate-50 hover:bg-slate-50">
+            <TableHead>이메일</TableHead>
+            <TableHead>표시 이름</TableHead>
+            <TableHead>역할</TableHead>
+            <TableHead>활성</TableHead>
+            <TableHead>로그인 연결</TableHead>
+            <TableHead>마지막 로그인</TableHead>
+            <TableHead>관리</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {users?.map((u) => (
             <UserRow key={`${u.id}:${u.revision}`} user={u} isSelf={u.id === me.id} onPatch={patch} onOpenHistory={onOpenHistory} />
           ))}
           {users && users.length === 0 && (
-            <tr>
-              <td colSpan={7} className="muted">
+            <TableRow>
+              <TableCell colSpan={7} className="text-muted-foreground">
                 사용자가 없습니다.
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           )}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   )
 }

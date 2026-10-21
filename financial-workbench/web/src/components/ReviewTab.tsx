@@ -3,10 +3,14 @@ import { api, errorMessage } from '../api/client'
 import type { ClaimView, Page, ReviewStatus } from '../api/types'
 import { useApp, useLabels } from '../context'
 import { formatDateTime, truncate, userName } from '../lib/format'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Pager } from './Pager'
 import { TypeBadge } from './TypeBadge'
 
-function ReviewRow({ claim, onDone, onError, onOpen }: { claim: ClaimView; onDone: (m: string) => void; onError: (e: unknown) => void; onOpen: (id: string) => void }) {
+export function ReviewRow({ claim, onDone, onError, onOpen }: { claim: ClaimView; onDone: (m: string) => void; onError: (e: unknown) => void; onOpen: (id: string) => void }) {
   const { user, canEdit } = useApp()
   const labels = useLabels()
   const [note, setNote] = useState('')
@@ -28,36 +32,38 @@ function ReviewRow({ claim, onDone, onError, onOpen }: { claim: ClaimView; onDon
   }
 
   return (
-    <tr data-testid="review-row" data-claim-id={claim.id}>
-      <td>
-        <button className="link-button" onClick={() => onOpen(claim.id)}>
+    <TableRow data-testid="review-row" data-claim-id={claim.id}>
+      <TableCell>
+        <Button variant="link" className="h-auto p-0" onClick={() => onOpen(claim.id)}>
           {labels.node(claim)}
-        </button>
-      </td>
-      <td>{claim.subject ? <><TypeBadge type={claim.subject.type} /> {claim.subject.label}</> : <span className="muted">(알 수 없음)</span>}</td>
-      <td>{claim.object ? <><TypeBadge type={claim.object.type} /> {claim.object.label}</> : <span className="muted">(알 수 없음)</span>}</td>
-      <td title={String(claim.properties.evidenceText ?? '')}>{truncate(String(claim.properties.evidenceText ?? ''), 50)}</td>
-      <td>{userName(claim.createdBy, '알 수 없음')}</td>
-      <td>{formatDateTime(claim.createdAt)}</td>
-      <td className="review-actions">
-        {!canEdit ? (
-          <span className="muted small" data-testid="review-viewer-hint">
-            열람자는 검토할 수 없습니다.
-          </span>
-        ) : own ? (
-          <span className="muted small" data-testid="review-own-hint">
-            본인이 작성한 주장은 검토할 수 없습니다.
-          </span>
-        ) : null}
-        <input data-testid="review-row-note" placeholder="메모(선택)" value={note} disabled={blocked || busy} onChange={(e) => setNote(e.target.value)} />
-        <button className="primary" data-testid="review-row-approve" disabled={blocked || busy} onClick={() => void review('REVIEWED')}>
-          {labels.status('REVIEWED')}
-        </button>
-        <button className="danger" data-testid="review-row-reject" disabled={blocked || busy} onClick={() => void review('REJECTED')}>
-          {labels.status('REJECTED')}
-        </button>
-      </td>
-    </tr>
+        </Button>
+      </TableCell>
+      <TableCell>{claim.subject ? <><TypeBadge type={claim.subject.type} /> {claim.subject.label}</> : <span className="text-muted-foreground">(알 수 없음)</span>}</TableCell>
+      <TableCell>{claim.object ? <><TypeBadge type={claim.object.type} /> {claim.object.label}</> : <span className="text-muted-foreground">(알 수 없음)</span>}</TableCell>
+      <TableCell title={String(claim.properties.evidenceText ?? '')}>{truncate(String(claim.properties.evidenceText ?? ''), 50)}</TableCell>
+      <TableCell>{userName(claim.createdBy, '알 수 없음')}</TableCell>
+      <TableCell>{formatDateTime(claim.createdAt)}</TableCell>
+      <TableCell>
+        <div className="flex min-w-70 flex-wrap items-center gap-1">
+          {!canEdit ? (
+            <span className="text-xs text-muted-foreground" data-testid="review-viewer-hint">
+              열람자는 검토할 수 없습니다.
+            </span>
+          ) : own ? (
+            <span className="text-xs text-muted-foreground" data-testid="review-own-hint">
+              본인이 작성한 주장은 검토할 수 없습니다.
+            </span>
+          ) : null}
+          <Input className="w-30" data-testid="review-row-note" placeholder="메모(선택)" value={note} disabled={blocked || busy} onChange={(e) => setNote(e.target.value)} />
+          <Button data-testid="review-row-approve" disabled={blocked || busy} onClick={() => void review('REVIEWED')}>
+            {labels.status('REVIEWED')}
+          </Button>
+          <Button variant="destructive" data-testid="review-row-reject" disabled={blocked || busy} onClick={() => void review('REJECTED')}>
+            {labels.status('REJECTED')}
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
   )
 }
 
@@ -89,37 +95,37 @@ export function ReviewTab({ onOpen }: { onOpen: (id: string) => void }) {
   }, [load])
 
   return (
-    <div className="tab-page" data-testid="review-tab">
-      <div className="row toolbar">
-        <h2>검토 대기</h2>
-        <button data-testid="review-refresh" onClick={() => void load()}>
+    <div className="min-h-full bg-card px-3 py-4 lg:px-6" data-testid="review-tab">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <h2 className="m-0 mr-2 text-lg font-bold">검토 대기</h2>
+        <Button variant="outline" data-testid="review-refresh" onClick={() => void load()}>
           새로고침
-        </button>
-        {loading && <span className="muted small">불러오는 중…</span>}
+        </Button>
+        {loading && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
       </div>
       {message && (
-        <div className="notice notice-success" data-testid="review-message">
-          {message}
-        </div>
+        <Alert role={undefined} className="my-2 border-emerald-300 bg-emerald-50" data-testid="review-message">
+          <AlertDescription className="text-emerald-900">{message}</AlertDescription>
+        </Alert>
       )}
       {error && (
-        <div className="error-box" data-testid="review-error">
-          {error}
-        </div>
+        <Alert role={undefined} variant="destructive" className="my-2" data-testid="review-error">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
-      <table className="data-table" data-testid="review-table">
-        <thead>
-          <tr>
-            <th>{labels.property('Claim', 'predicate')}</th>
-            <th>{labels.relationship('SUBJECT')}</th>
-            <th>{labels.relationship('OBJECT')}</th>
-            <th>{labels.property('Claim', 'evidenceText')}</th>
-            <th>작성자</th>
-            <th>생성 시각</th>
-            <th>검토</th>
-          </tr>
-        </thead>
-        <tbody>
+      <Table data-testid="review-table">
+        <TableHeader>
+          <TableRow className="bg-slate-50 hover:bg-slate-50">
+            <TableHead>{labels.property('Claim', 'predicate')}</TableHead>
+            <TableHead>{labels.relationship('SUBJECT')}</TableHead>
+            <TableHead>{labels.relationship('OBJECT')}</TableHead>
+            <TableHead>{labels.property('Claim', 'evidenceText')}</TableHead>
+            <TableHead>작성자</TableHead>
+            <TableHead>생성 시각</TableHead>
+            <TableHead>검토</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {page?.items.map((c) => (
             <ReviewRow
               key={`${c.id}:${c.revision}`}
@@ -138,14 +144,14 @@ export function ReviewTab({ onOpen }: { onOpen: (id: string) => void }) {
             />
           ))}
           {page && page.items.length === 0 && (
-            <tr>
-              <td colSpan={7} className="muted" data-testid="review-empty">
+            <TableRow>
+              <TableCell colSpan={7} className="text-muted-foreground" data-testid="review-empty">
                 검토를 기다리는 주장이 없습니다.
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           )}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
       {page && <Pager page={page} onPage={setPageNo} testIdPrefix="review-pager" />}
     </div>
   )

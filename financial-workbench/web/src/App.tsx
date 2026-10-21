@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage, setUnauthorizedHandler } from './api/client'
 import type { CurrentUser, Ontology } from './api/types'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { AppContext, canEditRole, ROLE_LABEL } from './context'
 import { LoginView } from './components/LoginView'
 import { Workspace } from './components/Workspace'
@@ -21,6 +25,12 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'ontology', label: '온톨로지' },
   { key: 'users', label: '사용자' },
 ]
+
+const ROLE_BADGE_CLASS: Record<string, string> = {
+  ADMIN: 'bg-[#7c2d12] text-[#ffedd5]',
+  EDITOR: 'bg-[#1e3a8a] text-[#dbeafe]',
+  VIEWER: 'bg-[#374151] text-[#e5e7eb]',
+}
 
 /** /?login=denied 인지 본다. 서버가 허용하지 않은 로그인 뒤 여기로 돌려보낸다. */
 function readLoginDenied(): boolean {
@@ -100,7 +110,9 @@ export default function App() {
   }
 
   if (auth.status === 'checking') {
-    return <div className="center-message" data-testid="app-loading">불러오는 중…</div>
+    return <div className="p-12 text-center text-muted-foreground" data-testid="app-loading">
+        불러오는 중…
+      </div>
   }
   if (auth.status === 'anonymous') {
     return <LoginView denied={denied} notice={auth.notice} />
@@ -112,16 +124,16 @@ export default function App() {
   const activeTab: TabKey = visibleTabs.some((t) => t.key === tab) ? tab : 'workspace'
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <div className="app-title">금융 온톨로지 워크벤치</div>
-        <nav className="tabs" role="tablist">
+    <div className="flex h-screen flex-col">
+      <header className="flex shrink-0 flex-wrap items-center gap-x-2 bg-slate-900 px-2 text-slate-200 lg:h-12 lg:flex-nowrap lg:gap-x-6 lg:px-4">
+        <div className="min-w-0 flex-1 truncate py-2 font-bold lg:flex-none lg:py-0">금융 온톨로지 워크벤치</div>
+        <nav className="order-3 flex min-w-0 basis-full flex-nowrap gap-1 overflow-x-auto lg:order-none lg:flex-1 lg:basis-auto" role="tablist">
           {visibleTabs.map((t) => (
             <button
               key={t.key}
               role="tab"
               aria-selected={activeTab === t.key}
-              className={activeTab === t.key ? 'tab active' : 'tab'}
+              className="shrink-0 cursor-pointer rounded-none border-0 border-b-[3px] border-transparent bg-transparent px-2.5 py-2.5 text-sm text-slate-300 aria-selected:border-blue-400 aria-selected:text-white lg:px-3 lg:py-3"
               data-testid={`tab-${t.key}`}
               onClick={() => setTab(t.key)}
             >
@@ -129,23 +141,31 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="user-box">
+        <div className="flex shrink-0 items-center gap-1 text-sm">
           <span data-testid="current-user-name">{user.displayName}</span>
-          <span className="muted" data-testid="current-user-email">
+          <span className="hidden text-slate-400 lg:inline" data-testid="current-user-email">
             {' '}
             {user.email}
           </span>
-          <span className={`role-badge role-${user.role.toLowerCase()}`} data-testid="current-user-role" data-role={user.role}>
+          <Badge
+            className={cn('ml-1.5 rounded-[3px] px-1.5 py-px', ROLE_BADGE_CLASS[user.role] ?? 'bg-slate-700 text-slate-200')}
+            data-testid="current-user-role"
+            data-role={user.role}
+          >
             {ROLE_LABEL[user.role] ?? user.role}
-          </span>
-          <button className="link-button" data-testid="logout-button" onClick={logout}>
+          </Badge>
+          <Button variant="link" size="sm" className="ml-2 h-auto px-1 py-0 text-blue-300" data-testid="logout-button" onClick={logout}>
             로그아웃
-          </button>
+          </Button>
         </div>
       </header>
-      <main className="app-main">
-        {ontologyError && <div className="error-box" data-testid="ontology-error">{ontologyError}</div>}
-        {!ontology && !ontologyError && <div className="center-message">온톨로지를 불러오는 중…</div>}
+      <main className="app-main min-h-0 flex-1 overflow-auto">
+        {ontologyError && (
+          <Alert role={undefined} variant="destructive" className="m-2 w-auto" data-testid="ontology-error">
+            <AlertDescription>{ontologyError}</AlertDescription>
+          </Alert>
+        )}
+        {!ontology && !ontologyError && <div className="p-12 text-center text-muted-foreground">온톨로지를 불러오는 중…</div>}
         {ontology && (
           <AppContext.Provider value={{ user, ontology, canEdit }}>
             <ErrorBoundary resetKey={activeTab}>

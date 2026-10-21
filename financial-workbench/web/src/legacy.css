@@ -57,7 +57,6 @@ button:where(:not([data-slot])).link-button:disabled { color: var(--text); opaci
 .required { color: var(--danger); }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .row > input:not([type='checkbox']) { flex: 1; }
-.center-message { padding: 48px; text-align: center; color: var(--legacy-muted); }
 
 .error-box, .warn-box, .info-box, .notice {
   border-radius: 4px;
@@ -69,42 +68,6 @@ button:where(:not([data-slot])).link-button:disabled { color: var(--text); opaci
 .warn-box, .notice-conflict { background: var(--warn-bg); border-color: var(--warn-border); color: #78350f; }
 .info-box { background: var(--info-bg); border-color: var(--info-border); }
 .notice-success { background: var(--success-bg); border-color: var(--success-border); color: #064e3b; }
-
-/* 로그인 */
-.login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-.login-card {
-  width: 360px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.login-card h1 { font-size: 18px; }
-.login-card label { display: flex; flex-direction: column; gap: 4px; }
-
-/* 상단 */
-.app { display: flex; flex-direction: column; height: 100vh; }
-.app-header {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 0 16px;
-  height: 48px;
-  background: #0f172a;
-  color: #e2e8f0;
-  flex-shrink: 0;
-}
-.app-title { font-weight: 700; }
-.tabs { display: flex; gap: 4px; flex: 1; }
-.tab { background: transparent; border: none; color: #cbd5e1; padding: 14px 12px; border-radius: 0; }
-.tab.active { color: #fff; border-bottom: 3px solid #60a5fa; }
-.user-box { display: flex; align-items: center; gap: 4px; }
-.user-box .muted { color: #94a3b8; }
-.user-box .link-button { color: #93c5fd; margin-left: 8px; }
-.app-main { flex: 1; min-height: 0; overflow: auto; }
 
 /* 작업 공간 */
 .workspace { display: grid; grid-template-columns: 260px minmax(0, 1fr) 380px; height: 100%; }
@@ -208,63 +171,11 @@ blockquote { margin: 0; padding: 4px 8px; border-left: 3px solid #cbd5e1; backgr
 .doc-list { list-style: none; padding: 0; margin: 0; }
 .doc-list li { margin-bottom: 4px; }
 
-/* 표 탭 */
-.tab-page { padding: 16px 24px; background: var(--panel); min-height: 100%; }
-.toolbar { margin-bottom: 12px; }
-.toolbar h2 { margin: 0 8px 0 0; }
-.data-table { width: 100%; border-collapse: collapse; background: #fff; }
-.data-table th, .data-table td { border-bottom: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; }
-.data-table th { background: #f8fafc; font-weight: 600; font-size: 13px; }
-.data-table.compact td, .data-table.compact th { padding: 4px 6px; font-size: 13px; }
-.data-table tr.clickable { cursor: pointer; }
-.data-table tr.clickable:hover { background: #f1f5ff; }
-.review-actions { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; min-width: 280px; }
-.review-actions input { width: 120px; }
-.pager { display: flex; gap: 12px; align-items: center; justify-content: center; margin: 12px 0; }
-.change-list { margin: 0; padding-left: 16px; font-size: 12px; }
-.action-badge { font-size: 11px; padding: 1px 6px; border-radius: 3px; background: #e5e7eb; }
-.action-create { background: #dbeafe; }
-.action-update { background: #e0e7ff; }
-.action-review { background: #d1fae5; }
-.action-archive { background: #fef3c7; }
-.action-restore { background: #fce7f3; }
-.ontology-type { margin-bottom: 16px; }
-.ontology h3 { margin-top: 16px; }
-
-/* 1024px 미만: 작업 공간은 탭으로 나뉜다(Workspace). 머리글과 표 탭이 화면 폭을 넘지 않게 한다 */
-@media (max-width: 1023px) {
-  /* 390px 에서는 제목, 탭, 사용자 상자가 한 줄에 들어가지 않는다. 탭을 둘째 줄 전체 폭에 둔다 */
-  .app-header { gap: 8px; padding: 0 8px; flex-wrap: wrap; height: auto; }
-  .app-title {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1 1 0;
-    padding: 8px 0;
-  }
-  .tabs { overflow-x: auto; flex-wrap: nowrap; min-width: 0; order: 3; flex-basis: 100%; }
-  .tab { flex-shrink: 0; padding: 10px 10px; }
-  .user-box { flex-shrink: 0; }
-  .user-box [data-testid="current-user-email"] { display: none; }
-  .tab-page { padding-left: 12px; padding-right: 12px; }
-  .tab-page table { display: block; overflow-x: auto; }
-  /* 칸을 글자 하나 폭으로 꺾지 않고 표를 가로로 밀어 보게 한다 */
-  .tab-page th, .tab-page td { white-space: nowrap; }
-}
-
-/* 역할 */
-.role-badge { font-size: 11px; padding: 1px 6px; border-radius: 3px; margin-left: 6px; background: #334155; color: #e2e8f0; }
-.role-admin { background: #7c2d12; color: #ffedd5; }
-.role-editor { background: #1e3a8a; color: #dbeafe; }
-.role-viewer { background: #374151; color: #e5e7eb; }
-.data-table tr.disabled-row td { color: var(--legacy-muted); background: #f9fafb; }
-
 /* Tailwind 기본 초기화가 지운 브라우저 기본값을 옛 화면에 되살린다 */
 h1, h2, h3, h4 { font-weight: 700; }
 p { margin: 1em 0; }
 .welcome ol { list-style: decimal; }
-.graph-node-list ul, .change-list { list-style: disc; }
+.graph-node-list ul { list-style: disc; }
 body { line-height: normal; }
 a { color: revert; text-decoration: revert; }
 input[type='checkbox'], input[type='radio'] { margin: revert; }
