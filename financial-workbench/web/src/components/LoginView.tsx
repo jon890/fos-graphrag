@@ -20,7 +20,7 @@ export function LoginView({ denied, notice }: Props) {
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {denied && (
-            <Alert variant="destructive" data-testid="login-denied">
+            <Alert role={undefined} variant="destructive" data-testid="login-denied">
               <AlertDescription>접근 권한이 없습니다. 관리자에게 허용을 요청하세요.</AlertDescription>
             </Alert>
           )}

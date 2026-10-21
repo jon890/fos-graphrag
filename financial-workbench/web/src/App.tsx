@@ -161,7 +161,7 @@ export default function App() {
       </header>
       <main className="app-main min-h-0 flex-1 overflow-auto">
         {ontologyError && (
-          <Alert variant="destructive" className="m-2 w-auto" data-testid="ontology-error">
+          <Alert role={undefined} variant="destructive" className="m-2 w-auto" data-testid="ontology-error">
             <AlertDescription>{ontologyError}</AlertDescription>
           </Alert>
         )}

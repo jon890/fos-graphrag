@@ -85,7 +85,7 @@ export function ListTab({ onOpen }: { onOpen: (id: string) => void }) {
         {loading && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
       </form>
       {error && (
-        <Alert variant="destructive" className="my-2">
+        <Alert role={undefined} variant="destructive" className="my-2">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}

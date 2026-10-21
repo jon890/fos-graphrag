@@ -24,7 +24,7 @@ function changeLine(ontology: Ontology, targetType: string, key: string, diff: {
   return `${show(diff?.before)} → ${show(diff?.after)}`
 }
 
-const ACTION_BADGE: Record<string, { variant: 'secondary' | 'outline'; className?: string } | undefined> = {
+const ACTION_BADGE: Record<string, { variant: 'secondary' | 'outline'; className?: string }> = {
   CREATE: { variant: 'outline', className: 'border-transparent bg-emerald-100 text-emerald-900' },
   ARCHIVE: { variant: 'secondary' },
   RESTORE: { variant: 'outline', className: 'border-transparent bg-blue-100 text-blue-900' },
