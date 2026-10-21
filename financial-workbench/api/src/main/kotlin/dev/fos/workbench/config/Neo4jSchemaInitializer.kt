@@ -1,6 +1,7 @@
 package dev.fos.workbench.config
 
 import dev.fos.workbench.auth.BootstrapAdmin
+import dev.fos.workbench.knowledge.LegacyValueCleanup
 import dev.fos.workbench.ontology.Ontology
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.SmartInitializingSingleton
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Component
 
 /**
  * 제약 조건과 인덱스를 만든다. 목록은 docs/data-schema.md 의 「제약 조건과 인덱스」 절과 같다.
+ * 그다음 목록 밖 enum 값을 고친다(`LegacyValueCleanup`).
  * 모든 싱글톤이 만들어진 직후, 웹 서버가 요청을 받기 전에 돈다. 실패하면 애플리케이션이 시작하지 않는다.
  * 여러 번 돌아도 결과가 같다.
  */
@@ -16,11 +18,13 @@ import org.springframework.stereotype.Component
 class Neo4jSchemaInitializer(
     private val client: Neo4jClient,
     private val ontology: Ontology,
+    private val legacyValueCleanup: LegacyValueCleanup,
     private val bootstrapAdmin: ObjectProvider<BootstrapAdmin>,
 ) : SmartInitializingSingleton {
 
     override fun afterSingletonsInstantiated() {
         initialize()
+        legacyValueCleanup.run()
         bootstrapAdmin.ifAvailable { it.ensureAdmin() }
     }
 
