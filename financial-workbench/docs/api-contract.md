@@ -143,6 +143,7 @@ Neo4j 예외는 시간 초과(`QUERY_TIMEOUT`), 연결 불가(`DATABASE_UNAVAILA
   "reviewedBy": { "id": "uuid", "email": "bob@example.com", "displayName": "Bob" },
   "reviewedAt": "2026-10-20T04:00:00Z",
   "reviewNote": "공시 원문과 대조함",
+  "contentUpdatedBy": { "id": "uuid", "email": "alice@example.com", "displayName": "Alice" },
   "subject": { "id": "uuid", "type": "Company", "label": "가상부품", "archived": false },
   "object": { "id": "uuid", "type": "Company", "label": "가상전자", "archived": false },
   "documents": [
@@ -254,7 +255,7 @@ Claim 에 딸린 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 는 이 API 로 만들 수 
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
-| GET | `/api/claims` | 목록. 쿼리: `reviewStatus`, `includeArchived`, `page`, `size`. 오래된 것부터. 검토 대기 목록은 `reviewStatus=DRAFT` 다 |
+| GET | `/api/claims` | 목록. 쿼리: `reviewStatus`, `scope`, `includeArchived`, `page`, `size`. 오래된 것부터. 검토 대기 목록은 `reviewStatus=DRAFT` 다. `scope=reviewable` 은 요청한 사람이 작성자도 마지막 내용 수정자도 아닌 것, `scope=mine` 은 둘 중 하나인 것만 준다. 없으면 나누지 않는다. 다른 값은 `400 VALIDATION_FAILED` 다 |
 | GET | `/api/claims/{id}` | 상세. 응답 `ClaimView` |
 | POST | `/api/claims` | 생성. 응답 `201 ClaimView` |
 | PATCH | `/api/claims/{id}` | 내용 수정. 응답 `ClaimView` |
@@ -332,6 +333,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 ## 변경 이력
 
 `GET /api/changes?targetId={uuid}&actor={email}&page=0&size=20` 은 최근 것부터 `Page<ChangeEventView>` 를 돌려준다.
+`GET /api/changes/actors` 는 이력에 한 번이라도 나온 사용자의 `UserRef` 목록을 표시 이름 순서로 돌려준다. 이력 화면의 사용자 고르기 칸이 쓴다. ADMIN 이 아니면 사용자 관리 이벤트(`targetKind = USER`)만 남긴 사용자는 빠진다. 서버가 남긴 이력(`system`)의 작업자는 사용자가 아니라 목록에 없다.
 
 ```json
 {
@@ -345,6 +347,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
   "targetLabel": "SUPPLIES_TO",
   "revision": 2,
   "changes": { "reviewStatus": { "before": "DRAFT", "after": "REVIEWED" } },
+  "refs": {},
   "note": "공시 원문과 대조함"
 }
 ```
@@ -355,11 +358,14 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 `action` 은 `CREATE`, `UPDATE`, `REVIEW`, `ARCHIVE`, `RESTORE` 가운데 하나다. `targetKind` 는 `NODE`, `RELATIONSHIP`, `USER` 가운데 하나다. 사용자 관리 변경도 같은 형식으로 남는다.
 `revision` 은 변경 뒤의 revision 이다. 이력은 지우거나 고치는 API 가 없다.
 
+`refs` 는 `changes` 안의 노드 ID 를 지금 이름으로 바꾼 맵이다. 키는 노드 ID, 값은 `{"id","type","label","archived"}` 다. 대상 키는 `subjectId`, `objectId`, `documentIds`, `fromId`, `toId` 이고, 이 키의 `before`, `after` 에 든 ID 를 모두 담는다. 찾지 못한 ID 는 빠진다.
+이름은 읽는 시점의 이름이다. 노드 이름을 바꾸면 예전 이력에도 새 이름이 보인다. 그때의 이름은 `targetLabel` 만 남긴다.
+
 ## 온톨로지
 
 | 메서드 | 경로 | 인증 | 응답 |
 | --- | --- | --- | --- |
-| GET | `/api/ontology` | 필요 | 온톨로지 YAML 을 그대로 옮긴 JSON. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`), 주장 문장 틀(`claimPredicates.<predicate>.sentence`), 만들기 폼 정보(`nodeTypes.<타입>.hintProperties`, `relationshipTypes.<관계>.createPicker`), 예전 값 별칭(`valueAliases`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다. 뜻은 [데이터 스키마](data-schema.md) 의 「표시 이름」 과 그 아래 절이다 |
+| GET | `/api/ontology` | 필요 | 온톨로지 YAML 을 그대로 옮긴 JSON. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`), 주장 문장 틀(`claimPredicates.<predicate>.sentence`), 만들기 폼 정보(`nodeTypes.<타입>.hintProperties`, `relationshipTypes.<관계>.createPicker`), 변경 이력의 항목 이름(`changeFields`), 예전 값 별칭(`valueAliases`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다. 뜻은 [데이터 스키마](data-schema.md) 의 「표시 이름」 과 그 아래 절이다 |
 
 ## 사용자 관리
 
