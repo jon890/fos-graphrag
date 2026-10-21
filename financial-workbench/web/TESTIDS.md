@@ -89,6 +89,7 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 | `viewer-hint` | VIEWER 에게 보이는 「조회만 할 수 있습니다」 안내 |
 | `node-history-link` | 「이 노드 이력」. 변경 이력 탭으로 가며 targetId 필터를 채운다 |
 | `node-center-graph` | 이 노드를 그래프 중심으로 |
+| `node-copy-link`, `node-copy-link-done`, `node-copy-link-fallback` | 「링크 복사」 단추, 복사했다는 안내, 클립보드를 못 쓸 때 주소를 보이는 읽기 전용 입력칸. 열람자에게도 보인다 |
 | `node-archive-reason`, `node-archive-button` | 보관 사유와 보관 버튼(보관되지 않은 노드) |
 | `node-restore-button` | 복원 버튼(보관된 노드) |
 | `node-meta`, `node-revision`, `node-updated-by` | 메타 정보 |
@@ -132,7 +133,8 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 | `review-status-badge` * | 검토 상태 배지 |
 | `review-controls` | Claim 노드 상세의 검토 영역 |
 | `review-note`, `review-approve`, `review-reject`, `review-draft` | 메모, 검토 완료, 반려, 초안으로 되돌리기 |
-| `self-review-hint` | 자기 Claim 이라 검토 버튼이 꺼졌다는 안내 |
+| `self-review-hint` | 내가 쓰거나 마지막으로 고친 Claim 이라 검토 버튼이 꺼졌다는 안내 |
+| `self-review-copy-link`, `self-review-copy-link-done`, `self-review-copy-link-fallback` | 그 안내 안의 「링크 복사」 |
 | `claim-edit-form`, `claim-edit-description`, `claim-edit-evidence`, `claim-edit-valid-from`, `claim-edit-valid-to`, `claim-edit-confidence`, `claim-edit-submit`, `claim-edit-message` | Claim 내용 수정 |
 
 ## 노드 고르기(NodePicker)
@@ -161,12 +163,17 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 
 | testid | 요소 |
 | --- | --- |
-| `review-tab`, `review-table`, `review-refresh` | 탭, 표, 새로고침 |
+| `review-tab`, `review-refresh` | 탭, 새로고침(두 구역을 모두 다시 읽는다) |
+| `review-section-reviewable`, `review-section-mine` | 편집자의 두 구역: 내가 검토할 주장, 내가 쓰거나 고친 주장. 열람자에게는 구역이 없고 `review-table` 한 목록만 있다 |
+| `review-table` | 구역 1(열람자는 유일한) 표 |
+| `review-mine-table`, `review-mine-row` *, `review-mine-empty`, `review-mine-pager-prev`, `review-mine-pager-next`, `review-mine-pager-info` | 구역 2 의 표, 행(`data-claim-id`), 빈 목록, 페이지 이동 |
+| `review-mine-copy-link`, `review-mine-copy-link-done`, `review-mine-copy-link-fallback` | 구역 2 행의 「링크 복사」 |
 | `review-row` * | 행. `data-claim-id` |
 | `review-row-note`, `review-row-approve`, `review-row-reject` | 행 안의 메모, 검토 완료, 반려 |
 | `review-own-hint` | 자기 Claim 이라 버튼이 꺼졌다는 안내 |
 | `review-viewer-hint` | VIEWER 라 버튼이 꺼졌다는 안내 |
-| `review-message`, `review-error`, `review-empty` | 처리 결과, 오류, 빈 목록 |
+| `review-message`, `review-error`, `review-empty` | 처리 결과, 처리 오류, 구역 1 의 빈 목록 |
+| `review-load-error`, `review-mine-load-error` | 구역 목록을 읽지 못한 오류 |
 | `review-pager-prev`, `review-pager-next`, `review-pager-info` | 페이지 이동 |
 
 ## 변경 이력 탭
@@ -174,8 +181,11 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 | testid | 요소 |
 | --- | --- |
 | `changes-tab`, `changes-table` | 탭과 표 |
-| `changes-target-filter`, `changes-actor-filter`, `changes-filter-submit`, `changes-filter-clear` | targetId 필터, actor(이메일) 필터 |
-| `change-row` * | 행. `data-action`(CREATE, UPDATE, REVIEW, ARCHIVE, RESTORE), `data-target-id` |
+| `changes-target-picker-input`, `changes-target-picker-search`, `changes-target-picker-result` *(`data-node-id`)*, `changes-target-picker-empty`, `changes-target-picker-none` | 대상 고르기. 대상이 골라지지 않았을 때만 보인다. 이름이나 종목 코드로 찾는다 |
+| `changes-target-selected`, `changes-filter-clear` | 고른 대상(타입 배지와 이름)과 「지우기」 |
+| `changes-actor-filter` | 사용자 select. 선택지는 표시 이름이고 값은 이메일, `''` 은 「(모두)」 |
+| `change-row` * | 행. `data-action`(CREATE, UPDATE, REVIEW, ARCHIVE, RESTORE), `data-target-id`. 수정 번호는 열이 아니라 행 `title` 에 있다 |
+| `change-actor` * | 행의 사용자 칸 |
 | `change-action` * | action 칸 |
 | `changes-empty` | 이력 없음 |
 | `changes-pager-prev`, `changes-pager-next`, `changes-pager-info` | 페이지 이동 |

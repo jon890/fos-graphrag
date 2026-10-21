@@ -1,5 +1,6 @@
 package dev.fos.workbench.knowledge
 
+import dev.fos.workbench.support.ApiClient
 import dev.fos.workbench.support.Fixtures
 import dev.fos.workbench.support.IntegrationTest
 import dev.fos.workbench.support.id
@@ -147,5 +148,37 @@ class ClaimIntegrationTest : IntegrationTest() {
             .isEqualTo("SELF_REVIEW_FORBIDDEN")
         assertThat(loggedIn(ADMIN).post("/api/claims/${claim.id}/review", mapOf("expectedRevision" to 2, "status" to "REVIEWED")).status)
             .isEqualTo(200)
+    }
+
+    @Test
+    fun `검토 대기는 요청한 사람 기준으로 나뉜다`() {
+        val alice = loggedIn(ALICE)
+        val bob = loggedIn(BOB)
+        val admin = loggedIn(ADMIN)
+        val fx = Fixtures(alice)
+        val (x, y, d) = Triple(fx.company("x").id, fx.company("y").id, fx.document("d").id)
+        val a = fx.claim("SUPPLIES_TO", x, y, listOf(d)).body.id
+        val b = Fixtures(bob).claim("COMPETES_WITH", x, y, listOf(d)).body.id
+        val c = fx.claim("HAS_EXPOSURE_TO", x, y, listOf(d)).body.id
+        assertThat(bob.patch("/api/claims/$c", mapOf("expectedRevision" to 1, "evidenceText" to "B 가 바꾼 근거 문장")).status).isEqualTo(200)
+
+        // 같은 컨테이너를 다른 테스트와 함께 쓰므로 개수는 세지 않고 이 테스트가 만든 id 가 있는지만 본다.
+        // 테스트 전체가 만드는 DRAFT 주장이 한 쪽(100개)을 넘지 않는다는 전제다
+        fun ids(client: ApiClient, scope: String): List<String> {
+            val response = client.get("/api/claims?reviewStatus=DRAFT&scope=$scope&size=100")
+            assertThat(response.status).describedAs(response.body.toString()).isEqualTo(200)
+            return response.body["items"].toList().map { it.id }
+        }
+        assertThat(ids(alice, "reviewable")).describedAs("Alice 가 검토할 것").contains(b).doesNotContain(a, c)
+        assertThat(ids(alice, "mine")).describedAs("Alice 가 쓰거나 고친 것").contains(a, c).doesNotContain(b)
+        assertThat(ids(bob, "reviewable")).describedAs("Bob 이 검토할 것").contains(a).doesNotContain(b, c)
+        assertThat(ids(bob, "mine")).describedAs("Bob 이 쓰거나 고친 것").contains(b, c)
+        assertThat(ids(admin, "reviewable")).describedAs("제3자가 검토할 것").contains(a, b, c)
+
+        val invalid = alice.get("/api/claims?reviewStatus=DRAFT&scope=everything")
+        assertThat(invalid.status).isEqualTo(400)
+        assertThat(invalid.code).isEqualTo("VALIDATION_FAILED")
+
+        assertThat(alice.get("/api/claims/$c").body["contentUpdatedBy"]["email"].asString()).isEqualTo(BOB)
     }
 }

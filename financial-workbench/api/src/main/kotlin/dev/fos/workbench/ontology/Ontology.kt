@@ -16,6 +16,8 @@ data class Ontology(
     val reviewStatuses: Map<String, LabelDef> = emptyMap(),
     /** 변경 이력 작업(CREATE, UPDATE, ...)의 표시 이름 */
     val changeActions: Map<String, LabelDef> = emptyMap(),
+    /** 변경 이력의 changes 키 가운데 온톨로지 속성이 아닌 것의 표시 이름 */
+    val changeFields: Map<String, LabelDef> = emptyMap(),
 ) {
     /** Cypher 에 label 로 넣을 수 있는 이름인지 확인한다. 허용 목록 밖이면 예외다. */
     fun requireNodeType(name: String): NodeTypeDef =

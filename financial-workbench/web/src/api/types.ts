@@ -84,6 +84,8 @@ export interface ClaimView extends NodeView {
   subject: NodeRef | null
   object: NodeRef | null
   documents: DocumentSummary[]
+  /** 마지막으로 내용을 고친 사람. 이 사람과 작성자는 검토할 수 없다 */
+  contentUpdatedBy: UserRef | null
 }
 
 export interface RelationshipView {
@@ -149,6 +151,14 @@ export interface GraphView {
 
 export type ChangeAction = 'CREATE' | 'UPDATE' | 'REVIEW' | 'ARCHIVE' | 'RESTORE'
 
+/** 변경 이력 안 노드나 사용자 ID 를 지금 이름으로 바꾼 참조 */
+export interface ChangeRef {
+  id: string
+  type: string
+  label: string
+  archived: boolean
+}
+
 export interface ChangeEventView {
   id: string
   at: string
@@ -162,6 +172,8 @@ export interface ChangeEventView {
   revision: number
   changes: Record<string, { before: unknown; after: unknown }> | null
   note: string | null
+  /** changes 안 노드 ID 의 지금 이름 */
+  refs: Record<string, ChangeRef>
 }
 
 export type PropertyType = 'string' | 'text' | 'url' | 'enum' | 'date' | 'datetime' | 'number' | 'integer' | 'boolean'
@@ -238,6 +250,8 @@ export interface Ontology {
   reviewStatuses?: Record<string, LabelDef>
   /** 변경 이력 작업(CREATE 등)의 표시 이름 */
   changeActions?: Record<string, LabelDef>
+  /** 변경 이력 키의 표시 이름 */
+  changeFields?: Record<string, LabelDef>
 }
 
 export interface ApiErrorBody {

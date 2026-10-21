@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { CurrentUser, Ontology } from '../api/types'
-import { AppContext } from '../context'
+import { AppContext, canEditRole } from '../context'
 
 /** 컴포넌트 테스트용 온톨로지. 실제 YAML 과 같은 모양이고, 화면 코드가 모르는 타입(Person)이 들어 있다 */
 export const testOntology: Ontology = {
@@ -80,8 +80,8 @@ export const testOntology: Ontology = {
   changeActions: { CREATE: { label: '만들기' }, ARCHIVE: { label: '보관' } },
 }
 
-const user: CurrentUser = { id: 'u1', email: 'a@example.com', displayName: 'A', role: 'EDITOR' }
+const editor: CurrentUser = { id: 'u1', email: 'a@example.com', displayName: 'A', role: 'EDITOR' }
 
-export function withApp(children: ReactNode, ontology: Ontology = testOntology) {
-  return <AppContext.Provider value={{ user, ontology, canEdit: true }}>{children}</AppContext.Provider>
+export function withApp(children: ReactNode, ontology: Ontology = testOntology, user: CurrentUser = editor) {
+  return <AppContext.Provider value={{ user, ontology, canEdit: canEditRole(user.role) }}>{children}</AppContext.Provider>
 }

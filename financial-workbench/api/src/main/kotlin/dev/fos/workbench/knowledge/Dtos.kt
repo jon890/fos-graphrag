@@ -39,6 +39,7 @@ data class ClaimView(
     val reviewedBy: UserRef?,
     val reviewedAt: String?,
     val reviewNote: String?,
+    val contentUpdatedBy: UserRef?,
     val subject: NodeRef?,
     val `object`: NodeRef?,
     val documents: List<DocumentRef>,

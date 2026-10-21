@@ -16,6 +16,7 @@ import type {
   ReviewStatus,
   CurrentUser,
   Role,
+  UserRef,
   UserView,
 } from './types'
 
@@ -183,10 +184,10 @@ export const api = {
       request<RelationshipView>('POST', `/api/relationships/${enc(id)}/restore`, { expectedRevision }),
   },
   claims: {
-    list: (p: { reviewStatus?: ReviewStatus; includeArchived?: boolean; page?: number; size?: number }) =>
+    list: (p: { reviewStatus?: ReviewStatus; includeArchived?: boolean; scope?: 'reviewable' | 'mine'; page?: number; size?: number }) =>
       request<Page<ClaimView>>(
         'GET',
-        `/api/claims${buildQuery({ reviewStatus: p.reviewStatus, includeArchived: p.includeArchived ? true : undefined, page: p.page, size: p.size })}`,
+        `/api/claims${buildQuery({ reviewStatus: p.reviewStatus, includeArchived: p.includeArchived ? true : undefined, scope: p.scope, page: p.page, size: p.size })}`,
       ),
     get: (id: string) => request<ClaimView>('GET', `/api/claims/${enc(id)}`),
     create: (body: CreateClaimRequest) => request<ClaimView>('POST', '/api/claims', body),
@@ -207,6 +208,7 @@ export const api = {
         'GET',
         `/api/changes${buildQuery({ targetId: p.targetId?.trim(), actor: p.actor?.trim(), page: p.page, size: p.size })}`,
       ),
+    actors: () => request<UserRef[]>('GET', '/api/changes/actors'),
   },
 }
 

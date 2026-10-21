@@ -1,6 +1,7 @@
 package dev.fos.workbench.ontology
 
 import dev.fos.workbench.history.ChangeAction
+import dev.fos.workbench.history.ChangeController
 import dev.fos.workbench.knowledge.ReviewStatus
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -34,6 +35,9 @@ class OntologyLabelsTest {
         assertThat(ontology.changeActions.keys).containsExactlyInAnyOrderElementsOf(ChangeAction.entries.map { it.name })
         assertThat(ontology.reviewStatuses["DRAFT"]?.label).isEqualTo("초안")
         assertThat(ontology.changeActions["ARCHIVE"]?.label).isEqualTo("보관")
+        // 서버가 이력에 새 키를 남기면 YAML 의 changeFields 에 이름을 더해야 이 단언이 통과한다
+        assertThat(ontology.changeFields.keys).containsExactlyInAnyOrderElementsOf(ChangeController.CHANGE_FIELD_KEYS)
+        assertThat(ontology.changeFields.filterValues { it.label.isBlank() }.keys).describedAs("표시 이름이 빈 changeFields").isEmpty()
     }
 
     @Test

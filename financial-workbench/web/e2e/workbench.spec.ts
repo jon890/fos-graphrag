@@ -58,7 +58,10 @@ async function searchAndOpen(page: Page, label: string, options: { includeArchiv
   if ((await archived.isChecked()) !== !!options.includeArchived) await archived.setChecked(!!options.includeArchived)
   await page.getByTestId('search-input').fill(label)
   await page.getByTestId('search-submit').click()
+  // 이미 같은 노드가 열려 있으면 라벨이 처음부터 같다. 상세를 새로 읽은 응답을 기다려야 예전 revision 으로 저장하지 않는다.
+  const detailLoaded = page.waitForResponse((r) => r.request().method() === 'GET' && /\/api\/nodes\/[^/?]+$/.test(new URL(r.url()).pathname))
   await searchResult(page, label).click()
+  await detailLoaded
   await expect(page.getByTestId('detail-label')).toHaveText(label)
 }
 
@@ -100,6 +103,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   let pageB: Page
   let pageViewer: Page
   let contextViewer: BrowserContext
+  // 2) 에서 만든 공급 주장의 id. 링크와 이력 단계가 쓴다.
+  let supplyClaimId = ''
 
   async function open(browser: Browser): Promise<Page> {
     const { context, page } = await newPage(browser)
@@ -349,6 +354,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(card).toBeVisible()
     await expect(card).toHaveAttribute('data-review-status', 'DRAFT')
     await expect(card.getByTestId('claim-valid-from')).toHaveText('미상')
+    supplyClaimId = (await card.getAttribute('data-claim-id')) ?? ''
+    expect(supplyClaimId).not.toBe('')
     await shot(pageA, '02-claim-created')
   })
 
@@ -403,18 +410,34 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   })
 
   test('3) B 가 검토 대기 탭에서 Claim 을 검토 완료한다', async ({ browser }) => {
+    // 작성자 A 에게는 그 주장이 「내가 쓰거나 고친 주장」 구역에만 있고, 링크를 복사할 수 있다.
+    await pageA.getByTestId('tab-review').click()
+    const mineSection = pageA.getByTestId('review-section-mine')
+    const mineRow = mineSection.locator(`[data-testid="review-mine-row"][data-claim-id="${supplyClaimId}"]`)
+    await expect(mineRow).toBeVisible()
+    const reviewableA = pageA.getByTestId('review-section-reviewable')
+    await expect(reviewableA.getByTestId('review-pager-info')).toBeVisible()
+    await expect(reviewableA.locator(`[data-claim-id="${supplyClaimId}"]`)).toHaveCount(0)
+    await mineRow.getByTestId('review-mine-copy-link').click()
+    await expect(mineRow.getByTestId('review-mine-copy-link-done').or(mineRow.getByTestId('review-mine-copy-link-fallback'))).toBeVisible()
+    await shot(pageA, '03-review-mine-a')
+
     pageB = await open(browser)
     await loginAs(pageB, editorB)
 
     await pageB.getByTestId('tab-review').click()
-    await expect(pageB.getByTestId('review-table')).toBeVisible()
-    const row = pageB.getByTestId('review-row').filter({ hasText: data.supplier })
+    const reviewable = pageB.getByTestId('review-section-reviewable')
+    await expect(reviewable.getByTestId('review-table')).toBeVisible()
+    const row = reviewable.getByTestId('review-row').filter({ hasText: data.supplier })
+    const pagerInfo = reviewable.getByTestId('review-pager-info')
+    await expect(pagerInfo).toBeVisible()
     // 검토 대기 목록은 오래된 것부터라 새 Claim 이 뒤쪽 페이지에 있을 수 있다.
     for (let i = 0; i < 50 && (await row.count()) === 0; i += 1) {
-      const next = pageB.getByTestId('review-pager-next')
+      const next = reviewable.getByTestId('review-pager-next')
       if (await next.isDisabled()) break
+      const before = await pagerInfo.textContent()
       await next.click()
-      await pageB.waitForTimeout(300)
+      await expect(pagerInfo).not.toHaveText(before ?? '')
     }
     await expect(row).toHaveCount(1)
     await expect(row).toContainText(data.customer)
@@ -424,6 +447,18 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageB.getByTestId('review-message')).toContainText(`${data.supplier} → ${data.customer} 공급한다`)
     await expect(row).toHaveCount(0)
     await shot(pageB, '03-reviewed-by-b')
+  })
+
+  test('3b) 링크로 들어오면 로그인한 뒤 그 주장의 상세가 열린다', async ({ browser }) => {
+    const { context, page } = await newPage(browser)
+    try {
+      await loginAs(page, editorB, 'success', `/?node=${encodeURIComponent(supplyClaimId)}`)
+      await expect(page.getByTestId('detail-panel')).toHaveAttribute('data-node-id', supplyClaimId)
+      await expect(page.getByTestId('detail-label')).toHaveText(`${data.supplier} → ${data.customer} 공급한다`)
+      await expect(page.getByTestId('node-copy-link')).toBeVisible()
+    } finally {
+      await context.close()
+    }
   })
 
   test('4) A 가 공급사 주변 그래프와 근거, 검토자를 확인한다', async () => {
@@ -535,7 +570,54 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA.getByTestId('changes-tab')).toBeVisible()
     await expect(pageA.locator('[data-testid="change-row"][data-action="ARCHIVE"]')).toHaveCount(1)
     await expect(pageA.locator('[data-testid="change-row"][data-action="RESTORE"]')).toHaveCount(1)
+    await expect(pageA.locator('[data-testid="change-row"][data-action="ARCHIVE"] li').filter({ hasText: '보관: 아니오 → 예' })).toHaveCount(1)
     await shot(pageA, '06-archive-restore-history')
+  })
+
+  test('6c) 변경 이력에서 사용자를 표시 이름으로 고르고 주장 이력의 주체와 대상이 이름으로 보인다', async () => {
+    await pageA.getByTestId('tab-changes').click()
+    await expect(pageA.getByTestId('changes-tab')).toBeVisible()
+    const clear = pageA.getByTestId('changes-filter-clear')
+    await expect(pageA.getByTestId('changes-target-selected')).toBeVisible()
+    await clear.click()
+    await expect(pageA.getByTestId('changes-target-picker-input')).toBeVisible()
+
+    const actorSelect = pageA.getByTestId('changes-actor-filter')
+    await expect(actorSelect).toContainText(editorA.name)
+    const pagerInfo = pageA.getByTestId('changes-pager-info')
+    await expect(pagerInfo).toBeVisible()
+    const allInfo = (await pagerInfo.textContent()) ?? ''
+    await actorSelect.selectOption({ value: editorA.email })
+    await expect(pagerInfo).not.toHaveText(allInfo)
+    const rows = pageA.getByTestId('change-row')
+    await expect(rows.first()).toBeVisible()
+    await expect
+      .poll(async () => [...new Set(await pageA.getByTestId('change-actor').allTextContents())].join('|'))
+      .toBe(editorA.name)
+
+    await actorSelect.selectOption({ value: '' })
+    await pageA.getByTestId('changes-target-picker-input').fill(data.supplier)
+    await pageA.getByTestId('changes-target-picker-search').click()
+    await pageA.getByTestId('changes-target-picker-result').filter({ hasText: data.supplier }).first().click()
+    await expect(pageA.getByTestId('changes-target-selected')).toContainText(data.supplier)
+    await expect(rows.first()).toBeVisible()
+    await expect
+      .poll(async () => new Set(await rows.evaluateAll((els) => els.map((e) => e.getAttribute('data-target-id')))).size)
+      .toBe(1)
+
+    // 주장은 기업 이름으로 검색되지 않으므로(docs/prd.md 「남은 한계」) 링크로 연다.
+    await pageA.goto('/?node=' + supplyClaimId)
+    await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-id', supplyClaimId)
+    await expect(pageA).not.toHaveURL(/node=/)
+    await pageA.getByTestId('node-history-link').click()
+    const created = pageA.locator('[data-testid="change-row"][data-action="CREATE"]')
+    await expect(created).toHaveCount(1)
+    await expect(created).toContainText('주체')
+    await expect(created).toContainText(data.supplier)
+    await expect(created).toContainText('대상')
+    await expect(created).toContainText(data.customer)
+    await expect(created).not.toContainText(/[0-9a-f]{8}-[0-9a-f]{4}-/)
+    await shot(pageA, '06c-changes-names')
   })
 
   test('6b) 유일한 근거 문서를 보관하려 하면 해당 주장을 여는 버튼이 나온다', async () => {

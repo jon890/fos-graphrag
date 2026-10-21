@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errorMessage, setUnauthorizedHandler } from './api/client'
 import type { CurrentUser, Ontology } from './api/types'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { nodeFromSearch, rememberPendingNode, takePendingNode } from './lib/links'
 import { AppContext, canEditRole, ROLE_LABEL } from './context'
 import { LoginView } from './components/LoginView'
 import { Workspace } from './components/Workspace'
@@ -51,8 +52,13 @@ export default function App() {
   // 같은 노드를 다시 골라도 그래프와 상세를 새로 읽게 한다.
   const [focusSeq, setFocusSeq] = useState(0)
   const [changesTargetId, setChangesTargetId] = useState('')
+  // 링크(/?node=)로 들어왔을 때 로그인과 온톨로지 읽기가 끝난 뒤 열 항목이다.
+  const pendingNodeRef = useRef<string | null>(null)
 
   useEffect(() => {
+    // 로그인 화면을 거쳐도 남도록 먼저 탭 저장소에 둔다.
+    const linked = nodeFromSearch(window.location.search)
+    if (linked) rememberPendingNode(linked)
     setUnauthorizedHandler(() => {
       setAuth({ status: 'anonymous', notice: '세션이 만료되었습니다. 다시 로그인하세요.' })
     })
@@ -61,10 +67,19 @@ export default function App() {
       .then((user) => {
         // 로그인에 성공했으면 주소창의 ?login=denied 같은 흔적을 지운다.
         if (window.location.search) window.history.replaceState(null, '', window.location.pathname)
+        // StrictMode 에서 이 콜백이 두 번 돌아도 둘째 호출이 첫 값을 덮어쓰지 않게 한다.
+        const pending = takePendingNode()
+        if (pending) pendingNodeRef.current = pending
         setAuth({ status: 'signed-in', user })
       })
       .catch(() => setAuth({ status: 'anonymous' }))
     return () => setUnauthorizedHandler(null)
+  }, [])
+
+  const focusNode = useCallback((id: string | null) => {
+    setCenterId(id)
+    setSelectedId(id)
+    setFocusSeq((n) => n + 1)
   }, [])
 
   const signedIn = auth.status === 'signed-in'
@@ -73,15 +88,18 @@ export default function App() {
     setOntologyError(null)
     api
       .ontology()
-      .then(setOntology)
+      .then((o) => {
+        setOntology(o)
+        // 같은 콜백에서 열어야 Workspace 가 선택된 상태로 처음 그려져 좁은 화면의 첫 탭이 상세가 된다.
+        const id = pendingNodeRef.current
+        if (id) {
+          pendingNodeRef.current = null
+          focusNode(id)
+          setTab('workspace')
+        }
+      })
       .catch((e) => setOntologyError(errorMessage(e)))
-  }, [signedIn])
-
-  const focusNode = useCallback((id: string | null) => {
-    setCenterId(id)
-    setSelectedId(id)
-    setFocusSeq((n) => n + 1)
-  }, [])
+  }, [signedIn, focusNode])
 
   const openNode = useCallback(
     (id: string) => {

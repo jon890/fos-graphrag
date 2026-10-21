@@ -34,8 +34,13 @@ export function exact(text: string): RegExp {
  * 앱의 「Google 로 로그인」 을 눌러 가짜 OIDC 서버의 로그인 폼을 채운다.
  * expect 가 success 면 앱에 로그인된 것을, denied 면 「접근 권한이 없습니다」 화면을 확인한다.
  */
-export async function loginAs(page: Page, user: TestUser, expectResult: 'success' | 'denied' = 'success'): Promise<void> {
-  await page.goto('/')
+export async function loginAs(
+  page: Page,
+  user: TestUser,
+  expectResult: 'success' | 'denied' = 'success',
+  startPath = '/',
+): Promise<void> {
+  await page.goto(startPath)
   await page.getByTestId('login-google').click()
   // 가짜 서버(http://localhost:8090/default/authorize?...)의 interactiveLogin 폼이다.
   await page.waitForURL(/\/authorize/)
