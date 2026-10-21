@@ -11,7 +11,7 @@ Neo4j 는 온톨로지 규칙을 집행하지 않는다. 아래 제약 조건은
 온톨로지 파일을 바꾸는 절차는 이렇다.
 
 1. YAML 을 고치고 `schemaVersion` 을 올린다.
-2. 기존 데이터가 새 정의를 어기는지 확인한다. 속성을 필수로 바꾸거나 enum 값을 빼면 기존 노드를 수정할 수 없게 된다.
+2. 기존 데이터가 새 정의를 어기는지 확인한다. 서버와 편집 폼은 바뀐 칸만 검사하므로, 새 정의를 어기는 값이 남아도 다른 칸은 고칠 수 있다. 어긴 칸을 고칠 때는 새 정의에 맞는 값을 넣어야 한다. 문자열 칸을 enum 으로 바꾸거나 enum 값을 뺄 때는 예전 표기를 `valueAliases` 에 적는다. API 가 시작할 때 고친다(「예전 값 정리」).
 3. API 를 다시 빌드한다. 파일은 빌드할 때 jar 안에 복사된다.
 
 웹에서 타입과 관계 정의를 바꾸는 기능은 아직 없다.
@@ -32,6 +32,33 @@ Neo4j 는 온톨로지 규칙을 집행하지 않는다. 아래 제약 조건은
 - Claim 의 `predicate` 선택지 이름은 `claimPredicates.<predicate>.label` 에서 온다. 로더가 응답의 `valueLabels` 에 채워 주므로 따로 적지 않는다.
 - 로더는 알 수 없는 키가 있으면 시작을 멈춘다. YAML 흐름 표기(`{ ... }`) 안에서 쉼표나 콜론이 든 문장을 따옴표로 감싸지 않으면 뒷부분이 값 없는 키가 되기 때문이다.
 - `OntologyLabelsTest` 가 모든 타입, 속성, enum 값, 관계, predicate, 검토 상태, 변경 작업에 표시 이름이 있는지, 모든 predicate 에 `sentence` 가 있고 `{subject}` 와 `{object}` 를 한 번씩 담는지 확인한다.
+
+### 만들기 폼과 구분 정보
+
+같은 YAML 이 만들기 폼과 목록에 보일 정보도 정한다.
+
+| 위치 | 키 | 뜻 |
+| --- | --- | --- |
+| `nodeTypes.<타입>` | `hintProperties` | 이름 옆에 함께 보일 속성 목록. 검색 결과, 고르기 후보, 같은 이름 경고에서 같은 이름의 항목을 구분하게 한다. 화면은 이 속성들의 표시 값과 만든 날을 ` · ` 로 잇는다. 없으면 만든 날만 보인다 |
+| `relationshipTypes.<관계>` | `createPicker.label`, `createPicker.description` | 끝(`to`) 타입을 만드는 폼에 시작(`from`) 노드를 고르는 칸을 더한다. 고르지 않아도 만들 수 있다. 고르면 노드를 만든 뒤 이 관계를 이어서 만든다 |
+
+- `hintProperties` 는 그 타입의 속성이어야 한다. 로더가 시작할 때 확인한다.
+- 지금 `createPicker` 가 있는 관계는 `ISSUES` 하나다. 종목 만들기 폼에 「발행 기업」 칸이 생긴다.
+
+### 예전 값 정리
+
+API 는 시작할 때, 스키마 초기화가 끝난 뒤 enum 속성의 값이 `values` 밖인 노드를 찾아 고친다.
+문자열 칸을 목록으로 바꾸기 전에 저장된 「원」, 「한국」 같은 표기를 목록 값에 맞추기 위해서다.
+
+- 앞뒤 공백을 지우고 대소문자를 무시해 `values` 의 값과 같으면 그 값으로 바꾼다. 예: `kr` 은 `KR` 이 된다.
+- `valueAliases` 의 별칭과 같으면 그 키로 바꾼다. 비교는 앞뒤 공백을 지우고 대소문자를 무시한다. 예: `valueAliases: { KRW: [원, 원화, "₩"] }`
+- 공백만 있는 값은 속성을 지운다. 빈 문자열은 값이 없는 것으로 보는 규칙과 같다.
+- 어디에도 맞지 않는 값은 그대로 둔다. 편집 폼의 선택 칸은 그 값을 「목록에 없는 값: 그 값」 으로 보여 주고, 그 칸을 건드리지 않으면 다른 칸을 저장할 수 있다.
+- 보관된 노드는 고치지 않는다. 보관된 노드는 수정할 수 없다는 규칙과 같다. 복원한 뒤 다음 시작 때 고쳐진다.
+- Claim 처럼 `managedBy` 가 있는 타입은 고치지 않는다. 검토 규칙의 `contentUpdatedBy` 를 바꾸지 않기 위해서다.
+- 고친 노드마다 revision 을 올리고 `actorId = system` 인 `UPDATE` ChangeEvent 를 같은 트랜잭션에서 남긴다. `note` 는 「온톨로지 목록에 맞춰 예전 값을 고쳤다」 다. 이력 없이 데이터를 바꾸지 않는다.
+- 여러 번 돌아도 결과가 같다. 고칠 값이 없으면 아무것도 쓰지 않는다. 정리가 실패하면 스키마 초기화가 실패한 것과 같이 API 가 시작하지 않는다.
+- `valueAliases` 의 키는 `values` 안에 있어야 하고, 한 속성 안에서 별칭이 겹치거나 다른 값과 같으면 안 된다. 로더가 시작할 때 확인한다.
 
 ## 속성 타입
 
@@ -91,6 +118,7 @@ Claim 만 더 가지는 시스템 속성이 있다.
 | Document | `title`, `url`, `collectedAt` | `publisher`, `documentType`, `publishedAt` |
 | Claim | `predicate`, `description`, `evidenceText`, `authoringMethod` | `validFrom`, `validTo`, `extractionConfidence` |
 
+Company 의 `country` 와 Security 의 `currency` 는 목록에서 고른다(enum). 선택지는 온톨로지 파일이 정한다. 국가는 「기타」 를 두고, 통화는 두지 않는다.
 Claim 의 `validFrom`, `validTo` 가 비어 있으면 관계의 유효 기간을 모른다는 뜻이다. 미상을 특정 날짜로 바꾸지 않는다.
 `extractionConfidence` 는 AI 추출의 확신도다. 투자 성공 확률과 다르고 첫 버전에서는 AI 추출을 하지 않아 비어 있다.
 자료 공개 시점은 Document 의 `publishedAt`, 수집 시점은 `collectedAt` 이다.
@@ -131,6 +159,7 @@ Claim 노드 하나와 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 관계로 저장한�
 - `changes` 는 `{속성: {before, after}}` 를 JSON 문자열로 저장한다. Neo4j 속성이 중첩 객체를 받지 않기 때문이다.
 - ChangeEvent 는 대상과 관계로 잇지 않고 `targetId` 로만 가리킨다. 그래프 조회 결과에 이력이 섞이지 않는다.
 - 이력을 지우거나 고치는 API 는 없다. 복원도 새 ChangeEvent 를 만든다.
+- 서버가 스스로 남긴 이력의 `actorId` 는 `system` 이다. 첫 관리자 생성과 예전 값 정리가 여기 해당한다. 화면은 「시스템」 으로 보인다.
 
 ## 제약 조건과 인덱스
 
