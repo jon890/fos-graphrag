@@ -81,6 +81,20 @@
 - `ListTab`: 도구 줄의 `<select` 가 있다(HTML 기본 select). 옛 class `data-table` 이 없다.
 - `UsersTab`: `data-testid="users-add-role"` 이 `<select` 다.
 
+## 보정 (구현 전 검토 반영, 아래가 위 본문보다 우선한다)
+
+- 머리글: 1024px 이상은 한 줄(`h-12`), 미만은 `flex-wrap` 두 줄이다. 탭 줄에 `order-3 basis-full`, 넓은 화면에서 `lg:order-none lg:basis-auto lg:flex-1` 을 준다. 제목은 `min-w-0 flex-1 truncate`, 사용자 상자는 `shrink-0` 이다.
+- 높이 사슬: `.app` 의 `height: 100vh` 와 flex column 은 `h-screen flex flex-col` 로, `.app-main` 의 `flex: 1; min-height: 0; overflow: auto` 는 `min-h-0 flex-1 overflow-auto` 로 옮긴다. Workspace 의 `height: 100%` 가 이것에 기댄다.
+- `financial-workbench/web/e2e/mobile.spec.ts` 가 `.app-main` class 로 본문을 찾는다. `<main>` 에 `app-main` class 를 표시용으로 남기고 `legacy.css` 의 `.app-main` 규칙만 지운다. 의도 메모의 grep 은 `financial-workbench/web/e2e` 도 함께 본다.
+- 표: `ui/table.tsx` 의 `TableHead`, `TableCell` 은 `whitespace-nowrap` 이 기본이다. 1024px 미만에서만 꺾지 않도록 `lg:whitespace-normal` 을 준다. phase 02 도 같은 부품을 쓴다.
+- `legacy.css` 의 `.tab-page` 와 표 nowrap 규칙은 phase 02 의 세 탭이 아직 쓰므로 phase 01 에서 지우지 않는다. 머리글 규칙만 지운다.
+- 로그아웃 링크 글자색은 `text-blue-300` 으로 두고 역할 Badge 는 기존 역할별 색(`legacy.css` 의 `.role-*`)을 class 로 옮긴다.
+- `Alert` 는 기본 `role="alert"` 를 붙인다. `users-message` 는 지금처럼 `role="status"` 를 넘기고, `login-notice` 와 `review-message` 도 기존 role 을 유지한다.
+- 폭 class: 입력 폭이 달라지지 않게 기존 폭(`width`, `min-width`, `size`)을 `w-*`, `min-w-*` 로 옮긴다.
+- `info-box`, `check`, `sub-form`, `danger`, `field-inline` 은 범위 밖 화면이 쓰므로 남긴다. 지울 규칙은 grep 으로 정한다.
+- `tabs.test.tsx` 에 더한다: `UsersTab` 에 `sub-form`, `data-table`, `disabled-row` 가 없고 `data-slot="native-select"` 가 있다. `Pager` 는 page 객체를 주고 그려 `data-slot="button"` 이 있고 `class="pager"` 가 없다.
+- 검증 블록의 각 줄은 저장소 루트에서 따로 실행한다.
+
 ## 검증
 
 ```bash

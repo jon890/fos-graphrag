@@ -72,6 +72,15 @@ phase 01 이 만든 파일에 아래를 더한다. `renderToStaticMarkup` 과 `w
 - `ReviewTab`: 첫 렌더에 `data-testid="review-tab"` 이 있고 옛 class `review-actions` 가 없다.
 - `ChangesTab`: `data-testid="changes-target-filter"` 가 `<input` 이고 옛 class `data-table` 이 없다.
 
+## 보정 (구현 전 검토 반영, 아래가 위 본문보다 우선한다)
+
+- 작업 배지 색은 만들기 `bg-emerald-100 text-emerald-900`, 보관 `variant="secondary"`, 복원 `bg-blue-100 text-blue-900`, 그 밖 `variant="outline"` 이다.
+- `ReviewTab` 테스트는 옛 class `data-table` 이 없고 `data-slot="table"` 이 있는지 본다. 행까지 보려면 `ReviewRow` 를 export 해 claim 하나로 그리고 `review-actions` 가 없는지 본다.
+- 표 칸의 `lg:whitespace-normal` 은 phase 01 이 `ui/table.tsx` 에 준 것을 따른다.
+- 기존 폭(`.review-actions input` 120px, `min-width: 280px`, `changes-target-filter` 의 `size={38}`)은 `w-*`, `min-w-*` class 로 옮긴다.
+- phase 가 끝나 쓰는 곳이 없어진 `.toolbar`, `.toolbar h2` 도 grep 으로 확인해 지운다. 범위 밖 화면이 쓰는 `info-box`, `check`, `sub-form`, `danger`, `field-inline` 은 남긴다.
+- `Alert` 는 기존 role 을 유지한다. 검증 블록의 각 줄은 저장소 루트에서 따로 실행한다.
+
 ## 검증
 
 ```bash
