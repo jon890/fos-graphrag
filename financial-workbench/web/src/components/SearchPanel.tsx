@@ -3,6 +3,7 @@ import { api, errorMessage } from '../api/client'
 import type { NodeView, Page, ReviewStatus } from '../api/types'
 import { creatableTypes, useApp, useLabels } from '../context'
 import { withEulReul } from '../lib/labels'
+import { ClaimCreateForm } from './ClaimCreateForm'
 import { NodeCreateForm } from './NodeCreateForm'
 import { Pager } from './Pager'
 import { StatusBadge, TypeBadge } from './TypeBadge'
@@ -78,6 +79,8 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
   }
 
   const creatable = creatableTypes(ontology)
+  const claimType = Object.keys(ontology.nodeTypes).find((t) => ontology.nodeTypes[t].managedBy === 'claims')
+  const claimCreatable = !!claimType && Object.keys(ontology.claimPredicates).length > 0
   // 조건 없이 검색해도 결과가 없으면 아직 아무것도 등록하지 않은 것이다.
   const nothingRegistered =
     !filters.q && !filters.reviewStatus && !filters.includeArchived && filters.types.length === labels.types.length
@@ -183,6 +186,7 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
                   {labels.type(t)}
                 </option>
               ))}
+              {claimCreatable && <option value={claimType}>{labels.type(claimType!)}</option>}
             </select>
             <button
               className="primary"
@@ -197,17 +201,28 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
           <>
             <h3>새 {labels.type(createType)}</h3>
             <div className="hint">{ontology.nodeTypes[createType]?.description}</div>
-            <NodeCreateForm
-              key={createType}
-              type={createType}
-              testIdPrefix="create"
-              onCancel={() => setCreating(false)}
-              onCreated={(node) => {
-                setCreating(false)
-                onCreated(node, `「${labels.node(node)}」 ${withEulReul(labels.type(node.type))} 만들었습니다.`)
-                void run()
-              }}
-            />
+            {createType === claimType ? (
+              <ClaimCreateForm
+                onCancel={() => setCreating(false)}
+                onCreated={(claim) => {
+                  setCreating(false)
+                  onCreated(claim, `「${labels.node(claim)}」 ${withEulReul(labels.type(claim.type))} 만들었습니다. 다른 편집자의 검토를 기다립니다.`)
+                  void run()
+                }}
+              />
+            ) : (
+              <NodeCreateForm
+                key={createType}
+                type={createType}
+                testIdPrefix="create"
+                onCancel={() => setCreating(false)}
+                onCreated={(node) => {
+                  setCreating(false)
+                  onCreated(node, `「${labels.node(node)}」 ${withEulReul(labels.type(node.type))} 만들었습니다.`)
+                  void run()
+                }}
+              />
+            )}
           </>
         )}
       </div>

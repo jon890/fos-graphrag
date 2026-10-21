@@ -15,6 +15,11 @@ const data = {
   docUrl: `https://example.com/financial-workbench/${suffix}`,
   description: `가상부품-${suffix} 이 가상전자-${suffix} 에 메모리 기판을 공급한다.`,
   evidence: `당사의 주요 매출처는 가상전자-${suffix} 이다.`,
+  supplier2: `가상소재-${suffix}`,
+  docTitle2: `가상소재 감사보고서-${suffix}`,
+  docUrl2: `https://example.com/financial-workbench/${suffix}/2`,
+  description2: `가상소재-${suffix} 이 가상전자-${suffix} 에 소재를 공급한다.`,
+  evidence2: `가상소재-${suffix} 의 주요 매출처는 가상전자-${suffix} 이다.`,
   reviewNote: '공시 원문과 대조함',
   editByA: `A 가 고친 메모 ${suffix}`,
   editByB: `B 가 고친 메모 ${suffix}`,
@@ -178,9 +183,15 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await shot(pageAdmin, '00e-first-screen')
 
     const typeSelect = pageAdmin.getByTestId('new-node-type')
-    await expect(typeSelect.locator('option')).toHaveText(['무엇을 만들까요?', '기업', '종목', '산업', '근거 문서'])
+    await expect(typeSelect.locator('option')).toHaveText(['무엇을 만들까요?', '기업', '종목', '산업', '근거 문서', '주장'])
     // 저장되는 값은 그대로다.
-    await expect(typeSelect.locator('option')).toHaveCount(5)
+    await expect(typeSelect.locator('option')).toHaveCount(6)
+    await typeSelect.selectOption('Claim')
+    await pageAdmin.getByTestId('new-node-button').click()
+    await expect(pageAdmin.getByTestId('claim-add-form')).toBeVisible()
+    await expect(pageAdmin.getByTestId('claim-subject-picker-input')).toBeVisible()
+    await expect(pageAdmin.getByTestId('claim-object-picker-input')).toBeVisible()
+    await pageAdmin.getByTestId('claim-add-cancel').click()
     await typeSelect.selectOption('Company')
     await pageAdmin.getByTestId('new-node-button').click()
     const company = pageAdmin.getByTestId('create-form')
@@ -259,6 +270,56 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(card).toHaveAttribute('data-review-status', 'DRAFT')
     await expect(card.getByTestId('claim-valid-from')).toHaveText('미상')
     await shot(pageA, '02-claim-created')
+  })
+
+  test('2b) A 가 고객사 상세에서 「주체와 대상 바꾸기」 로 공급 주장을 만든다', async () => {
+    await createNode(pageA, 'Company', data.supplier2, { name: data.supplier2, country: 'KR' })
+    await createNode(pageA, 'Document', data.docTitle2, {
+      title: data.docTitle2,
+      url: data.docUrl2,
+      publisher: '가상소재',
+      documentType: 'FILING',
+      publishedAt: '2026-03-15',
+      collectedAt: '2026-10-20T12:00',
+    })
+
+    await searchAndOpen(pageA, data.customer)
+    await pageA.getByTestId('claim-add-toggle').click()
+    await expect(pageA.getByTestId('claim-subject-selected')).toContainText(data.customer)
+    await pageA.getByTestId('claim-predicate-select').selectOption('SUPPLIES_TO')
+    await pageA.getByTestId('claim-swap').click()
+    await expect(pageA.getByTestId('claim-object-selected')).toContainText(data.customer)
+    await expect(pageA.getByTestId('claim-subject-selected')).toHaveCount(0)
+    await pick(pageA, 'claim-subject-picker', data.supplier2)
+    await expect(pageA.getByTestId('claim-subject-selected')).toContainText(data.supplier2)
+    await expect(pageA.getByTestId('claim-sentence')).toContainText('에 공급한다')
+    await pick(pageA, 'claim-doc-picker', data.docTitle2)
+    await pageA.getByTestId('claim-description').fill(data.description2)
+    await pageA.getByTestId('claim-evidence').fill(data.evidence2)
+    await pageA.getByTestId('claim-add-submit').click()
+
+    await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
+    const card = pageA.getByTestId('node-claims-section').getByTestId('claim-card').filter({ hasText: data.evidence2 })
+    await expect(card.getByTestId('claim-subject')).toContainText(data.supplier2)
+    await expect(card.getByTestId('claim-object')).toContainText(data.customer)
+    await shot(pageA, '02b-claim-from-object')
+  })
+
+  test('2c) A 가 왼쪽 「무엇을 만들까요?」 에서 주장을 만든다', async () => {
+    await pageA.getByTestId('tab-workspace').click()
+    await pageA.getByTestId('new-node-type').selectOption('Claim')
+    await pageA.getByTestId('new-node-button').click()
+    await pageA.getByTestId('claim-predicate-select').selectOption('COMPETES_WITH')
+    await pick(pageA, 'claim-subject-picker', data.supplier2)
+    await pick(pageA, 'claim-object-picker', data.customer)
+    await pick(pageA, 'claim-doc-picker', data.docTitle2)
+    await pageA.getByTestId('claim-description').fill(`${data.supplier2} 와 ${data.customer} 가 같은 시장에서 경쟁한다.`)
+    await pageA.getByTestId('claim-evidence').fill(data.evidence2)
+    await pageA.getByTestId('claim-add-submit').click()
+
+    await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
+    await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-type', 'Claim')
+    await expect(pageA.getByTestId('detail-label')).toHaveText(`${data.supplier2} → ${data.customer} 경쟁한다`)
   })
 
   test('3) B 가 검토 대기 탭에서 Claim 을 검토 완료한다', async ({ browser }) => {

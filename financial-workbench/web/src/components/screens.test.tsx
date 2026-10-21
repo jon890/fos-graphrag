@@ -42,8 +42,8 @@ describe('온톨로지에 새로 더한 타입', () => {
     expect(html).toContain('data-testid="filter-type-Person"')
     expect(html).toContain('<option value="Person">인물</option>')
     expect(html).toContain('<option value="DRAFT">초안</option>')
-    // Claim 은 전용 API 로 만들므로 만들기 선택지에 없다.
-    expect(html).not.toContain('<option value="Claim">')
+    // Claim 은 전용 API 로 만들지만 주장 폼을 여는 선택지로 나온다.
+    expect(html).toContain('<option value="Claim">주장</option>')
     expect(html).not.toContain('새 노드')
   })
 

@@ -283,7 +283,7 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
           )}
           {canEdit && addingClaim && (
             <ClaimCreateForm
-              subject={node}
+              initialSubject={node}
               onCancel={() => setAddingClaim(false)}
               onCreated={() => {
                 setAddingClaim(false)
