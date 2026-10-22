@@ -1,8 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 import { api, errorMessage } from '../api/client'
 import type { NodeView, Page } from '../api/types'
 import { useLabels } from '../context'
 import { formatDateTime, userName } from '../lib/format'
+import { TAB_PATHS, listSearch, parseListQuery, type ListQuery } from '../routes'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,14 +15,26 @@ import { StatusBadge, TypeBadge } from './TypeBadge'
 
 export function ListTab({ onOpen }: { onOpen: (id: string) => void }) {
   const labels = useLabels()
-  const [type, setType] = useState('')
-  const [qInput, setQInput] = useState('')
-  const [q, setQ] = useState('')
-  const [includeArchived, setIncludeArchived] = useState(false)
-  const [pageNo, setPageNo] = useState(0)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
+  const query = useMemo(() => parseListQuery(location.search), [location.search])
+  const { type, q, archived: includeArchived, page: pageNo } = query
+  const [qInput, setQInput] = useState(q)
   const [page, setPage] = useState<Page<NodeView> | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  /** 주소만 바꾸고 기록을 쌓지 않는다. 쪽 번호가 아닌 조건을 바꾸면 쪽은 0 으로 돌린다 */
+  const change = (patch: Partial<ListQuery>) => {
+    const next = { ...query, page: 0, ...patch }
+    const url = TAB_PATHS.list + listSearch(next)
+    if (url !== location.pathname + location.search) navigate(url, { replace: true })
+  }
+
+  // 뒤로가기로 주소의 검색어가 바뀌면 입력칸도 따라간다.
+  useEffect(() => setQInput(q), [q])
 
   useEffect(() => {
     let cancelled = false
@@ -28,7 +42,16 @@ export function ListTab({ onOpen }: { onOpen: (id: string) => void }) {
     setError(null)
     api.nodes
       .search({ q, types: type ? [type] : undefined, includeArchived, page: pageNo, size: 20 })
-      .then((p) => !cancelled && setPage(p))
+      .then((p) => {
+        if (cancelled) return
+        // 쪽 번호가 끝 쪽을 넘으면 끝 쪽으로 바꿔 연다.
+        const last = Math.max(p.totalPages - 1, 0)
+        if (last < pageNo) {
+          navigateRef.current(TAB_PATHS.list + listSearch({ type, q, archived: includeArchived, page: last }), { replace: true })
+          return
+        }
+        setPage(p)
+      })
       .catch((e) => !cancelled && setError(errorMessage(e)))
       .finally(() => !cancelled && setLoading(false))
     return () => {
@@ -38,8 +61,7 @@ export function ListTab({ onOpen }: { onOpen: (id: string) => void }) {
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    setPageNo(0)
-    setQ(qInput)
+    change({ q: qInput })
   }
 
   return (
@@ -48,10 +70,7 @@ export function ListTab({ onOpen }: { onOpen: (id: string) => void }) {
         <NativeSelect
           data-testid="list-type-filter"
           value={type}
-          onChange={(e) => {
-            setType(e.target.value)
-            setPageNo(0)
-          }}
+          onChange={(e) => change({ type: e.target.value })}
         >
           <option value="">모든 종류</option>
           {labels.types.map((t) => (
@@ -75,10 +94,7 @@ export function ListTab({ onOpen }: { onOpen: (id: string) => void }) {
             type="checkbox"
             data-testid="list-include-archived"
             checked={includeArchived}
-            onChange={(e) => {
-              setIncludeArchived(e.target.checked)
-              setPageNo(0)
-            }}
+            onChange={(e) => change({ archived: e.target.checked })}
           />
           보관 포함
         </label>
@@ -122,7 +138,7 @@ export function ListTab({ onOpen }: { onOpen: (id: string) => void }) {
           )}
         </TableBody>
       </Table>
-      {page && <Pager page={page} onPage={setPageNo} testIdPrefix="list-pager" />}
+      {page && <Pager page={page} onPage={(n) => change({ page: n })} testIdPrefix="list-pager" />}
     </div>
   )
 }
