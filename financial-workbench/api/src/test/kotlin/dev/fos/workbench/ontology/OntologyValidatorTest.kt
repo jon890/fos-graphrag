@@ -94,12 +94,14 @@ class OntologyValidatorTest {
         assertThatThrownBy { OntologyLoader.load(underscore.byteInputStream()) }.hasMessageContaining("_lock")
     }
 
-    @Suppress("UNCHECKED_CAST")
     @Test
     fun `인물의 연도는 정수 범위를 검사한다`() {
-        assertThatThrownBy { validator.validateCreate("Person", mapOf("name" to "x", "birthYear" to 999)) }
-            .isInstanceOf(ValidationFailedException::class.java)
+        val e = org.junit.jupiter.api.assertThrows<ValidationFailedException> {
+            validator.validateCreate("Person", mapOf("name" to "x", "birthYear" to 999))
+        }
+        assertThat(fieldErrors(e)).containsKey("birthYear")
     }
 
+    @Suppress("UNCHECKED_CAST")
     private fun fieldErrors(e: ValidationFailedException) = e.details["fieldErrors"] as Map<String, String>
 }

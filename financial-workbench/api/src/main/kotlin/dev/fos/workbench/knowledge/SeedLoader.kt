@@ -69,8 +69,9 @@ class SeedLoader(
     internal fun apply(file: SeedFile) {
         val ids = mutableMapOf<String, String>()
         file.nodes.forEach { node ->
-            val name = ontology.labelOf(node.type, node.properties)
-            ids[node.ref] = findExisting(node.type, name)
+            // 이름이 없으면 기존 노드에 묶지 않고 생성 검증이 실패하게 둔다
+            val name = node.properties[ontology.requireNodeType(node.type).labelProperty]?.toString()
+            ids[node.ref] = name?.let { findExisting(node.type, it) }
                 ?: nodes.create(CreateNodeRequest(node.type, node.properties), BootstrapAdmin.SYSTEM_ACTOR).id
         }
         file.relationships.forEach { rel ->
