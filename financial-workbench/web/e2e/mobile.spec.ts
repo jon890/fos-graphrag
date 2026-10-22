@@ -115,9 +115,9 @@ test('휴대폰 폭에서 노드를 만들고 그래프에서 골라 상세를 �
   // 8. 좁은 화면의 모습을 남긴다.
   await shot(page, 'mobile-workspace')
 
-  // 9. 링크로 열면 첫 탭이 상세이고, 주소에서 node 값은 지워진다.
+  // 9. 옛 링크로 열면 첫 탭이 상세이고, 주소가 새 형식으로 바뀐다.
   await page.goto(`/?node=${encodeURIComponent(companyId)}`)
   await expect(page.getByTestId('workspace-tab-detail')).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByTestId('detail-label')).toHaveText(exact(company))
-  await expect(page).not.toHaveURL(/node=/)
+  await expect(page).toHaveURL(new RegExp('/workspace\\?node=' + companyId))
 })

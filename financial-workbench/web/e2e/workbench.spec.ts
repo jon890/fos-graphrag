@@ -224,11 +224,31 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageAdmin.getByTestId('create-cancel').click()
   })
 
+  test('0f) 상단 탭은 경로를 바꾸고 뒤로가기로 앞 탭에 돌아온다', async () => {
+    await pageAdmin.getByTestId('tab-list').click()
+    await expect(pageAdmin).toHaveURL(/\/list(\?|$)/)
+    await pageAdmin.getByTestId('tab-changes').click()
+    await expect(pageAdmin).toHaveURL(/\/changes(\?|$)/)
+    await pageAdmin.goBack()
+    await expect(pageAdmin).toHaveURL(/\/list(\?|$)/)
+    await expect(pageAdmin.getByTestId('tab-list')).toHaveAttribute('aria-selected', 'true')
+    await pageAdmin.reload()
+    await expect(pageAdmin.getByTestId('tab-list')).toHaveAttribute('aria-selected', 'true')
+    await expect(pageAdmin).toHaveURL(/\/list(\?|$)/)
+    await pageAdmin.goto('/')
+    await expect(pageAdmin).toHaveURL(/\/workspace$/)
+    await expect(pageAdmin.getByTestId('tab-workspace')).toHaveAttribute('aria-selected', 'true')
+  })
+
   test('1) A 가 기업 두 개와 종목을 만들고 ISSUES 관계를 잇는다', async ({ browser }) => {
     pageA = await open(browser)
     await loginAs(pageA, editorA)
     await expect(pageA.getByTestId('current-user-role')).toHaveAttribute('data-role', 'EDITOR')
     await expect(pageA.getByTestId('tab-users')).toHaveCount(0)
+    // ADMIN 이 아니면 /users 는 작업 공간으로 바뀐다.
+    await pageA.goto('/users')
+    await expect(pageA).toHaveURL(/\/workspace$/)
+    await expect(pageA.getByTestId('search-input')).toBeVisible()
 
     await createNode(pageA, 'Company', data.supplier, { name: data.supplier, country: 'KR' })
     await createNode(pageA, 'Company', data.customer, { name: data.customer, country: 'KR' })
@@ -420,6 +440,9 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(reviewableA.locator(`[data-claim-id="${supplyClaimId}"]`)).toHaveCount(0)
     await mineRow.getByTestId('review-mine-copy-link').click()
     await expect(mineRow.getByTestId('review-mine-copy-link-done').or(mineRow.getByTestId('review-mine-copy-link-fallback'))).toBeVisible()
+    // 클립보드를 쓸 수 없어 주소를 입력칸에 보인 경우에만 새 형식의 주소인지 본다.
+    const fallback = mineRow.getByTestId('review-mine-copy-link-fallback')
+    if (await fallback.isVisible()) await expect(fallback).toHaveValue(/\/workspace\?node=/)
     await shot(pageA, '03-review-mine-a')
 
     pageB = await open(browser)
@@ -452,12 +475,23 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   test('3b) 링크로 들어오면 로그인한 뒤 그 주장의 상세가 열린다', async ({ browser }) => {
     const { context, page } = await newPage(browser)
     try {
+      // 이미 보낸 /?node= 링크도 열리고, 새 주소로 바뀐다.
       await loginAs(page, editorB, 'success', `/?node=${encodeURIComponent(supplyClaimId)}`)
       await expect(page.getByTestId('detail-panel')).toHaveAttribute('data-node-id', supplyClaimId)
       await expect(page.getByTestId('detail-label')).toHaveText(`${data.supplier} → ${data.customer} 공급한다`)
       await expect(page.getByTestId('node-copy-link')).toBeVisible()
+      await expect(page).toHaveURL(new RegExp(`/workspace\\?node=${supplyClaimId}&pane=detail$`))
     } finally {
       await context.close()
+    }
+    // 새 형식의 링크도 같은 상세를 연다.
+    const fresh = await newPage(browser)
+    try {
+      await loginAs(fresh.page, editorB, 'success', `/workspace?node=${encodeURIComponent(supplyClaimId)}`)
+      await expect(fresh.page.getByTestId('detail-panel')).toHaveAttribute('data-node-id', supplyClaimId)
+      await expect(fresh.page.getByTestId('detail-label')).toHaveText(`${data.supplier} → ${data.customer} 공급한다`)
+    } finally {
+      await fresh.context.close()
     }
   })
 
@@ -608,7 +642,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     // 주장은 기업 이름으로 검색되지 않으므로(docs/prd.md 「남은 한계」) 링크로 연다.
     await pageA.goto('/?node=' + supplyClaimId)
     await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-id', supplyClaimId)
-    await expect(pageA).not.toHaveURL(/node=/)
+    await expect(pageA).toHaveURL(new RegExp('/workspace\\?node=' + supplyClaimId))
     await pageA.getByTestId('node-history-link').click()
     const created = pageA.locator('[data-testid="change-row"][data-action="CREATE"]')
     await expect(created).toHaveCount(1)
