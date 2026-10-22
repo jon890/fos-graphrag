@@ -1,4 +1,5 @@
-import type { GraphEdge, GraphLimits, GraphNode, GraphView, ReviewStatus } from '../api/types'
+import type cytoscape from 'cytoscape'
+import type { GraphEdge, GraphLimits, GraphNode, GraphView, Ontology, ReviewStatus } from '../api/types'
 
 /** 화면이 들고 있는 합쳐진 그래프. 여러 번의 neighborhood 응답을 누적한다. */
 export interface GraphData {
@@ -39,23 +40,20 @@ export function mergeGraph(base: GraphData, incoming: Pick<GraphView, 'nodes' | 
   }
 }
 
-export const TYPE_COLORS: Record<string, string> = {
-  Company: '#2563eb',
-  Security: '#0d9488',
-  Sector: '#9333ea',
-  Document: '#d97706',
-  Claim: '#dc2626',
-}
-
-/** 온톨로지에 새 타입이 생겨도 겹치지 않게 이름으로 고르는 색. 위 다섯 타입 색과 다른 계열을 쓴다 */
+/** 온톨로지에 색이 없는 타입에 쓴다. 겹치지 않게 타입 이름으로 고른다 */
 const FALLBACK_COLORS = ['#0891b2', '#65a30d', '#c026d3', '#ea580c', '#4f46e5', '#be123c', '#0f766e', '#a16207']
 
-export function colorForType(type: string): string {
-  const known = TYPE_COLORS[type]
-  if (known) return known
+export function typeColor(o: Ontology, type: string): string {
+  const configured = o.nodeTypes[type]?.display?.color
+  if (configured) return configured
   let hash = 0
   for (const ch of type) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
   return FALLBACK_COLORS[hash % FALLBACK_COLORS.length]
+}
+
+/** 그래프 노드 모양. 온톨로지 display.shape 를 따르고, 없으면 원이다 */
+export function typeShape(o: Ontology, type: string): cytoscape.Css.NodeShape {
+  return (o.nodeTypes[type]?.display?.shape ?? 'ellipse') as cytoscape.Css.NodeShape
 }
 
 /** 접힌 주장 하나. 주체에서 대상으로 가는 선 하나로 그린다 */

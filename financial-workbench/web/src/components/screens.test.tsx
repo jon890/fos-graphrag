@@ -86,6 +86,11 @@ describe('온톨로지에 새로 더한 타입', () => {
     expect(html).toContain('>반려<')
     expect(html).toContain('>Mystery<')
   })
+
+  it('배지 배경은 온톨로지 display.color 를 따른다', () => {
+    const html = renderToStaticMarkup(withApp(<TypeBadge type="Company" />))
+    expect(html).toContain('background-color:#2563eb')
+  })
 })
 
 describe('첫 화면 안내', () => {

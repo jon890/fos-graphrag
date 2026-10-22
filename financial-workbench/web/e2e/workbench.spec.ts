@@ -193,9 +193,9 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await shot(pageAdmin, '00e-first-screen')
 
     const typeSelect = pageAdmin.getByTestId('new-node-type')
-    await expect(typeSelect.locator('option')).toHaveText(['무엇을 만들까요?', '기업', '종목', '산업', '근거 문서', '주장'])
+    await expect(typeSelect.locator('option')).toHaveText(['무엇을 만들까요?', '기업', '종목', '산업', '근거 문서', '인물', '개념', '주장'])
     // 저장되는 값은 그대로다.
-    await expect(typeSelect.locator('option')).toHaveCount(6)
+    await expect(typeSelect.locator('option')).toHaveCount(8)
     await typeSelect.selectOption('Claim')
     await pageAdmin.getByTestId('new-node-button').click()
     await expect(pageAdmin.getByTestId('claim-add-form')).toBeVisible()
@@ -222,6 +222,13 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageAdmin.getByTestId('create-prop-securityType').locator('option')).toHaveText(['(없음)', '보통주', '우선주', 'ETF', '예탁증서(ADR)', '기타'])
     await shot(pageAdmin, '00e-security-form')
     await pageAdmin.getByTestId('create-cancel').click()
+
+    // 시작할 때 들어간 인물은 영문 이름으로도 찾고, 타입 배지는 온톨로지의 표시 이름이다.
+    await pageAdmin.getByTestId('search-input').fill('Warren Buffett')
+    await pageAdmin.getByTestId('search-submit').click()
+    const buffett = searchResult(pageAdmin, '워런 버핏')
+    await expect(buffett).toBeVisible()
+    await expect(buffett.locator('.type-badge')).toHaveText('인물')
   })
 
   test('0f) 상단 탭은 경로를 바꾸고 뒤로가기로 앞 탭에 돌아온다', async () => {
@@ -377,6 +384,43 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     supplyClaimId = (await card.getAttribute('data-claim-id')) ?? ''
     expect(supplyClaimId).not.toBe('')
     await shot(pageA, '02-claim-created')
+  })
+
+  test('2d) A 가 책을 근거로 거장의 생각을 주장으로 만든다', async () => {
+    const bookTitle = `안전마진 해설서-${suffix}`
+    await pageA.getByTestId('tab-workspace').click()
+    await pageA.getByTestId('new-node-type').selectOption('Document')
+    await pageA.getByTestId('new-node-button').click()
+    await pageA.getByTestId('create-prop-title').fill(bookTitle)
+    await pageA.getByTestId('create-prop-url').fill(`https://example.com/book-${suffix}`)
+    await pageA.getByTestId('create-prop-documentType').selectOption('BOOK')
+    await pageA.getByTestId('create-prop-collectedAt').fill('2026-10-20T12:00')
+    await pick(pageA, 'create-link-AUTHORED-picker', '워런 버핏')
+    await pageA.getByTestId('create-submit').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(bookTitle)
+    await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
+    await expect(pageA.getByTestId('relationship-row').filter({ hasText: '워런 버핏' })).toHaveAttribute('data-rel-type', 'AUTHORED')
+
+    await searchAndOpen(pageA, '워런 버핏')
+    await pageA.getByTestId('claim-add-toggle').click()
+    await pageA.getByTestId('claim-predicate-select').selectOption('ADVOCATES')
+    await expect(pageA.getByTestId('claim-sentence')).toContainText('강조한다')
+    await pick(pageA, 'claim-object-picker', '안전마진')
+    await expect(pageA.getByTestId('claim-object-selected')).toContainText('안전마진')
+    await pick(pageA, 'claim-doc-picker', bookTitle)
+    await pageA.getByTestId('claim-description').fill('버핏은 안전마진을 투자의 핵심으로 본다.')
+    await pageA.getByTestId('claim-evidence').fill(`안전마진은 투자의 핵심이다(테스트 문장 ${suffix})`)
+    await pageA.getByTestId('claim-add-submit').click()
+
+    await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
+    const card = pageA.getByTestId('node-claims-section').getByTestId('claim-card').filter({ hasText: suffix })
+    await expect(card).toBeVisible()
+    const claimId = (await card.getAttribute('data-claim-id')) ?? ''
+    expect(claimId).not.toBe('')
+    const list = pageA.getByTestId('graph-node-list')
+    await expect(list).toContainText('안전마진')
+    await expect(list.locator(`[data-node-id="${claimId}"]`)).toContainText('워런 버핏 → 안전마진 강조한다')
+    await shot(pageA, '02d-master-claim')
   })
 
   test('2b) A 가 고객사 상세에서 「주체와 대상 바꾸기」 로 공급 주장을 만든다', async () => {

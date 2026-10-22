@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { collapseClaims, EMPTY_GRAPH, expandedDisplay, graphFromView, mergeGraph, type GraphData } from './graph'
+import { collapseClaims, EMPTY_GRAPH, expandedDisplay, graphFromView, mergeGraph, typeColor, typeShape, type GraphData } from './graph'
+import { testOntology } from '../components/testSupport'
 import type { GraphView } from '../api/types'
 
 const limits = { maxHops: 2, maxNodes: 150, maxRelationships: 300 }
@@ -116,5 +117,20 @@ describe('collapseClaims', () => {
     expect(display.listed).toEqual(base.nodes)
     expect(display.edges).toEqual(base.edges)
     expect(display.claimEdges).toEqual([])
+  })
+})
+
+describe('타입 표시', () => {
+  it('온톨로지에 display 가 있으면 그 색과 모양을 쓴다', () => {
+    expect(typeColor(testOntology, 'Company')).toBe('#2563eb')
+    expect(typeShape(testOntology, 'Company')).toBe('ellipse')
+  })
+
+  it('display 가 없으면 이름으로 고른 팔레트 색과 원 모양이다', () => {
+    const color = typeColor(testOntology, 'Person')
+    expect(color).toMatch(/^#[0-9a-f]{6}$/)
+    expect(typeColor(testOntology, 'Person')).toBe(color)
+    expect(typeShape(testOntology, 'Person')).toBe('ellipse')
+    expect(typeShape(testOntology, 'Unknown')).toBe('ellipse')
   })
 })

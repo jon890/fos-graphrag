@@ -1,11 +1,12 @@
-import { useLabels } from '../context'
-import { colorForType } from '../lib/graph'
+import { useApp, useLabels } from '../context'
+import { typeColor } from '../lib/graph'
 
 /** 노드 타입 배지. 색은 타입 키로, 글자는 온톨로지 표시 이름으로 정한다 */
 export function TypeBadge({ type }: { type: string }) {
   const labels = useLabels()
+  const { ontology } = useApp()
   return (
-    <span className="type-badge" style={{ backgroundColor: colorForType(type) }} data-type={type}>
+    <span className="type-badge" style={{ backgroundColor: typeColor(ontology, type) }} data-type={type}>
       {labels.type(type)}
     </span>
   )

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import cytoscape, { type Core, type ElementDefinition } from 'cytoscape'
 import { useApp, useLabels } from '../context'
-import { collapseClaims, colorForType, expandedDisplay, type GraphData, type GraphDisplay } from '../lib/graph'
+import { collapseClaims, expandedDisplay, type GraphData, type GraphDisplay, typeColor, typeShape } from '../lib/graph'
 import type { Ontology } from '../api/types'
 import { nodeDisplayLabel, predicateLabel, relationshipLabel } from '../lib/labels'
 import { WelcomeGuide } from './WelcomeGuide'
@@ -28,6 +28,7 @@ const STYLE: cytoscape.StylesheetJson = [
     selector: 'node',
     style: {
       'background-color': 'data(color)',
+      shape: (ele: cytoscape.NodeSingular) => ele.data('shape') as cytoscape.Css.NodeShape,
       label: 'data(label)',
       color: '#1f2937',
       'font-size': 11,
@@ -40,9 +41,7 @@ const STYLE: cytoscape.StylesheetJson = [
       'border-width': 0,
     },
   },
-  { selector: 'node[type = "Claim"]', style: { shape: 'round-diamond', width: 22, height: 22 } },
-  { selector: 'node[type = "Document"]', style: { shape: 'round-rectangle' } },
-  { selector: 'node[type = "Sector"]', style: { shape: 'hexagon' } },
+  { selector: 'node[?compact]', style: { width: 22, height: 22 } },
   { selector: 'node[reviewStatus = "DRAFT"]', style: { 'border-width': 2, 'border-style': 'dashed', 'border-color': '#6b7280' } },
   { selector: 'node[reviewStatus = "REJECTED"]', style: { opacity: 0.55 } },
   { selector: 'node.center', style: { width: 36, height: 36, 'font-weight': 'bold' } },
@@ -78,7 +77,10 @@ function toElements(data: GraphDisplay, ontology: Ontology): ElementDefinition[]
   return [
     ...data.nodes.map((n) => ({
       group: 'nodes' as const,
-      data: { id: n.id, label: nodeDisplayLabel(ontology, n), type: n.type, reviewStatus: n.reviewStatus ?? '', color: colorForType(n.type) },
+      data: { id: n.id, label: nodeDisplayLabel(ontology, n), type: n.type, reviewStatus: n.reviewStatus ?? '', color: typeColor(ontology, n.type),
+        shape: typeShape(ontology, n.type),
+        compact: ontology.nodeTypes[n.type]?.managedBy === 'claims',
+      },
     })),
     ...data.edges.map((e) => ({
       group: 'edges' as const,
@@ -278,7 +280,7 @@ export function GraphPanel(props: Props) {
       <div className="legend" data-testid="graph-legend">
         {labels.types.map((t) => (
           <span key={t} className="legend-item">
-            <span className="legend-dot" style={{ backgroundColor: colorForType(t) }} />
+            <span className="legend-dot" style={{ backgroundColor: typeColor(ontology, t) }} />
             {labels.type(t)}
           </span>
         ))}
