@@ -365,7 +365,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 
 | 메서드 | 경로 | 인증 | 응답 |
 | --- | --- | --- | --- |
-| GET | `/api/ontology` | 필요 | 온톨로지 YAML 을 그대로 옮긴 JSON. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`), 주장 문장 틀(`claimPredicates.<predicate>.sentence`), 만들기 폼 정보(`nodeTypes.<타입>.hintProperties`, `relationshipTypes.<관계>.createPicker`), 변경 이력의 항목 이름(`changeFields`), 예전 값 별칭(`valueAliases`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다. 뜻은 [데이터 스키마](data-schema.md) 의 「표시 이름」 과 그 아래 절이다 |
+| GET | `/api/ontology` | 필요 | 온톨로지 YAML 을 그대로 옮긴 JSON. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`), 주장 문장 틀(`claimPredicates.<predicate>.sentence`), 만들기 폼 정보(`nodeTypes.<타입>.hintProperties`, `relationshipTypes.<관계>.createPicker`), 타입의 색과 모양(`nodeTypes.<타입>.display`), 검색에 넣을 속성(`nodeTypes.<타입>.searchProperties`), 변경 이력의 항목 이름(`changeFields`), 예전 값 별칭(`valueAliases`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다. 뜻은 [데이터 스키마](data-schema.md) 의 「표시 이름」 과 그 아래 절이다 |
 
 ## 사용자 관리
 
