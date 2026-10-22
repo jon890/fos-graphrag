@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 import { api, errorMessage, setUnauthorizedHandler } from './api/client'
 import type { CurrentUser, Ontology } from './api/types'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { nodeFromSearch, rememberPendingNode, takePendingNode } from './lib/links'
+import { rememberReturnTo, takeReturnTo } from './lib/links'
+import {
+  DEFAULT_WORKSPACE_QUERY,
+  TAB_PATHS,
+  changesSearch,
+  legacyRedirect,
+  parseChangesQuery,
+  parseWorkspaceQuery,
+  tabOfPath,
+  workspaceSearch,
+  type TabKey,
+} from './routes'
 import { AppContext, canEditRole, ROLE_LABEL } from './context'
 import { LoginView } from './components/LoginView'
 import { Workspace } from './components/Workspace'
@@ -15,8 +27,6 @@ import { ChangesTab } from './components/ChangesTab'
 import { OntologyTab } from './components/OntologyTab'
 import { UsersTab } from './components/UsersTab'
 import { ErrorBoundary } from './components/ErrorBoundary'
-
-export type TabKey = 'workspace' | 'list' | 'review' | 'changes' | 'ontology' | 'users'
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'workspace', label: '작업 공간' },
@@ -45,41 +55,41 @@ export default function App() {
   const [denied, setDenied] = useState(readLoginDenied)
   const [ontology, setOntology] = useState<Ontology | null>(null)
   const [ontologyError, setOntologyError] = useState<string | null>(null)
-  const [tab, setTab] = useState<TabKey>('workspace')
-  // centerId 는 주변 그래프의 중심, selectedId 는 오른쪽 패널에 연 노드다.
-  const [centerId, setCenterId] = useState<string | null>(null)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   // 같은 노드를 다시 골라도 그래프와 상세를 새로 읽게 한다.
   const [focusSeq, setFocusSeq] = useState(0)
-  const [changesTargetId, setChangesTargetId] = useState('')
-  // 링크(/?node=)로 들어왔을 때 로그인과 온톨로지 읽기가 끝난 뒤 열 항목이다.
-  const pendingNodeRef = useRef<string | null>(null)
+  const location = useLocation()
+  const navigate = useNavigate()
+  // useNavigate 가 돌려주는 함수는 경로가 바뀔 때마다 새로 만들어진다. effect 와 콜백은 ref 로 최신 값을 쓴다.
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
+  const locationRef = useRef(location)
+  locationRef.current = location
+  // 로그인 화면을 거쳐도 남은 주소다. 로그인과 온톨로지 읽기가 끝난 뒤 연다.
+  const returnToRef = useRef<string | null>(null)
+  // 탭마다 마지막으로 보던 주소. 화면 메모리에만 두고 새로고침하면 사라진다.
+  const lastUrlOf = useRef<Partial<Record<TabKey, string>>>({})
+
+  const tab = tabOfPath(location.pathname)
+  const role = auth.status === 'signed-in' ? auth.user.role : null
 
   useEffect(() => {
     // 로그인 화면을 거쳐도 남도록 먼저 탭 저장소에 둔다.
-    const linked = nodeFromSearch(window.location.search)
-    if (linked) rememberPendingNode(linked)
+    const { pathname, search } = window.location
+    rememberReturnTo(legacyRedirect(pathname, search) ?? pathname + search)
     setUnauthorizedHandler(() => {
+      rememberReturnTo(window.location.pathname + window.location.search)
       setAuth({ status: 'anonymous', notice: '세션이 만료되었습니다. 다시 로그인하세요.' })
     })
     api.auth
       .me()
       .then((user) => {
-        // 로그인에 성공했으면 주소창의 ?login=denied 같은 흔적을 지운다.
-        if (window.location.search) window.history.replaceState(null, '', window.location.pathname)
         // StrictMode 에서 이 콜백이 두 번 돌아도 둘째 호출이 첫 값을 덮어쓰지 않게 한다.
-        const pending = takePendingNode()
-        if (pending) pendingNodeRef.current = pending
+        const back = takeReturnTo()
+        if (back) returnToRef.current = back
         setAuth({ status: 'signed-in', user })
       })
       .catch(() => setAuth({ status: 'anonymous' }))
     return () => setUnauthorizedHandler(null)
-  }, [])
-
-  const focusNode = useCallback((id: string | null) => {
-    setCenterId(id)
-    setSelectedId(id)
-    setFocusSeq((n) => n + 1)
   }, [])
 
   const signedIn = auth.status === 'signed-in'
@@ -91,28 +101,67 @@ export default function App() {
       .then((o) => {
         setOntology(o)
         // 같은 콜백에서 열어야 Workspace 가 선택된 상태로 처음 그려져 좁은 화면의 첫 탭이 상세가 된다.
-        const id = pendingNodeRef.current
-        if (id) {
-          pendingNodeRef.current = null
-          focusNode(id)
-          setTab('workspace')
+        const back = returnToRef.current
+        if (back) {
+          returnToRef.current = null
+          navigateRef.current(back, { replace: true })
         }
       })
       .catch((e) => setOntologyError(errorMessage(e)))
-  }, [signedIn, focusNode])
+  }, [signedIn])
 
-  const openNode = useCallback(
+  // 모르는 경로(/ 포함)와 권한 없는 경로는 기록을 쌓지 않고 바꿔 연다.
+  useEffect(() => {
+    if (!signedIn) return
+    if (tab === null) navigateRef.current(legacyRedirect(location.pathname, location.search) ?? TAB_PATHS.workspace, { replace: true })
+    else if (tab === 'users' && role !== 'ADMIN') navigateRef.current(TAB_PATHS.workspace, { replace: true })
+  }, [signedIn, tab, role, location.pathname, location.search])
+
+  useEffect(() => {
+    if (tab) lastUrlOf.current[tab] = location.pathname + location.search
+  }, [tab, location.pathname, location.search])
+
+  /** 같은 주소면 기록을 쌓지 않는다 */
+  const go = useCallback((url: string, replace = false) => {
+    const here = locationRef.current.pathname + locationRef.current.search
+    navigateRef.current(url, { replace: replace || url === here })
+  }, [])
+
+  /** 작업 공간의 지금 query. 다른 탭에서 항목을 열어도 작업 공간의 검색 조건이 남게 한다 */
+  const workspaceQueryNow = useCallback(() => {
+    const here = locationRef.current
+    if (here.pathname === TAB_PATHS.workspace) return parseWorkspaceQuery(here.search)
+    const last = lastUrlOf.current.workspace
+    return last ? parseWorkspaceQuery(new URL(last, 'http://localhost').search) : DEFAULT_WORKSPACE_QUERY
+  }, [])
+
+  /** 그래프 중심과 상세를 함께 바꾸며 작업 공간으로 간다 */
+  const focusNode = useCallback(
     (id: string) => {
-      focusNode(id)
-      setTab('workspace')
+      go(TAB_PATHS.workspace + workspaceSearch({ ...workspaceQueryNow(), node: id, center: null, pane: 'detail' }))
+      setFocusSeq((n) => n + 1)
     },
-    [focusNode],
+    [go, workspaceQueryNow],
   )
 
-  const openHistory = useCallback((id: string) => {
-    setChangesTargetId(id)
-    setTab('changes')
-  }, [])
+  /** 상세만 바꾼다. 그래프 중심은 그대로 둔다 */
+  const selectNode = useCallback(
+    (id: string) => {
+      const q = workspaceQueryNow()
+      go(TAB_PATHS.workspace + workspaceSearch({ ...q, node: id, center: q.center ?? q.node }))
+    },
+    [go, workspaceQueryNow],
+  )
+
+  const openHistory = useCallback(
+    (id: string) => go(TAB_PATHS.changes + changesSearch({ target: id, actor: '', page: 0 })),
+    [go],
+  )
+
+  const openTab = (key: TabKey) => {
+    if (key === tab) return
+    go(lastUrlOf.current[key] ?? TAB_PATHS[key])
+  }
 
   const logout = async () => {
     try {
@@ -120,10 +169,10 @@ export default function App() {
     } catch {
       // 세션이 이미 끊겼어도 로그인 화면으로 간다.
     }
-    focusNode(null)
+    lastUrlOf.current = {}
+    navigateRef.current(TAB_PATHS.workspace, { replace: true })
     setOntology(null)
     setDenied(false)
-    setTab('workspace')
     setAuth({ status: 'anonymous' })
   }
 
@@ -139,7 +188,10 @@ export default function App() {
   const user = auth.user
   const canEdit = canEditRole(user.role)
   const visibleTabs = TABS.filter((t) => t.key !== 'users' || user.role === 'ADMIN')
-  const activeTab: TabKey = visibleTabs.some((t) => t.key === tab) ? tab : 'workspace'
+  // 모르는 경로나 권한 없는 경로는 위 effect 가 바꿔 열 때까지 아무 화면도 그리지 않는다.
+  const activeTab: TabKey | null = visibleTabs.some((t) => t.key === tab) ? tab : null
+  const workspaceQuery = parseWorkspaceQuery(location.search)
+  const changesQuery = parseChangesQuery(location.search)
 
   return (
     <div className="flex h-screen flex-col">
@@ -153,7 +205,7 @@ export default function App() {
               aria-selected={activeTab === t.key}
               className="shrink-0 cursor-pointer rounded-none border-0 border-b-[3px] border-transparent bg-transparent px-2.5 py-2.5 text-sm text-slate-300 aria-selected:border-blue-400 aria-selected:text-white lg:px-3 lg:py-3"
               data-testid={`tab-${t.key}`}
-              onClick={() => setTab(t.key)}
+              onClick={() => openTab(t.key)}
             >
               {t.label}
             </button>
@@ -186,21 +238,25 @@ export default function App() {
         {!ontology && !ontologyError && <div className="p-12 text-center text-muted-foreground">온톨로지를 불러오는 중…</div>}
         {ontology && (
           <AppContext.Provider value={{ user, ontology, canEdit }}>
-            <ErrorBoundary resetKey={activeTab}>
+            <ErrorBoundary resetKey={activeTab ?? undefined}>
               {activeTab === 'workspace' && (
                 <Workspace
-                  centerId={centerId}
+                  centerId={workspaceQuery.center ?? workspaceQuery.node}
                   focusSeq={focusSeq}
-                  selectedId={selectedId}
+                  selectedId={workspaceQuery.node}
                   onFocus={focusNode}
-                  onSelect={setSelectedId}
+                  onSelect={selectNode}
                   onOpenHistory={openHistory}
                 />
               )}
-              {activeTab === 'list' && <ListTab onOpen={openNode} />}
-              {activeTab === 'review' && <ReviewTab onOpen={openNode} />}
+              {activeTab === 'list' && <ListTab onOpen={focusNode} />}
+              {activeTab === 'review' && <ReviewTab onOpen={focusNode} />}
               {activeTab === 'changes' && (
-                <ChangesTab targetId={changesTargetId} onTargetIdChange={setChangesTargetId} onOpen={openNode} />
+                <ChangesTab
+                  targetId={changesQuery.target}
+                  onTargetIdChange={(id) => go(TAB_PATHS.changes + changesSearch({ ...changesQuery, target: id, page: 0 }), true)}
+                  onOpen={focusNode}
+                />
               )}
               {activeTab === 'ontology' && <OntologyTab />}
               {activeTab === 'users' && user.role === 'ADMIN' && <UsersTab onOpenHistory={openHistory} />}

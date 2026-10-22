@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nodeFromSearch, nodeLink, rememberPendingNode, takePendingNode } from './links'
+import { nodeLink, rememberReturnTo, takeReturnTo } from './links'
 
 function fakeStorage(): Storage {
   const m = new Map<string, string>()
@@ -24,24 +24,27 @@ const broken = {
 
 describe('링크 함수', () => {
   it('nodeLink 는 id 를 인코딩해 origin 뒤에 붙인다', () => {
-    expect(nodeLink('a b', 'https://x.io')).toBe('https://x.io/?node=a%20b')
+    expect(nodeLink('a b', 'https://x.io')).toBe('https://x.io/workspace?node=a%20b')
   })
 
-  it('nodeFromSearch 는 node 값을 꺼내고 없거나 비면 null 이다', () => {
-    expect(nodeFromSearch('?node=abc&x=1')).toBe('abc')
-    expect(nodeFromSearch('?login=denied')).toBeNull()
-    expect(nodeFromSearch('?node=')).toBeNull()
-  })
-
-  it('둔 항목은 한 번만 꺼낼 수 있다', () => {
+  it('둔 주소는 한 번만 꺼낼 수 있다', () => {
     const s = fakeStorage()
-    rememberPendingNode('n1', s)
-    expect(takePendingNode(s)).toBe('n1')
-    expect(takePendingNode(s)).toBeNull()
+    rememberReturnTo('/changes?target=n1', s)
+    expect(takeReturnTo(s)).toBe('/changes?target=n1')
+    expect(takeReturnTo(s)).toBeNull()
+  })
+
+  it('안전하지 않은 주소는 저장하지 않고, 저장소에 든 안전하지 않은 값도 꺼내지 않는다', () => {
+    const s = fakeStorage()
+    rememberReturnTo('//evil.example', s)
+    rememberReturnTo('https://x.io/workspace', s)
+    expect(takeReturnTo(s)).toBeNull()
+    s.setItem('workbench.returnTo', '//evil.example')
+    expect(takeReturnTo(s)).toBeNull()
   })
 
   it('저장소가 막혀 있어도 예외를 내지 않는다', () => {
-    expect(takePendingNode(broken)).toBeNull()
-    expect(() => rememberPendingNode('n1', broken)).not.toThrow()
+    expect(takeReturnTo(broken)).toBeNull()
+    expect(() => rememberReturnTo('/workspace', broken)).not.toThrow()
   })
 })

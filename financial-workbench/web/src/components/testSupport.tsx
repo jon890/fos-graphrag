@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { MemoryRouter } from 'react-router'
 import type { CurrentUser, Ontology } from '../api/types'
 import { AppContext, canEditRole } from '../context'
 
@@ -82,6 +83,10 @@ export const testOntology: Ontology = {
 
 const editor: CurrentUser = { id: 'u1', email: 'a@example.com', displayName: 'A', role: 'EDITOR' }
 
-export function withApp(children: ReactNode, ontology: Ontology = testOntology, user: CurrentUser = editor) {
-  return <AppContext.Provider value={{ user, ontology, canEdit: canEditRole(user.role) }}>{children}</AppContext.Provider>
+export function withApp(children: ReactNode, ontology: Ontology = testOntology, user: CurrentUser = editor, initialPath = '/workspace') {
+  return (
+    <MemoryRouter initialEntries={[initialPath]} useTransitions={false}>
+      <AppContext.Provider value={{ user, ontology, canEdit: canEditRole(user.role) }}>{children}</AppContext.Provider>
+    </MemoryRouter>
+  )
 }
