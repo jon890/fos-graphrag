@@ -16,7 +16,8 @@
 - 시작 때 데이터를 고치는 선례는 `knowledge/LegacyValueCleanup.kt` 다. `TransactionTemplate`(`timeout = Limits.WRITE_TIMEOUT_SECONDS`)으로 트랜잭션을 나누고, 작업자는 `BootstrapAdmin.SYSTEM_ACTOR`(`"system"`)다.
 - 노드와 관계 만들기는 `knowledge/NodeService.create(CreateNodeRequest(type, properties), actorId)` 와 `knowledge/RelationshipService.create(CreateRelationshipRequest(type, fromId, toId), actorId)` 다. 둘 다 `@Transactional` 이라 바깥 트랜잭션이 있으면 그 안에서 돈다. 검증, 이력, `searchText` 를 함께 처리한다. 같은 관계가 이미 있으면 `409 DUPLICATE`(예외)다.
 - 설정 속성은 `config/WorkbenchProperties.kt` 의 `WorkbenchProperties(graph, detail, security, bootstrap)` 이고 접두사는 `workbench` 다. YAML 은 `api/src/main/resources/application.yaml` 의 `workbench:` 아래다.
-- 온톨로지 파일은 빌드할 때 jar 안에 복사된다(`OntologyLoader.RESOURCE = "financial-ontology.yaml"`, `ClassPathResource`). 복사 설정은 `financial-workbench/api/build.gradle.kts` 에 있다. seeds 폴더도 같은 방식으로 classpath 에 넣어야 한다. 그 파일을 읽고 `processResources` 설정을 확인한다. 컨테이너 이미지는 `financial-workbench/Dockerfile` 이 jar 를 만든다.
+- 온톨로지 파일은 빌드할 때 jar 안에 복사된다(`OntologyLoader.RESOURCE = "financial-ontology.yaml"`, `ClassPathResource`). 복사 설정은 `financial-workbench/api/build.gradle.kts` 의 `processResources` 에 있는 `from("../ontology/financial-ontology.yaml")` 이다. seeds 폴더도 같은 방식으로 classpath 의 `seeds/` 아래에 넣는다. 컨테이너 이미지는 `financial-workbench/Dockerfile` 이 빌드 단계에 `ontology/` 를 이미 복사하고(16행), 실행 jar 는 `/app/app.jar` 다. 실행 이미지는 JRE 라 `unzip`, `jar`, `python3` 이 없다.
+- `RelationshipService.create` 와 `NodeService.create` 는 `@Transactional` 이다. 바깥 트랜잭션(`TransactionTemplate`) 안에서 부르면 참여 트랜잭션이 되고, 안에서 예외가 프록시를 지나면 바깥 트랜잭션이 rollback-only 로 표시된다(Spring Data Neo4j `Neo4jTransactionManager.doSetRollbackOnly`). 그 예외를 잡아도 커밋 때 `UnexpectedRollbackException` 이 나서 파일 전체가 롤백된다. `RelationshipService.create` 는 잠금(`lockEnds`) 뒤에 같은 관계가 있으면 `DuplicateException` 을 던진다.
 - 통합 테스트는 같은 Neo4j 컨테이너를 여러 테스트가 함께 쓴다. 시작 때 초기 데이터가 적용되므로 다른 테스트의 데이터와 함께 있다.
 
 **근거 문서**: `financial-workbench/docs/data-schema.md` 의 「초기 데이터」 절과 「제약 조건과 인덱스」 의 `seed_run_key_unique` 행, `financial-workbench/docs/code-architecture.md` 「결정」 의 초기 데이터 항목과 「API 패키지」 의 `SeedLoader`
@@ -25,6 +26,7 @@
 
 - 바깥 스크립트로 넣지 않는다. 로그인이 Google 로만 되어 스크립트가 API 를 부를 수 없고, 이력 없이 Neo4j 에 직접 쓰지 않는다.
 - 실패해도 API 는 시작한다. 초기 데이터는 없어도 쓸 수 있다. 실패는 `warn` 로그로 남기고 다음 시작 때 다시 시도한다.
+- 파일 트랜잭션 안에서는 `@Transactional` 서비스가 던진 예외를 잡고 계속하지 않는다. 건너뛸 경우(이미 있는 노드, 이미 있는 관계)는 서비스를 부르기 전에 Cypher 로 먼저 확인한다.
 - 소개와 정의는 널리 알려진 사실만 짧게 적는다. 인용과 평가는 넣지 않는다.
 
 ## Blocked 조건
@@ -67,7 +69,7 @@ relationships:
 ### 2. classpath 에 넣기
 
 - `financial-workbench/api/build.gradle.kts` 가 온톨로지 YAML 을 리소스로 복사하는 설정을 읽고, `ontology/seeds/*.yaml` 도 classpath 의 `seeds/` 아래로 복사되게 고친다. 테스트 classpath 에도 들어가야 한다.
-- `financial-workbench/Dockerfile` 이 `ontology/` 를 빌드 단계에 넣는지 확인한다. 넣지 않으면 `seeds/` 가 함께 들어가게 고친다. 고쳤으면 변경 파일 표에 더하고 그 이유를 커밋 메시지에 적는다.
+- `financial-workbench/Dockerfile` 은 이미 `ontology/` 를 빌드 단계에 넣으므로 고치지 않는다.
 
 ### 3. `financial-workbench/api/src/main/kotlin/dev/fos/workbench/knowledge/SeedLoader.kt` 신규
 
@@ -91,10 +93,18 @@ class SeedLoader(
 ```
 
 - `properties.seeds.enabled` 가 `false` 면 아무것도 하지 않는다. `WorkbenchProperties` 에 `val seeds: Seeds = Seeds()`, `data class Seeds(val enabled: Boolean = true)` 를 더한다.
-- `PathMatchingResourcePatternResolver().getResources("classpath*:seeds/*.yaml")` 로 파일을 읽고, `key` 순서로 정렬한다. YAML 은 `tools.jackson.dataformat.yaml.YAMLMapper`(로더와 같은 라이브러리)로 `data class SeedFile(val key: String, val nodes: List<SeedNode> = emptyList(), val relationships: List<SeedRelationship> = emptyList())` 에 읽는다. 알 수 없는 키는 실패다.
-- 파일마다 `MATCH (s:SeedRun {key: $key}) RETURN count(s) > 0` 이 참이면 건너뛴다. 아니면 `TransactionTemplate`(`timeout = Limits.WRITE_TIMEOUT_SECONDS * 3`)에서:
+- `PathMatchingResourcePatternResolver().getResources("classpath*:seeds/*.yaml")` 로 자원을 모아 파일 이름 순서로 정렬한다. 자원마다 따로 읽는다. YAML 은 `tools.jackson.dataformat.yaml.YAMLMapper`(로더와 같은 라이브러리, `FAIL_ON_UNKNOWN_PROPERTIES` 켬)로 아래 클래스에 읽는다. 읽기에 실패한 자원은 `log.warn("초기 데이터 파일 {} 를 읽지 못했다: {}", resource.filename, e.message)` 뒤 건너뛴다. 같은 `key` 가 이미 나온 파일이면 `warn` 로그 뒤 건너뛴다.
+
+  ```kotlin
+  data class SeedFile(val key: String, val nodes: List<SeedNode> = emptyList(), val relationships: List<SeedRelationship> = emptyList())
+  /** ref 는 이 파일 안에서만 쓰는 이름이다 */
+  data class SeedNode(val ref: String, val type: String, val properties: Map<String, Any?> = emptyMap())
+  data class SeedRelationship(val type: String, val from: String, val to: String)
+  ```
+- `run()` 은 어떤 경우에도 예외를 밖으로 던지지 않는다. 파일마다 `try` 로 감싼다.
+- 파일마다 `MATCH (s:SeedRun {key: $key}) RETURN count(s) > 0` 이 참이면 건너뛴다. 아니면 `internal fun apply(file: SeedFile)` 를 `TransactionTemplate`(`timeout = Limits.WRITE_TIMEOUT_SECONDS`. 서버의 `db.transaction.timeout` 보다 짧아야 한다는 `Limits` 의 규칙을 지킨다)에서 부른다. `apply` 는:
   - 노드마다 `findExisting(type, name)` 으로 같은 타입, 같은 이름의 보관되지 않은 노드를 찾는다. 이름은 그 타입의 `labelProperty` 값이고, 비교는 `toLower(trim(n[$prop])) = toLower(trim($name))` 다. 있으면 그 id 를 `ref` 에 묶고 만들지 않는다. 없으면 `nodes.create(CreateNodeRequest(type, properties), BootstrapAdmin.SYSTEM_ACTOR)` 로 만들고 id 를 묶는다.
-  - 관계마다 `from`, `to` 의 `ref` 로 id 를 찾는다. 하나라도 없으면 건너뛰고 로그를 남긴다. 같은 관계가 이미 있으면(`DuplicateException`) 건너뛴다. 아니면 `relationships.create(...)` 로 만든다.
+  - 관계마다 `from`, `to` 의 `ref` 로 id 를 찾는다. 하나라도 없으면 건너뛰고 로그를 남긴다. 타입은 `ontology.requireRelationshipType(type)` 으로 확인한 값만 Cypher 에 넣고, `MATCH (:Knowledge {id: $from})-[r:\`TYPE\`]->(:Knowledge {id: $to}) WHERE r.archived = false RETURN count(r) > 0` 이 참이면 만들지 않는다. 아니면 `relationships.create(...)` 로 만든다. `DuplicateException` 을 잡지 않는다.
   - 끝에 `CREATE (:SeedRun {key: $key, appliedAt: $now})` 를 남긴다(`Timestamps.now()`).
 - 파일 하나가 예외로 끝나면 `log.warn("초기 데이터 {} 를 적용하지 못했다: {}", key, e.message)` 를 남기고 다음 파일로 간다. 예외를 밖으로 던지지 않는다. 고친 노드 수가 아니라 적용한 파일 수를 `info` 로 남긴다.
 
@@ -102,14 +112,15 @@ class SeedLoader(
 
 - `Neo4jSchemaInitializer` 의 생성자에 `SeedLoader` 를 더하고 `afterSingletonsInstantiated()` 를 `initialize()`, `legacyValueCleanup.run()`, `seedLoader.run()`, `bootstrapAdmin…` 순서로 고친다. 클래스 주석의 순서 설명도 고친다.
 - `STATEMENTS` 에 `"CREATE CONSTRAINT seed_run_key_unique IF NOT EXISTS FOR (s:SeedRun) REQUIRE s.key IS UNIQUE"` 를 더한다. 제약 조건 개수나 이름을 단언하는 기존 테스트(`ReviewFixIntegrationTest` 의 인덱스 테스트 등)가 있으면 함께 고친다.
-- `application.yaml` 의 `workbench:` 아래에 `seeds: { enabled: true }` 를 적지 않아도 기본값이 켜짐이다. 문서와 맞추려고 주석 한 줄만 둔다.
+- `application.yaml` 의 `workbench:` 아래에 `seeds: { enabled: ${WORKBENCH_SEEDS_ENABLED:true} }` 를 둔다. `docs/deployment.md` 의 환경 변수 표에 이 값이 이미 있다(이 계획의 docs 커밋).
 
 ### 5. 이 phase 를 검증하는 테스트
 
 - `financial-workbench/api/src/test/kotlin/dev/fos/workbench/knowledge/SeedLoaderIntegrationTest.kt` 신규(`IntegrationTest` 상속, `@Autowired lateinit var seeds: SeedLoader`).
-  - 「시작할 때 초기 데이터가 들어가고 이력은 system 이다」: `GET /api/nodes?q=warren buffett&types=Person` 에 「워런 버핏」 이 있고, 그 노드의 이력 첫 항목이 `CREATE`, 작업자가 비어 있다(system). `MATCH (s:SeedRun {key: 'investing-basics-2026-10'})` 가 하나다. 「안전마진」 상세의 관계에 `RELATED_TO` 로 「내재가치」 가 있다.
-  - 「다시 돌려도 새로 만들지 않는다」: `seeds.run()` 을 한 번 더 부른 뒤 「워런 버핏」 Person 이 하나다.
-  - 「같은 이름이 이미 있으면 그 노드를 쓴다」: 이름으로 찾는 부분을 `SeedLoader` 의 `internal fun findExisting(type: String, name: String): String?` 로 뺀다. 테스트에서 Alice 가 Concept `「 테스트개념-<suffix> 」`(앞뒤 공백 포함)를 만든 뒤 `findExisting("Concept", "테스트개념-<SUFFIX 대문자>")` 가 그 id 를 돌려준다. 그 노드를 보관하면 `null` 이다.
+  - 「시작할 때 초기 데이터가 들어가고 이력은 system 이다」: URL 인코딩한 `GET /api/nodes?q=warren%20buffett&types=Person` 에 label 이 정확히 「워런 버핏」 인 항목이 있고, 그 노드의 이력 첫 항목이 `CREATE`, 작업자가 비어 있다(system). `MATCH (s:SeedRun {key: 'investing-basics-2026-10'})` 가 하나다. 「안전마진」 상세의 관계에 `RELATED_TO` 로 「내재가치」 가 있다.
+  - 「다시 돌려도 새로 만들지 않는다」: `seeds.run()` 을 한 번 더 부른 뒤 `MATCH (n:Knowledge:Person {name: '워런 버핏', archived: false}) RETURN count(n)` 이 1 이다. 검색(`CONTAINS`)으로 세지 않는다. 다른 테스트의 데이터가 같은 글자를 담을 수 있다.
+  - 「이미 있는 관계를 다시 적은 파일도 적용된다」: `seeds.apply(SeedFile(key = "test-dup-<suffix>", nodes = 안전마진, 내재가치 두 개념(이름과 summary 를 초기 데이터와 같게), relationships = [RELATED_TO 안전마진 → 내재가치]))` 를 `TransactionTemplate` 으로 부른 뒤 예외 없이 끝나고 `SeedRun {key: 'test-dup-<suffix>'}` 가 남는다. 두 개념 사이 `RELATED_TO` 는 여전히 하나다. `apply` 가 `SeedRun` 도 남기게 하거나, 테스트가 `run()` 과 같은 경로를 타도록 `internal fun applyInTransaction(file)` 를 두어 그것을 부른다.
+  - 「같은 이름이 이미 있으면 그 노드를 쓴다」: 이름으로 찾는 부분을 `SeedLoader` 의 `internal fun findExisting(type: String, name: String): String?` 로 뺀다. 테스트에서 Alice 가 Concept(`name` 「테스트개념-<suffix>」, 필수인 `summary` 「테스트」)를 만든 뒤 `findExisting("Concept", "테스트개념-<SUFFIX 대문자>")` 가 그 id 를 돌려준다. 그 노드를 보관하면 `null` 이다.
   - `workbench.seeds.enabled=false` 이면 `run()` 이 0 을 돌려준다. 이것은 `SeedLoader` 를 직접 만들어 `WorkbenchProperties(seeds = Seeds(enabled = false))` 를 넘겨 본다.
 
 ## 검증
@@ -118,10 +129,10 @@ class SeedLoader(
 cd financial-workbench/api && ./gradlew test --tests 'dev.fos.workbench.knowledge.SeedLoaderIntegrationTest'
 cd financial-workbench/api && ./gradlew test
 test -f financial-workbench/ontology/seeds/investing-basics-2026-10.yaml
-cd financial-workbench && docker build --platform linux/amd64 -q -t workbench-seed-check . && docker run --rm --entrypoint sh workbench-seed-check -c 'unzip -l /app/app.jar | grep -q seeds/investing-basics-2026-10.yaml'
+cd financial-workbench && docker build --platform linux/amd64 -q -t workbench-seed-check . && cid=$(docker create workbench-seed-check) && docker cp "$cid":/app/app.jar /tmp/wb-seed-check.jar && docker rm "$cid" && unzip -l /tmp/wb-seed-check.jar | grep -q 'BOOT-INF/classes/seeds/investing-basics-2026-10.yaml'
 ```
 
-- 각 줄은 저장소 루트에서 돈다. 마지막 줄은 컨테이너 이미지의 jar 에 초기 데이터 파일이 들어갔는지 본다. 이미지에 `unzip` 이 없으면 `jar tf` 나 `python3 -m zipfile -l` 처럼 이미지에 있는 도구로 바꾸고 그 줄을 고친다. jar 경로가 `/app/app.jar` 가 아니면 `Dockerfile` 을 읽고 맞춘다.
+- 각 줄은 저장소 루트에서 돈다. 마지막 줄은 컨테이너 이미지의 jar 를 밖으로 꺼내 호스트의 `unzip` 으로 초기 데이터 파일이 들어갔는지 본다(실행 이미지에는 압축 도구가 없다).
 
 ## 변경 파일
 

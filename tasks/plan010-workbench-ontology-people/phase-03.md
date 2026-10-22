@@ -45,20 +45,24 @@
 
 ### 3. `GraphPanel.tsx` 의 모양
 
-- 노드 data 에 `shape: typeShape(ontology, n.type)` 를 넣고, 기본 노드 스타일에 `shape: 'data(shape)'` 를 둔다.
-- `node[type = "Claim"]`, `node[type = "Document"]`, `node[type = "Sector"]` 선택자를 지운다. 주장 노드의 작은 크기(22×22)는 `node[shape = "round-diamond"]` 선택자로 옮긴다. 주장을 선으로 접는 코드의 `type: 'Claim'` 처럼 동작에 쓰는 타입 비교는 이 phase 범위가 아니라 그대로 둔다.
+- 노드 data 에 `shape: typeShape(ontology, n.type)` 를 넣고, 기본 노드 스타일에 함수 mapper `shape: (ele) => ele.data('shape') as cytoscape.Css.NodeShape` 를 둔다. Cytoscape 3.34 의 타입은 `shape` 를 `NodeShape` 문자열 union 으로 받아 `'data(shape)'` 문자열은 typecheck 에서 실패한다(`TS2322`). `typeShape` 의 반환 타입도 `cytoscape.Css.NodeShape` 로 두고, 그 안에서 온톨로지 값을 한 번만 단언한다.
+- `node[type = "Claim"]`, `node[type = "Document"]`, `node[type = "Sector"]` 선택자를 지운다. 주장 노드의 작은 크기(22×22)는 모양에 묶지 않는다. 노드 data 에 `compact: ontology.nodeTypes[n.type]?.managedBy === 'claims'` 를 넣고 `node[?compact]` 선택자로 옮긴다. 다른 타입이 같은 모양을 골라도 작아지지 않게 하려는 것이다. 주장을 선으로 접는 코드의 `type: 'Claim'` 처럼 동작에 쓰는 타입 비교는 이 phase 범위가 아니라 그대로 둔다.
 
-### 4. 이 phase 를 검증하는 테스트
+### 4. `financial-workbench/web/TESTIDS.md`
+
+「노드 고르기(NodePicker)」 절의 접두사 목록에 `create-link-AUTHORED-picker`(근거 문서 폼의 「저자」)를 더한다.
+
+### 5. 이 phase 를 검증하는 테스트
 
 - `financial-workbench/web/src/lib/graph.test.ts`: `colorForType` 테스트가 있으면 `typeColor` 로 바꾼다. 온톨로지에 `display.color` 가 있는 타입은 그 값, 없는 타입은 팔레트 색(같은 이름은 늘 같은 색)이다. `typeShape` 는 값이 있으면 그 값, 없으면 `ellipse` 다. 테스트 온톨로지는 `financial-workbench/web/src/components/testSupport.tsx` 의 `testOntology` 에 `display` 를 더해 쓴다(Company `{ color: '#2563eb', shape: 'ellipse' }`, Person 은 `display` 없이 두어 기본값을 본다).
 - `financial-workbench/web/src/components/screens.test.tsx`: `TypeBadge type="Company"` 의 배경이 `#2563eb`(정적 렌더의 `style` 에 `background-color:#2563eb`)다.
 - `financial-workbench/web/e2e/workbench.spec.ts`
-  - `0e)` 의 `new-node-type` 선택지 기대값에 「인물」, 「개념」 을 YAML 순서대로 더한다(Claim 은 「주장」 으로 이미 있다).
+  - `0e)` 의 `new-node-type` 선택지 기대값에 「인물」, 「개념」 을 YAML 순서대로 더하고(「주장」 은 이미 있다), 바로 아래 `toHaveCount(6)` 을 `toHaveCount(8)` 로 고친다.
   - `0e)` 끝에 단언을 더한다. `search-input` 에 `Warren Buffett` 를 넣어 검색하면 `search-result` 에 「워런 버핏」 이 있고 그 `TypeBadge` 가 「인물」 이다(초기 데이터와 영문 이름 검색).
   - `2)` 다음에 `2d) A 가 책을 근거로 거장의 생각을 주장으로 만든다` 를 더한다.
     1. `createNode(pageA, 'Document', 책 제목, { title, url: 'https://example.com/book-<suffix>', documentType: 'BOOK', collectedAt })` 로 만들되, 만들기 전에 「저자」 칸(`create-link-AUTHORED-picker-*`)에서 「워런 버핏」 을 고른다. `createNode` 도우미가 고르기 칸을 다루지 못하면 이 단계는 도우미를 쓰지 않고 직접 채운다. 만든 상세의 `relationship-row` 에 「워런 버핏」 이 `data-rel-type="AUTHORED"` 로 있다.
     2. `searchAndOpen(pageA, '워런 버핏')` 뒤 「주장 추가」 에서 관계 종류를 `ADVOCATES` 로 고른다. 문장(`claim-sentence`)에 「강조한다」 가 보인다. 대상에서 「안전마진」 을, 근거 문서에서 1의 책을 고르고, 설명과 근거 문장(짧은 인용, 예: 「안전마진은 투자의 핵심이다(테스트 문장)」)을 넣어 만든다.
-    3. 성공 안내 뒤 그래프의 `graph-node-list` 에 「안전마진」 이 있고, 「주장을 따로 보기」 를 끈 기본 보기에서 주장 노드가 목록에 「[주장] 워런 버핏 → 안전마진 강조한다」 로 보인다. `shot(pageA, '02d-master-claim')` 를 남긴다.
+    3. 성공 안내 뒤 만든 주장 카드의 `data-claim-id` 를 읽는다. 그래프의 `graph-node-list` 에 「안전마진」 이 있고, 그 목록에서 그 id 의 주장 항목이 「워런 버핏 → 안전마진 강조한다」 를 담는다. 초기 데이터 이름에는 접미사가 없어 같은 DB 에서 다시 돌리면 같은 이름의 주장이 쌓이므로, 항목은 id 로 좁혀 찾는다(목록 항목에 id 속성이 없으면 단추를 눌러 열린 상세의 `data-node-id` 로 본다). 책 제목에는 접미사를 붙인다. `shot(pageA, '02d-master-claim')` 를 남긴다.
   - 이 테스트가 만든 주장은 검토하지 않는다. 뒤 테스트가 세는 검토 대기 개수나 주장 개수가 있으면 `data-claim-id` 로 좁혀 영향을 없앤다.
 
 ## 검증
@@ -68,7 +72,7 @@ cd financial-workbench/web && npm ci && npm run typecheck
 cd financial-workbench/web && npx vitest run src/lib/graph.test.ts src/components/screens.test.tsx
 cd financial-workbench/web && npm test
 cd financial-workbench/web && npm run build
-! git grep -n "TYPE_COLORS\|node\[type = \"Sector\"\]\|node\[type = \"Document\"\]" -- financial-workbench/web/src
+! git grep -n "TYPE_COLORS\|node\[type = \"Sector\"\]\|node\[type = \"Document\"\]\|node\[type = \"Claim\"\]" -- financial-workbench/web/src
 cd financial-workbench && NEO4J_PASSWORD=e2e-local-password COMPOSE_PROJECT_NAME=wb-plan010 COMPOSE_FILE=compose.yml:compose.e2e.yml docker compose up -d --build --wait
 cd financial-workbench/web && WORKBENCH_URL=http://127.0.0.1:8081 E2E_ADMIN_NAME=관리자 npm run test:e2e -- e2e/workbench.spec.ts e2e/mobile.spec.ts --project=chromium --project=mobile
 cd financial-workbench && NEO4J_PASSWORD=e2e-local-password COMPOSE_PROJECT_NAME=wb-plan010 COMPOSE_FILE=compose.yml:compose.e2e.yml docker compose down -v
@@ -90,3 +94,4 @@ cd financial-workbench/api && ./gradlew test
 | `financial-workbench/web/src/components/testSupport.tsx` | 수정 |
 | `financial-workbench/web/src/components/screens.test.tsx` | 수정 |
 | `financial-workbench/web/e2e/workbench.spec.ts` | 수정 |
+| `financial-workbench/web/TESTIDS.md` | 수정 |
