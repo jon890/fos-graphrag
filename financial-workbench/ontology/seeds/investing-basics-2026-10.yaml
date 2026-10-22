@@ -1,0 +1,38 @@
+# 처음 넣을 인물과 개념. API 가 시작할 때 한 번만 적용한다(docs/data-schema.md 「초기 데이터」).
+# 같은 key 는 다시 적용하지 않는다. 내용을 바꾸려면 새 key 의 파일을 더한다.
+key: investing-basics-2026-10
+nodes:
+  - ref: buffett
+    type: Person
+    properties: { name: 워런 버핏, englishName: Warren Buffett, role: INVESTOR, country: US, birthYear: 1930, description: "버크셔 해서웨이 회장. 가치 투자를 대표하는 투자자다." }
+  - ref: graham
+    type: Person
+    properties: { name: 벤저민 그레이엄, englishName: Benjamin Graham, role: INVESTOR, country: US, birthYear: 1894, deathYear: 1976, description: "가치 투자의 아버지로 불린다. 『증권 분석』 과 『현명한 투자자』 를 썼다." }
+  - ref: munger
+    type: Person
+    properties: { name: 찰리 멍거, englishName: Charlie Munger, role: INVESTOR, country: US, birthYear: 1924, deathYear: 2023, description: "버크셔 해서웨이 부회장을 지냈다. 여러 학문의 사고 모형으로 판단하라고 했다." }
+  - ref: lynch
+    type: Person
+    properties: { name: 피터 린치, englishName: Peter Lynch, role: INVESTOR, country: US, birthYear: 1944, description: "피델리티 마젤란 펀드를 운용했다. 생활 속에서 투자 아이디어를 찾으라고 했다." }
+  - ref: fisher
+    type: Person
+    properties: { name: 필립 피셔, englishName: Philip Fisher, role: INVESTOR, country: US, birthYear: 1907, deathYear: 2004, description: "성장주 투자의 선구자다. 『위대한 기업에 투자하라』 를 썼다." }
+  - ref: margin-of-safety
+    type: Concept
+    properties: { name: 안전마진, englishName: Margin of Safety, category: VALUATION, summary: 내재가치보다 충분히 낮은 값에 사서 판단 착오에 대비하는 여유 }
+  - ref: economic-moat
+    type: Concept
+    properties: { name: 경제적 해자, englishName: Economic Moat, category: BUSINESS, summary: 경쟁자가 따라오기 어렵게 하는 기업의 오래가는 경쟁 우위 }
+  - ref: intrinsic-value
+    type: Concept
+    properties: { name: 내재가치, englishName: Intrinsic Value, category: VALUATION, summary: 기업이 앞으로 벌어들일 현금을 지금 가치로 할인한 값 }
+  - ref: mr-market
+    type: Concept
+    properties: { name: 미스터 마켓, englishName: "Mr. Market", category: BEHAVIOR, summary: 날마다 감정에 따라 값을 부르는 거래 상대에 시장을 빗댄 비유 }
+  - ref: circle-of-competence
+    type: Concept
+    properties: { name: 능력 범위, englishName: Circle of Competence, category: STRATEGY, summary: 자신이 잘 이해하는 사업에만 투자하라는 원칙 }
+relationships:
+  - { type: RELATED_TO, from: margin-of-safety, to: intrinsic-value }
+  - { type: RELATED_TO, from: mr-market, to: margin-of-safety }
+  - { type: RELATED_TO, from: economic-moat, to: intrinsic-value }

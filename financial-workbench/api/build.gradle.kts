@@ -40,6 +40,8 @@ dependencies {
 // 온톨로지 정의는 저장소의 단일 파일을 jar 에 복사해 쓴다
 tasks.processResources {
     from("../ontology/financial-ontology.yaml")
+    // 초기 데이터는 classpath 의 seeds/ 아래에서 읽는다
+    from("../ontology/seeds") { into("seeds") }
 }
 
 tasks.withType<Test> {

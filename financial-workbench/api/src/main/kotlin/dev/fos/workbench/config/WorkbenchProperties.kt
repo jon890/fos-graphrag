@@ -9,6 +9,7 @@ data class WorkbenchProperties(
     val detail: Detail = Detail(),
     val security: Security = Security(),
     val bootstrap: Bootstrap = Bootstrap(),
+    val seeds: Seeds = Seeds(),
 ) {
     data class Graph(
         val maxHops: Int = 2,
@@ -34,5 +35,10 @@ data class WorkbenchProperties(
         /** 사용자가 한 명도 없을 때 시작하면서 만들 첫 ADMIN 의 이메일. */
         val adminEmail: String? = null,
         val adminName: String = "관리자",
+    )
+
+    data class Seeds(
+        /** 시작할 때 초기 데이터(ontology/seeds 폴더의 YAML)를 적용할지 */
+        val enabled: Boolean = true,
     )
 }
