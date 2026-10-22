@@ -49,10 +49,10 @@
   ```
   바꾼 결과가 지금 주소와 같으면 부르지 않는다.
 - `mobileTab` 상태를 지우고 `const mobileTab = query.pane ?? initialMobileTab(selectedId)` 로 읽는다. 탭 단추와 「상세 보기」 는 `push({ pane })` 다. 검색 결과를 누를 때와 노드를 만들 때의 `setMobileTab('detail')` 은 지운다. `onFocus` 가 이미 `pane: 'detail'` 로 주소를 쌓는다(phase 01). 넓은 화면이면 `pane` 을 쓰지 않는다(`onFocus` 가 넣은 `pane` 은 주소에 남아도 넓은 화면은 읽지 않는다).
-- `filters` 상태를 지우고 `{ q: query.q, types: query.types ?? allTypes, reviewStatus: query.status, includeArchived: query.archived }` 로 만든다. `onFiltersChange` 는 `replace({ q, types: 전체면 null, status, archived })` 다.
+- `filters` 상태를 지우고 `{ q: query.q, types: query.types ?? allTypes, reviewStatus: query.status, includeArchived: query.archived }` 로 만든다. 렌더마다 새 객체를 만들면 `SearchPanel` 의 `run`(의존성에 `filters` 객체)이 그때마다 다시 돌아 검색 요청이 쌓이고, 늦게 온 옛 응답이 새 결과를 덮을 수 있다. 그래서 `useMemo` 로 만들고 의존성은 `query.q`, `types` 를 쉼표로 이은 문자열, `query.status`, `query.archived` 로 둔다. `onFiltersChange` 는 `replace({ q, types: 전체면 null, status, archived })` 다. 종류를 모두 끄면 `types` 가 비어 `null`(전체)로 돌아간다. 모두 꺼진 상태를 보이던 지금 동작이 바뀐다(`docs/flow.md` 「주소와 뒤로가기」).
 - `hops` 와 `claimsAsNodes` 상태를 지우고 query 에서 읽는다. 바꾸면 `replace` 다.
 - `onRecenter`(「선택한 항목을 중심으로」)는 `replace({ center: id })` 다. 노드를 「연다」 가 아니라 그래프를 옮기는 것이라 기록을 쌓지 않는다.
-- 그래프에서 노드를 누르는 `onSelect` 는 phase 01 그대로 push 다. 이때 `center` 가 비어 있으면(=`node` 가 중심이었으면) 지금 `node` 를 `center` 로 함께 넣어, 상세만 바뀌고 그래프 중심은 그대로 남게 한다.
+- 상세만 바꾸는 `onSelect` 는 phase 01 그대로다(push, 그때의 중심을 `center` 로 남긴다). 상세의 「그래프 중심으로」(`node-center-graph`)는 `onFocus` 라 push 다(`docs/flow.md` 의 push 표).
 
 ### 2. `SearchPanel.tsx`
 
@@ -67,9 +67,13 @@
   2. 그래프 아래 「그래프에 나온 항목」 목록에서 고객사(`data.customer`)를 누른다. `detail-label` 이 고객사다.
   3. `pageA.goBack()` 하면 `detail-label` 이 공급사다. `search-input` 값이 `data.supplier` 다.
   4. `tab-list` 를 누른 뒤 `goBack()` 하면 작업 공간이고 `search-input` 값과 `detail-label` 이 그대로다.
-  5. `hops` 를 2로 바꾸면 주소에 `hops=2` 가 생기고, `goBack()` 은 홉을 되돌리지 않고 앞 화면(목록 탭에 가기 전)으로 간다. 기록을 쌓지 않았다는 근거다.
+  5. `hops` 를 2로 바꾸면 주소에 `hops=2` 가 생긴다. 여기서 `goBack()` 하면 홉을 되돌리는 것이 아니라 2단계의 고객사 열기 전, 곧 1단계에서 공급사를 연 화면으로 간다. `detail-label` 이 공급사이고 주소에 `hops=` 가 없다. 홉 변경이 기록을 쌓지 않았다는 근거다. 이 단언은 앞 단계의 뒤로가기 횟수에 따라 도착점이 달라지므로, 5단계 직전에 `const before = pageA.url()` 을 적어 두지 말고 위 두 값으로만 본다.
   - 「그래프에 나온 항목」 은 `graph-node-list` 안의 단추다(`financial-workbench/web/TESTIDS.md`). 고객사는 `hasText: data.customer` 인 단추 가운데 기업 항목이다.
-- `financial-workbench/web/e2e/mobile.spec.ts` 에 단계를 더한다. 그래프 탭(`workspace-tab-graph`)에서 노드를 고르고 「상세 보기」 를 누르면 상세 탭이다. `page.goBack()` 하면 그래프 탭이 골라져 있고, 한 번 더 `goBack()` 하면 그 앞 탭이다. 각 단계에서 `aria-selected` 로 본다.
+- `financial-workbench/web/e2e/mobile.spec.ts` 에 단계를 더한다. 위치는 그래프 탭에서 노드를 고르고 「상세 보기」 로 상세 탭에 가는 기존 흐름 바로 뒤, `page.goto('/?node=' …)` 단계 앞이다. 그 흐름의 기록은 「그래프 탭(앞 노드) → 노드 고르기(push) → 상세 보기(push)」 다.
+  1. `page.goBack()` 하면 `workspace-tab-graph` 가 `aria-selected="true"` 이고 `graph-selection-bar` 에 고른 노드 이름이 보인다.
+  2. 한 번 더 `goBack()` 하면 여전히 그래프 탭이고 막대가 앞 노드 이름이다(노드 고르기도 push 다).
+  3. 각 뒤로가기 뒤 `graph-canvas` 의 `data-layout-pending` 이 `false` 다. 그래프 탭이 다시 보일 때 크기를 다시 쟀다는 근거다.
+  4. `goForward()` 를 두 번 하면 다시 상세 탭이다.
 
 ## 검증
 

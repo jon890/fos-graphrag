@@ -39,7 +39,7 @@
 ### 2. `ReviewTab.tsx`
 
 - `ReviewSection` 의 `pageNo` 를 props 로 받는다(`page`, `onPage`). `ReviewTab` 이 `parseReviewQuery` 로 읽어 구역 1(또는 열람자 목록)에 `page`, 구역 2 에 `minePage` 를 넘기고, 바꾸면 `navigate('/review' + reviewSearch({...}), { replace: true })` 다.
-- 「마지막 쪽을 다 처리해 빈 쪽이 되면 앞 쪽으로 간다」 는 지금 동작은 그대로 두고, 앞 쪽으로 갈 때도 주소를 replace 로 바꾼다.
+- 「마지막 쪽을 다 처리해 빈 쪽이 되면 앞 쪽으로 간다」 는 지금 동작(`ReviewTab.tsx` 의 `p.items.length === 0 && pageNo > 0` 이면 `pageNo - 1`)을 바꾼다. 받은 응답의 `totalPages` 로 끝 쪽(`max(totalPages - 1, 0)`)을 구해 한 번에 그 쪽으로 replace 한다. `/review?page=999` 처럼 열었을 때 빈 쪽마다 요청이 쌓이지 않게 하려는 것이다. 목록과 이력의 쪽 번호도 같은 방식으로 끝 쪽을 넘으면 끝 쪽으로 replace 한다(`docs/flow.md`).
 
 ### 3. `ChangesTab.tsx`
 
@@ -49,13 +49,13 @@
 ### 4. 이 phase 를 검증하는 테스트
 
 - `financial-workbench/web/src/components/tabs.test.tsx` 에 정적 렌더 테스트를 더한다.
-  - `withApp(<ListTab onOpen={() => {}} />, testOntology, undefined, '/list?type=Company&q=abc&archived=1')` 이면 타입 select 의 값이 `Company`, 검색 입력 값이 `abc`, 보관 포함이 체크돼 있다. testid 는 `financial-workbench/web/TESTIDS.md` 「목록 탭」 에서 읽는다.
+  - `withApp(<ListTab onOpen={() => {}} />, testOntology, undefined, '/list?type=Company&q=abc&archived=1')` 이면 타입 select 안에 `<option value="Company" selected=""` 가 있고(정적 렌더는 고른 값을 `selected` 속성으로 낸다), 검색 입력에 `value="abc"`, 보관 포함에 `checked=""` 가 있다. testid 는 `financial-workbench/web/TESTIDS.md` 「목록 탭」 에서 읽는다.
   - `withApp(<ChangesTab … />, …, '/changes?actor=a%40example.com')` 이면 `changes-actor-filter` 의 값이 `a@example.com` 이다. 사용자 목록은 비동기로 읽으므로 선택지가 없을 때의 값 단언이 어렵다면, 이 단언은 브라우저 테스트로 옮기고 그 사실을 커밋 메시지에 적는다.
 - `financial-workbench/web/e2e/workbench.spec.ts` 에 `6d) 목록과 이력에서 항목을 열었다가 뒤로가기로 돌아오면 조건이 그대로다` 를 `6c)` 다음에 더한다.
   1. `pageA` 로 `tab-list` 에서 타입을 기업으로 고르고 `data.supplier` 를 검색한다. 주소에 `type=Company` 와 `q=` 가 있다.
   2. `list-row`(`hasText: data.supplier`)를 눌러 상세를 연다. 주소가 `/workspace?node=` 다.
   3. `pageA.goBack()` 하면 주소가 1의 주소이고 타입 select 와 검색 입력 값이 그대로이며 `list-row` 가 보인다.
-  4. `tab-changes` 에서 `changes-actor-filter` 를 편집자 A 의 이메일로 고른다. 주소에 `actor=` 가 있다. 첫 `change-row` 의 대상 이름 단추를 눌러 항목을 연 뒤 `goBack()` 하면 `changes-actor-filter` 값이 그대로다.
+  4. `tab-changes` 에서 `changes-actor-filter` 를 편집자 A 의 이메일로 고른다. 주소에 `actor=` 가 있다. 첫 `change-row` 의 대상 이름 단추(행 안 「대상 이름」 칸의 `button`. testid 가 없으므로 `row.locator('td').nth(4).locator('button')` 처럼 칸 순서로 찾고, 칸 순서는 `ChangesTab.tsx` 의 표 머리에서 확인한다)를 눌러 항목을 연 뒤 `goBack()` 하면 `changes-actor-filter` 값이 그대로다.
   5. 쪽 넘기기가 기록을 쌓지 않는지는 쪽이 둘 이상일 때만 본다. 데이터가 한 쪽이면 건너뛴다(`if`).
   - 각 `goBack()` 뒤에는 목록이 다시 읽힐 때까지 기다린 뒤 단언한다.
 

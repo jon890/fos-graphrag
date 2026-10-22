@@ -16,7 +16,7 @@
 - 결정과 경로, query 이름은 `financial-workbench/docs/adr/007-routes-in-url.md` 와 `financial-workbench/docs/flow.md` 의 「주소와 뒤로가기」 절(표 셋)이 소유한다. 이 phase 의 코드는 그 표를 그대로 따른다.
 - 서버
   - 정적 파일은 `container` 프로필에서 `spring.web.resources.static-locations: file:/app/static/`(`financial-workbench/api/src/main/resources/application.yaml`)다. 그 밖의 프로필은 Spring 기본 위치(`classpath:/static/` 등)다. 지금 `/` 는 정적 `index.html` 로 열린다.
-  - 정적 파일이 없는 경로는 `web/ApiErrorController.kt` 가 `404` 와 `{"code":"NOT_FOUND"}` 로 답한다.
+  - 정적 파일이 없는 경로는 `web/GlobalExceptionHandler.kt` 가 `NoResourceFoundException` 을 받아 `404` 와 `{"code":"NOT_FOUND"}` 로 답한다. 익명 `GET /api/**` 는 그 전에 `SecurityConfig` 의 `hasRole("VIEWER")` 에 막혀 `401 UNAUTHENTICATED` 다.
   - `config/SecurityConfig.kt` 는 `/api/**` 밖의 요청을 `anyRequest().permitAll()` 로 열고, Google 로그인을 마치면 `.defaultSuccessUrl("/", true)` 로 `/` 에 돌려보낸다.
   - 통합 테스트(`support/IntegrationTest.kt`)는 `mockoidc` 프로필이라 `container` 의 정적 위치를 쓰지 않는다. `financial-workbench/api/src/test/resources/` 는 아직 없다.
 - 웹
@@ -60,17 +60,18 @@ class SpaRouteController {
 }
 ```
 
-- 목록 밖 경로와 `/api/**` 는 지금처럼 `ApiErrorController` 가 답한다.
+- 목록 밖 경로와 `/api/**` 는 지금처럼 답한다(404 는 `GlobalExceptionHandler`, 익명 `/api/**` 는 401).
 - 테스트용 정적 파일 `financial-workbench/api/src/test/resources/static/index.html` 을 만든다. 내용은 `<!doctype html><title>workbench-test-index</title>` 한 줄이다. 다른 통합 테스트가 `/` 의 응답 본문을 단언하는지 `git grep -n '"/"' -- financial-workbench/api/src/test` 로 확인하고, 있으면 함께 고친다.
 - 테스트 `financial-workbench/api/src/test/kotlin/dev/fos/workbench/web/SpaRouteIntegrationTest.kt` 신규(`IntegrationTest` 상속, 로그인 없이 `anonymous()`):
-  - `GET /changes?target=x` 와 `GET /users` 가 `200` 이고 본문에 `workbench-test-index` 가 있다.
-  - `GET /nope` 과 `GET /api/nope` 이 `404` 이고 `code` 가 `NOT_FOUND` 다.
-  - `ApiClient` 가 HTML 본문을 읽지 못하면 이 테스트만 `java.net.http.HttpClient` 로 직접 부른다.
+  - `support/ApiClient` 는 JSON 본문만 읽고 `Accept: application/json` 을 보내므로, 화면 경로는 처음부터 `java.net.http.HttpClient` 로 직접 부른다(`Accept: text/html`).
+  - 익명 `GET /changes?target=x` 와 `GET /users` 가 `200` 이고 본문에 `workbench-test-index` 가 있다.
+  - 익명 `GET /nope` 은 `404` 이고 `code` 가 `NOT_FOUND` 다.
+  - `loggedIn(VIEWER)` 의 `GET /api/nope` 은 `404`, `NOT_FOUND` 다. 익명 `GET /api/nope` 은 `401` 이다.
 
 ### 2. 의존과 시작점
 
 - `financial-workbench/web` 에서 `npm install --save-exact react-router@8.4.0` 로 `package.json` 과 `package-lock.json` 을 고친다.
-- `main.tsx` 에서 `<App />` 을 `<BrowserRouter>` 로 감싼다(`ErrorBoundary` 안쪽).
+- `main.tsx` 에서 `<App />` 을 `<BrowserRouter useTransitions={false}>` 로 감싼다(`ErrorBoundary` 안쪽). 8.4.0 의 `BrowserRouter` 는 이 prop 이 `false` 가 아니면 주소 갱신을 `React.startTransition` 으로 감싼다(`dist/production/lib/dom/lib.js`). 그러면 `navigate` 와 같은 콜백에서 바꾼 일반 상태(예: 노드를 만든 뒤의 `setFlash`)가 옛 주소로 먼저 그려져, `Workspace` 의 「다른 노드를 고르면 안내를 지운다」 effect 가 성공 안내를 지운다. 주소 갱신과 상태 변경을 한 번에 그리려고 끈다. `MemoryRouter` 에도 같은 prop 이 있으면 테스트에서도 끈다.
 - 컴포넌트 테스트(`renderToStaticMarkup`)가 `useNavigate` 같은 router 훅을 쓰는 부품을 그리면 router 밖이라 실패한다. `financial-workbench/web/src/components/testSupport.tsx` 의 `withApp(children, ontology = testOntology, user = editor)` 를 `withApp(children, ontology = testOntology, user = editor, initialPath = '/workspace')` 로 바꾸고 `<MemoryRouter initialEntries={[initialPath]}>` 로 함께 감싼다.
 
 ### 3. 순수 함수 `financial-workbench/web/src/routes.ts` 신규
@@ -102,7 +103,9 @@ export function legacyRedirect(pathname: string, search: string): string | null 
 export function isSafeReturnTo(path: string): boolean
 ```
 
-- query 이름과 기본값은 flow.md 의 표 그대로다. `types` 는 쉼표로 잇고, 비거나 없으면 `null`(전체)이다. 숫자가 아니거나 범위 밖인 `hops`, `page` 는 기본값으로 읽는다. 모르는 `pane` 값은 `null` 이다.
+- query 이름과 기본값은 flow.md 의 표 그대로다. `types` 는 쉼표로 잇고, 비거나 없으면 `null`(전체)이다. `hops` 는 1 이나 2 만 받는다(화면 선택지와 서버 `workbench.graph.max-hops` 가 2 다). `page`, `minePage` 는 0 이상의 정수만 받는다. 그 밖의 값은 기본값으로 읽는다. 모르는 `pane` 값은 `null` 이다.
+- query 문자열은 `URLSearchParams.toString()`(공백을 `+` 로 바꾼다)이 아니라 키마다 `encodeURIComponent` 로 만든다. 공백은 `%20` 이다. 읽을 때는 `URLSearchParams` 로 읽는다.
+- `isSafeReturnTo` 는 `?` 앞의 경로 부분이 `TAB_PATHS` 의 값 가운데 하나와 정확히 같을 때만 참이다.
 - `routes.ts` 는 React 와 router 를 import 하지 않는다.
 
 ### 4. 링크 `financial-workbench/web/src/lib/links.ts`
@@ -114,8 +117,10 @@ export function isSafeReturnTo(path: string): boolean
 ### 5. `App.tsx` 를 경로로
 
 - `tab` 상태를 지우고 `const tab = tabOfPath(useLocation().pathname)` 로 읽는다.
-- 인증 확인 `useEffect` 맨 앞: `legacyRedirect(pathname, search)` 가 있으면 그 주소를, 없으면 지금 `pathname + search` 를 `rememberReturnTo` 한다(로그인 화면을 보이기 전이라 두 경우 모두 잃지 않는다). `me()` 성공 콜백에서 `takeReturnTo()` 를 `returnToRef` 에 둔다. `window.history.replaceState` 로 query 를 지우는 지금 코드는 지운다(`login=denied` 는 `LoginView` 로 가는 경우라 로그인 성공 때는 없다).
-- 온톨로지를 받는 콜백에서 `setOntology(o)` 와 함께 `navigate(returnToRef.current ?? currentLegacyOrPath, { replace: true })` 를 부른다. 여기서 반영해야 `Workspace` 가 `node` 가 있는 상태로 처음 그려진다(좁은 화면의 첫 탭). 지금 `pendingNodeRef` 처리를 이것으로 바꾼다.
+- 인증 확인 `useEffect` 맨 앞: `legacyRedirect(pathname, search)` 가 있으면 그 주소를, 없으면 지금 `pathname + search` 를 `rememberReturnTo` 한다(로그인 화면을 보이기 전이라 두 경우 모두 잃지 않는다). `me()` 성공 콜백에서 `const back = takeReturnTo(); if (back) returnToRef.current = back` 으로 둔다. 지금 코드의 StrictMode 보호(`if (pending) pendingNodeRef.current = pending`)와 같은 이유다. 개발 모드에서 콜백이 두 번 돌아도 둘째가 첫 값을 `null` 로 덮지 않는다.
+- 세션이 끝나 로그인 화면으로 가는 경로(`setUnauthorizedHandler` 의 콜백)에서도 그 순간의 `pathname + search` 를 `rememberReturnTo` 한다. `window.history.replaceState` 로 query 를 지우는 지금 코드는 지운다(`login=denied` 는 `LoginView` 로 가는 경우라 로그인 성공 때는 없다).
+- 온톨로지를 받는 콜백에서 `setOntology(o)` 와 함께, `returnToRef.current` 가 있을 때만 `navigateRef.current(returnToRef.current, { replace: true })` 를 부르고 `returnToRef.current = null` 로 비운다. `useTransitions={false}` 라 두 변경이 한 번에 그려져 `Workspace` 가 `node` 가 있는 상태로 처음 그려진다(좁은 화면의 첫 탭). 지금 `pendingNodeRef` 처리를 이것으로 바꾼다.
+- 이 effect 의 의존성은 `[signedIn]` 하나다. `useNavigate()` 가 돌려주는 함수는 경로가 바뀔 때마다 새로 만들어지므로(`useNavigateUnstable` 의 deps 에 `locationPathname`), `const navigateRef = useRef(navigate); navigateRef.current = navigate` 로 들고 쓴다. 의존성에 `navigate` 나 그것을 쓰는 함수를 넣으면 탭을 옮길 때마다 온톨로지를 다시 받는다.
 - 로그인한 뒤의 경로 판정은 한 곳(`useEffect` 하나 또는 렌더 중 `<Navigate replace>`)에서 한다.
   - `tab` 이 `null`(모르는 경로, `/` 포함)이면 `legacyRedirect` 결과나 `/workspace` 로 바꾼다.
   - `users` 인데 ADMIN 이 아니면 `/workspace` 로 바꾼다.
@@ -123,10 +128,10 @@ export function isSafeReturnTo(path: string): boolean
 - 탭 단추는 `navigate(lastUrlOf[key] ?? TAB_PATHS[key])` 다(push). `lastUrlOf` 는 `useRef<Partial<Record<TabKey, string>>>` 이고, 경로가 바뀔 때마다 그 탭의 `pathname + search` 를 적는다. 지금 보고 있는 탭을 다시 누르면 아무것도 하지 않는다.
 - `selectedId`, `centerId` 상태를 지우고 `/workspace` 의 query 에서 읽는다(`parseWorkspaceQuery(location.search)` 의 `node`, `center ?? node`).
 - `focusNode(id)` 는 `navigate('/workspace' + workspaceSearch({ ...current, node: id, center: null, pane: 'detail' }))`(push) 뒤 `focusSeq` 를 올린다. `current` 는 지금 주소가 `/workspace` 면 그 query, 아니면 `lastUrlOf.workspace` 의 query, 그것도 없으면 기본값이다. 이렇게 하면 다른 탭에서 항목을 열어도 작업 공간의 검색 조건이 남는다. 같은 주소면 `replace: true` 로 부른다.
-- `Workspace` 의 `onSelect={setSelectedId}` 를 `onSelect={(id) => navigate(workspace 주소에서 node 만 id 로 바꾼 주소)}`(push)로 바꾼다. 이 phase 에서 `center` 와 `pane` 은 그대로 둔다. `pane` 은 phase 02 가 다룬다.
+- `Workspace` 의 `onSelect={setSelectedId}` 를 `onSelect={(id) => navigate('/workspace' + workspaceSearch({ ...q, node: id, center: q.center ?? q.node }))}`(push)로 바꾼다. `center` 가 비어 있으면 지금 `node` 가 중심이었으므로 그것을 `center` 로 남겨, 상세만 바뀌고 그래프 중심은 그대로 둔다(`Workspace.tsx` 의 `onSelect` 주석 「상세만 바꾼다」). 이 `onSelect` 는 그래프 노드, 「그래프에 나온 항목」, 상세 안의 관계와 주장 카드 이름, 「주장 열기」 안내가 함께 쓴다. `pane` 은 그대로 둔다. `pane` 은 phase 02 가 다룬다.
 - `openNode(id)` 는 `focusNode(id)` 와 같다(탭 이동이 주소에 들어 있다). `openHistory(id)` 는 `navigate('/changes' + changesSearch({ target: id, actor: '', page: 0 }))` 다.
 - `ChangesTab` 에는 `targetId={parseChangesQuery(location.search).target}` 과 `onTargetIdChange={(id) => navigate('/changes' + changesSearch({ ...q, target: id, page: 0 }), { replace: true })}` 를 넘긴다. `changesTargetId` 상태를 지운다.
-- `logout` 은 `navigate('/workspace', { replace: true })` 뒤 지금처럼 상태를 비운다.
+- `logout` 은 지금의 `focusNode(null)` 과 `setTab('workspace')` 를 지우고 `navigate('/workspace', { replace: true })` 를 부른 뒤, 온톨로지와 인증 상태를 지금처럼 비운다.
 
 ### 6. 이 phase 를 검증하는 테스트
 
@@ -135,12 +140,15 @@ export function isSafeReturnTo(path: string): boolean
   - `workspaceSearch` 는 기본값이면 `''`, `{ node: 'a', pane: 'detail', hops: 2, types: ['Company','Security'] }` 이면 표 순서의 query 다. `parseWorkspaceQuery(workspaceSearch(x))` 가 `x` 로 돌아온다(왕복). `hops=abc`, `pane=zzz` 는 기본값과 `null` 이다.
   - 목록, 검토, 이력도 왕복과 기본값 생략을 하나씩 본다.
   - `legacyRedirect('/', '?node=a%20b')` 는 `/workspace?node=a%20b&pane=detail`, `legacyRedirect('/workspace', '?node=a')` 와 `legacyRedirect('/', '')` 는 `null` 이다.
-  - `isSafeReturnTo` 는 `/changes?target=x` 가 참이고 `//evil.example`, `https://x`, `/nope`, `''` 는 거짓이다.
+  - `isSafeReturnTo` 는 `/changes?target=x` 와 `/workspace` 가 참이고 `//evil.example`, `https://x`, `/nope`, `/workspacefoo`, `''` 는 거짓이다.
+  - `parseWorkspaceQuery('?hops=3')` 의 `hops` 는 1, `parseListQuery('?page=-1')` 의 `page` 는 0 이다. `workspaceSearch({ ...기본값, q: 'a b' })` 는 `?q=a%20b` 다.
 - `financial-workbench/web/src/lib/links.test.ts`: `nodeLink` 기대값을 `/workspace?node=` 로 바꾸고, pending 테스트를 `rememberReturnTo`/`takeReturnTo` 로 바꾼다. 안전하지 않은 주소는 저장하지 않는 경우를 더한다.
 - `financial-workbench/web/src/components/tabs.test.tsx`, `screens.test.tsx`, `ChangesTab.test.tsx` 가 `withApp` 의 `MemoryRouter` 로 그대로 통과하는지 돌린다. 실패하면 감싸기만 고친다.
 - 브라우저 테스트
-  - `financial-workbench/web/e2e/workbench.spec.ts` 에 `0f) 상단 탭은 경로를 바꾸고 뒤로가기로 앞 탭에 돌아온다` 를 더한다. `pageAdmin` 으로 `tab-list` 를 누르면 주소가 `/list` 이고, `tab-changes` 를 누르면 `/changes` 다. `page.goBack()` 하면 주소가 `/list` 이고 `tab-list` 가 `aria-selected="true"` 다. `page.reload()` 해도 `/list` 와 목록 탭이다. `page.goto('/nope')` 은 `/workspace` 로 바뀐다(`toHaveURL(/\/workspace$/)`).
+  - `financial-workbench/web/e2e/workbench.spec.ts` 의 `0e)` 다음에 `0f) 상단 탭은 경로를 바꾸고 뒤로가기로 앞 탭에 돌아온다` 를 더한다. `pageAdmin` 으로 `tab-list` 를 누르면 주소가 `/\/list(\?|$)/` 에 맞고, `tab-changes` 를 누르면 `/\/changes(\?|$)/` 에 맞는다(phase 03 뒤에는 탭이 마지막 query 를 기억하므로 정확히 같은지로 보지 않는다). `pageAdmin.goBack()` 하면 주소가 목록이고 `tab-list` 가 `aria-selected="true"` 다. `reload()` 해도 목록 탭이다. `pageAdmin.goto('/')` 는 `/workspace` 로 바뀐다.
+  - `1)` 에서 편집자 A 가 로그인한 직후 `pageA.goto('/users')` 하면 `/workspace` 로 바뀐다(ADMIN 이 아니다).
   - `3b)` 의 기대값을 바꾼다. `loginAs(..., '/?node=' + supplyClaimId)` 로 옛 링크를 그대로 쓰고, 로그인한 뒤 주소가 `/workspace?node=${supplyClaimId}&pane=detail` 이다. 같은 테스트에서 새 형식 `/workspace?node=…` 로 한 번 더 로그인해 같은 상세가 열리는지 본다(새 context).
+  - `6c)` 의 4단계(`workbench.spec.ts` 에서 `pageA.goto('/?node=' + supplyClaimId)` 뒤 `expect(pageA).not.toHaveURL(/node=/)`)를 `toHaveURL(new RegExp('/workspace\\?node=' + supplyClaimId))` 로 바꾼다.
   - `financial-workbench/web/e2e/mobile.spec.ts` 끝 단계의 `expect(page).not.toHaveURL(/node=/)` 를 `toHaveURL(new RegExp('/workspace\\?node=' + id))` 로 바꾼다. `workspace-tab-detail` 단언은 그대로다.
   - `CopyLinkButton` 의 대체 입력칸 값이 `/workspace?node=` 를 담는지 `3)` 의 `review-mine-copy-link-fallback` 이 보일 때만 단언한다(클립보드가 되면 건너뛴다).
 
