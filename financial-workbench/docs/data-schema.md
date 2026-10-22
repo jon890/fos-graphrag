@@ -3,7 +3,7 @@
 ## 온톨로지와 지식 데이터
 
 온톨로지는 타입, 속성, 관계의 정의다. `ontology/financial-ontology.yaml` 에 있고 Git 으로 관리한다.
-지식 데이터는 그 정의를 따르는 개별 기업, 종목, 주장이다. Neo4j 에 있다.
+지식 데이터는 그 정의를 따르는 개별 기업, 종목, 인물, 개념, 주장이다. Neo4j 에 있다.
 
 API 는 시작할 때 온톨로지 파일을 읽고, 모든 쓰기를 그 정의로 검증한다.
 Neo4j 는 온톨로지 규칙을 집행하지 않는다. 아래 제약 조건은 유일성과 조회 속도만 맡는다.
@@ -42,9 +42,12 @@ Neo4j 는 온톨로지 규칙을 집행하지 않는다. 아래 제약 조건은
 | --- | --- | --- |
 | `nodeTypes.<타입>` | `hintProperties` | 이름 옆에 함께 보일 속성 목록. 검색 결과, 고르기 후보, 같은 이름 경고에서 같은 이름의 항목을 구분하게 한다. 화면은 이 속성들의 표시 값과 만든 날을 ` · ` 로 잇는다. 없으면 만든 날만 보인다 |
 | `relationshipTypes.<관계>` | `createPicker.label`, `createPicker.description` | 끝(`to`) 타입을 만드는 폼에 시작(`from`) 노드를 고르는 칸을 더한다. 고르지 않아도 만들 수 있다. 고르면 노드를 만든 뒤 이 관계를 이어서 만든다 |
+| `nodeTypes.<타입>` | `display.color`, `display.shape` | 그래프 노드, 타입 배지, 범례의 색(`#rrggbb`)과 그래프 노드 모양(`ellipse`, `round-rectangle`, `hexagon`, `round-diamond`, `round-tag`, `round-pentagon` 가운데 하나). 없으면 화면이 타입 이름으로 고른 색과 원을 쓴다 |
+| `nodeTypes.<타입>` | `searchProperties` | 검색어(`searchText`)에 이름과 함께 넣을 속성. 영문 이름처럼 다른 표기로도 찾게 한다. Security 의 `ticker` 는 지금처럼 늘 들어간다 |
 
-- `hintProperties` 는 그 타입의 속성이어야 한다. 로더가 시작할 때 확인한다.
-- 지금 `createPicker` 가 있는 관계는 `ISSUES` 하나다. 종목 만들기 폼에 「발행 기업」 칸이 생긴다.
+- `hintProperties`, `searchProperties` 는 그 타입의 속성이어야 한다. `display.color` 는 `#` 과 16진수 여섯 자리, `display.shape` 는 위 목록 가운데 하나여야 한다. 로더가 시작할 때 확인한다.
+- `createPicker` 가 있는 관계는 `ISSUES`(종목 폼의 「발행 기업」)와 `AUTHORED`(근거 문서 폼의 「저자」)다.
+- `searchProperties` 를 바꾸면 이미 저장된 노드의 `searchText` 는 그 노드를 다음에 고칠 때 새 규칙으로 바뀐다. 바로 맞추려면 「초기 데이터」 와 같은 시작 작업이 필요하다. 이번에는 새 타입에만 쓰므로 기존 노드에 영향이 없다.
 
 ### 예전 값 정리
 
@@ -98,7 +101,7 @@ API 는 시작할 때, 스키마 초기화가 끝난 뒤 `valueAliases` 가 있�
 | `archivedAt` | String | 보관 시각. 복원하면 지운다 |
 | `createdAt`, `updatedAt` | String | UTC ISO 시각 |
 | `createdBy`, `updatedBy` | String | `:User` 의 `id` |
-| `searchText` | String | `label` 과 `ticker` 를 소문자로 이은 값. 검색용 |
+| `searchText` | String | `label`, Security 의 `ticker`, 그 타입의 `searchProperties` 값을 공백으로 이어 소문자로 만든 값. 검색용 |
 
 Claim 만 더 가지는 시스템 속성이 있다.
 
@@ -118,12 +121,16 @@ Claim 만 더 가지는 시스템 속성이 있다.
 | Security | `market`, `ticker`, `name` | `securityType`, `currency` |
 | Sector | `name` | `scheme`, `code` |
 | Document | `title`, `url`, `collectedAt` | `publisher`, `documentType`, `publishedAt` |
+| Person | `name` | `englishName`, `role`, `country`, `birthYear`, `deathYear`, `description` |
+| Concept | `name`, `summary` | `englishName`, `category`, `description` |
 | Claim | `predicate`, `description`, `evidenceText`, `authoringMethod` | `validFrom`, `validTo`, `extractionConfidence` |
 
 Company 의 `country` 와 Security 의 `currency` 는 목록에서 고른다(enum). 선택지는 온톨로지 파일이 정한다. 국가는 「기타」 를 두고, 통화는 두지 않는다.
 Claim 의 `validFrom`, `validTo` 가 비어 있으면 관계의 유효 기간을 모른다는 뜻이다. 미상을 특정 날짜로 바꾸지 않는다.
 `extractionConfidence` 는 AI 추출의 확신도다. 투자 성공 확률과 다르고 첫 버전에서는 AI 추출을 하지 않아 비어 있다.
 자료 공개 시점은 Document 의 `publishedAt`, 수집 시점은 `collectedAt` 이다.
+Document 의 `documentType` 에 책(`BOOK`), 서한(`LETTER`), 강연과 인터뷰(`SPEECH`)가 있다. 책과 서한은 출판사나 원문 페이지 주소를 `url` 에 넣는다.
+Person 은 투자자, 경영자, 학자 같은 인물이다. `role` 은 목록에서 고르고 `birthYear`, `deathYear` 는 정수다. Concept 는 안전마진, 경제적 해자 같은 투자 개념과 원칙이다. `summary` 는 한 줄 정의(300자 이하), `category` 는 목록에서 고른다.
 
 ## 관계
 
@@ -133,12 +140,27 @@ Claim 의 `validFrom`, `validTo` 가 비어 있으면 관계의 유효 기간을
 | 관계 | 시작 | 끝 | 만드는 곳 |
 | --- | --- | --- | --- |
 | `ISSUES` | Company | Security | 관계 API |
+| `AUTHORED` | Person | Document | 관계 API |
+| `RELATED_TO` | Concept | Concept | 관계 API |
 | `SUBJECT` | Claim | predicate 의 `subjectTypes` | Claim API |
 | `OBJECT` | Claim | predicate 의 `objectTypes` | Claim API |
 | `SUPPORTED_BY` | Claim | Document | Claim API |
 
 공급 관계나 산업 분류처럼 근거가 필요한 금융 주장은 기업 사이의 선 하나로 저장하지 않는다.
 Claim 노드 하나와 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 관계로 저장한다. 주장마다 근거와 검토 상태가 붙는다.
+거장의 생각도 같은 방식이다. 「버핏 → 안전마진 강조한다」 처럼 인물(주체)과 개념(대상)을 잇는 Claim(`ADVOCATES`, `CRITICIZES`)을 만들고, 짧은 인용은 `evidenceText`, 출처인 책이나 서한은 근거 문서다. 저작과 저자는 `AUTHORED` 로 잇는다. `RELATED_TO` 는 개념 사이의 식별 관계라 근거가 필요 없다.
+
+### 초기 데이터
+
+`ontology/seeds/*.yaml` 은 처음 넣을 노드와 관계다. API 는 시작할 때, 예전 값 정리 다음에 아직 적용하지 않은 파일을 적용한다.
+
+- 파일마다 `key` 가 있고, 적용하면 `(:SeedRun {key, appliedAt})` 를 남긴다. 같은 `key` 는 다시 적용하지 않는다. 그래서 초기 데이터로 만든 노드를 사람이 보관하거나 이름을 바꿔도 되살아나지 않는다.
+- 노드는 `NodeService` 와 같은 검증과 이력으로 만든다. 작업자는 `system` 이다. 같은 타입에 같은 이름(앞뒤 공백과 대소문자를 무시하고 비교)의 보관되지 않은 노드가 이미 있으면 만들지 않고 그 노드를 쓴다.
+- 관계는 파일 안의 `ref` 로 끝을 찾는다. 끝을 찾지 못하거나 같은 타입, 같은 끝의 보관되지 않은 관계가 이미 있으면 만들지 않고 넘어간다. 그래서 새 파일이 앞 파일의 노드와 관계를 다시 적어도 된다.
+- 파일을 읽지 못하면(문법 오류, 알 수 없는 키) 그 파일만 건너뛰고 파일 이름으로 `warn` 로그를 남긴다. 같은 `key` 가 여러 파일에 있으면 파일 이름 순서로 처음 것만 적용하고 나머지는 `warn` 로그로 남긴다.
+- 한 파일은 트랜잭션 하나로 적용한다. 실패하면 그 파일 전체가 롤백되고 `SeedRun` 도 남지 않아 다음 시작 때 다시 시도한다. 실패해도 API 는 시작한다. 초기 데이터는 없어도 쓸 수 있기 때문이다.
+- 끄려면 `workbench.seeds.enabled=false` 다. 기본은 켜짐이다.
+- 첫 파일은 `investing-basics-2026-10` 이다. 인물 다섯(워런 버핏, 벤저민 그레이엄, 찰리 멍거, 피터 린치, 필립 피셔), 개념 다섯(안전마진, 경제적 해자, 내재가치, 미스터 마켓, 능력 범위)과 개념 사이 `RELATED_TO` 를 담는다. 인용과 주장은 담지 않는다. 사람이 출처를 확인하고 만든다.
 
 ## 사용자
 
@@ -161,7 +183,7 @@ Claim 노드 하나와 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 관계로 저장한�
 - `changes` 는 `{속성: {before, after}}` 를 JSON 문자열로 저장한다. Neo4j 속성이 중첩 객체를 받지 않기 때문이다.
 - ChangeEvent 는 대상과 관계로 잇지 않고 `targetId` 로만 가리킨다. 그래프 조회 결과에 이력이 섞이지 않는다.
 - 이력을 지우거나 고치는 API 는 없다. 복원도 새 ChangeEvent 를 만든다.
-- 서버가 스스로 남긴 이력의 `actorId` 는 `system` 이다. 첫 관리자 생성과 예전 값 정리가 여기 해당한다. 화면은 「시스템」 으로 보인다.
+- 서버가 스스로 남긴 이력의 `actorId` 는 `system` 이다. 첫 관리자 생성, 예전 값 정리, 초기 데이터 적용이 여기 해당한다. 화면은 「시스템」 으로 보인다.
 
 ## 제약 조건과 인덱스
 
@@ -177,6 +199,7 @@ API 가 시작할 때, 웹 서버가 요청을 받기 전에 `IF NOT EXISTS` 로
 | `change_event_id_unique` | `(:ChangeEvent).id` 유일 | 이력 ID |
 | `change_event_target` | `(:ChangeEvent).targetId` 인덱스 | 대상별 이력 조회 |
 | `change_event_at` | `(:ChangeEvent).at` 인덱스 | 최근 이력 조회 |
+| `seed_run_key_unique` | `(:SeedRun).key` 유일 | 초기 데이터 파일을 한 번만 적용한다. `:SeedRun` 은 `:Knowledge` 가 아니라 검색과 그래프에 나오지 않는다 |
 | `knowledge_search_text` | `(:Knowledge).searchText` TEXT 인덱스 | 검색어 `CONTAINS`. 첫 버전의 RANGE 인덱스가 있으면 시작할 때 지우고 TEXT 로 다시 만든다 |
 | `rel_<타입>_id` | 관계 타입마다 `()-[r:<타입>]-()` 의 `r.id` 인덱스 | 관계 보관, 복원, 조회. 타입은 온톨로지의 관계와 Claim 관계 전부다 |
 

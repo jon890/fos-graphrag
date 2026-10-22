@@ -33,7 +33,7 @@ class AuthIntegrationTest : IntegrationTest() {
         assertThat(me.body["role"].asString()).isEqualTo("EDITOR")
         assertThat(me.body.has("googleSub")).isFalse()
         val ontology = client.get("/api/ontology").body
-        assertThat(ontology["schemaVersion"].asString()).isEqualTo("1.3.0")
+        assertThat(ontology["schemaVersion"].asString()).isEqualTo("1.4.0")
         // 만들기 폼과 고르기 후보가 쓰는 정보, 예전 값 별칭도 같은 응답에 실린다
         assertThat(ontology["nodeTypes"]["Company"]["hintProperties"][0].asString()).isEqualTo("country")
         assertThat(ontology["relationshipTypes"]["ISSUES"]["createPicker"]["label"].asString()).isEqualTo("발행 기업")

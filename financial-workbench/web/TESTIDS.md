@@ -139,7 +139,7 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 
 ## 노드 고르기(NodePicker)
 
-접두사 `<p>` 는 `relationship-target-picker`, `claim-subject-picker`, `claim-object-picker`, `claim-doc-picker`, `create-link-ISSUES-picker` 가운데 하나다.
+접두사 `<p>` 는 `relationship-target-picker`, `claim-subject-picker`, `claim-object-picker`, `claim-doc-picker`, `create-link-ISSUES-picker`, `create-link-AUTHORED-picker`(근거 문서 폼의 「저자」) 가운데 하나다.
 
 | testid | 요소 |
 | --- | --- |

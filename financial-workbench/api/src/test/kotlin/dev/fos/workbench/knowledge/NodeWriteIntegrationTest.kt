@@ -6,6 +6,7 @@ import dev.fos.workbench.support.id
 import dev.fos.workbench.support.revision
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import java.net.URLEncoder
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -180,6 +181,20 @@ class NodeWriteIntegrationTest : IntegrationTest() {
         val items = alice.get("/api/changes?targetId=${company.id}").body["items"]
         assertThat(items.toList().map { it["action"].asString() }).containsExactly("RESTORE", "ARCHIVE", "CREATE")
         assertThat(items[1]["note"].asString()).isEqualTo("중복 등록")
+    }
+
+    @Test
+    fun `인물은 영문 이름으로도 찾는다`() {
+        val alice = loggedIn(ALICE)
+        val fx = Fixtures(alice)
+        val person = fx.node("Person", mapOf("name" to "가상인물-${fx.suffix}", "englishName" to "Virtual Investor ${fx.suffix}"))
+        val query = URLEncoder.encode("investor ${fx.suffix}".lowercase(), Charsets.UTF_8)
+        fun found() = alice.get("/api/nodes?q=$query&types=Person").body["items"].toList().map { it.id }
+        assertThat(found()).contains(person.id)
+
+        val renamed = alice.patch("/api/nodes/${person.id}", mapOf("expectedRevision" to 1, "properties" to mapOf("name" to "가상인물-개명-${fx.suffix}")))
+        assertThat(renamed.status).isEqualTo(200)
+        assertThat(found()).contains(person.id)
     }
 
     @Test

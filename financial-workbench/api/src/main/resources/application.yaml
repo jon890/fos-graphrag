@@ -56,6 +56,8 @@ workbench:
   bootstrap:
     admin-email: ${WORKBENCH_BOOTSTRAP_ADMIN_EMAIL:}
     admin-name: ${WORKBENCH_BOOTSTRAP_ADMIN_NAME:관리자}
+  seeds:
+    enabled: ${WORKBENCH_SEEDS_ENABLED:true}
 
 logging:
   level:

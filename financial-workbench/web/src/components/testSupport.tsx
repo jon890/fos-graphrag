@@ -12,6 +12,7 @@ export const testOntology: Ontology = {
       description: '기업',
       labelProperty: 'name',
       hintProperties: ['country'],
+      display: { color: '#2563eb', shape: 'ellipse' },
       properties: {
         name: { type: 'string', label: '기업 이름', required: true, description: '기업의 공식 이름. 예: 삼성전자' },
         country: {

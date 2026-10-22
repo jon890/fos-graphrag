@@ -72,11 +72,11 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 
 | 패키지 | 책임 |
 | --- | --- |
-| `config` | 설정 속성(`WorkbenchProperties`), Spring Security, Neo4j 제약 조건 생성. 시작 순서(`Neo4jSchemaInitializer`: 제약 조건, 예전 값 정리, 첫 관리자) |
+| `config` | 설정 속성(`WorkbenchProperties`), Spring Security, Neo4j 제약 조건 생성. 시작 순서(`Neo4jSchemaInitializer`: 제약 조건, 예전 값 정리, 초기 데이터, 첫 관리자) |
 | `ontology` | YAML 읽기(`OntologyLoader`), 모델(`Ontology`), 쓰기 검증(`OntologyValidator`) |
 | `auth` | `:User` 저장소, Google OIDC 허용 목록 검사(`AllowlistOidcUserService`), 요청마다 역할을 다시 읽는 필터, 첫 관리자 생성 |
 | `users` | ADMIN 의 허용 사용자 관리 API |
-| `knowledge` | 노드, 관계, Claim 의 서비스와 컨트롤러. revision 잠금과 갱신. 시작할 때 목록 밖 enum 값을 고치는 `LegacyValueCleanup` |
+| `knowledge` | 노드, 관계, Claim 의 서비스와 컨트롤러. revision 잠금과 갱신. 시작할 때 목록 밖 enum 값을 고치는 `LegacyValueCleanup`, 초기 데이터를 넣는 `SeedLoader` |
 | `graph` | 주변 그래프 조회와 한도 적용 |
 | `history` | ChangeEvent 기록(`ChangeEventRecorder`)과 이력 조회 |
 | `web` | 오류 형식(`ApiError`), 예외 처리기, health, 화면 경로(`/workspace` 등)의 GET 을 `index.html` 로 넘기는 `SpaRouteController` |
@@ -108,6 +108,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `workbench.security.hsts` | `WORKBENCH_HSTS` | `false` | 앞단이 HSTS 를 붙이지 않을 때만 켠다 |
 | `server.tomcat.remoteip.internal-proxies` | `WORKBENCH_TRUSTED_PROXIES` | loopback 과 `172.16.0.0/12` | X-Forwarded-* 를 믿을 프록시 주소(정규식) |
 | `workbench.detail.max-relationships`, `max-claims` | | 100, 50 | 노드 상세 목록 상한 |
+| `workbench.seeds.enabled` | `WORKBENCH_SEEDS_ENABLED` | `true` | 시작할 때 `ontology/seeds/*.yaml` 을 적용한다. `docs/data-schema.md` 「초기 데이터」 |
 | `workbench.bootstrap.admin-email` | `WORKBENCH_BOOTSTRAP_ADMIN_EMAIL` | 없음 | 사용자가 없을 때 만들 첫 ADMIN |
 | `spring.security.oauth2.client.registration.google.client-id`, `client-secret` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 없음 | 운영 프로필에서 비어 있으면 시작에 실패한다 |
 
@@ -206,6 +207,9 @@ ADR 로 남기지 않은 작은 결정은 다음과 같다.
 - 검토 대기를 「내가 검토할 주장」 과 「내가 쓰거나 고친 주장」 으로 나누는 일은 서버가 한다(2026-10-21 사용자 결정). 화면이 받은 쪽 안에서 나누면 한 쪽에 두 종류가 섞이고, 마지막 내용 수정자 규칙은 화면이 알 수 없다. `GET /api/claims` 의 `scope` 가 자기 검토 금지 규칙과 같은 조건(`createdBy`, `contentUpdatedBy`)으로 나눈다.
 - 변경 이력의 노드 ID 는 읽을 때 이름으로 바꾼다(2026-10-21 사용자 결정). 쓸 때 이름을 저장하는 안은 그때의 이름이 남지만 이미 쌓인 이력은 ID 그대로라 버렸다. `ChangeController` 가 자기 쿼리로 이름을 읽는다. `history` 가 `knowledge` 를 부르지 않는다는 호출 방향을 지키기 위해서다. 바꾸는 ID 는 Claim 이 아닌 노드(주체, 대상, 근거 문서, 관계의 끝)라 `Ontology.labelOf` 로 충분하다.
 - 화면 상태는 경로와 query 로 주소에 두고 React Router 로 다룬다([ADR-007](adr/007-routes-in-url.md)). 처음 링크를 만들 때는 router 를 들이지 않고 `/?node=` 만 썼으나, 뒤로가기와 새로고침을 고치면서 바꿨다(2026-10-22 사용자 결정).
+- 거장의 생각은 새 인용 타입 없이 Claim 과 Document 로 담는다(2026-10-23 사용자 결정). 인용을 따로 두면 검토, 근거, 이력, 그래프 접기를 다시 만들어야 한다.
+- 노드 타입의 색과 모양(`display`), 검색에 넣을 속성(`searchProperties`)을 온톨로지 YAML 이 소유한다. 타입이 늘어도 웹 코드에 타입 이름을 적지 않기 위해서다. 다음에 온톨로지를 웹에서 편집하게 되면 이 값도 함께 편집된다.
+- 초기 데이터는 `ontology/seeds/*.yaml` 을 시작 때 `system` 작업자로 한 번만 적용한다. 로그인이 Google 로만 되어 바깥 스크립트가 API 를 부를 수 없고, 이력 없이 데이터를 넣지 않기 위해서다.
 - 반응형 경계는 1024px 하나다. 768px 에 두 칸 배치를 더하는 안은 검사할 배치가 늘어나는 데 비해 두 사람이 쓰는 도구에서 얻는 것이 작아 버렸다.
 
 - 작성자와 마지막으로 내용을 고친 사람은 그 Claim 을 검토할 수 없다. 다른 사람이 확인하는 것이 검토의 목적이다.

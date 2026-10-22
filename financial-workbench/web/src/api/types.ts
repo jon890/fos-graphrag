@@ -200,6 +200,12 @@ export interface PropertyDef {
   valueAliases?: Record<string, string[]>
 }
 
+/** 그래프 노드와 배지의 표시. shape 는 Cytoscape 노드 모양 이름이다 */
+export interface NodeDisplayDef {
+  color?: string | null
+  shape?: string | null
+}
+
 export interface NodeTypeDef {
   label?: string
   description: string
@@ -207,6 +213,9 @@ export interface NodeTypeDef {
   managedBy?: string
   /** 이름 옆에 함께 보일 속성. 같은 이름의 항목을 구분하게 한다 */
   hintProperties?: string[]
+  /** 검색이 이름 말고 함께 보는 속성 */
+  searchProperties?: string[]
+  display?: NodeDisplayDef | null
   properties: Record<string, PropertyDef>
 }
 

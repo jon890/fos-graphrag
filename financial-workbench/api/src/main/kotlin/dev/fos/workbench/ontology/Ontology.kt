@@ -55,7 +55,23 @@ data class NodeTypeDef(
     val properties: Map<String, PropertyDef>,
     /** 검색 결과와 고르기 후보에서 이름 옆에 함께 보일 속성 */
     val hintProperties: List<String> = emptyList(),
+    /** 검색어에 이름과 함께 넣을 속성 */
+    val searchProperties: List<String> = emptyList(),
+    /** 그래프와 배지의 색, 모양 */
+    val display: NodeDisplayDef? = null,
 )
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
+data class NodeDisplayDef(
+    /** #rrggbb */
+    val color: String? = null,
+    /** [SHAPES] 가운데 하나 */
+    val shape: String? = null,
+) {
+    companion object {
+        val SHAPES = setOf("ellipse", "round-rectangle", "hexagon", "round-diamond", "round-tag", "round-pentagon")
+    }
+}
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class PropertyDef(

@@ -45,7 +45,7 @@ class OntologyLabelsTest {
         val market = ontology.nodeTypes.getValue("Security").properties.getValue("market")
         assertThat(market.values).containsExactly("KRX_KOSPI", "KRX_KOSDAQ", "NASDAQ", "NYSE", "OTHER")
         assertThat(market.valueLabels).containsEntry("KRX_KOSPI", "코스피").containsEntry("KRX_KOSDAQ", "코스닥")
-        assertThat(ontology.claimPredicates.keys).containsExactly("SUPPLIES_TO", "BELONGS_TO_SECTOR", "COMPETES_WITH", "HAS_EXPOSURE_TO")
+        assertThat(ontology.claimPredicates.keys).containsExactly("SUPPLIES_TO", "BELONGS_TO_SECTOR", "COMPETES_WITH", "HAS_EXPOSURE_TO", "ADVOCATES", "CRITICIZES")
         val country = ontology.nodeTypes.getValue("Company").properties.getValue("country")
         assertThat(country.type).isEqualTo(PropertyType.ENUM)
         assertThat(country.values).containsExactly("KR", "US", "JP", "CN", "TW", "HK", "NL", "DE", "GB", "FR", "OTHER")
@@ -134,6 +134,22 @@ class OntologyLabelsTest {
         val o = OntologyLoader.load(minimal("{ type: string }").byteInputStream())
         assertThat(o.nodeTypes.getValue("Company").label).isNull()
         assertThat(o.reviewStatuses).isEmpty()
+    }
+
+    @Test
+    fun `모든 노드 타입에 색과 모양이 있다`() {
+        assertThat(ontology.nodeTypes.keys).hasSize(7)
+        val missing = ontology.nodeTypes.filterValues { it.display?.color.isNullOrBlank() || it.display?.shape.isNullOrBlank() }.keys
+        assertThat(missing).describedAs("색이나 모양이 없는 노드 타입").isEmpty()
+    }
+
+    @Test
+    fun `색과 모양, 검색 속성이 잘못되면 읽지 않는다`() {
+        listOf("display: { color: red }", "display: { shape: star }", "searchProperties: [nope]").forEach { extra ->
+            val yaml = minimal("{ type: string }").replace("    labelProperty: name\n", "    labelProperty: name\n    $extra\n")
+            assertThatThrownBy { OntologyLoader.load(yaml.byteInputStream()) }
+                .describedAs(extra).isInstanceOf(IllegalArgumentException::class.java)
+        }
     }
 
     private fun minimal(nameProperty: String) = """
