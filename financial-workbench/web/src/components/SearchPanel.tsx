@@ -30,6 +30,8 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
   const { ontology, canEdit } = useApp()
   const labels = useLabels()
   const [qInput, setQInput] = useState(filters.q)
+  // 뒤로가기로 주소의 검색어가 바뀌면 입력칸도 따라간다.
+  useEffect(() => setQInput(filters.q), [filters.q])
   const [pageNo, setPageNo] = useState(0)
   const [result, setResult] = useState<Page<NodeView> | null>(null)
   const [loading, setLoading] = useState(false)

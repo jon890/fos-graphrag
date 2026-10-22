@@ -9,6 +9,7 @@ import { PropertyFields } from './PropertyFields'
 import { SearchPanel } from './SearchPanel'
 import { StatusBadge, TypeBadge } from './TypeBadge'
 import { WelcomeGuide } from './WelcomeGuide'
+import { Workspace } from './Workspace'
 import { testOntology, withApp } from './testSupport'
 
 // 「Person」 은 화면 코드에 없는 타입이다. 온톨로지에만 있어도 화면이 따라오는지 본다.
@@ -176,5 +177,20 @@ describe('ReviewControls 의 자기 검토 안내', () => {
     expect(html).not.toContain('self-review-hint')
     expect(html).not.toContain('self-review-copy-link')
     expect(html).not.toMatch(/<button[^>]*data-testid="review-approve"[^>]*disabled/)
+  })
+})
+
+describe('주소의 검색 조건', () => {
+  it('작업 공간은 주소의 q 와 archived 로 검색 입력칸과 보관 포함을 채운다', () => {
+    const html = renderToStaticMarkup(
+      withApp(
+        <Workspace centerId={null} focusSeq={0} selectedId={null} onFocus={() => {}} onSelect={() => {}} onOpenHistory={() => {}} />,
+        testOntology,
+        undefined,
+        '/workspace?q=abc&archived=1',
+      ),
+    )
+    expect(html).toMatch(/<input[^>]*data-testid="search-input"[^>]*value="abc"/)
+    expect(html).toMatch(/<input[^>]*data-testid="filter-include-archived"[^>]*checked=""/)
   })
 })
