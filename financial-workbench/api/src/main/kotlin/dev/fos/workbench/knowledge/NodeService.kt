@@ -128,7 +128,8 @@ class NodeService(
     }
 
     private fun searchText(type: String, props: Map<String, Any?>): String =
-        listOfNotNull(ontology.labelOf(type, props), props["ticker"]).joinToString(" ").lowercase()
+        (listOfNotNull(ontology.labelOf(type, props), props["ticker"]) +
+            ontology.requireNodeType(type).searchProperties.mapNotNull { props[it] }).joinToString(" ").lowercase()
 
     companion object {
         const val CLAIMS = "claims"

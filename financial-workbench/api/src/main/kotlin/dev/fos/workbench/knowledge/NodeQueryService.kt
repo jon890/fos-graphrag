@@ -54,7 +54,7 @@ class NodeQueryService(
         )
     }
 
-    /** label 과 ticker 를 소문자로 이은 searchText 에서 부분 일치로 찾는다. 보관된 노드는 기본으로 뺀다. */
+    /** label, ticker, 타입의 searchProperties 를 소문자로 이은 searchText 에서 부분 일치로 찾는다. 보관된 노드는 기본으로 뺀다. */
     @Transactional(readOnly = true)
     @Suppress("UNCHECKED_CAST")
     fun search(q: String?, types: List<String>?, reviewStatus: String?, includeArchived: Boolean, page: PageQuery): Page<NodeView> {

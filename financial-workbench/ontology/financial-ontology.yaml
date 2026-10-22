@@ -9,11 +9,13 @@
 # - description: 입력칸 바로 아래에 보이는 도움말. 개발 용어 없이 쓴다.
 # - valueAliases: enum 속성의 예전 표기. API 가 시작할 때 목록 밖 값을 이 표를 보고 고친다. docs/data-schema.md 의 「예전 값 정리」.
 # - hintProperties: 검색 결과와 고르기 후보에서 이름 옆에 함께 보일 속성.
+# - display: 그래프와 배지의 색(#rrggbb)과 모양(cytoscape 도형 이름).
+# - searchProperties: 이름과 함께 검색어에 넣을 속성.
 # - createPicker: 끝(to) 타입 만들기 폼에 시작(from) 노드를 고르는 칸을 더한다.
 # YAML 흐름 표기({ ... }) 안에서는 쉼표와 콜론이 값을 끊는다. 쉼표나 콜론이 든 문장은 반드시 따옴표로 감싼다.
 # API 는 알 수 없는 키가 있으면 시작을 멈춘다. 쉼표로 잘린 값이나 오타를 시작할 때 잡기 위해서다.
 
-schemaVersion: "1.3.0"
+schemaVersion: "1.4.0"
 
 nodeTypes:
   Company:
@@ -21,6 +23,7 @@ nodeTypes:
     description: 기업. 상장 여부와 무관한 법인이다.
     labelProperty: name
     hintProperties: [country]
+    display: { color: "#2563eb", shape: ellipse }
     properties:
       name: { type: string, label: 기업 이름, required: true, maxLength: 200, description: "기업의 공식 이름. 예: 삼성전자" }
       country:
@@ -60,6 +63,7 @@ nodeTypes:
     description: 거래되는 종목. 같은 기업의 여러 상장과 동명이종목을 시장과 종목 코드로 구분한다.
     labelProperty: name
     hintProperties: [market, ticker]
+    display: { color: "#0d9488", shape: ellipse }
     properties:
       market:
         type: enum
@@ -107,6 +111,7 @@ nodeTypes:
     description: 산업 분류.
     labelProperty: name
     hintProperties: [scheme, code]
+    display: { color: "#9333ea", shape: hexagon }
     properties:
       name: { type: string, label: 산업 이름, required: true, maxLength: 200, description: "산업의 이름. 예: 반도체" }
       scheme: { type: string, label: 분류 체계, required: false, maxLength: 64, description: "산업을 나눈 기준의 이름. 예: GICS, KSIC" }
@@ -117,6 +122,7 @@ nodeTypes:
     description: 주장의 근거가 되는 자료. 서버가 주소를 읽어 오지 않는다. 사람이 자료의 정보를 직접 등록한다.
     labelProperty: title
     hintProperties: [publisher, publishedAt]
+    display: { color: "#d97706", shape: round-rectangle }
     properties:
       title: { type: string, label: 제목, required: true, maxLength: 300, description: 자료의 제목 }
       url: { type: url, label: 주소, required: true, maxLength: 2000, description: "자료 주소. https:// 를 빼고 적으면 저장할 때 붙인다" }
@@ -125,19 +131,79 @@ nodeTypes:
         type: enum
         label: 자료 종류
         required: false
-        values: [FILING, NEWS, REPORT, IR, OTHER]
-        valueLabels: { FILING: 공시, NEWS: 뉴스, REPORT: 보고서, IR: IR 자료, OTHER: 기타 }
+        values: [FILING, NEWS, REPORT, IR, BOOK, LETTER, SPEECH, OTHER]
+        valueLabels: { FILING: 공시, NEWS: 뉴스, REPORT: 보고서, IR: IR 자료, BOOK: 책, LETTER: 서한, SPEECH: 강연과 인터뷰, OTHER: 기타 }
         description: 자료의 성격
       publishedAt: { type: date, label: 공개일, required: false, description: 자료가 공개된 날. 모르면 비워 둔다 }
       collectedAt: { type: datetime, label: 수집 시각, required: true, description: 이 자료를 확인한 시각 }
+
+  Person:
+    label: 인물
+    description: 투자자, 경영자, 경제학자 같은 인물이다.
+    labelProperty: name
+    hintProperties: [role, country]
+    searchProperties: [englishName]
+    display: { color: "#db2777", shape: round-tag }
+    properties:
+      name: { type: string, label: 이름, required: true, maxLength: 200, description: "인물의 이름. 예: 워런 버핏" }
+      englishName: { type: string, label: 영문 이름, required: false, maxLength: 200, description: "영문 이름. 검색에 쓴다. 예: Warren Buffett" }
+      role:
+        type: enum
+        label: 구분
+        required: false
+        values: [INVESTOR, EXECUTIVE, ECONOMIST, OTHER]
+        valueLabels: { INVESTOR: 투자자, EXECUTIVE: 경영자, ECONOMIST: 경제학자, OTHER: 기타 }
+        description: 인물이 주로 한 일
+      country:
+        type: enum
+        label: 국가
+        required: false
+        values: [KR, US, JP, CN, TW, HK, NL, DE, GB, FR, OTHER]
+        valueLabels:
+          KR: 대한민국 (KR)
+          US: 미국 (US)
+          JP: 일본 (JP)
+          CN: 중국 (CN)
+          TW: 대만 (TW)
+          HK: 홍콩 (HK)
+          NL: 네덜란드 (NL)
+          DE: 독일 (DE)
+          GB: 영국 (GB)
+          FR: 프랑스 (FR)
+          OTHER: 기타
+        description: 주로 활동한 나라
+      birthYear: { type: integer, label: 태어난 해, required: false, min: 1000, max: 2100, description: "태어난 해. 예: 1930" }
+      deathYear: { type: integer, label: 세상을 떠난 해, required: false, min: 1000, max: 2100, description: 살아 있으면 비워 둔다 }
+      description: { type: text, label: 소개, required: false, maxLength: 4000, description: 인물을 소개하는 글 }
+
+  Concept:
+    label: 개념
+    description: 안전마진, 경제적 해자 같은 투자 개념과 원칙이다.
+    labelProperty: name
+    hintProperties: [category]
+    searchProperties: [englishName]
+    display: { color: "#475569", shape: round-pentagon }
+    properties:
+      name: { type: string, label: 개념 이름, required: true, maxLength: 200, description: "개념의 이름. 예: 안전마진" }
+      englishName: { type: string, label: 영문 이름, required: false, maxLength: 200, description: "영문 이름. 검색에 쓴다. 예: Margin of Safety" }
+      category:
+        type: enum
+        label: 분류
+        required: false
+        values: [VALUATION, BUSINESS, RISK, BEHAVIOR, STRATEGY, OTHER]
+        valueLabels: { VALUATION: 가치 평가, BUSINESS: 사업의 질, RISK: 위험 관리, BEHAVIOR: 투자 심리, STRATEGY: 투자 방식, OTHER: 기타 }
+        description: 개념이 다루는 영역
+      summary: { type: string, label: 한 줄 정의, required: true, maxLength: 300, description: 개념을 한 문장으로 정의한다 }
+      description: { type: text, label: 설명, required: false, maxLength: 4000, description: 더 자세한 설명 }
 
   Claim:
     label: 주장
     description: 자료나 사람이 내놓은 주장. 근거 문서와 함께 등록하고 다른 편집자가 검토한다.
     labelProperty: predicate
     managedBy: claims
+    display: { color: "#dc2626", shape: round-diamond }
     properties:
-      predicate: { type: enum, label: 관계 종류, required: true, values: [SUPPLIES_TO, BELONGS_TO_SECTOR, COMPETES_WITH, HAS_EXPOSURE_TO], description: 주장이 말하는 관계의 종류 }
+      predicate: { type: enum, label: 관계 종류, required: true, values: [SUPPLIES_TO, BELONGS_TO_SECTOR, COMPETES_WITH, HAS_EXPOSURE_TO, ADVOCATES, CRITICIZES], description: 주장이 말하는 관계의 종류 }
       description: { type: text, label: 설명, required: true, maxLength: 4000, description: 주장을 한두 문장으로 풀어 쓴 글 }
       evidenceText: { type: text, label: 근거 문장, required: true, maxLength: 4000, description: 근거 문서에서 그대로 옮긴 문장 }
       validFrom: { type: date, label: 시작일, required: false, description: 관계가 시작된 날. 모르면 비워 두고 미상으로 표시한다 }
@@ -158,6 +224,17 @@ relationshipTypes:
     from: [Company]
     to: [Security]
     createPicker: { label: 발행 기업, description: "이 종목을 발행한 기업. 고르면 종목을 만든 뒤 발행 관계를 함께 만든다. 몰라도 비워 둘 수 있다" }
+  AUTHORED:
+    label: 썼다
+    description: 인물이 책, 서한, 강연 같은 자료를 썼다.
+    from: [Person]
+    to: [Document]
+    createPicker: { label: 저자, description: "이 자료를 쓴 인물. 고르면 자료를 만든 뒤 「썼다」 관계를 함께 만든다" }
+  RELATED_TO:
+    label: 관련된다
+    description: 두 개념이 서로 관련된다. 근거가 필요 없는 식별 관계다.
+    from: [Concept]
+    to: [Concept]
 
 # Claim 과 대상 노드를 잇는 관계다. Claim API 가 만들고 일반 관계 API 로는 만들 수 없다.
 claimRelationships:
@@ -190,6 +267,18 @@ claimPredicates:
     description: 주체의 실적이 대상의 변화에 영향을 받는다.
     subjectTypes: [Company, Security]
     objectTypes: [Company, Security, Sector]
+  ADVOCATES:
+    label: 강조한다
+    sentence: "{subject}이(가) {object}을(를) 강조한다"
+    description: 인물이 개념이나 원칙을 강조한다. 짧은 인용과 출처를 근거로 붙인다.
+    subjectTypes: [Person]
+    objectTypes: [Concept]
+  CRITICIZES:
+    label: 비판한다
+    sentence: "{subject}이(가) {object}을(를) 비판한다"
+    description: 인물이 개념이나 관행을 비판한다.
+    subjectTypes: [Person]
+    objectTypes: [Concept]
 
 # Claim 검토 상태. 값은 서버가 정하고, 여기서는 화면에 보일 이름만 정한다.
 reviewStatuses:

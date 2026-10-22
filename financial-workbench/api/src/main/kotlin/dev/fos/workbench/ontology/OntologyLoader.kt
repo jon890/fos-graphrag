@@ -11,6 +11,7 @@ import java.io.InputStream
 
 object OntologyLoader {
     const val RESOURCE = "financial-ontology.yaml"
+    private val HEX_COLOR = Regex("^#[0-9a-fA-F]{6}$")
 
     /** API 가 직접 쓰는 노드 속성 이름. 온톨로지가 이 이름을 정의하면 사용자가 시스템 값을 덮어쓸 수 있어 시작을 막는다. */
     val RESERVED_PROPERTIES = setOf(
@@ -59,6 +60,10 @@ object OntologyLoader {
             require(reserved.isEmpty()) { "$name 이 시스템 속성 이름을 사용자 속성으로 정의한다: $reserved" }
             val strayHints = def.hintProperties.filterNot { it in def.properties }
             require(strayHints.isEmpty()) { "$name 의 hintProperties 가 속성에 없는 이름을 가리킨다: $strayHints" }
+            val straySearch = def.searchProperties.filterNot { it in def.properties }
+            require(straySearch.isEmpty()) { "$name 의 searchProperties 가 속성에 없는 이름을 가리킨다: $straySearch" }
+            def.display?.color?.let { require(HEX_COLOR.matches(it)) { "$name 의 display.color 는 #rrggbb 형식이어야 한다: $it" } }
+            def.display?.shape?.let { require(it in NodeDisplayDef.SHAPES) { "$name 의 display.shape 는 ${NodeDisplayDef.SHAPES} 가운데 하나여야 한다: $it" } }
             def.properties.forEach { (prop, p) ->
                 require(p.type != PropertyType.ENUM || !p.values.isNullOrEmpty()) { "$name.$prop enum 에 values 가 없다" }
                 val stray = p.valueLabels.orEmpty().keys.filterNot { it in p.values.orEmpty() }

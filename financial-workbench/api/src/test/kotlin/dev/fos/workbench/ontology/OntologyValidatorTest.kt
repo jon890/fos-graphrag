@@ -67,8 +67,8 @@ class OntologyValidatorTest {
 
     @Test
     fun `온톨로지 파일이 스스로 일관되다`() {
-        assertThat(ontology.schemaVersion).isEqualTo("1.3.0")
-        assertThat(ontology.nodeTypes.keys).containsExactlyInAnyOrder("Company", "Security", "Sector", "Document", "Claim")
+        assertThat(ontology.schemaVersion).isEqualTo("1.4.0")
+        assertThat(ontology.nodeTypes.keys).containsExactlyInAnyOrder("Company", "Security", "Sector", "Document", "Person", "Concept", "Claim")
         assertThat(ontology.requirePredicate("SUPPLIES_TO").subjectTypes).containsExactly("Company")
         assertThatThrownBy { ontology.requireRelationshipType("OWNS_ACCOUNT") }.isInstanceOf(OntologyViolationException::class.java)
     }
@@ -95,5 +95,11 @@ class OntologyValidatorTest {
     }
 
     @Suppress("UNCHECKED_CAST")
+    @Test
+    fun `인물의 연도는 정수 범위를 검사한다`() {
+        assertThatThrownBy { validator.validateCreate("Person", mapOf("name" to "x", "birthYear" to 999)) }
+            .isInstanceOf(ValidationFailedException::class.java)
+    }
+
     private fun fieldErrors(e: ValidationFailedException) = e.details["fieldErrors"] as Map<String, String>
 }
