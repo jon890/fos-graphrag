@@ -690,6 +690,50 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await shot(pageA, '06c-changes-names')
   })
 
+  test('6d) 목록과 이력에서 항목을 열었다가 뒤로가기로 돌아오면 조건이 그대로다', async () => {
+    await pageA.getByTestId('tab-list').click()
+    await pageA.getByTestId('list-type-filter').selectOption('Company')
+    await pageA.getByTestId('list-search-input').fill(data.supplier)
+    await pageA.getByTestId('list-search-submit').click()
+    await expect(pageA).toHaveURL(/type=Company/)
+    await expect(pageA).toHaveURL(/q=/)
+    const listUrl = pageA.url()
+    const listRow = pageA.getByTestId('list-row').filter({ hasText: data.supplier })
+    await expect(listRow).toHaveCount(1)
+    await listRow.click()
+    await expect(pageA).toHaveURL(/\/workspace\?node=/)
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
+    await pageA.goBack()
+    await expect(pageA).toHaveURL(listUrl)
+    await expect(pageA.getByTestId('list-type-filter')).toHaveValue('Company')
+    await expect(pageA.getByTestId('list-search-input')).toHaveValue(data.supplier)
+    await expect(pageA.getByTestId('list-row').filter({ hasText: data.supplier })).toHaveCount(1)
+    await shot(pageA, '06d-list-back')
+
+    await pageA.getByTestId('tab-changes').click()
+    await expect(pageA.getByTestId('changes-tab')).toBeVisible()
+    await pageA.getByTestId('changes-actor-filter').selectOption({ value: editorA.email })
+    await expect(pageA).toHaveURL(/actor=/)
+    const targetButton = pageA.locator('[data-testid="change-row"] td:nth-child(5) button').first()
+    await expect(targetButton).toBeVisible()
+    await targetButton.click()
+    await expect(pageA).toHaveURL(/\/workspace\?node=/)
+    await pageA.goBack()
+    await expect(pageA).toHaveURL(/\/changes/)
+    await expect(pageA.getByTestId('changes-actor-filter')).toHaveValue(editorA.email)
+    await expect(pageA.getByTestId('change-row').first()).toBeVisible()
+    await shot(pageA, '06d-changes-back')
+
+    // 쪽을 넘겨도 기록이 쌓이지 않는다. 쪽이 둘 이상일 때만 본다.
+    const next = pageA.getByTestId('changes-pager-next')
+    if (await next.isEnabled()) {
+      await next.click()
+      await expect(pageA).toHaveURL(/page=1/)
+      await pageA.goBack()
+      await expect(pageA).toHaveURL(/\/workspace\?node=/)
+    }
+  })
+
   test('6b) 유일한 근거 문서를 보관하려 하면 해당 주장을 여는 버튼이 나온다', async () => {
     await searchAndOpen(pageA, data.docTitle)
     await pageA.getByTestId('node-archive-button').click()
