@@ -214,7 +214,7 @@ revision 은 그대로이고 ChangeEvent 도 만들지 않는다. `expectedRevis
 | POST | `/api/nodes/{id}/archive` | 보관. 본문 `{"expectedRevision","reason"}`. `reason` 은 선택. 응답 `NodeView` |
 | POST | `/api/nodes/{id}/restore` | 복원. 본문 `{"expectedRevision"}`. 응답 `NodeView` |
 
-- `q` 는 `label` 과 Security 의 `ticker` 에서 대소문자를 무시하고 부분 일치로 찾는다. 100자까지다. 비우면 전체를 돌려준다.
+- `q` 는 `label`, Security 의 `ticker`, 그 타입의 `searchProperties` 값(예: 인물과 개념의 `englishName`)에서 대소문자를 무시하고 부분 일치로 찾는다. 100자까지다. 비우면 전체를 돌려준다.
 - `POST /api/nodes` 의 `type` 은 `Company`, `Security`, `Sector`, `Document` 가운데 하나다. `Claim` 은 `400 ONTOLOGY_VIOLATION` 이고 `/api/claims` 로 만든다.
 - `PATCH` 로 Claim 을 고치면 `400 ONTOLOGY_VIOLATION` 이다. `PATCH /api/claims/{id}` 를 쓴다.
 - `relationships` 는 만든 순서로 100개, `claims` 는 오래된 순서로 50개까지 담는다. 넘으면 잘라 내고 `...Truncated` 를 `true` 로 둔다.

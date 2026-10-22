@@ -48,6 +48,7 @@ services:
       WORKBENCH_SECURE_COOKIE: "${WORKBENCH_SECURE_COOKIE:-true}"
       WORKBENCH_FORWARD_HEADERS_STRATEGY: "${WORKBENCH_FORWARD_HEADERS_STRATEGY:-native}"
       WORKBENCH_SESSION_TIMEOUT: "${WORKBENCH_SESSION_TIMEOUT:-8h}"
+      WORKBENCH_SEEDS_ENABLED: "${WORKBENCH_SEEDS_ENABLED:-true}"
       WORKBENCH_HSTS: "${WORKBENCH_HSTS:-false}"
       # 비어 있으면 loopback 과 Docker 브리지 대역(172.16.0.0/12)을 믿는다. API 설정의 기본값과 같다.
       # 이 기본값은 WORKBENCH_BIND 가 loopback 일 때만 안전하다. 아래 두 값으로 API 가 시작할 때 확인한다

@@ -1,6 +1,6 @@
 # 금융 온톨로지 워크벤치
 
-두 사람이 금융 지식(기업, 종목, 산업, 근거 문서, 주장)을 Neo4j 에 저장하고 웹에서 함께 탐색, 추가, 수정, 검토하는 도구다.
+두 사람이 금융 지식(기업, 종목, 산업, 근거 문서, 인물, 개념, 주장)을 Neo4j 에 저장하고 웹에서 함께 탐색, 추가, 수정, 검토하는 도구다.
 근거가 있는 지식그래프를 사람이 관리하는 첫 마일스톤이다. GraphRAG 검색이나 자동매매는 아직 없다.
 
 ## 구성
@@ -8,6 +8,7 @@
 | 경로 | 내용 |
 | --- | --- |
 | `ontology/financial-ontology.yaml` | 온톨로지 정의. 타입, 속성, 관계, Claim predicate, 스키마 버전 |
+| `ontology/seeds/` | 시작할 때 한 번 넣는 초기 데이터. key 마다 한 번만 적용한다 |
 | `api/` | Kotlin, Spring Boot 4.1, Neo4jClient. Google 로그인과 역할, 검증, 변경 이력, 조회 제한 |
 | `web/` | React, TypeScript, Vite, Cytoscape.js |
 | `compose.yml` | 운영 Compose. Neo4j 포트를 호스트에 열지 않는다 |
