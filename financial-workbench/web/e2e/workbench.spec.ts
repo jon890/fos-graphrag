@@ -540,6 +540,42 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(canvas).toHaveAttribute('data-collapsed-claims', '1')
   })
 
+  test('4b) 작업 공간에서 뒤로가기는 앞 항목으로 돌아가고 검색 조건은 남는다', async () => {
+    await pageA.getByTestId('tab-workspace').click()
+    await pageA.getByTestId('search-input').fill(data.supplier)
+    await pageA.getByTestId('search-submit').click()
+    await searchResult(pageA, data.supplier).click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
+    await expect(pageA).toHaveURL(/node=/)
+    await expect(pageA).toHaveURL(/q=/)
+
+    // 「그래프에 나온 항목」 에서 고객사를 열면 상세만 바뀐다.
+    const customerItem = pageA.locator('[data-testid="graph-node"][data-node-type="Company"]').filter({ hasText: data.customer })
+    await customerItem.getByRole('button').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.customer)
+    await pageA.goBack()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
+    await expect(pageA.getByTestId('search-input')).toHaveValue(data.supplier)
+
+    // 다른 탭에 갔다 뒤로가기로 돌아와도 검색 조건과 열어 둔 항목이 그대로다.
+    await pageA.getByTestId('tab-list').click()
+    await expect(pageA).toHaveURL(/\/list(\?|$)/)
+    await pageA.goBack()
+    await expect(pageA.getByTestId('tab-workspace')).toHaveAttribute('aria-selected', 'true')
+    await expect(pageA.getByTestId('search-input')).toHaveValue(data.supplier)
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
+
+    // 홉 수는 주소만 바꾸고 기록을 쌓지 않는다. 고객사를 연 뒤 홉을 바꿔도 뒤로가기 한 번이면 공급사다.
+    await customerItem.getByRole('button').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.customer)
+    await pageA.getByTestId('graph-hops').selectOption('2')
+    await expect(pageA).toHaveURL(/hops=2/)
+    await pageA.goBack()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
+    await expect(pageA).not.toHaveURL(/hops=/)
+    await shot(pageA, '04b-back-to-supplier')
+  })
+
   test('5) 같은 노드를 동시에 고치면 나중 저장은 409 안내 뒤 최신 값을 보이고, 내 입력을 골라 다시 적용해 저장한다', async () => {
     await searchAndOpen(pageA, data.customer)
     await searchAndOpen(pageB, data.customer)
