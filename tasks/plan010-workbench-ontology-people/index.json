@@ -1,0 +1,13 @@
+{
+  "name": "plan010-workbench-ontology-people",
+  "description": "인물과 개념, 저작으로 온톨로지를 넓혀 거장의 생각을 주장과 근거 문서로 담고, 타입의 색과 모양과 검색 속성을 온톨로지로 옮기며, 인물과 개념 초기 데이터를 시작 때 한 번 넣는다",
+  "status": "pending",
+  "created_at": "2026-10-23",
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "title": "온톨로지 확장과 표시, 검색 속성", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "title": "초기 데이터 적용", "execution_profile": "standard" },
+    { "number": 3, "file": "phase-03.md", "title": "화면의 타입 표시와 거장의 생각 흐름", "execution_profile": "standard" }
+  ]
+}
