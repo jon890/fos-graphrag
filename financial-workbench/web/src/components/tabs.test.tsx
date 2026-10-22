@@ -138,3 +138,18 @@ describe('머리글 밖 탭의 첫 렌더', () => {
     expect(html).not.toContain('data-table')
   })
 })
+
+describe('주소의 조건', () => {
+  it('ListTab 은 주소의 type, q, archived 로 필터를 채운다', () => {
+    const html = renderToStaticMarkup(withApp(<ListTab onOpen={() => {}} />, testOntology, undefined, '/list?type=Company&q=abc&archived=1'))
+    expect(html).toContain('<option value="Company" selected=""')
+    expect(html).toMatch(/<input[^>]*data-testid="list-search-input"[^>]*value="abc"/)
+    expect(html).toMatch(/<input[^>]*data-testid="list-include-archived"[^>]*checked=""/)
+  })
+
+  it('주소에 조건이 없으면 모든 종류에 보관 제외다', () => {
+    const html = renderToStaticMarkup(withApp(<ListTab onOpen={() => {}} />, testOntology, undefined, '/list'))
+    expect(html).toContain('<option value="" selected="">모든 종류</option>')
+    expect(html).not.toMatch(/data-testid="list-include-archived"[^>]*checked/)
+  })
+})

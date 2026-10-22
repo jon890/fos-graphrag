@@ -28,9 +28,67 @@ sequenceDiagram
 로그인한 뒤에도 API 는 요청마다 사용자 상태와 역할을 다시 읽는다.
 관리자가 사용자를 비활성화하면 그 사용자의 다음 요청은 `401` 이고 세션이 지워진다.
 
-### 링크로 항목 열기
+## 주소와 뒤로가기
 
-`/?node=<id>` 주소로 들어오면 작업 공간에서 그 항목의 상세를 연다. 검토를 부탁할 때 메신저로 보내는 링크다.
+화면 상태는 주소에 있다. 상단 탭은 경로, 그 탭 안의 상태는 query 다. 결정과 근거는 [ADR-007](adr/007-routes-in-url.md) 이다.
+
+| 경로 | 화면 | query |
+| --- | --- | --- |
+| `/workspace` | 작업 공간 | `node`(상세로 연 항목), `center`(그래프 중심, 없으면 `node`), `pane`(좁은 화면의 `search`, `graph`, `detail`), `q`, `types`(쉼표 구분, 전체면 뺀다), `status`(주장 검토 상태), `archived=1`(보관 포함), `hops`(1이면 뺀다), `claims=nodes`(주장을 따로 보기) |
+| `/list` | 목록 | `type`, `q`, `archived=1`, `page`(0이면 뺀다) |
+| `/review` | 검토 대기 | `page`, `minePage`(0이면 뺀다) |
+| `/changes` | 변경 이력 | `target`(대상 노드 id), `actor`(사용자 이메일), `page` |
+| `/ontology` | 온톨로지 | 없음 |
+| `/users` | 사용자(ADMIN) | 없음 |
+
+- `/` 는 `/workspace` 로 바꿔 연다. 기본값과 같은 query 는 주소에 쓰지 않는다. 그래서 처음 열면 주소가 `/workspace` 다.
+- `/` 와 권한 없는 화면 경로(`/users` 를 ADMIN 이 아닌 사람이 연 경우)는 `/workspace` 로 바꿔 연다. 바꿀 때는 기록을 쌓지 않는다. 표에 없는 경로는 서버가 `404` 로 답해 화면이 뜨지 않는다.
+- 이미 보낸 `/?node=<id>` 링크는 `/workspace?node=<id>&pane=detail` 로 바꿔 연다. 「링크 복사」 는 이제 `/workspace?node=<id>` 를 넣는다.
+- 서버는 위 여섯 경로의 GET 을 `index.html` 로 돌려준다. 그 밖의 경로는 지금처럼 `404` 다. 정적 파일과 `/api/**` 는 그대로다.
+
+### 뒤로가기 한 번으로 되돌리는 동작
+
+아래 동작은 주소를 새로 쌓는다(push). 뒤로가기를 누르면 바로 앞 화면으로 돌아간다.
+
+| 동작 | 바뀌는 주소 |
+| --- | --- |
+| 상단 탭 누르기 | 경로. 그 탭에 처음 들어가면 query 없이, 그 탭에서 마지막으로 보던 주소가 있으면 그 주소로 간다 |
+| 항목 열기(검색 결과, 그래프 노드, 「그래프에 나온 항목」, 목록, 검토 대기, 변경 이력, 관계와 주장 카드의 이름, 상세의 「그래프 중심으로」) | `/workspace?node=…`. 좁은 화면에서는 `pane` 도 함께 바뀐다. 상세만 바꾸는 열기(그래프와 상세 안에서 누른 것)는 그때의 그래프 중심을 `center` 로 남긴다 |
+| 좁은 화면의 검색, 그래프, 상세 탭 누르기, 그래프 아래 「상세 보기」 | `pane` |
+
+나머지는 주소만 바꾸고 기록을 쌓지 않는다(replace). 검색어와 필터, 홉 수, 「주장을 따로 보기」, 그래프의 「선택한 항목을 중심으로」, 쪽 넘기기, 이력의 대상과 사용자 고르기가 여기 해당한다. 새로고침과 링크에는 남는다.
+
+- 종류 필터를 모두 끄면 주소에서 `types` 가 빠져 전체로 돌아간다. 모두 끈 상태는 주소에 담지 않는다.
+- 쪽 번호가 끝 쪽을 넘으면 끝 쪽으로 바꿔 연다(replace).
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"'Noto Sans KR', sans-serif","fontSize":"14px","lineColor":"#7A8594","primaryTextColor":"#1D1F23","edgeLabelBackground":"#FFFFFF","clusterBkg":"#FAFAFA"},"flowchart":{"curve":"basis","nodeSpacing":40,"rankSpacing":60,"padding":14}}}%%
+flowchart LR
+  subgraph 사용자
+    A1[목록에서 기업 A 를 연다]
+    A2[그래프에서 기업 B 를 누른다]
+    A3[뒤로가기]
+    A4[뒤로가기]
+  end
+  subgraph 주소
+    L["/list?type=Company"]
+    WA["/workspace?node=A"]
+    WB["/workspace?node=B&amp;center=A"]
+  end
+  L --> A1 --> WA --> A2 --> WB --> A3 --> WA --> A4 --> L
+  classDef c1 fill:#E8F1FB,stroke:#3B7DD8,stroke-width:1.5px,color:#0B2545
+  classDef c2 fill:#E9F7EF,stroke:#2E9E5B,stroke-width:1.5px,color:#0E3B22
+  class A1,A2,A3,A4 c1
+  class L,WA,WB c2
+  style 사용자 fill:#F6FAFE,stroke:#3B7DD8,stroke-dasharray:4 3
+  style 주소 fill:#F5FBF7,stroke:#2E9E5B,stroke-dasharray:4 3
+```
+
+- 뒤로가기로 돌아온 화면은 주소의 상태로 다시 그린다. 검색 결과와 그래프는 다시 읽는다. 「이웃 확장」 으로 넓힌 그래프와 폼에 쓰던 입력은 주소에 없어 돌아오지 않는다.
+- 상세에서 고치던 폼에 저장하지 않은 입력이 있어도 뒤로가기를 막지 않는다. 저장하지 않은 입력은 사라진다.
+- 같은 항목을 다시 열면 주소가 같아 기록을 쌓지 않는다.
+
+### 로그인을 거치는 링크
 
 ```mermaid
 %%{init: {"theme":"base","themeVariables":{"fontFamily":"'Noto Sans KR', sans-serif","fontSize":"14px","lineColor":"#7A8594","primaryTextColor":"#1D1F23","edgeLabelBackground":"#FFFFFF","clusterBkg":"#FAFAFA"},"flowchart":{"curve":"basis","nodeSpacing":40,"rankSpacing":60,"padding":14}}}%%
@@ -41,26 +99,27 @@ flowchart TD
   end
   subgraph 화면
     Q{로그인했나}
-    S[주소의 node 를 탭 저장소에 둔다]
-    O[주소에서 node 를 지우고 그 항목을 연다]
+    S[경로와 query 를 탭 저장소에 둔다]
+    R[저장한 주소로 바꿔 연다]
+    O[그 화면을 그린다]
     E[항목을 열지 못했다는 안내]
   end
   U1 --> Q
   Q -- 예 --> O
-  Q -- 아니오 --> S --> U2 --> O
+  Q -- 아니오 --> S --> U2 --> R --> O
   O -- 없거나 볼 수 없는 항목 --> E
   classDef c1 fill:#E8F1FB,stroke:#3B7DD8,stroke-width:1.5px,color:#0B2545
   classDef c2 fill:#E9F7EF,stroke:#2E9E5B,stroke-width:1.5px,color:#0E3B22
   class U1,U2 c1
-  class Q,S,O,E c2
+  class Q,S,R,O,E c2
   style 사용자 fill:#F6FAFE,stroke:#3B7DD8,stroke-dasharray:4 3
   style 화면 fill:#F5FBF7,stroke:#2E9E5B,stroke-dasharray:4 3
 ```
 
-- Google 로그인은 `/` 로 돌아오므로 주소의 `node` 가 사라진다. 그래서 로그인하기 전에 탭 저장소(`sessionStorage`)에 두었다가 로그인한 뒤 꺼내 연다. 꺼낸 값은 지운다. 저장소를 쓸 수 없는 브라우저(사생활 보호 창 등)에서는 로그인한 뒤 첫 화면이 열린다.
-- 로그인한 상태로 링크를 열면 바로 그 항목을 연다. 주소창의 `?node=` 는 연 뒤 지운다. 새로고침해도 같은 항목을 다시 열지 않는다.
-- 화면은 로그인 확인 직후 탭 저장소의 값을 꺼내 들고 있다가, 온톨로지를 받는 순간 함께 그 항목을 고른다. 좁은 화면에서도 상세 탭으로 시작한다. 온톨로지 읽기가 실패해도 저장소에는 값이 남지 않는다.
-- 항목 상세의 「링크 복사」 와 검토 대기의 「링크 복사」 가 이 주소를 클립보드에 넣는다. 클립보드를 쓸 수 없으면 주소를 입력칸에 보여 직접 복사하게 한다.
+- Google 로그인은 `/` 로 돌아오므로 보던 주소가 사라진다. 로그인 화면을 보이기 전에(처음 열 때와 쓰는 중 세션이 끝나 로그인 화면으로 갈 때 모두) 경로와 query 를 탭 저장소(`sessionStorage`, 키 `workbench.returnTo`)에 두었다가, 로그인을 확인한 뒤 꺼내 그 주소로 바꿔 연다(기록을 쌓지 않는다). 꺼낸 값은 지운다. 저장소를 쓸 수 없는 브라우저(사생활 보호 창 등)에서는 `/workspace` 가 열린다.
+- 저장하는 주소는 경로 부분이 위 표의 경로 가운데 하나와 정확히 같은 것만이다. 다른 값(바깥 주소, `//` 로 시작하는 값, `/workspacefoo` 같은 값)은 저장하지 않는다.
+- 꺼낸 주소는 온톨로지를 받는 순간 함께 반영한다. 좁은 화면에서도 `pane` 대로 시작한다.
+- 항목 상세의 「링크 복사」 와 검토 대기의 「링크 복사」 가 `/workspace?node=<id>` 를 클립보드에 넣는다. 클립보드를 쓸 수 없으면 주소를 입력칸에 보여 직접 복사하게 한다.
 - 열람자도 링크로 항목을 열 수 있다. 보관된 항목은 상세가 「보관됨」 으로 열린다.
 
 ## 노드 만들기
@@ -282,7 +341,7 @@ flowchart TD
 
 폭 1024px 이상에서는 검색, 그래프, 상세가 세 칸으로 함께 보인다.
 1024px 미만에서는 같은 세 칸을 탭으로 나누고 한 번에 하나만 보인다.
-작업 공간을 열 때 고른 항목이 없으면 검색 탭, 있으면 상세 탭으로 시작한다. 목록, 검토 대기, 변경 이력에서 항목을 열면 상세 탭이 열린다.
+어느 탭을 보일지는 주소의 `pane` 이 정한다. `pane` 이 없으면 고른 항목(`node`)이 있을 때 상세, 없을 때 검색이다. 목록, 검토 대기, 변경 이력에서 항목을 열면 `pane=detail` 로 열린다. 넓은 화면에서는 `pane` 을 쓰지 않는다.
 
 ```mermaid
 %%{init: {"theme":"base","themeVariables":{"fontFamily":"'Noto Sans KR', sans-serif","fontSize":"14px","lineColor":"#7A8594","primaryTextColor":"#1D1F23","edgeLabelBackground":"#FFFFFF","clusterBkg":"#FAFAFA"},"flowchart":{"curve":"basis","nodeSpacing":40,"rankSpacing":60,"padding":14}}}%%

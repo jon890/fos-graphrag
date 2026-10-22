@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 import { api, errorMessage } from '../api/client'
 import { useLabels } from '../context'
 import { EMPTY_GRAPH, graphFromView, mergeGraph, type GraphData } from '../lib/graph'
 import { SearchPanel, type SearchFilters } from './SearchPanel'
 import { GraphPanel } from './GraphPanel'
 import { DetailPanel } from './DetailPanel'
+import { parseWorkspaceQuery, workspaceSearch, TAB_PATHS, type WorkspaceQuery } from '../routes'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -16,6 +18,11 @@ export type MobileTab = 'search' | 'graph' | 'detail'
 /** 고른 노드가 있으면 상세부터 보여 준다. 다른 탭에서 노드를 열고 들어온 경우다 */
 export function initialMobileTab(selectedId: string | null): MobileTab {
   return selectedId ? 'detail' : 'search'
+}
+
+/** 주소의 pane 이 있으면 그것을, 없으면 고른 노드로 정한 첫 탭을 쓴다 */
+export function mobileTabOf(pane: MobileTab | null, selectedId: string | null): MobileTab {
+  return pane ?? initialMobileTab(selectedId)
 }
 
 interface Props {
@@ -35,15 +42,37 @@ export function Workspace({ centerId, focusSeq, selectedId, onFocus, onSelect, o
   const labels = useLabels()
   const allTypes = labels.types
   const wide = useMediaQuery('(min-width: 1024px)')
-  const [mobileTab, setMobileTab] = useState<MobileTab>(() => initialMobileTab(selectedId))
+  const location = useLocation()
+  const navigate = useNavigate()
+  const query = useMemo(() => parseWorkspaceQuery(location.search), [location.search])
+  // 주소를 바꾼다. 바꾼 결과가 지금 주소와 같으면 기록도 쌓지 않는다.
+  const change = (patch: Partial<WorkspaceQuery>, replace: boolean) => {
+    const url = TAB_PATHS.workspace + workspaceSearch({ ...query, ...patch })
+    if (url !== location.pathname + location.search) navigate(url, { replace })
+  }
+  /** 기록을 쌓는다. 좁은 화면 탭 이동에 쓴다 */
+  const push = (patch: Partial<WorkspaceQuery>) => change(patch, false)
+  /** 주소만 바꾼다. 검색 조건, 홉 수, 주장 보기, 중심 이동에 쓴다 */
+  const replace = (patch: Partial<WorkspaceQuery>) => change(patch, true)
+  const mobileTab = mobileTabOf(query.pane, selectedId)
   /** 필터가 전체 타입이면 쿼리에서 뺀다. */
   const typesParam = useCallback(
     (types: string[]): string[] | undefined => (types.length === 0 || types.length === allTypes.length ? undefined : types),
     [allTypes],
   )
-  const [filters, setFilters] = useState<SearchFilters>({ q: '', types: allTypes, reviewStatus: '', includeArchived: false })
-  const [hops, setHops] = useState(1)
-  const [claimsAsNodes, setClaimsAsNodes] = useState(false)
+  const typesKey = query.types?.join(',') ?? ''
+  // 렌더마다 새 객체를 만들면 SearchPanel 이 그때마다 다시 검색해 늦게 온 옛 응답이 새 결과를 덮을 수 있다.
+  const filters = useMemo<SearchFilters>(
+    () => ({
+      q: query.q,
+      types: typesKey ? typesKey.split(',') : allTypes,
+      reviewStatus: query.status as SearchFilters['reviewStatus'],
+      includeArchived: query.archived,
+    }),
+    [query.q, typesKey, query.status, query.archived, allTypes],
+  )
+  const hops = query.hops
+  const claimsAsNodes = query.claimsAsNodes
   const [graph, setGraph] = useState<GraphData>(EMPTY_GRAPH)
   const [graphLoading, setGraphLoading] = useState(false)
   const [graphError, setGraphError] = useState<string | null>(null)
@@ -111,16 +140,14 @@ export function Workspace({ centerId, focusSeq, selectedId, onFocus, onSelect, o
   const searchPanel = (
     <SearchPanel
       filters={filters}
-      onFiltersChange={setFilters}
+      onFiltersChange={(f) =>
+        replace({ q: f.q, types: typesParam(f.types) ?? null, status: f.reviewStatus, archived: f.includeArchived })
+      }
       selectedId={selectedId}
-      onFocus={(id) => {
-        onFocus(id)
-        setMobileTab('detail')
-      }}
+      onFocus={onFocus}
       onCreated={(node, message, kind) => {
         setFlash({ id: node.id, text: message, kind })
         onFocus(node.id)
-        setMobileTab('detail')
       }}
       refreshTick={changeTick}
       typesParam={typesParam}
@@ -134,12 +161,12 @@ export function Workspace({ centerId, focusSeq, selectedId, onFocus, onSelect, o
       loading={graphLoading}
       error={graphError}
       hops={hops}
-      onHopsChange={setHops}
+      onHopsChange={(n) => replace({ hops: n })}
       onSelect={onSelect}
       onExpand={(id) => void expand(id)}
-      onRecenter={onFocus}
+      onRecenter={(id) => replace({ center: id })}
       claimsAsNodes={claimsAsNodes}
-      onClaimsAsNodesChange={setClaimsAsNodes}
+      onClaimsAsNodesChange={(on) => replace({ claimsAsNodes: on })}
       visible={wide || mobileTab === 'graph'}
     />
   )
@@ -169,7 +196,7 @@ export function Workspace({ centerId, focusSeq, selectedId, onFocus, onSelect, o
   // 고르지 않은 탭도 그려 두고 숨긴다. 상세에서 쓰던 입력이 탭을 옮겨도 남는다.
   const content = 'min-h-0 flex-1 data-[state=inactive]:hidden'
   return (
-    <Tabs value={mobileTab} onValueChange={(v) => setMobileTab(v as MobileTab)} className="h-full gap-0">
+    <Tabs value={mobileTab} onValueChange={(v) => push({ pane: v as MobileTab })} className="h-full gap-0">
       <TabsList className="w-full shrink-0 rounded-none">
         <TabsTrigger value="search" data-testid="workspace-tab-search">
           검색
@@ -189,7 +216,7 @@ export function Workspace({ centerId, focusSeq, selectedId, onFocus, onSelect, o
         <div className="min-h-[600px] flex-1">{graphPanel}</div>
         {selectedNode && (
           <div className="flex shrink-0 items-center justify-end border-t bg-card px-3 py-2" data-testid="graph-selection-bar">
-            <Button size="sm" className="max-w-full truncate" data-testid="graph-selection-open" onClick={() => setMobileTab('detail')}>
+            <Button size="sm" className="max-w-full truncate" data-testid="graph-selection-open" onClick={() => push({ pane: 'detail' })}>
               {labels.node(selectedNode)} 상세 보기
             </Button>
           </div>

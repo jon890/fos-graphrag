@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 import { api, errorMessage } from '../api/client'
 import type { ClaimView, Page, ReviewStatus } from '../api/types'
 import { useApp, useLabels } from '../context'
 import { formatDateTime, truncate, userName } from '../lib/format'
+import { TAB_PATHS, parseReviewQuery, reviewSearch, type ReviewQuery } from '../routes'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -99,6 +101,9 @@ interface SectionProps {
   title: string
   testIdPrefix: string
   emptyText: string
+  /** 주소의 쪽 번호 */
+  page: number
+  onPage: (page: number) => void
   /** 바뀌면 다시 읽는다 */
   refreshKey: number
   onOpen: (id: string) => void
@@ -106,10 +111,11 @@ interface SectionProps {
   onError: (e: unknown) => void
 }
 
-/** 검토 대기 목록 하나. 쪽 번호와 목록을 구역마다 따로 들고 있다. */
-function ReviewSection({ scope, title, testIdPrefix, emptyText, refreshKey, onOpen, onDone, onError }: SectionProps) {
+/** 검토 대기 목록 하나. 쪽 번호는 주소에서 받고 목록은 구역마다 따로 들고 있다. */
+function ReviewSection({ scope, title, testIdPrefix, emptyText, page: pageNo, onPage, refreshKey, onOpen, onDone, onError }: SectionProps) {
   const labels = useLabels()
-  const [pageNo, setPageNo] = useState(0)
+  const onPageRef = useRef(onPage)
+  onPageRef.current = onPage
   const [page, setPage] = useState<Page<ClaimView> | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -123,8 +129,9 @@ function ReviewSection({ scope, title, testIdPrefix, emptyText, refreshKey, onOp
       .list({ reviewStatus: 'DRAFT', scope, page: pageNo, size: 20 })
       .then((p) => {
         if (!live) return
-        // 마지막 쪽을 다 처리해 빈 쪽이 되면 앞 쪽으로 간다.
-        if (p.items.length === 0 && pageNo > 0) setPageNo(pageNo - 1)
+        // 마지막 쪽을 다 처리했거나 끝 쪽을 넘는 주소로 열어 빈 쪽이 되면, 끝 쪽으로 한 번에 간다.
+        const last = Math.max(p.totalPages - 1, 0)
+        if (last < pageNo) onPageRef.current(last)
         else setPage(p)
       })
       .catch((e) => live && setError(errorMessage(e)))
@@ -174,7 +181,7 @@ function ReviewSection({ scope, title, testIdPrefix, emptyText, refreshKey, onOp
           )}
         </TableBody>
       </Table>
-      {page && <Pager page={page} onPage={setPageNo} testIdPrefix={`${testIdPrefix}-pager`} />}
+      {page && <Pager page={page} onPage={onPage} testIdPrefix={`${testIdPrefix}-pager`} />}
     </section>
   )
 }
@@ -185,6 +192,17 @@ export function ReviewTab({ onOpen }: { onOpen: (id: string) => void }) {
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const refresh = () => setRefreshKey((n) => n + 1)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const query = parseReviewQuery(location.search)
+  // 두 구역이 같은 렌더에서 쪽을 바꿔도 앞의 변경을 잃지 않게 마지막으로 보낸 주소의 값을 들고 있다.
+  const latest = useRef(query)
+  latest.current = query
+  /** 주소만 바꾸고 기록을 쌓지 않는다 */
+  const setPage = (patch: Partial<ReviewQuery>) => {
+    latest.current = { ...latest.current, ...patch }
+    navigate(TAB_PATHS.review + reviewSearch(latest.current), { replace: true })
+  }
 
   const done = (m: string) => {
     setError(null)
@@ -222,6 +240,8 @@ export function ReviewTab({ onOpen }: { onOpen: (id: string) => void }) {
             title="내가 검토할 주장"
             testIdPrefix="review"
             emptyText="검토를 기다리는 주장이 없습니다."
+            page={query.page}
+            onPage={(n) => setPage({ page: n })}
             refreshKey={refreshKey}
             onOpen={onOpen}
             onDone={done}
@@ -232,6 +252,8 @@ export function ReviewTab({ onOpen }: { onOpen: (id: string) => void }) {
             title="내가 쓰거나 고친 주장"
             testIdPrefix="review-mine"
             emptyText="내가 쓰고 아직 검토되지 않은 주장이 없습니다."
+            page={query.minePage}
+            onPage={(n) => setPage({ minePage: n })}
             refreshKey={refreshKey}
             onOpen={onOpen}
             onDone={done}
@@ -243,6 +265,8 @@ export function ReviewTab({ onOpen }: { onOpen: (id: string) => void }) {
           title="검토 대기"
           testIdPrefix="review"
           emptyText="검토를 기다리는 주장이 없습니다."
+          page={query.page}
+          onPage={(n) => setPage({ page: n })}
           refreshKey={refreshKey}
           onOpen={onOpen}
           onDone={done}

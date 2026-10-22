@@ -97,6 +97,23 @@ test('휴대폰 폭에서 노드를 만들고 그래프에서 골라 상세를 �
   const companyId = (await page.getByTestId('detail-panel').getAttribute('data-node-id')) ?? ''
   expect(companyId).not.toBe('')
 
+  // 6a. 뒤로가기는 앞 화면으로 돌아간다. 기록은 「그래프 탭(앞 노드) → 노드 고르기 → 상세 보기」 다.
+  const graphCanvas = page.getByTestId('graph-canvas')
+  await page.goBack()
+  await expect(page.getByTestId('workspace-tab-graph')).toHaveAttribute('aria-selected', 'true')
+  await expect(bar).toContainText(company)
+  await expect(graphCanvas).toHaveAttribute('data-layout-pending', 'false')
+  await shot(page, 'mobile-back-1')
+  await page.goBack()
+  await expect(page.getByTestId('workspace-tab-graph')).toHaveAttribute('aria-selected', 'true')
+  await expect(bar).toContainText(security)
+  await expect(graphCanvas).toHaveAttribute('data-layout-pending', 'false')
+  await shot(page, 'mobile-back-2')
+  await page.goForward()
+  await page.goForward()
+  await expect(page.getByTestId('workspace-tab-detail')).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByTestId('detail-label')).toHaveText(exact(company))
+
   // 6b. 검색 결과에 구분 정보가 보이고 줄바꿈되어 가로로 넘치지 않는다.
   await page.getByTestId('workspace-tab-search').click()
   await page.getByTestId('search-input').fill(company)
@@ -115,9 +132,9 @@ test('휴대폰 폭에서 노드를 만들고 그래프에서 골라 상세를 �
   // 8. 좁은 화면의 모습을 남긴다.
   await shot(page, 'mobile-workspace')
 
-  // 9. 링크로 열면 첫 탭이 상세이고, 주소에서 node 값은 지워진다.
+  // 9. 옛 링크로 열면 첫 탭이 상세이고, 주소가 새 형식으로 바뀐다.
   await page.goto(`/?node=${encodeURIComponent(companyId)}`)
   await expect(page.getByTestId('workspace-tab-detail')).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByTestId('detail-label')).toHaveText(exact(company))
-  await expect(page).not.toHaveURL(/node=/)
+  await expect(page).toHaveURL(new RegExp('/workspace\\?node=' + companyId))
 })

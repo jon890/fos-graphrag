@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 import { api, errorMessage } from '../api/client'
 import type { ChangeEventView, NodeView, Page, UserRef } from '../api/types'
 import { useApp, useLabels } from '../context'
 import { changeFieldLabel, changeValueText, REF_KEYS } from '../lib/changes'
 import { formatDateTime, userName } from '../lib/format'
+import { TAB_PATHS, changesSearch, parseChangesQuery } from '../routes'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
@@ -93,14 +95,18 @@ export function ChangeRows({ items, onOpen }: { items: ChangeEventView[]; onOpen
 
 export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
   const labels = useLabels()
-  const [actor, setActor] = useState('')
+  const location = useLocation()
+  const navigate = useNavigate()
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
+  const query = useMemo(() => parseChangesQuery(location.search), [location.search])
+  const { actor, page: pageNo } = query
   const [actors, setActors] = useState<UserRef[]>([])
   const [target, setTarget] = useState<NodeView | null>(null)
   /** 고른 대상이 노드가 아니거나(사용자, 관계 ID) 읽지 못했을 때 true */
   /** 이름을 이미 아는 대상. effect 가 이 값을 보고 다시 읽을지 정한다 */
   const knownTarget = useRef<NodeView | null>(null)
   const [targetUnknown, setTargetUnknown] = useState(false)
-  const [pageNo, setPageNo] = useState(0)
   const [page, setPage] = useState<Page<ChangeEventView> | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -145,7 +151,16 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
     setError(null)
     api.changes
       .list({ targetId, actor, page: pageNo, size: 20 })
-      .then((p) => !cancelled && setPage(p))
+      .then((p) => {
+        if (cancelled) return
+        // 쪽 번호가 끝 쪽을 넘으면 끝 쪽으로 바꿔 연다.
+        const last = Math.max(p.totalPages - 1, 0)
+        if (last < pageNo) {
+          navigateRef.current(TAB_PATHS.changes + changesSearch({ target: targetId, actor, page: last }), { replace: true })
+          return
+        }
+        setPage(p)
+      })
       .catch((e) => !cancelled && setError(errorMessage(e)))
       .finally(() => !cancelled && setLoading(false))
     return () => {
@@ -171,7 +186,6 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
               variant="outline"
               data-testid="changes-filter-clear"
               onClick={() => {
-                setPageNo(0)
                 knownTarget.current = null
                 setTarget(null)
                 onTargetIdChange('')
@@ -186,7 +200,6 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
             testIdPrefix="changes-target-picker"
             placeholder="이름이나 종목 코드로 대상 찾기"
             onPick={(node) => {
-              setPageNo(0)
               knownTarget.current = node
               setTarget(node)
               onTargetIdChange(node.id)
@@ -199,10 +212,7 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
             <NativeSelect
               data-testid="changes-actor-filter"
               value={actor}
-              onChange={(e) => {
-                setPageNo(0)
-                setActor(e.target.value)
-              }}
+              onChange={(e) => navigate(TAB_PATHS.changes + changesSearch({ target: targetId, actor: e.target.value, page: 0 }), { replace: true })}
             >
               <NativeSelectOption value="">(모두)</NativeSelectOption>
               {actors.map((u) => (
@@ -243,7 +253,7 @@ export function ChangesTab({ targetId, onTargetIdChange, onOpen }: Props) {
           )}
         </TableBody>
       </Table>
-      {page && <Pager page={page} onPage={setPageNo} testIdPrefix="changes-pager" />}
+      {page && <Pager page={page} onPage={(n) => navigate(TAB_PATHS.changes + changesSearch({ target: targetId, actor, page: n }), { replace: true })} testIdPrefix="changes-pager" />}
     </div>
   )
 }

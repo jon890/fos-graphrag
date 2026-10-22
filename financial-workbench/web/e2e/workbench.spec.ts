@@ -224,11 +224,31 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageAdmin.getByTestId('create-cancel').click()
   })
 
+  test('0f) 상단 탭은 경로를 바꾸고 뒤로가기로 앞 탭에 돌아온다', async () => {
+    await pageAdmin.getByTestId('tab-list').click()
+    await expect(pageAdmin).toHaveURL(/\/list(\?|$)/)
+    await pageAdmin.getByTestId('tab-changes').click()
+    await expect(pageAdmin).toHaveURL(/\/changes(\?|$)/)
+    await pageAdmin.goBack()
+    await expect(pageAdmin).toHaveURL(/\/list(\?|$)/)
+    await expect(pageAdmin.getByTestId('tab-list')).toHaveAttribute('aria-selected', 'true')
+    await pageAdmin.reload()
+    await expect(pageAdmin.getByTestId('tab-list')).toHaveAttribute('aria-selected', 'true')
+    await expect(pageAdmin).toHaveURL(/\/list(\?|$)/)
+    await pageAdmin.goto('/')
+    await expect(pageAdmin).toHaveURL(/\/workspace$/)
+    await expect(pageAdmin.getByTestId('tab-workspace')).toHaveAttribute('aria-selected', 'true')
+  })
+
   test('1) A 가 기업 두 개와 종목을 만들고 ISSUES 관계를 잇는다', async ({ browser }) => {
     pageA = await open(browser)
     await loginAs(pageA, editorA)
     await expect(pageA.getByTestId('current-user-role')).toHaveAttribute('data-role', 'EDITOR')
     await expect(pageA.getByTestId('tab-users')).toHaveCount(0)
+    // ADMIN 이 아니면 /users 는 작업 공간으로 바뀐다.
+    await pageA.goto('/users')
+    await expect(pageA).toHaveURL(/\/workspace$/)
+    await expect(pageA.getByTestId('search-input')).toBeVisible()
 
     await createNode(pageA, 'Company', data.supplier, { name: data.supplier, country: 'KR' })
     await createNode(pageA, 'Company', data.customer, { name: data.customer, country: 'KR' })
@@ -420,6 +440,9 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(reviewableA.locator(`[data-claim-id="${supplyClaimId}"]`)).toHaveCount(0)
     await mineRow.getByTestId('review-mine-copy-link').click()
     await expect(mineRow.getByTestId('review-mine-copy-link-done').or(mineRow.getByTestId('review-mine-copy-link-fallback'))).toBeVisible()
+    // 클립보드를 쓸 수 없어 주소를 입력칸에 보인 경우에만 새 형식의 주소인지 본다.
+    const fallback = mineRow.getByTestId('review-mine-copy-link-fallback')
+    if (await fallback.isVisible()) await expect(fallback).toHaveValue(/\/workspace\?node=/)
     await shot(pageA, '03-review-mine-a')
 
     pageB = await open(browser)
@@ -452,12 +475,23 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   test('3b) 링크로 들어오면 로그인한 뒤 그 주장의 상세가 열린다', async ({ browser }) => {
     const { context, page } = await newPage(browser)
     try {
+      // 이미 보낸 /?node= 링크도 열리고, 새 주소로 바뀐다.
       await loginAs(page, editorB, 'success', `/?node=${encodeURIComponent(supplyClaimId)}`)
       await expect(page.getByTestId('detail-panel')).toHaveAttribute('data-node-id', supplyClaimId)
       await expect(page.getByTestId('detail-label')).toHaveText(`${data.supplier} → ${data.customer} 공급한다`)
       await expect(page.getByTestId('node-copy-link')).toBeVisible()
+      await expect(page).toHaveURL(new RegExp(`/workspace\\?node=${supplyClaimId}&pane=detail$`))
     } finally {
       await context.close()
+    }
+    // 새 형식의 링크도 같은 상세를 연다.
+    const fresh = await newPage(browser)
+    try {
+      await loginAs(fresh.page, editorB, 'success', `/workspace?node=${encodeURIComponent(supplyClaimId)}`)
+      await expect(fresh.page.getByTestId('detail-panel')).toHaveAttribute('data-node-id', supplyClaimId)
+      await expect(fresh.page.getByTestId('detail-label')).toHaveText(`${data.supplier} → ${data.customer} 공급한다`)
+    } finally {
+      await fresh.context.close()
     }
   })
 
@@ -504,6 +538,42 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
 
     await pageA.getByTestId('graph-claims-as-nodes').setChecked(false)
     await expect(canvas).toHaveAttribute('data-collapsed-claims', '1')
+  })
+
+  test('4b) 작업 공간에서 뒤로가기는 앞 항목으로 돌아가고 검색 조건은 남는다', async () => {
+    await pageA.getByTestId('tab-workspace').click()
+    await pageA.getByTestId('search-input').fill(data.supplier)
+    await pageA.getByTestId('search-submit').click()
+    await searchResult(pageA, data.supplier).click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
+    await expect(pageA).toHaveURL(/node=/)
+    await expect(pageA).toHaveURL(/q=/)
+
+    // 「그래프에 나온 항목」 에서 고객사를 열면 상세만 바뀐다.
+    const customerItem = pageA.locator('[data-testid="graph-node"][data-node-type="Company"]').filter({ hasText: data.customer })
+    await customerItem.getByRole('button').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.customer)
+    await pageA.goBack()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
+    await expect(pageA.getByTestId('search-input')).toHaveValue(data.supplier)
+
+    // 다른 탭에 갔다 뒤로가기로 돌아와도 검색 조건과 열어 둔 항목이 그대로다.
+    await pageA.getByTestId('tab-list').click()
+    await expect(pageA).toHaveURL(/\/list(\?|$)/)
+    await pageA.goBack()
+    await expect(pageA.getByTestId('tab-workspace')).toHaveAttribute('aria-selected', 'true')
+    await expect(pageA.getByTestId('search-input')).toHaveValue(data.supplier)
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
+
+    // 홉 수는 주소만 바꾸고 기록을 쌓지 않는다. 고객사를 연 뒤 홉을 바꿔도 뒤로가기 한 번이면 공급사다.
+    await customerItem.getByRole('button').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.customer)
+    await pageA.getByTestId('graph-hops').selectOption('2')
+    await expect(pageA).toHaveURL(/hops=2/)
+    await pageA.goBack()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
+    await expect(pageA).not.toHaveURL(/hops=/)
+    await shot(pageA, '04b-back-to-supplier')
   })
 
   test('5) 같은 노드를 동시에 고치면 나중 저장은 409 안내 뒤 최신 값을 보이고, 내 입력을 골라 다시 적용해 저장한다', async () => {
@@ -608,7 +678,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     // 주장은 기업 이름으로 검색되지 않으므로(docs/prd.md 「남은 한계」) 링크로 연다.
     await pageA.goto('/?node=' + supplyClaimId)
     await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-id', supplyClaimId)
-    await expect(pageA).not.toHaveURL(/node=/)
+    await expect(pageA).toHaveURL(new RegExp('/workspace\\?node=' + supplyClaimId))
     await pageA.getByTestId('node-history-link').click()
     const created = pageA.locator('[data-testid="change-row"][data-action="CREATE"]')
     await expect(created).toHaveCount(1)
@@ -618,6 +688,50 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(created).toContainText(data.customer)
     await expect(created).not.toContainText(/[0-9a-f]{8}-[0-9a-f]{4}-/)
     await shot(pageA, '06c-changes-names')
+  })
+
+  test('6d) 목록과 이력에서 항목을 열었다가 뒤로가기로 돌아오면 조건이 그대로다', async () => {
+    await pageA.getByTestId('tab-list').click()
+    await pageA.getByTestId('list-type-filter').selectOption('Company')
+    await pageA.getByTestId('list-search-input').fill(data.supplier)
+    await pageA.getByTestId('list-search-submit').click()
+    await expect(pageA).toHaveURL(/type=Company/)
+    await expect(pageA).toHaveURL(/q=/)
+    const listUrl = pageA.url()
+    const listRow = pageA.getByTestId('list-row').filter({ hasText: data.supplier })
+    await expect(listRow).toHaveCount(1)
+    await listRow.click()
+    await expect(pageA).toHaveURL(/\/workspace\?node=/)
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
+    await pageA.goBack()
+    await expect(pageA).toHaveURL(listUrl)
+    await expect(pageA.getByTestId('list-type-filter')).toHaveValue('Company')
+    await expect(pageA.getByTestId('list-search-input')).toHaveValue(data.supplier)
+    await expect(pageA.getByTestId('list-row').filter({ hasText: data.supplier })).toHaveCount(1)
+    await shot(pageA, '06d-list-back')
+
+    await pageA.getByTestId('tab-changes').click()
+    await expect(pageA.getByTestId('changes-tab')).toBeVisible()
+    await pageA.getByTestId('changes-actor-filter').selectOption({ value: editorA.email })
+    await expect(pageA).toHaveURL(/actor=/)
+    const targetButton = pageA.locator('[data-testid="change-row"] td:nth-child(5) button').first()
+    await expect(targetButton).toBeVisible()
+    await targetButton.click()
+    await expect(pageA).toHaveURL(/\/workspace\?node=/)
+    await pageA.goBack()
+    await expect(pageA).toHaveURL(/\/changes/)
+    await expect(pageA.getByTestId('changes-actor-filter')).toHaveValue(editorA.email)
+    await expect(pageA.getByTestId('change-row').first()).toBeVisible()
+    await shot(pageA, '06d-changes-back')
+
+    // 쪽을 넘겨도 기록이 쌓이지 않는다. 쪽이 둘 이상일 때만 본다.
+    const next = pageA.getByTestId('changes-pager-next')
+    if (await next.isEnabled()) {
+      await next.click()
+      await expect(pageA).toHaveURL(/page=1/)
+      await pageA.goBack()
+      await expect(pageA).toHaveURL(/\/workspace\?node=/)
+    }
   })
 
   test('6b) 유일한 근거 문서를 보관하려 하면 해당 주장을 여는 버튼이 나온다', async () => {
