@@ -56,7 +56,7 @@
 
 `components/guide/GuideProvider.tsx`
 
-- props 에 `ontology` 를 더한다(App 이 받은 온톨로지). 온톨로지를 받기 전에는 가이드를 열지 않는다.
+- props 의 `ontology`(phase 02 가 넘긴다)로 아래 판단을 한다.
 - 여는 종류: 편집자와 관리자(`canEditRole(user.role)`)면 `practicePredicateCandidates` 를 차례로 보며, 그 종류의 `objectTypes` 가운데 보관되지 않은 노드가 하나라도 있는 첫 타입을 찾는다(타입마다 `size=1` 검색). 찾으면 `practice` 와 `PracticePlan { predicate, objectType }`, 못 찾으면 `browse` 다. 열람자는 언제나 `browse` 다. 이 판단은 자동 시작과 「사용법」 모두에서 한다.
 - `GuideProgress` 에 `plan` 과 `created`(`company`, `document`, `claim` 키)를 담는다.
 - `report(event: { kind: 'node-created' | 'claim-created'; node: NodeView })`: 지금 단계가 `company` 이고 `node.type === 'Company'` 면 `created.company` 에 담고 다음 단계, `document` 이고 `Document` 면 `created.document`, `claim` 이고 `claim-created` 면 `created.claim` 에 담고 다음 단계다. 그 밖의 이벤트는 무시한다. 단계가 바뀌면 `writeProgress` 한다.
@@ -69,9 +69,9 @@
 ### 3. 화면 연결
 
 - `NodeCreateForm.tsx`: prop `initialValues?: Record<string, string>` 를 더해 `initialCreateValues(defs)` 위에 덮어쓴다. 폼 값의 형식(`FormValues`)을 `lib/formValues.ts` 에서 확인하고 맞춘다.
-- `SearchPanel.tsx`: 가이드의 `prefill.type` 이 있고 지금 폼이 닫혀 있으면 `createType` 을 그 타입으로, `creating` 을 `true` 로 열고, `NodeCreateForm` 에 `key={prefill.step}` 와 `initialValues` 를 넘긴 뒤 `consumePrefill()` 한다. `onCreated` 가 성공하면 가이드에 `report({ kind: 'node-created', node })` 한다. `onCancel` 은 가이드에 폼을 닫았다고 알려 「폼 다시 열기」 가 보이게 한다. 같은 이름 경고에서 「열기」 를 고르면 만들기로 보지 않는다(가이드는 그 단계에 남는다).
+- `SearchPanel.tsx`: 가이드의 `prefill.type` 이 있고 지금 폼이 닫혀 있으면 `createType` 을 그 타입으로, `creating` 을 `true` 로 열고, 그 프리필을 자기 상태(`openedPrefill`)에 복사한 뒤 `consumePrefill()` 한다. `NodeCreateForm` 의 `key` 와 `initialValues` 는 이 복사본에서 읽는다. context 의 프리필이 비어도 폼이 다시 만들어지지 않게 하려는 것이다(두 폼은 `useState` 초깃값으로만 값을 읽는다). 복사본은 폼을 닫거나 만들기가 끝나면 비운다. `onCreated` 가 성공하면 가이드에 `report({ kind: 'node-created', node })` 한다. `onCancel` 은 가이드에 폼을 닫았다고 알려 「폼 다시 열기」 가 보이게 한다. 같은 이름 경고에서 「열기」 를 고르면 만들기로 보지 않는다(가이드는 그 단계에 남는다).
 - `ClaimCreateForm.tsx`: prop `initialPredicate?: string`, `initialDocuments?: NodeView[]`, `initialDescription?: string`, `initialEvidenceText?: string` 을 더한다. 주어진 주장 종류가 주체 타입을 받지 않으면 무시한다.
-- `DetailPanel.tsx`: 가이드의 `prefill.subjectId` 가 `detail?.node.id` 와 같으면 `api.nodes.get(prefill.documentId)` 의 `.node` 를 읽은 뒤에 `addingClaim` 을 `true` 로 연다. 위 `[selectedId, flash]` effect 보다 뒤에 열리도록 별도 effect 로 두고 `detail` 과 `prefill` 을 의존성으로 한다. `ClaimCreateForm` 에 `key={prefill.documentId}` 와 위 초깃값들을 넘기고 `consumePrefill()` 한다. `onCreated` 가 성공하면 가이드에 `report({ kind: 'claim-created', node: claim })` 한다.
+- `DetailPanel.tsx`: 가이드의 `prefill.subjectId` 가 `detail?.node.id` 와 같으면 `api.nodes.get(prefill.documentId)` 의 `.node` 를 읽은 뒤에 `addingClaim` 을 `true` 로 연다. 위 `[selectedId, flash]` effect 보다 뒤에 열리도록 별도 effect 로 두고 `detail` 과 `prefill` 을 의존성으로 한다. 이때 프리필과 읽은 문서를 자기 상태(`openedPrefill`)에 복사한 뒤 `consumePrefill()` 한다. `ClaimCreateForm` 의 `key`(`openedPrefill.documentId`)와 초깃값들은 이 복사본에서 읽는다. 복사본은 폼을 닫거나 만들기가 끝나면 비운다. `onCreated` 가 성공하면 가이드에 `report({ kind: 'claim-created', node: claim })` 한다.
 - 가이드 context 가 없는 렌더링(단위 테스트, 가이드 꺼짐)에서도 이 컴포넌트들이 지금처럼 동작하게, context 기본값은 `active: false`, `prefill: null` 과 빈 함수다.
 
 ### 4. 문서

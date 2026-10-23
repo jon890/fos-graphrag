@@ -51,7 +51,7 @@
 
 새 폴더 `web/src/components/guide/`
 
-- `GuideProvider.tsx`: props 로 `user: CurrentUser`, `onUserChange(user)` 를 받는다(온톨로지는 phase 03 이 더한다). context 로 `{ active, kind, step, steps, busy, message, start(kind), next(), finish(), skip() }` 를 내려 준다.
+- `GuideProvider.tsx`: props 로 `user: CurrentUser`, `onUserChange(user)`, `ontology: Ontology | null`(App 의 온톨로지 상태, 받기 전에는 `null`)을 받는다. context 로 `{ active, kind, step, steps, busy, message, start(kind), next(), finish(), skip() }` 를 내려 준다.
   - `App.tsx` 는 `auth.status === 'signed-in'` 일 때만 `GuideProvider` 로 머리글과 `<main>` 을 함께 감싼다. 탭 단위 `ErrorBoundary` 바깥이라 탭을 옮겨도 가이드가 남는다. 로그아웃이나 세션 만료로 로그인 화면이 되면 Provider 가 사라지며 가이드도 닫힌다(진행 상태는 저장소에 남는다).
   - 단계를 바꿀 때마다 `writeProgress` 한다. 단계에 들어갈 때 좁은 화면(`useMediaQuery('(min-width: 1024px)')` 가 거짓)이고 그 단계의 `pane` 이 있으면, 지금 주소의 query 를 유지한 채 `pane` 만 바꾼 주소로 `replace` 한다. 들어갈 때 한 번만 한다.
   - `finish()` 와 `skip()` 은 `busy` 를 켜고 진행 상태를 지운 뒤 `api.auth.guideDone()` 을 기다린다. 성공하면 받은 `CurrentUser` 로 `onUserChange` 를 부르고 가이드를 닫는다. 실패하면 가이드를 닫되 머리글 아래 `Alert`(testid `guide-message`)로 「가이드를 끝냈다는 기록을 남기지 못했습니다. 다음 로그인 때 다시 열릴 수 있습니다.」 를 보이고, 이 세션에서는 다시 자동으로 열지 않는다.
@@ -64,7 +64,7 @@
 
 ### 4. 여는 때와 사용법 단추
 
-- 자동 시작: `GuideProvider` 가 `shouldAutoStart(user)` 이고 지금 탭이 작업 공간이며 온톨로지를 받은 뒤에 연다. 다른 탭의 링크로 들어왔으면 그 화면을 그대로 두고, 이 세션에서 처음 작업 공간에 들어올 때 연다(`flow.md` 「첫 접속 가이드」 첫 문단).
+- 자동 시작: `GuideProvider` 가 `shouldAutoStart(user)` 이고 지금 탭이 작업 공간이며 `ontology` 가 `null` 이 아닐 때 연다. 다른 탭의 링크로 들어왔으면 그 화면을 그대로 두고, 이 세션에서 처음 작업 공간에 들어올 때 연다(`flow.md` 「첫 접속 가이드」 첫 문단).
 - 머리글의 `current-user-name` 앞에 「사용법」(`guide-open`, `Button variant="link"`)을 둔다. 누르면 작업 공간이 아니면 `/workspace` 로 `push` 한 뒤 가이드를 처음부터 연다. 열린 가이드가 있으면 그것을 닫고 다시 연다(phase 03 이 진행 중인 연습을 먼저 묻게 바꾼다).
 - 이 phase 에서는 모든 역할이 `browse` 를 연다.
 
