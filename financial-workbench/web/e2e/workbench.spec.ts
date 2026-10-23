@@ -936,6 +936,16 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
 
     // 4. 마침
     await expect(bubble).toHaveAttribute('data-step', 'done')
+    // 그래프처럼 큰 대상이면 말풍선이 그 안쪽에 있어 상세 칸의 성공 안내와 입력칸을 덮지 않는다.
+    await expect(bubble).toHaveAttribute('data-placement', 'anchored')
+    await expect
+      .poll(async () => {
+        const b = await bubble.boundingBox()
+        const d = await page.getByTestId('detail-panel').boundingBox()
+        if (!b || !d) return null
+        return b.x < d.x + d.width && d.x < b.x + b.width && b.y < d.y + d.height && d.y < b.y + b.height
+      }, { message: '마침 말풍선과 상세 칸이 겹치지 않는다' })
+      .toBe(false)
     await shot(page, '11-guide-practice-done')
 
     const created = await page.evaluate(
