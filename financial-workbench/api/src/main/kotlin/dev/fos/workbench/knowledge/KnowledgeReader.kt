@@ -3,6 +3,7 @@ package dev.fos.workbench.knowledge
 import dev.fos.workbench.auth.UserRef
 import dev.fos.workbench.auth.UserRepository
 import dev.fos.workbench.ontology.Ontology
+import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.web.NotFoundException
 import org.springframework.data.neo4j.core.Neo4jClient
 import org.springframework.stereotype.Component
@@ -11,7 +12,7 @@ import org.springframework.stereotype.Component
 @Component
 class KnowledgeReader(
     private val client: Neo4jClient,
-    private val ontology: Ontology,
+    private val holder: OntologyHolder,
     private val users: UserRepository,
 ) {
 
@@ -23,15 +24,17 @@ class KnowledgeReader(
     fun node(id: String): NodeView = nodes(listOf(nodeProps(id))).single()
 
     fun nodes(rows: List<Map<String, Any?>>): List<NodeView> {
+        val ontology = holder.current()
         val refs = users.findRefs(rows.flatMap { listOfNotNull(it["createdBy"], it["updatedBy"]) }.map { it as String })
         val claimNames = claimLabels(rows.filter { it["type"] == ClaimService.CLAIM }.map { it["id"] as String })
-        return rows.map { toNodeView(it, refs, claimNames[it["id"]] ?: ontology.labelOf(it["type"] as String, it)) }
+        return rows.map { toNodeView(ontology, it, refs, claimNames[it["id"]] ?: ontology.labelOf(it["type"] as String, it)) }
     }
 
     /** Claim id 마다 「주체 → 대상 관계」 이름. 쿼리 한 번으로 읽고 Claim 이 아닌 id 는 빠진다 */
     @Suppress("UNCHECKED_CAST")
     fun claimLabels(ids: Collection<String>): Map<String, String> {
         if (ids.isEmpty()) return emptyMap()
+        val ontology = holder.current()
         return client.query(
             """
             MATCH (c:Knowledge:Claim) WHERE c.id IN ${'$'}ids
@@ -50,6 +53,7 @@ class KnowledgeReader(
 
     /** Claim 이면 주체와 대상 이름으로 만든 이름, 아니면 labelProperty 값 */
     fun labelOf(p: Map<String, Any?>): String {
+        val ontology = holder.current()
         val type = p["type"] as String
         return if (type == ClaimService.CLAIM) {
             val id = p["id"] as String
@@ -60,7 +64,9 @@ class KnowledgeReader(
     }
 
     /** Claim 을 넘기지 않는다. Claim 이름은 `labelOf` 나 `claimLabels` 로 만든다 */
-    fun ref(p: Map<String, Any?>): NodeRef =
+    fun ref(p: Map<String, Any?>): NodeRef = ref(holder.current(), p)
+
+    private fun ref(ontology: Ontology, p: Map<String, Any?>): NodeRef =
         NodeRef(p["id"] as String, p["type"] as String, ontology.labelOf(p["type"] as String, p), p["archived"] == true)
 
     fun claim(id: String): ClaimView = claims(listOf(id)).firstOrNull() ?: throw NotFoundException(id)
@@ -69,6 +75,7 @@ class KnowledgeReader(
     @Suppress("UNCHECKED_CAST")
     fun claims(ids: List<String>): List<ClaimView> {
         if (ids.isEmpty()) return emptyList()
+        val ontology = holder.current()
         val rows = client.query(
             """
             MATCH (c:Knowledge:Claim) WHERE c.id IN ${'$'}ids
@@ -90,7 +97,7 @@ class KnowledgeReader(
             val c = r["c"] as Map<String, Any?>
             ClaimView(
                 node = toNodeView(
-                    c, refs,
+                    ontology, c, refs,
                     ontology.claimLabel(
                         (r["s"] as Map<String, Any?>?)?.let { ontology.labelOf(it["type"] as String, it) },
                         (r["o"] as Map<String, Any?>?)?.let { ontology.labelOf(it["type"] as String, it) },
@@ -101,8 +108,8 @@ class KnowledgeReader(
                 reviewedAt = c["reviewedAt"] as String?,
                 reviewNote = c["reviewNote"] as String?,
                 contentUpdatedBy = (c["contentUpdatedBy"] as String?)?.let { refs[it] },
-                subject = (r["s"] as Map<String, Any?>?)?.let(::ref),
-                `object` = (r["o"] as Map<String, Any?>?)?.let(::ref),
+                subject = (r["s"] as Map<String, Any?>?)?.let { ref(ontology, it) },
+                `object` = (r["o"] as Map<String, Any?>?)?.let { ref(ontology, it) },
                 documents = (r["docs"] as List<Map<String, Any?>>).map(::document),
             )
         }
@@ -120,9 +127,10 @@ class KnowledgeReader(
     )
 
     private fun toNodeView(
+        ontology: Ontology,
         p: Map<String, Any?>,
         refs: Map<String, UserRef>,
-        label: String = ontology.labelOf(p["type"] as String, p),
+        label: String,
     ): NodeView {
         val type = p["type"] as String
         val def = ontology.requireNodeType(type)

@@ -48,6 +48,7 @@ class SecurityConfig {
             .authorizeHttpRequests {
                 it.requestMatchers("/api/health", "/api/auth/csrf").permitAll()
                     .requestMatchers("/api/users", "/api/users/**").hasRole("ADMIN")
+                    .requestMatchers("/api/ontology/versions", "/api/ontology/versions/**", "/api/ontology/export", "/api/ontology/preview").hasRole("ADMIN")
                     .requestMatchers(HttpMethod.GET, "/api/**").hasRole("VIEWER")
                     .requestMatchers("/api/auth/logout").authenticated()
                     .requestMatchers("/api/**").hasRole("EDITOR")

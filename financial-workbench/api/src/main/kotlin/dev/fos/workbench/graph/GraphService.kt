@@ -6,6 +6,7 @@ import dev.fos.workbench.knowledge.ClaimService
 import dev.fos.workbench.knowledge.KnowledgeReader
 import dev.fos.workbench.knowledge.ReviewStatus
 import dev.fos.workbench.ontology.Ontology
+import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.web.NotFoundException
 import dev.fos.workbench.web.ValidationFailedException
 import org.springframework.data.neo4j.core.Neo4jClient
@@ -32,7 +33,7 @@ data class GraphView(
 @Service
 class GraphService(
     private val client: Neo4jClient,
-    private val ontology: Ontology,
+    private val holder: OntologyHolder,
     private val reader: KnowledgeReader,
     private val properties: WorkbenchProperties,
     transactionManager: PlatformTransactionManager,
@@ -47,15 +48,16 @@ class GraphService(
         if (hops < 1 || hops > limits.maxHops) {
             throw ValidationFailedException(mapOf("hops" to "1 이상 ${limits.maxHops} 이하여야 합니다."))
         }
+        val ontology = holder.current()
         types?.forEach { ontology.requireNodeType(it) }
         if (reviewStatus != null && ReviewStatus.entries.none { it.name == reviewStatus }) {
             throw ValidationFailedException(mapOf("reviewStatus" to "DRAFT, REVIEWED, REJECTED 가운데 하나여야 합니다."))
         }
-        return readOnly.execute { load(id, hops, types?.takeIf { it.isNotEmpty() }, reviewStatus) }!!
+        return readOnly.execute { load(ontology, id, hops, types?.takeIf { it.isNotEmpty() }, reviewStatus) }!!
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun load(id: String, hops: Int, types: List<String>?, reviewStatus: String?): GraphView {
+    private fun load(ontology: Ontology, id: String, hops: Int, types: List<String>?, reviewStatus: String?): GraphView {
         val center = reader.nodeProps(id)
         if (center["archived"] == true) throw NotFoundException(id)
         val neighborLimit = limits.maxNodes - 1

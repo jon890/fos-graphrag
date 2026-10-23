@@ -8,6 +8,7 @@ import dev.fos.workbench.history.ChangeEventRecorder
 import dev.fos.workbench.history.TargetKind
 import dev.fos.workbench.history.diff
 import dev.fos.workbench.ontology.Ontology
+import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.ontology.PropertyDef
 import dev.fos.workbench.ontology.PropertyType
 import org.slf4j.LoggerFactory
@@ -23,7 +24,7 @@ import org.springframework.transaction.support.TransactionTemplate
 @Component
 class LegacyValueCleanup(
     private val client: Neo4jClient,
-    private val ontology: Ontology,
+    private val holder: OntologyHolder,
     private val guard: RevisionGuard,
     private val recorder: ChangeEventRecorder,
     transactionManager: PlatformTransactionManager,
@@ -40,23 +41,21 @@ class LegacyValueCleanup(
         timeout = Limits.WRITE_TIMEOUT_SECONDS
     }
 
-    /**
-     * 처음부터 enum 이던 속성(market 등)은 대상이 아니다. valueAliases 가 있는 속성만 고친다.
-     * market 을 고치면 (market, ticker) 유일성 제약에 걸려 시작이 멈출 수 있다.
-     */
-    private val targets: Map<String, Map<String, PropertyDef>> =
-        ontology.nodeTypes
+    /** 고친 노드 수를 돌려준다. 여러 번 불러도 결과가 같다. 노드마다 트랜잭션 하나다 */
+    fun run(): Int {
+        val ontology = holder.current()
+        // 처음부터 enum 이던 속성(market 등)은 대상이 아니다. valueAliases 가 있는 속성만 고친다.
+        // market 을 고치면 (market, ticker) 유일성 제약에 걸려 시작이 멈출 수 있다.
+        // 시작 작업이 holder 를 채운 뒤에 불리므로 빈을 만들 때가 아니라 여기서 계산한다
+        val targets: Map<String, Map<String, PropertyDef>> = ontology.nodeTypes
             .filterValues { it.managedBy == null }
             .mapValues { (_, def) -> def.properties.filterValues { it.type == PropertyType.ENUM && it.valueAliases != null } }
             .filterValues { it.isNotEmpty() }
-
-    /** 고친 노드 수를 돌려준다. 여러 번 불러도 결과가 같다. 노드마다 트랜잭션 하나다 */
-    fun run(): Int {
         val candidates = readOnly.execute { targets.map { (type, props) -> type to candidateIds(type, props) } }
         var fixed = 0
         candidates.forEach { (type, ids) ->
             val props = targets.getValue(type)
-            ids.forEach { id -> if (perNode.execute { fix(id, type, props) } == true) fixed++ }
+            ids.forEach { id -> if (perNode.execute { fix(ontology, id, type, props) } == true) fixed++ }
         }
         if (fixed > 0) log.info("온톨로지 목록 밖 값을 고친 노드: {}개", fixed)
         return fixed
@@ -80,7 +79,7 @@ class LegacyValueCleanup(
         ).fetch().all().map { it["id"] as String }
 
     /** 잠근 뒤 다시 읽은 값으로 판정한다. 고쳤으면 true */
-    private fun fix(id: String, type: String, props: Map<String, PropertyDef>): Boolean {
+    private fun fix(ontology: Ontology, id: String, type: String, props: Map<String, PropertyDef>): Boolean {
         val before = guard.lockNode(id)
         if (before["archived"] == true) {
             guard.unlockNode(id)

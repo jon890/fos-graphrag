@@ -1,7 +1,7 @@
 package dev.fos.workbench.knowledge
 
 import dev.fos.workbench.config.WorkbenchProperties
-import dev.fos.workbench.ontology.Ontology
+import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.support.Fixtures
 import dev.fos.workbench.support.IntegrationTest
 import dev.fos.workbench.support.id
@@ -18,7 +18,7 @@ class SeedLoaderIntegrationTest : IntegrationTest() {
     @Autowired lateinit var seeds: SeedLoader
     @Autowired lateinit var nodes: NodeService
     @Autowired lateinit var relationships: RelationshipService
-    @Autowired lateinit var ontology: Ontology
+    @Autowired lateinit var holder: OntologyHolder
     @Autowired lateinit var transactionManager: PlatformTransactionManager
 
     @Test
@@ -111,7 +111,7 @@ class SeedLoaderIntegrationTest : IntegrationTest() {
 
     @Test
     fun `seeds enabled 가 false 이면 아무것도 하지 않는다`() {
-        val disabled = SeedLoader(neo4j, nodes, relationships, ontology, WorkbenchProperties(seeds = WorkbenchProperties.Seeds(enabled = false)), transactionManager)
+        val disabled = SeedLoader(neo4j, nodes, relationships, holder, WorkbenchProperties(seeds = WorkbenchProperties.Seeds(enabled = false)), transactionManager)
 
         assertThat(disabled.run()).isZero()
     }

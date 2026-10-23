@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test
 class OntologyValidatorTest {
 
     private val ontology = OntologyLoader.loadDefault()
-    private val validator = OntologyValidator(ontology)
+    private val validator = OntologyValidator(OntologyHolder.fixed(ontology))
 
     @Test
     fun `정의된 속성은 정규화해 통과시킨다`() {

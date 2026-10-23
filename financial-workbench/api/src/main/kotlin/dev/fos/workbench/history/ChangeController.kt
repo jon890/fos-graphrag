@@ -4,6 +4,7 @@ import dev.fos.workbench.auth.UserRef
 import dev.fos.workbench.auth.UserRepository
 import dev.fos.workbench.config.params
 import dev.fos.workbench.ontology.Ontology
+import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.web.Page
 import dev.fos.workbench.web.PageQuery
 import org.springframework.data.neo4j.core.Neo4jClient
@@ -38,7 +39,7 @@ class ChangeController(
     private val client: Neo4jClient,
     private val users: UserRepository,
     private val mapper: JsonMapper,
-    private val ontology: Ontology,
+    private val holder: OntologyHolder,
 ) {
 
     @GetMapping("/api/changes")
@@ -51,6 +52,7 @@ class ChangeController(
         authentication: Authentication,
     ): Page<ChangeEventView> {
         val query = PageQuery.of(page, size)
+        val ontology = holder.current()
         val admin = isAdmin(authentication)
         val actorId = actor?.let { users.findByEmail(it)?.id ?: return query.of(emptyList(), 0) }
         val params = params("targetId" to targetId, "actorId" to actorId, "skip" to query.skip, "limit" to query.size, "admin" to admin)
@@ -65,7 +67,7 @@ class ChangeController(
         val nodeIds = changes.flatMap { idsOf(it, NODE_REF_KEYS) }.toSet()
         val userIds = changes.flatMap { idsOf(it, USER_REF_KEYS) }.toSet()
         val userRefs = users.findRefs(rows.map { it["actorId"] as String } + userIds)
-        val known = nodeRefs(nodeIds) + userIds.mapNotNull { id -> userRefs[id]?.let { id to ChangeRef(id, "User", it.displayName, false) } }
+        val known = nodeRefs(ontology, nodeIds) + userIds.mapNotNull { id -> userRefs[id]?.let { id to ChangeRef(id, "User", it.displayName, false) } }
         return query.of(
             rows.zip(changes).map { (e, c) ->
                 val ids = idsOf(c, NODE_REF_KEYS) + idsOf(c, USER_REF_KEYS)
@@ -97,7 +99,7 @@ class ChangeController(
             .toSet()
 
     @Suppress("UNCHECKED_CAST")
-    private fun nodeRefs(ids: Set<String>): Map<String, ChangeRef> {
+    private fun nodeRefs(ontology: Ontology, ids: Set<String>): Map<String, ChangeRef> {
         if (ids.isEmpty()) return emptyMap()
         return client.query("MATCH (n:Knowledge) WHERE n.id IN \$ids RETURN properties(n) AS n")
             .bind(ids.toList()).to("ids").fetch().all()
@@ -137,6 +139,6 @@ class ChangeController(
          * 이력에 새 키를 남기는 코드를 더하면 여기에도 더한다. OntologyLabelsTest 가 YAML 과 대조한다.
          */
         val CHANGE_FIELD_KEYS = NODE_REF_KEYS + USER_REF_KEYS +
-            setOf("reviewStatus", "reviewedAt", "reviewNote", "archived", "email", "displayName", "role", "enabled")
+            setOf("reviewStatus", "reviewedAt", "reviewNote", "archived", "email", "displayName", "role", "enabled", "added", "removed", "changed")
     }
 }

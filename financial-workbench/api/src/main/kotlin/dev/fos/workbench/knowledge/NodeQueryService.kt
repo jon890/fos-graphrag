@@ -3,7 +3,7 @@ package dev.fos.workbench.knowledge
 import dev.fos.workbench.config.Limits
 import dev.fos.workbench.config.WorkbenchProperties
 import dev.fos.workbench.config.params
-import dev.fos.workbench.ontology.Ontology
+import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.web.Page
 import dev.fos.workbench.web.PageQuery
 import dev.fos.workbench.web.ValidationFailedException
@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class NodeQueryService(
     private val client: Neo4jClient,
-    private val ontology: Ontology,
+    private val holder: OntologyHolder,
     private val reader: KnowledgeReader,
     private val relationships: RelationshipService,
     properties: WorkbenchProperties,
@@ -23,6 +23,7 @@ class NodeQueryService(
 
     @Transactional(readOnly = true)
     fun detail(id: String): NodeDetail {
+        val ontology = holder.current()
         val node = reader.node(id)
         val relationshipRows = client.query(
             """
@@ -58,6 +59,7 @@ class NodeQueryService(
     @Transactional(readOnly = true)
     @Suppress("UNCHECKED_CAST")
     fun search(q: String?, types: List<String>?, reviewStatus: String?, includeArchived: Boolean, page: PageQuery): Page<NodeView> {
+        val ontology = holder.current()
         types?.forEach { ontology.requireNodeType(it) }
         if ((q?.trim()?.length ?: 0) > Limits.MAX_QUERY_LENGTH) {
             throw ValidationFailedException(mapOf("q" to "검색어는 ${Limits.MAX_QUERY_LENGTH}자 이하여야 합니다."))

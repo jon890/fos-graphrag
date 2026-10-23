@@ -10,6 +10,7 @@ import dev.fos.workbench.history.ChangeEventRecorder
 import dev.fos.workbench.history.FieldChange
 import dev.fos.workbench.history.TargetKind
 import dev.fos.workbench.ontology.Ontology
+import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.web.ArchivedException
 import dev.fos.workbench.web.DuplicateException
 import dev.fos.workbench.web.NotArchivedException
@@ -23,7 +24,7 @@ import java.util.UUID
 @Service
 class RelationshipService(
     private val client: Neo4jClient,
-    private val ontology: Ontology,
+    private val holder: OntologyHolder,
     private val guard: RevisionGuard,
     private val recorder: ChangeEventRecorder,
     private val reader: KnowledgeReader,
@@ -32,6 +33,7 @@ class RelationshipService(
 
     @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun create(request: CreateRelationshipRequest, actorId: String): RelationshipView {
+        val ontology = holder.current()
         val def = ontology.requireRelationshipType(request.type)
         // 중복 관계와 보관 경합을 막으려고 양 끝 노드를 ID 순서로 잠근다
         val locked = lockEnds(request.fromId, request.toId)
@@ -63,16 +65,18 @@ class RelationshipService(
                 mapOf("fromId" to FieldChange(null, request.fromId), "toId" to FieldChange(null, request.toId)),
             ),
         )
-        return view(id)
+        return view(ontology, id)
     }
 
     @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
-    fun archive(id: String, request: RevisionRequest, actorId: String): RelationshipView = transition(id, request, actorId, archive = true)
+    fun archive(id: String, request: RevisionRequest, actorId: String): RelationshipView =
+        transition(holder.current(), id, request, actorId, archive = true)
 
     @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
-    fun restore(id: String, request: RevisionRequest, actorId: String): RelationshipView = transition(id, request, actorId, archive = false)
+    fun restore(id: String, request: RevisionRequest, actorId: String): RelationshipView =
+        transition(holder.current(), id, request, actorId, archive = false)
 
-    private fun transition(id: String, request: RevisionRequest, actorId: String, archive: Boolean): RelationshipView {
+    private fun transition(ontology: Ontology, id: String, request: RevisionRequest, actorId: String, archive: Boolean): RelationshipView {
         val locked = guard.lockRelationship(id)
         if (locked.type !in ontology.relationshipTypes) {
             throw OntologyViolationException("claim-relationship", "Claim 에 딸린 관계는 Claim 을 보관해 정리합니다.")
@@ -98,11 +102,13 @@ class RelationshipService(
                 request.reason?.takeIf { it.isNotBlank() }?.take(1000),
             ),
         )
-        return view(id)
+        return view(ontology, id)
     }
 
     /** 관계 타입마다 id 인덱스가 있어 타입을 넣어 찾는다. */
-    fun view(id: String): RelationshipView = ontology.relationshipTypes.keys.sorted().firstNotNullOfOrNull { type ->
+    fun view(id: String): RelationshipView = view(holder.current(), id)
+
+    private fun view(ontology: Ontology, id: String): RelationshipView = ontology.relationshipTypes.keys.sorted().firstNotNullOfOrNull { type ->
         views(
             client.query(
                 "MATCH (a:Knowledge)-[r:`$type` {id: \$id}]->(b:Knowledge) RETURN type(r) AS type, properties(r) AS r, properties(a) AS a, properties(b) AS b",
