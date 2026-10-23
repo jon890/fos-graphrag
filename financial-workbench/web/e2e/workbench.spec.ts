@@ -981,8 +981,10 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
 
   test('9c) 관리자가 기존 데이터와 어긋나는 변경을 미리보면 영향과 확인란이 보이고, 저장하지 않고 초안을 버린다', async () => {
     const propKey = `required${suffix}`
-    // 1. 관리자가 시작 전 버전 번호를 읽어 둔다.
+    // 1. 관리자가 시작 전 버전 번호를 읽어 둔다. 9b 의 정리는 API 로 되돌려 화면이 예전 버전을 들고 있으므로 새로고침해 최신 버전을 읽는다.
     await pageAdmin.getByTestId('tab-ontology').click()
+    await pageAdmin.reload()
+    await expect(pageAdmin.getByTestId('ontology-stale')).toHaveCount(0)
     const before = Number(/\d+/.exec(await pageAdmin.getByTestId('ontology-version').innerText())?.[0])
     expect(before, '시작 전 온톨로지 버전').toBeGreaterThan(0)
 
@@ -1011,6 +1013,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     const impact = pageAdmin.locator('[data-testid="ontology-impact"][data-kind="NOW_REQUIRED"]')
     await expect(impact).toBeVisible()
     await expect(impact).toContainText(/\d+개/)
+    // 더한 것은 이 단계의 속성 하나뿐이다. 앞 단계가 남긴 항목이 섞이지 않는다.
+    await expect(pageAdmin.getByTestId('ontology-diff-added').locator('li')).toHaveCount(1)
     const save = pageAdmin.getByTestId('ontology-save')
     await expect(save).toBeDisabled()
     await pageAdmin.getByTestId('ontology-save-confirm').check()
