@@ -1,0 +1,12 @@
+{
+  "finish": {
+    "run": "run_9b1b8772b620",
+    "base_branch": "main",
+    "specs_dir": ".omc/orch/specs"
+  },
+  "queue": {
+    "method": "merge",
+    "after_merged": "bash \"$(git rev-parse --show-toplevel)/financial-workbench/scripts/deploy-prod.sh\"",
+    "docs_glob": ["**/*.md", "tasks/**"]
+  }
+}

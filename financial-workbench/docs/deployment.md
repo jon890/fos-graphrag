@@ -109,6 +109,9 @@ runner 에는 docker 와 socket 이 없어서, workflow 는 checkout 다음에 `
 runner 없이 확인하려면 로컬에서 `docker build --platform linux/amd64 financial-workbench` 를 실행한다.
 홈서버에서는 `latest` 대신 `sha-<7자리>` 를 `WORKBENCH_IMAGE` 에 고정해 쓴다.
 
+운영 배포는 `scripts/deploy-prod.sh` 한 명령으로 한다. main 의 이미지 workflow 를 돌려 성공을 기다리고, 홈서버의 `scripts/deploy/host-deploy-service.sh financial-workbench`(fos-home-infra)로 배포한 뒤 공개 주소의 health 를 본다.
+PR 을 머지 큐(`merge-with-finish.py`)로 머지하면 `.claude/orch-finish.json` 의 머지 뒤 명령이 이 스크립트를 부른다. 문서만 머지했으면 배포하지 않는다.
+
 ## 자원 설정
 
 | 서비스 | 변수 | 기본값 | 근거 |
