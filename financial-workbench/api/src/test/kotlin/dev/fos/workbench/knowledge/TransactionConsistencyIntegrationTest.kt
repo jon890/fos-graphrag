@@ -3,6 +3,12 @@ package dev.fos.workbench.knowledge
 import dev.fos.workbench.history.ChangeEventDraft
 import dev.fos.workbench.history.ChangeEventRecorder
 import dev.fos.workbench.history.Neo4jChangeEventRecorder
+import dev.fos.workbench.ontology.NodeTypeDef
+import dev.fos.workbench.ontology.OntologyLoader
+import dev.fos.workbench.ontology.OntologyVersionStore
+import dev.fos.workbench.ontology.PropertyDef
+import dev.fos.workbench.ontology.PropertyType
+import dev.fos.workbench.support.ApiClient
 import dev.fos.workbench.support.Fixtures
 import dev.fos.workbench.support.IntegrationTest
 import dev.fos.workbench.support.id
@@ -14,6 +20,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.data.neo4j.core.Neo4jClient
 import tools.jackson.databind.json.JsonMapper
+import java.util.UUID
 
 /**
  * 이력 기록이 실패하면 데이터 변경도 롤백되는지 실제 Neo4j 로 확인한다.
@@ -41,6 +48,9 @@ class TransactionConsistencyIntegrationTest : IntegrationTest() {
     @org.springframework.beans.factory.annotation.Autowired
     lateinit var recorder: SwitchableRecorder
 
+    @org.springframework.beans.factory.annotation.Autowired
+    lateinit var versions: OntologyVersionStore
+
     @Test
     fun `이력 기록이 실패하면 노드 변경도 남지 않는다`() {
         val alice = loggedIn(ALICE)
@@ -61,6 +71,37 @@ class TransactionConsistencyIntegrationTest : IntegrationTest() {
         // 잠금 표시도 롤백되어 남지 않는다
         val lock = neo4j.query("MATCH (n:Knowledge {id: \$id}) RETURN n._lock AS lock").bind(company.id).to("id").fetch().one().get()
         assertThat(lock["lock"]).isNull()
+    }
+
+    @Test
+    fun `온톨로지 저장에서 이력 기록이 실패하면 버전도 holder 도 그대로다`() {
+        val admin = loggedIn(ADMIN)
+        // 다른 테스트 클래스의 컨텍스트가 버전을 올렸을 수 있어 정의와 번호는 DB 의 최신 버전에서 읽는다
+        val latest = versions.latest()!!
+        val type = "Rollback" + UUID.randomUUID().toString().filter { it.isLetter() }.uppercase().take(6)
+        val def = NodeTypeDef(
+            label = "롤백", description = "x", labelProperty = "title",
+            properties = mapOf("title" to PropertyDef(PropertyType.STRING, label = "제목", required = true)),
+        )
+        val yaml = OntologyLoader.toYaml(latest.ontology.copy(nodeTypes = latest.ontology.nodeTypes + (type to def)))
+        val before = state(admin)
+
+        recorder.fail = true
+        try {
+            val response = admin.post("/api/ontology/versions", mapOf("baseVersion" to latest.version, "yaml" to yaml))
+            assertThat(response.status).describedAs(response.body.toString()).isEqualTo(500)
+        } finally {
+            recorder.fail = false
+        }
+
+        assertThat(state(admin)).isEqualTo(before)
+    }
+
+    /** GET /api/ontology 의 version, OntologyHead 의 번호, OntologyVersion 개수 */
+    private fun state(admin: ApiClient): Triple<Int, Long, Long> {
+        val head = neo4j.query("MATCH (h:OntologyHead {key: 'ontology'}) RETURN h.version AS c").fetch().one().map { (it["c"] as Number).toLong() }.get()
+        val count = neo4j.query("MATCH (v:OntologyVersion) RETURN count(v) AS c").fetch().one().map { (it["c"] as Number).toLong() }.get()
+        return Triple(admin.get("/api/ontology").body["version"].asInt(), head, count)
     }
 
     @Test

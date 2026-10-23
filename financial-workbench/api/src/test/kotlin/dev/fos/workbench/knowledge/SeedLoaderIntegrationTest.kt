@@ -5,6 +5,7 @@ import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.support.Fixtures
 import dev.fos.workbench.support.IntegrationTest
 import dev.fos.workbench.support.id
+import dev.fos.workbench.web.OntologyViolationException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -90,6 +91,16 @@ class SeedLoaderIntegrationTest : IntegrationTest() {
 
         assertThat(count("MATCH (s:SeedRun {key: '$key'}) RETURN count(s) AS c")).isZero()
         assertThat(count("MATCH (n:Knowledge {name: '롤백개념-$suffix'}) RETURN count(n) AS c")).describedAs("롤백된 노드").isZero()
+    }
+
+    @Test
+    fun `최신 버전에 없는 타입을 쓰는 파일은 적용하지 않고 기록도 남기지 않는다`() {
+        val key = "test-unknown-${UUID.randomUUID().toString().take(8)}"
+        val file = SeedFile(key = key, nodes = listOf(SeedNode("a", "NoSuchType", mapOf("name" to "x"))))
+
+        assertThrows<OntologyViolationException> { seeds.applyInTransaction(file) }
+
+        assertThat(count("MATCH (s:SeedRun {key: '$key'}) RETURN count(s) AS c")).isZero()
     }
 
     @Test

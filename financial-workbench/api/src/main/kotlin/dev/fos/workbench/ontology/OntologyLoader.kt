@@ -1,15 +1,34 @@
 package dev.fos.workbench.ontology
 
 import org.springframework.core.io.ClassPathResource
+import tools.jackson.core.JacksonException
+import tools.jackson.core.JsonToken
+import tools.jackson.databind.DatabindException
 import tools.jackson.databind.DeserializationFeature
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.exc.UnrecognizedPropertyException
 import tools.jackson.dataformat.yaml.YAMLMapper
 import tools.jackson.module.kotlin.kotlinModule
 import tools.jackson.module.kotlin.readValue
 import java.io.InputStream
 
+/** ADMIN 이 보낸 정의를 읽고 검사한 결과. 정의는 코드 소유 부분을 저장소 값으로 바꾼 것이다 */
+sealed interface EditRead {
+    /** 보낸 값 가운데 코드가 소유해 무시한 경로(`CodeOwned.ignoredPaths`) */
+    val codeOwnedIgnored: List<String>
+
+    data class Valid(val ontology: Ontology, override val codeOwnedIgnored: List<String> = emptyList()) : EditRead
+
+    /** 읽기에 성공했으면 [ontology] 에 합친 정의가 있다. 읽지 못했으면 null 이다 */
+    data class Invalid(val errors: List<String>, val ontology: Ontology?, override val codeOwnedIgnored: List<String> = emptyList()) : EditRead
+}
+
 object OntologyLoader {
     const val RESOURCE = "financial-ontology.yaml"
     private val HEX_COLOR = Regex("^#[0-9a-fA-F]{6}$")
+    private val NODE_TYPE_KEY = Regex("^[A-Z][A-Za-z0-9]*$")
+    private val UPPER_SNAKE_KEY = Regex("^[A-Z][A-Z0-9_]*$")
+    private val PROPERTY_KEY = Regex("^[a-z][A-Za-z0-9]*$")
 
     /** API 가 직접 쓰는 노드 속성 이름. 온톨로지가 이 이름을 정의하면 사용자가 시스템 값을 덮어쓸 수 있어 시작을 막는다. */
     val RESERVED_PROPERTIES = setOf(
@@ -56,6 +75,70 @@ object OntologyLoader {
                 }
             },
         )
+    }
+
+    /** 편집기가 보낸 YAML 을 읽고 검사한다. [latest] 는 더한 키를 가려내는 데 쓴다 */
+    fun readEdited(text: String, latest: Ontology): EditRead = readEdited(latest, text) { mapper.readValue(text, Ontology::class.java) }
+
+    /** 편집 폼이 보낸 JSON 정의를 읽고 검사한다 */
+    fun readEdited(definition: JsonNode, latest: Ontology): EditRead =
+        readEdited(latest, null) { mapper.treeToValue(definition, Ontology::class.java) }
+
+    /**
+     * 읽기, 코드 소유 부분 합치기(Claim predicate 선택지 포함), 일관성 검사, 코드가 이름으로 읽는 키 검사, managedBy 검사,
+     * 더한 키의 형식 검사 순서다. 오류 문장에는 클래스 이름이나 Jackson 의 원래 메시지를 담지 않는다.
+     */
+    private fun readEdited(latest: Ontology, text: String?, read: () -> Ontology?): EditRead {
+        val edited = try {
+            read() ?: return EditRead.Invalid(listOf("YAML 을 읽지 못했습니다"), null)
+        } catch (e: UnrecognizedPropertyException) {
+            return EditRead.Invalid(listOf("알 수 없는 키 ${e.propertyName}${lineSuffix(lineOf(text, e))}"), null)
+        } catch (e: DatabindException) {
+            val path = e.path.joinToString(".") { it.propertyName ?: it.index.toString() }
+            return EditRead.Invalid(listOf("값의 형식이 맞지 않습니다: $path${lineSuffix(lineOf(text, e))}"), null)
+        } catch (e: JacksonException) {
+            return EditRead.Invalid(listOf("YAML 을 읽지 못했습니다${lineSuffix(e.location?.lineNr)}"), null)
+        }
+        val repo = loadDefault()
+        val merged = CodeOwned.merge(edited, repo)
+        val ignored = CodeOwned.ignoredPaths(edited, merged)
+        val errors = consistencyErrors(merged) + CodeReadKeys.violations(merged, repo) + CodeOwned.errors(edited, repo) + newKeyErrors(merged, latest)
+        return if (errors.isEmpty()) EditRead.Valid(merged, ignored) else EditRead.Invalid(errors, merged, ignored)
+    }
+
+    private fun lineSuffix(line: Int?): String = line?.takeIf { it > 0 }?.let { " (줄 $it)" }.orEmpty()
+
+    /**
+     * 오류가 난 키의 줄. 데이터 클래스는 생성자 인자를 객체 끝까지 모은 뒤 만들어서 예외의 위치가 객체 끝을 가리키므로,
+     * 예외의 경로와 같은 경로의 키를 원문에서 다시 찾는다. 찾지 못하면 예외의 위치를 쓴다. JSON 정의로 보냈으면 줄이 없다.
+     */
+    private fun lineOf(text: String?, e: DatabindException): Int? {
+        if (text == null) return null
+        val target = e.path.joinToString("") { "/" + (it.propertyName?.replace("~", "~0")?.replace("/", "~1") ?: it.index.toString()) }
+        return try {
+            mapper.createParser(text).use { p ->
+                generateSequence { p.nextToken() }
+                    .firstOrNull { it == JsonToken.PROPERTY_NAME && p.streamReadContext().pathAsPointer().toString() == target }
+                    ?.let { p.currentTokenLocation().lineNr }
+            }
+        } catch (_: JacksonException) {
+            null
+        } ?: e.location?.lineNr
+    }
+
+    /** [latest] 에 없던 키만 형식을 본다. 이미 있는 키는 그대로 둔다 */
+    private fun newKeyErrors(o: Ontology, latest: Ontology): List<String> = buildList {
+        (o.nodeTypes.keys - latest.nodeTypes.keys).sorted().filterNot { NODE_TYPE_KEY.matches(it) }
+            .forEach { add("새 노드 타입 키는 영문 대문자로 시작하고 영문자와 숫자만 씁니다: $it") }
+        (o.relationshipTypes.keys - latest.relationshipTypes.keys).sorted().filterNot { UPPER_SNAKE_KEY.matches(it) }
+            .forEach { add("새 관계 종류 키는 영문 대문자로 시작하고 영문 대문자, 숫자, 밑줄만 씁니다: $it") }
+        (o.claimPredicates.keys - latest.claimPredicates.keys).sorted().filterNot { UPPER_SNAKE_KEY.matches(it) }
+            .forEach { add("새 주장 종류 키는 영문 대문자로 시작하고 영문 대문자, 숫자, 밑줄만 씁니다: $it") }
+        o.nodeTypes.toSortedMap().forEach { (type, def) ->
+            val known = latest.nodeTypes[type]?.properties?.keys.orEmpty()
+            (def.properties.keys - known).sorted().filterNot { PROPERTY_KEY.matches(it) }
+                .forEach { add("새 속성 키는 영문 소문자로 시작하고 영문자와 숫자만 씁니다: $type.$it") }
+        }
     }
 
     fun loadDefault(): Ontology = load(ClassPathResource(RESOURCE).inputStream)

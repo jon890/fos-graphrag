@@ -4,13 +4,16 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonValue
 import dev.fos.workbench.web.OntologyViolationException
+import dev.fos.workbench.web.ValidationFailedException
 
 /** ontology/financial-ontology.yaml 의 구조. 필드 이름은 YAML 키와 같다. */
 data class Ontology(
-    val schemaVersion: String,
+    /** 저장할 때 서버가 버전 번호로 채운다. 편집한 정의에는 없어도 된다 */
+    val schemaVersion: String = "",
     val nodeTypes: Map<String, NodeTypeDef>,
     val relationshipTypes: Map<String, RelationshipTypeDef>,
-    val claimRelationships: Map<String, ClaimRelationshipDef>,
+    /** 코드가 소유한다. 편집한 정의에 없으면 `CodeOwned.merge` 가 저장소 값으로 채운다 */
+    val claimRelationships: Map<String, ClaimRelationshipDef> = emptyMap(),
     val claimPredicates: Map<String, ClaimPredicateDef>,
     /** Claim 검토 상태의 표시 이름. 키는 서버가 정한 값(DRAFT, REVIEWED, REJECTED)이다 */
     val reviewStatuses: Map<String, LabelDef> = emptyMap(),
@@ -35,9 +38,25 @@ data class Ontology(
     val allRelationshipTypes: Set<String>
         get() = relationshipTypes.keys + claimRelationships.keys
 
+    /** 정의에서 빠진 타입의 노드는 `name` 속성, 그것도 없으면 타입 키다(docs/data-schema.md 의 「정의에서 빠진 데이터」) */
     fun labelOf(type: String, properties: Map<String, Any?>): String {
-        val def = nodeTypes[type] ?: return type
+        val def = nodeTypes[type] ?: return properties["name"]?.toString() ?: type
         return properties[def.labelProperty]?.toString() ?: type
+    }
+
+    companion object {
+        private val TYPE_KEY = Regex("^[A-Za-z][A-Za-z0-9_]*$")
+
+        /**
+         * 검색, 목록, 그래프의 타입 필터. 지금 정의에 없는 타입 키도 받아 빠진 타입의 노드를 좁혀 볼 수 있게 하고, 키 형식만 검사한다.
+         * 값은 Cypher 에 parameter 로만 넘긴다.
+         */
+        fun requireTypeFilter(types: List<String>?) {
+            val invalid = types.orEmpty().filterNot { TYPE_KEY.matches(it) }
+            if (invalid.isNotEmpty()) {
+                throw ValidationFailedException(mapOf("types" to "타입 키는 영문자로 시작하고 영문자, 숫자, 밑줄만 씁니다: ${invalid.joinToString()}"))
+            }
+        }
     }
 
     /** Claim 의 이름. 「주체 → 대상 관계 표시 이름」 이고, 찾지 못한 끝은 ? 로 둔다 */

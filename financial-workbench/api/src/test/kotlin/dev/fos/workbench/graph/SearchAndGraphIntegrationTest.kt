@@ -41,7 +41,13 @@ class SearchAndGraphIntegrationTest : IntegrationTest() {
         val byTicker = alice.get("/api/nodes?q=${q("q" + fx.suffix)}&types=Security").body
         assertThat(byTicker["items"].toList().map { it["id"].asString() }).containsExactly(security.id)
         assertThat(alice.get("/api/nodes?q=${q("q" + fx.suffix)}&types=Company").body["totalItems"].asLong()).isZero()
-        assertThat(alice.get("/api/nodes?types=Account").code).isEqualTo("ONTOLOGY_VIOLATION")
+        // 타입 필터는 정의에 없는 키도 받고 키 형식만 본다
+        val unknownType = alice.get("/api/nodes?types=Account")
+        assertThat(unknownType.status).isEqualTo(200)
+        assertThat(unknownType.body["totalItems"].asLong()).isZero()
+        val badKey = alice.get("/api/nodes?types=bad-key")
+        assertThat(badKey.status).isEqualTo(400)
+        assertThat(badKey.code).isEqualTo("VALIDATION_FAILED")
     }
 
     @Test

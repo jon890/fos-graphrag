@@ -4,6 +4,7 @@ import dev.fos.workbench.auth.UserRef
 import dev.fos.workbench.auth.UserRepository
 import dev.fos.workbench.ontology.Ontology
 import dev.fos.workbench.ontology.OntologyHolder
+import dev.fos.workbench.ontology.OntologyLoader
 import dev.fos.workbench.web.NotFoundException
 import org.springframework.data.neo4j.core.Neo4jClient
 import org.springframework.stereotype.Component
@@ -133,12 +134,14 @@ class KnowledgeReader(
         label: String,
     ): NodeView {
         val type = p["type"] as String
-        val def = ontology.requireNodeType(type)
+        // 정의에서 빠진 타입의 노드는 시스템 속성을 뺀 저장된 값을 모두 담는다(docs/data-schema.md 의 「정의에서 빠진 데이터」)
+        val keys = ontology.nodeTypes[type]?.properties?.keys
+            ?: p.keys.filterNot { it in OntologyLoader.RESERVED_PROPERTIES || it.startsWith("_") }
         return NodeView(
             id = p["id"] as String,
             type = type,
             label = label,
-            properties = def.properties.keys.filter { p[it] != null }.associateWith { p[it] },
+            properties = keys.filter { p[it] != null }.associateWith { p[it] },
             revision = (p["revision"] as Number).toLong(),
             archived = p["archived"] == true,
             archivedAt = p["archivedAt"] as String?,

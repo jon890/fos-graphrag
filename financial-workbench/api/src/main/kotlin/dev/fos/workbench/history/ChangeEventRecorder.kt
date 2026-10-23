@@ -8,7 +8,7 @@ import java.util.UUID
 
 enum class ChangeAction { CREATE, UPDATE, REVIEW, ARCHIVE, RESTORE }
 
-enum class TargetKind { NODE, RELATIONSHIP, USER }
+enum class TargetKind { NODE, RELATIONSHIP, USER, ONTOLOGY }
 
 data class FieldChange(val before: Any?, val after: Any?)
 

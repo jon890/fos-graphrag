@@ -198,6 +198,21 @@ class OntologyLabelsTest {
         assertThat(errors[1]).contains("searchProperties").contains("nope2")
     }
 
+    @Test
+    fun `알 수 없는 키는 줄 번호와 함께 알린다`() {
+        // 다섯째 줄에 Company 타입의 알 수 없는 키를 둔다
+        val yaml = minimal("{ type: string }").replace("    description: x\n", "    description: x\n    oddKey: 1\n")
+        assertThat(yaml.lines()[4]).isEqualTo("    oddKey: 1")
+
+        val read = OntologyLoader.readEdited(yaml, OntologyLoader.loadDefault())
+
+        assertThat(read).isInstanceOf(EditRead.Invalid::class.java)
+        val errors = (read as EditRead.Invalid).errors
+        assertThat(errors).hasSize(1)
+        assertThat(errors.single()).contains("oddKey").contains("줄 5").doesNotContain("dev.fos")
+        assertThat(read.ontology).isNull()
+    }
+
     private fun minimal(nameProperty: String) = """
         schemaVersion: "9"
         nodeTypes:

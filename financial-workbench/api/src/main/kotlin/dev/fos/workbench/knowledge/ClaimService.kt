@@ -122,6 +122,8 @@ class ClaimService(
             throw OntologyViolationException("claim-immutable-field", "Claim 의 ${immutable.joinToString()} 은 바꿀 수 없습니다. 보관하고 새로 만드세요.")
         }
         val before = lockClaim(id)
+        // 정의에서 빠진 주장 종류의 주장은 내용을 고칠 수 없다. 검토, 보관, 복원은 된다
+        holder.current().requirePredicate(before["predicate"] as String)
         guard.requireRevision(before, expected)
         guard.requireActive(before)
         val changes = validator.validatePatch(CLAIM, requested)

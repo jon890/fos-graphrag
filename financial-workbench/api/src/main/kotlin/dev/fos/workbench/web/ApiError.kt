@@ -1,5 +1,6 @@
 package dev.fos.workbench.web
 
+import dev.fos.workbench.ontology.OntologyImpact
 import org.springframework.http.HttpStatus
 
 data class ApiError(
@@ -58,3 +59,12 @@ class LastEvidenceException(claimIds: List<String>) :
 
 class NoActiveEvidenceException :
     ApiException(HttpStatus.CONFLICT, "NO_ACTIVE_EVIDENCE", "활성 근거 문서가 없는 Claim 입니다. 근거 문서를 먼저 복원하세요.")
+
+class OntologyInvalidException(errors: List<String>) :
+    ApiException(HttpStatus.BAD_REQUEST, "ONTOLOGY_INVALID", "온톨로지 정의에 오류가 있습니다.", mapOf("errors" to errors))
+
+class OntologyImpactUnconfirmedException(impacts: List<OntologyImpact>) :
+    ApiException(
+        HttpStatus.CONFLICT, "ONTOLOGY_IMPACT_UNCONFIRMED", "기존 데이터와 어긋나는 변경입니다. 영향을 확인한 뒤 다시 저장하세요.",
+        mapOf("impacts" to impacts),
+    )

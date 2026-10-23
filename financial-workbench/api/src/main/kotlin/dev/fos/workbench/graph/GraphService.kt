@@ -49,7 +49,7 @@ class GraphService(
             throw ValidationFailedException(mapOf("hops" to "1 이상 ${limits.maxHops} 이하여야 합니다."))
         }
         val ontology = holder.current()
-        types?.forEach { ontology.requireNodeType(it) }
+        Ontology.requireTypeFilter(types)
         if (reviewStatus != null && ReviewStatus.entries.none { it.name == reviewStatus }) {
             throw ValidationFailedException(mapOf("reviewStatus" to "DRAFT, REVIEWED, REJECTED 가운데 하나여야 합니다."))
         }
