@@ -86,7 +86,7 @@
 | 411 | `LENGTH_REQUIRED` | 본문이 있는 `/api` 요청에 Content-Length 가 없다(chunked 전송) |
 | 413 | `PAYLOAD_TOO_LARGE` | 요청 본문이 64KiB 를 넘는다. 온톨로지 미리보기, 저장, 되돌리기는 512KiB 다 |
 | 403 | `SELF_REVIEW_FORBIDDEN` | 자기가 작성한 Claim 을 검토하려 했다 |
-| 404 | `NOT_FOUND` | 그 ID 의 노드나 관계가 없다 |
+| 404 | `NOT_FOUND` | 그 ID 의 노드나 관계가 없다. 온톨로지 버전 조회와 되돌리기에서는 그 버전 번호가 없다 |
 | 409 | `REVISION_CONFLICT` | `expectedRevision` 이 현재 revision 과 다르다. `details` 에 두 값이 있다 |
 | 409 | `ARCHIVED` | 보관된 대상을 수정하려 했다. 먼저 복원한다 |
 | 409 | `NOT_ARCHIVED` | 보관되지 않은 대상을 복원하려 했다 |
@@ -401,7 +401,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 - 최신 버전과 바뀐 점이 없으면(`added`, `removed`, `changed` 가 모두 비면) 저장과 되돌리기는 `400 ONTOLOGY_INVALID`(「바뀐 점이 없습니다.」)다. 새 버전을 만들지 않는다.
 - 저장과 되돌리기의 `note` 는 1000자까지다. 넘으면 `400 VALIDATION_FAILED` 다. `yaml` 과 `definition` 은 하나만 보낸다.
 - ADMIN 이 아니면 `GET /api/ontology` 를 뺀 위 여섯 끝점은 `403 FORBIDDEN` 이다. `GET /api/ontology` 는 모든 역할이 읽는다.
-- 모든 API 응답에 `X-Ontology-Version` 헤더(최신 버전 번호)가 있다. 화면은 이 값이 들고 있는 버전과 다르면 온톨로지를 다시 읽으라는 안내를 보인다.
+- 모든 API 응답에 `X-Ontology-Version` 헤더(최신 버전 번호)가 있다. 요청 크기 검사가 거절한 `413`, `411` 응답에는 붙지 않는다. 화면은 이 값이 들고 있는 버전과 다르면 온톨로지를 다시 읽으라는 안내를 보인다.
 
 ## 사용자 관리
 
