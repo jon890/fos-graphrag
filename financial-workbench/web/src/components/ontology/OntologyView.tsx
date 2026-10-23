@@ -1,8 +1,8 @@
-import { useApp } from '../context'
-import type { PropertyDef } from '../api/types'
+import { useApp } from '../../context'
+import type { PropertyDef } from '../../api/types'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { TypeBadge } from './TypeBadge'
+import { TypeBadge } from '../TypeBadge'
 
 function constraints(def: PropertyDef): string {
   const parts: string[] = []
@@ -13,15 +13,10 @@ function constraints(def: PropertyDef): string {
   return parts.join(', ')
 }
 
-export function OntologyTab() {
+export function OntologyView() {
   const { ontology } = useApp()
   return (
-    <div className="min-h-full bg-card px-3 py-4 lg:px-6" data-testid="ontology-tab">
-      <h2 className="m-0 mb-2 text-lg font-bold">
-        온톨로지 <span className="text-muted-foreground" data-testid="ontology-version">schemaVersion {ontology.schemaVersion}</span>
-      </h2>
-      <p className="mb-2 mt-0.5 text-xs text-muted-foreground">읽기 전용입니다. 바꾸려면 저장소의 온톨로지 YAML 을 고칩니다.</p>
-
+    <div>
       <h3 className="mb-2 mt-4 text-[15px] font-bold">노드 타입</h3>
       {Object.entries(ontology.nodeTypes).map(([name, def]) => (
         <Card key={name} className="mb-4 gap-3 py-4" data-testid="ontology-node-type" data-type={name}>

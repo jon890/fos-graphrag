@@ -86,7 +86,12 @@ export function RelationshipSection({ node, relationships, onChanged, onError, o
               <TypeBadge type={r.to.type} /> {r.to.label}
             </button>
             {r.archived && <span className="archived-badge">보관됨</span>}
-            {canEdit && (
+            {!ontology.relationshipTypes[r.type] && (
+              <span className="archived-badge" data-testid="relationship-undefined">
+                정의에서 빠진 관계
+              </span>
+            )}
+            {canEdit && ontology.relationshipTypes[r.type] && (
               <button className="link-button small" data-testid="relationship-archive-toggle" onClick={() => void toggleArchive(r)}>
                 {r.archived ? '관계 복원' : '관계 보관'}
               </button>

@@ -156,6 +156,28 @@ export function changesSearch(q: ChangesQuery): string {
   ])
 }
 
+export interface OntologyQuery {
+  view?: 'yaml' | 'history'
+  version?: number
+}
+
+export function parseOntologyQuery(search: string): OntologyQuery {
+  const p = new URLSearchParams(search)
+  const view = p.get('view')
+  const version = p.get('version')
+  const q: OntologyQuery = {}
+  if (view === 'yaml' || view === 'history') q.view = view
+  if (version !== null && /^\d+$/.test(version)) q.version = Number(version)
+  return q
+}
+
+export function ontologySearch(q: OntologyQuery): string {
+  return build([
+    ['view', q.view ?? null],
+    ['version', q.version !== undefined ? String(q.version) : null],
+  ])
+}
+
 /** 옛 /?node=<id> 를 새 주소로. 해당 없으면 null */
 export function legacyRedirect(pathname: string, search: string): string | null {
   if (pathname !== '/') return null

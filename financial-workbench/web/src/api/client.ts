@@ -8,6 +8,10 @@ import type {
   NodeDetail,
   NodeView,
   Ontology,
+  OntologyEditRequest,
+  OntologyPreview,
+  OntologyVersionDetail,
+  OntologyVersionSummary,
   Page,
   PatchClaimRequest,
   PatchUserRequest,
@@ -40,6 +44,17 @@ let unauthorizedHandler: (() => void) | null = null
 /** 세션이 끊겨 401 이 오면 부른다. App 이 로그인 화면으로 돌아가게 등록한다. */
 export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler
+}
+
+let ontologyVersionListener: ((version: number) => void) | null = null
+/** 모든 응답의 X-Ontology-Version 을 받는다. App 이 최신 버전 번호를 알아 「다시 읽기」 안내를 보이게 등록한다. */
+export function setOntologyVersionListener(listener: ((version: number) => void) | null): void {
+  ontologyVersionListener = listener
+}
+
+function reportOntologyVersion(res: Response): void {
+  const header = res.headers.get('X-Ontology-Version')
+  if (header !== null && /^\d+$/.test(header)) ontologyVersionListener?.(Number(header))
 }
 
 function cookieToken(): string | null {
@@ -87,6 +102,7 @@ async function request<T>(method: Method, path: string, body?: unknown, options:
     credentials: 'same-origin',
     body: body === undefined ? undefined : JSON.stringify(body),
   })
+  reportOntologyVersion(res)
   if (res.ok) {
     if (res.status === 204) return undefined as T
     const text = await res.text()
@@ -117,6 +133,22 @@ export function buildQuery(params: Record<string, string | number | boolean | nu
 }
 
 const enc = encodeURIComponent
+
+/** 최신 버전을 파일로 받는 주소. 링크의 href 로 쓴다 */
+export const ONTOLOGY_EXPORT_URL = '/api/ontology/export'
+
+/** 그 버전의 YAML 을 financial-ontology-v<n>.yaml 로 내려받는다 */
+export async function ontologyVersionDownload(n: number): Promise<void> {
+  const detail = await api.ontology.version(n)
+  const url = URL.createObjectURL(new Blob([detail.yaml], { type: 'application/yaml;charset=UTF-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `financial-ontology-v${n}.yaml`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
 
 export const GOOGLE_LOGIN_PATH = '/oauth2/authorization/google'
 
@@ -151,7 +183,15 @@ export const api = {
       request<UserView>('POST', '/api/users', { email, displayName, role }),
     patch: (id: string, body: PatchUserRequest) => request<UserView>('PATCH', `/api/users/${enc(id)}`, body),
   },
-  ontology: () => request<Ontology>('GET', '/api/ontology'),
+  ontology: {
+    get: () => request<Ontology>('GET', '/api/ontology'),
+    versions: (page: number) => request<Page<OntologyVersionSummary>>('GET', `/api/ontology/versions${buildQuery({ page, size: 20 })}`),
+    version: (n: number) => request<OntologyVersionDetail>('GET', `/api/ontology/versions/${n}`),
+    preview: (body: OntologyEditRequest) => request<OntologyPreview>('POST', '/api/ontology/preview', body),
+    save: (body: OntologyEditRequest) => request<OntologyVersionSummary>('POST', '/api/ontology/versions', body),
+    restore: (n: number, body: { baseVersion: number; note?: string; confirm?: boolean }) =>
+      request<OntologyVersionSummary>('POST', `/api/ontology/versions/${n}/restore`, body),
+  },
   nodes: {
     search: (p: NodeSearchParams) =>
       request<Page<NodeView>>(

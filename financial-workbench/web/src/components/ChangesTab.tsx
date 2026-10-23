@@ -64,7 +64,7 @@ export function ChangeRows({ items, onOpen }: { items: ChangeEventView[]; onOpen
             <ActionBadge action={c.action}>{labels.action(c.action)}</ActionBadge>
           </TableCell>
           <TableCell>
-            {c.targetKind === 'RELATIONSHIP' ? labels.relationship(c.targetType) : labels.type(c.targetType)}
+            {c.targetKind === 'ONTOLOGY' ? '온톨로지' : c.targetKind === 'RELATIONSHIP' ? labels.relationship(c.targetType) : labels.type(c.targetType)}
             {c.targetKind === 'RELATIONSHIP' ? ' (관계)' : c.targetKind === 'USER' ? ' (사용자)' : ''}
           </TableCell>
           <TableCell>
@@ -72,6 +72,8 @@ export function ChangeRows({ items, onOpen }: { items: ChangeEventView[]; onOpen
               <Button variant="link" className="h-auto p-0" onClick={() => onOpen(c.targetId)}>
                 {labels.node({ type: c.targetType, label: c.targetLabel })}
               </Button>
+            ) : c.targetKind === 'ONTOLOGY' ? (
+              `온톨로지 ${c.targetLabel}`
             ) : (
               c.targetLabel
             )}

@@ -853,4 +853,76 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageViewer.getByTestId('current-user-name')).toHaveCount(0)
     await shot(pageViewer, '08-disabled')
   })
+
+  test('9) 관리자가 YAML 로 새 타입을 더하면 편집자 화면에 안내가 나오고, 되돌리면 타입이 사라진다', async () => {
+    const typeKey = `Fund${suffix}`
+    // 1. 편집자 A 가 온톨로지를 한 번 읽어 둔 상태(작업 공간)로 둔다.
+    await pageA.getByTestId('tab-workspace').click()
+    await expect(pageA.getByTestId('search-input')).toBeVisible()
+
+    // 2. 관리자가 저장 전 버전 번호를 읽어 두고 YAML 로 새 타입을 더해 저장한다.
+    await pageAdmin.getByTestId('tab-ontology').click()
+    const versionText = await pageAdmin.getByTestId('ontology-version').innerText()
+    const before = Number(/\d+/.exec(versionText)?.[0])
+    expect(before, '저장 전 온톨로지 버전').toBeGreaterThan(0)
+
+    try {
+      await pageAdmin.getByTestId('ontology-edit-yaml').click()
+      const input = pageAdmin.getByTestId('ontology-yaml-input')
+      await expect(input).not.toHaveValue('')
+      const lines = (await input.inputValue()).split('\n')
+      const at = lines.findIndex((line) => line === 'nodeTypes:')
+      expect(at, '정규화된 YAML 의 nodeTypes: 줄').toBeGreaterThanOrEqual(0)
+      lines.splice(
+        at + 1,
+        0,
+        `  ${typeKey}:`,
+        '    label: 펀드',
+        '    description: 투자 펀드',
+        '    labelProperty: name',
+        '    properties:',
+        '      name:',
+        '        type: string',
+        '        label: 펀드 이름',
+        '        required: true',
+      )
+      await input.fill(lines.join('\n'))
+      await pageAdmin.getByTestId('ontology-preview').click()
+      await expect(pageAdmin.getByTestId('ontology-diff-added')).toContainText(`nodeTypes.${typeKey}`)
+      await pageAdmin.getByTestId('ontology-save').click()
+      await expect(pageAdmin.getByTestId('ontology-message')).toHaveAttribute('data-kind', 'success')
+      await shot(pageAdmin, '09-ontology-saved')
+
+      // 3. 편집자 A 가 API 를 부르는 동작을 하면 안내가 나오고, 다시 읽으면 새 타입이 선택지에 있다.
+      await pageA.getByTestId('search-input').fill(data.supplier)
+      await pageA.getByTestId('search-submit').click()
+      await expect(pageA.getByTestId('ontology-stale')).toBeVisible()
+      await pageA.getByTestId('ontology-reload').click()
+      await expect(pageA.getByTestId('ontology-stale')).toHaveCount(0)
+      await expect(pageA.getByTestId('new-node-type').locator('option', { hasText: '펀드' })).toHaveCount(1)
+
+      // 4. 관리자가 버전 기록에서 저장 전 버전으로 되돌린다.
+      await pageAdmin.getByTestId('ontology-history-open').click()
+      await pageAdmin.locator(`[data-testid="ontology-history-row"][data-version="${before}"]`).click()
+      await pageAdmin.getByTestId('ontology-restore').click()
+      await expect(pageAdmin.getByTestId('ontology-diff-removed')).toContainText(`nodeTypes.${typeKey}`)
+      await pageAdmin.getByTestId('ontology-save').click()
+      await expect(pageAdmin.getByTestId('ontology-message')).toHaveAttribute('data-kind', 'success')
+      await shot(pageAdmin, '09-ontology-restored')
+    } finally {
+      // 단계가 중간에 실패해도 새 타입이 남아 다음 실행의 타입 선택지 단언을 깨지 않게 저장 전 버전으로 되돌린다.
+      const base = new URL(pageAdmin.url()).origin
+      await pageAdmin.request.get(`${base}/api/auth/csrf`)
+      const xsrf = (await pageAdmin.context().cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value
+      const latest = ((await (await pageAdmin.request.get(`${base}/api/ontology`)).json()) as { version: number }).version
+      if (latest !== before) {
+        const res = await pageAdmin.request.post(`${base}/api/ontology/versions/${before}/restore`, {
+          headers: { 'X-XSRF-TOKEN': xsrf ?? '', 'Content-Type': 'application/json' },
+          data: { baseVersion: latest, note: '테스트 정리', confirm: true },
+        })
+        // 이미 되돌려 바뀐 점이 없으면 서버가 400 으로 답한다.
+        expect([201, 400]).toContain(res.status())
+      }
+    }
+  })
 })

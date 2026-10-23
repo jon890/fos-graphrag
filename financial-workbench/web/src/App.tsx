@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { api, errorMessage, setUnauthorizedHandler } from './api/client'
+import { api, errorMessage, setOntologyVersionListener, setUnauthorizedHandler } from './api/client'
 import type { CurrentUser, Ontology } from './api/types'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { rememberReturnTo, takeReturnTo } from './lib/links'
+import type { OntologyDraft } from './lib/ontologyEdit'
 import {
   DEFAULT_WORKSPACE_QUERY,
   TAB_PATHS,
@@ -24,7 +25,7 @@ import { Workspace } from './components/Workspace'
 import { ListTab } from './components/ListTab'
 import { ReviewTab } from './components/ReviewTab'
 import { ChangesTab } from './components/ChangesTab'
-import { OntologyTab } from './components/OntologyTab'
+import { OntologyTab } from './components/ontology/OntologyTab'
 import { UsersTab } from './components/UsersTab'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
@@ -55,6 +56,10 @@ export default function App() {
   const [denied, setDenied] = useState(readLoginDenied)
   const [ontology, setOntology] = useState<Ontology | null>(null)
   const [ontologyError, setOntologyError] = useState<string | null>(null)
+  // 서버 응답 헤더로 안 가장 큰 온톨로지 버전. 들고 있는 ontology.version 보다 크면 다시 읽기 안내를 보인다.
+  const [latestVersion, setLatestVersion] = useState(0)
+  // 온톨로지 편집 초안. 탭을 옮겨도 남고 새로고침하면 사라진다.
+  const [ontologyDraft, setOntologyDraft] = useState<OntologyDraft | null>(null)
   // 같은 노드를 다시 골라도 그래프와 상세를 새로 읽게 한다.
   const [focusSeq, setFocusSeq] = useState(0)
   const location = useLocation()
@@ -80,6 +85,7 @@ export default function App() {
       rememberReturnTo(window.location.pathname + window.location.search)
       setAuth({ status: 'anonymous', notice: '세션이 만료되었습니다. 다시 로그인하세요.' })
     })
+    setOntologyVersionListener((version) => setLatestVersion((v) => Math.max(v, version)))
     api.auth
       .me()
       .then((user) => {
@@ -89,15 +95,18 @@ export default function App() {
         setAuth({ status: 'signed-in', user })
       })
       .catch(() => setAuth({ status: 'anonymous' }))
-    return () => setUnauthorizedHandler(null)
+    return () => {
+      setUnauthorizedHandler(null)
+      setOntologyVersionListener(null)
+    }
   }, [])
 
   const signedIn = auth.status === 'signed-in'
   useEffect(() => {
     if (!signedIn) return
     setOntologyError(null)
-    api
-      .ontology()
+    api.ontology
+      .get()
       .then((o) => {
         setOntology(o)
         // 같은 콜백에서 열어야 Workspace 가 선택된 상태로 처음 그려져 좁은 화면의 첫 탭이 상세가 된다.
@@ -110,12 +119,29 @@ export default function App() {
       .catch((e) => setOntologyError(errorMessage(e)))
   }, [signedIn])
 
+  /** 온톨로지만 다시 받는다. 주소와 열린 항목은 그대로다. 저장과 되돌리기가 끝났을 때도 부른다 */
+  const reloadOntology = useCallback(async () => {
+    const fresh = await api.ontology.get()
+    setOntology(fresh)
+    setLatestVersion((v) => Math.max(v, fresh.version))
+  }, [])
+
   // 모르는 경로(/ 포함)와 권한 없는 경로는 기록을 쌓지 않고 바꿔 연다.
   useEffect(() => {
     if (!signedIn) return
     if (tab === null) navigateRef.current(legacyRedirect(location.pathname, location.search) ?? TAB_PATHS.workspace, { replace: true })
     else if (tab === 'users' && role !== 'ADMIN') navigateRef.current(TAB_PATHS.workspace, { replace: true })
+    else if (tab === 'ontology' && role !== 'ADMIN' && new URLSearchParams(location.search).has('view')) navigateRef.current(TAB_PATHS.ontology, { replace: true })
   }, [signedIn, tab, role, location.pathname, location.search])
+
+  // 고친 초안이 있으면 새로고침과 창 닫기 전에 브라우저가 떠날지 묻는다.
+  const draftDirty = ontologyDraft?.dirty === true
+  useEffect(() => {
+    if (!draftDirty) return
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [draftDirty])
 
   useEffect(() => {
     if (tab) lastUrlOf.current[tab] = location.pathname + location.search
@@ -172,6 +198,8 @@ export default function App() {
     lastUrlOf.current = {}
     navigateRef.current(TAB_PATHS.workspace, { replace: true })
     setOntology(null)
+    setLatestVersion(0)
+    setOntologyDraft(null)
     setDenied(false)
     setAuth({ status: 'anonymous' })
   }
@@ -235,6 +263,16 @@ export default function App() {
             <AlertDescription>{ontologyError}</AlertDescription>
           </Alert>
         )}
+        {ontology && latestVersion > ontology.version && (
+          <Alert role={undefined} className="m-2 w-auto" data-testid="ontology-stale">
+            <AlertDescription className="flex flex-wrap items-center gap-2">
+              <span>온톨로지가 바뀌었습니다(버전 {latestVersion}). 다시 읽으면 바뀐 타입과 칸이 보입니다.</span>
+              <Button type="button" size="sm" variant="outline" data-testid="ontology-reload" onClick={() => void reloadOntology().catch((e) => setOntologyError(errorMessage(e)))}>
+                다시 읽기
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         {!ontology && !ontologyError && <div className="p-12 text-center text-muted-foreground">온톨로지를 불러오는 중…</div>}
         {ontology && (
           <AppContext.Provider value={{ user, ontology, canEdit }}>
@@ -258,7 +296,7 @@ export default function App() {
                   onOpen={focusNode}
                 />
               )}
-              {activeTab === 'ontology' && <OntologyTab />}
+              {activeTab === 'ontology' && <OntologyTab draft={ontologyDraft} onDraftChange={setOntologyDraft} reloadOntology={reloadOntology} />}
               {activeTab === 'users' && user.role === 'ADMIN' && <UsersTab onOpenHistory={openHistory} />}
             </ErrorBoundary>
           </AppContext.Provider>

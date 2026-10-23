@@ -81,4 +81,19 @@ describe('ChangeRows', () => {
     expect(html).not.toContain('수정 번호</')
     expect(html).toContain('title="수정 번호 1"')
   })
+
+  it('온톨로지 버전 이력은 버전과 바뀐 경로를 보이고 누르는 단추가 없다', () => {
+    const html = render([
+      event({
+        targetKind: 'ONTOLOGY',
+        targetType: 'Ontology',
+        targetLabel: '버전 7',
+        changes: { added: { before: null, after: ['nodeTypes.Fund'] } },
+      }),
+    ])
+    expect(html).toContain('온톨로지')
+    expect(html).toContain('버전 7')
+    expect(html).toContain('nodeTypes.Fund')
+    expect(html).not.toContain('<button')
+  })
 })

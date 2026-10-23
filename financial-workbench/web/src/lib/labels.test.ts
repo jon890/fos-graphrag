@@ -25,6 +25,9 @@ import {
 // 이 파일의 어떤 함수도 Person 을 알지 못해야 한다.
 const ontology: Ontology = {
   schemaVersion: '9.9.9',
+  version: 1,
+  versionCreatedAt: '2026-10-20T03:15:00Z',
+  versionCreatedBy: null,
   nodeTypes: {
     Company: {
       label: '기업',
@@ -98,7 +101,7 @@ describe('표시 이름', () => {
   })
 
   it('표시 이름이 하나도 없는 예전 온톨로지도 읽는다', () => {
-    const bare: Ontology = { schemaVersion: '1.0.0', nodeTypes: {}, relationshipTypes: {}, claimPredicates: {} }
+    const bare: Ontology = { schemaVersion: '1.0.0', version: 1, versionCreatedAt: '2026-10-20T03:15:00Z', versionCreatedBy: null, nodeTypes: {}, relationshipTypes: {}, claimPredicates: {} }
     expect(reviewStatusKeys(bare)).toEqual(['DRAFT', 'REVIEWED', 'REJECTED'])
     expect(typeLabel(bare, 'Company')).toBe('Company')
     expect(relationshipLabel(bare, 'SUBJECT')).toBe('SUBJECT')

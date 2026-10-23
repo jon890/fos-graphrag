@@ -6,6 +6,9 @@ import { enumValueLabel, nodeDisplayLabel, propertyDef, propertyLabel, reviewSta
 /** 값이 노드나 사용자 ID 인 이력 키. 서버가 refs 에 이 ID 들의 지금 이름을 싣는다 */
 export const REF_KEYS = new Set(['subjectId', 'objectId', 'documentIds', 'fromId', 'toId', 'reviewedBy'])
 
+/** 온톨로지 버전 이력의 키. 값은 바뀐 경로의 목록이다 */
+const ONTOLOGY_PATH_KEYS = new Set(['added', 'removed', 'changed'])
+
 /** 이력 키의 이름. 속성이면 속성 label, 아니면 changeFields label, 둘 다 없으면 키 */
 export function changeFieldLabel(o: Ontology, targetType: string, key: string): string {
   const def = propertyDef(o, targetType, key)
@@ -24,6 +27,7 @@ export function changeValueText(o: Ontology, targetType: string, key: string, va
     const ids = Array.isArray(value) ? value : [value]
     return ids.map((id) => refName(o, refs[String(id)])).join(', ')
   }
+  if (ONTOLOGY_PATH_KEYS.has(key) && Array.isArray(value)) return value.join(', ')
   if (key === 'reviewedAt') return formatDateTime(String(value))
   if (key === 'reviewStatus') return reviewStatusLabel(o, String(value))
   if (key === 'role') return ROLE_LABEL[String(value)] ?? String(value)

@@ -5,8 +5,10 @@ import {
   isSafeReturnTo,
   legacyRedirect,
   listSearch,
+  ontologySearch,
   parseChangesQuery,
   parseListQuery,
+  parseOntologyQuery,
   parseReviewQuery,
   parseWorkspaceQuery,
   reviewSearch,
@@ -98,5 +100,19 @@ describe('isSafeReturnTo', () => {
     expect(isSafeReturnTo('/changes?target=x')).toBe(true)
     expect(isSafeReturnTo('/workspace')).toBe(true)
     for (const bad of ['//evil.example', 'https://x', '/nope', '/workspacefoo', '']) expect(isSafeReturnTo(bad)).toBe(false)
+  })
+})
+
+describe('온톨로지 주소', () => {
+  it('view 와 version 을 읽고 모르는 값은 버린다', () => {
+    expect(parseOntologyQuery('?view=history&version=3')).toEqual({ view: 'history', version: 3 })
+    expect(parseOntologyQuery('?view=nope&version=x')).toEqual({})
+    expect(parseOntologyQuery('')).toEqual({})
+  })
+
+  it('기본값은 쓰지 않고 view 와 version 을 순서대로 만든다', () => {
+    expect(ontologySearch({ view: 'yaml' })).toBe('?view=yaml')
+    expect(ontologySearch({ view: 'history', version: 3 })).toBe('?view=history&version=3')
+    expect(ontologySearch({})).toBe('')
   })
 })

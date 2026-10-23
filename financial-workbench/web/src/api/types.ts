@@ -166,7 +166,7 @@ export interface ChangeEventView {
   actor: UserRef | null
   action: ChangeAction
   targetId: string
-  targetKind: 'NODE' | 'RELATIONSHIP' | 'USER'
+  targetKind: 'NODE' | 'RELATIONSHIP' | 'USER' | 'ONTOLOGY'
   targetType: string
   targetLabel: string
   revision: number
@@ -251,6 +251,11 @@ export interface ClaimPredicateDef {
 
 export interface Ontology {
   schemaVersion: string
+  /** 온톨로지 버전 번호. 저장할 때마다 1씩 늘어난다 */
+  version: number
+  versionCreatedAt: string
+  /** 서버가 만든 버전이면 null */
+  versionCreatedBy: UserRef | null
   nodeTypes: Record<string, NodeTypeDef>
   relationshipTypes: Record<string, RelationshipTypeDef>
   claimRelationships?: Record<string, ClaimRelationshipDef>
@@ -261,6 +266,58 @@ export interface Ontology {
   changeActions?: Record<string, LabelDef>
   /** 변경 이력 키의 표시 이름 */
   changeFields?: Record<string, LabelDef>
+}
+
+export interface OntologyVersionSummary {
+  version: number
+  createdAt: string
+  createdBy: UserRef | null
+  note: string | null
+  restoredFrom: number | null
+}
+
+export interface OntologyVersionDetail extends OntologyVersionSummary {
+  yaml: string
+}
+
+export type OntologyImpactKind =
+  | 'REMOVED_NODE_TYPE'
+  | 'REMOVED_PROPERTY'
+  | 'NOW_REQUIRED'
+  | 'REMOVED_ENUM_VALUE'
+  | 'CHANGED_PROPERTY_TYPE'
+  | 'NARROWED_RANGE'
+  | 'REMOVED_RELATIONSHIP_TYPE'
+  | 'NARROWED_RELATIONSHIP_ENDS'
+  | 'REMOVED_CLAIM_PREDICATE'
+  | 'NARROWED_CLAIM_TYPES'
+
+export interface OntologyImpact {
+  path: string
+  kind: OntologyImpactKind
+  count: number
+}
+
+/** POST /api/ontology/preview 의 응답 */
+export interface OntologyPreview {
+  valid: boolean
+  errors: string[]
+  added: string[]
+  removed: string[]
+  changed: string[]
+  impacts: OntologyImpact[]
+  codeOwnedIgnored: string[]
+  yaml: string | null
+  definition: unknown
+}
+
+/** 미리보기와 저장의 본문. yaml 과 definition 은 하나만 보낸다. note 와 confirm 은 저장만 읽는다 */
+export interface OntologyEditRequest {
+  baseVersion: number
+  yaml?: string
+  definition?: unknown
+  note?: string
+  confirm?: boolean
 }
 
 export interface ApiErrorBody {

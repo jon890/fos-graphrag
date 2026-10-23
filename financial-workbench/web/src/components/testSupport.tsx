@@ -6,6 +6,9 @@ import { AppContext, canEditRole } from '../context'
 /** 컴포넌트 테스트용 온톨로지. 실제 YAML 과 같은 모양이고, 화면 코드가 모르는 타입(Person)이 들어 있다 */
 export const testOntology: Ontology = {
   schemaVersion: 'test',
+  version: 1,
+  versionCreatedAt: '2026-10-20T03:15:00Z',
+  versionCreatedBy: null,
   nodeTypes: {
     Company: {
       label: '기업',

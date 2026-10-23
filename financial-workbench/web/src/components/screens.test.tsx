@@ -8,6 +8,7 @@ import { NodeEditForm } from './NodeEditForm'
 import { PropertyFields } from './PropertyFields'
 import { SearchPanel } from './SearchPanel'
 import { StatusBadge, TypeBadge } from './TypeBadge'
+import { UndefinedTypeProperties } from './UndefinedTypeProperties'
 import { WelcomeGuide } from './WelcomeGuide'
 import { Workspace } from './Workspace'
 import { testOntology, withApp } from './testSupport'
@@ -197,5 +198,30 @@ describe('주소의 검색 조건', () => {
     )
     expect(html).toMatch(/<input[^>]*data-testid="search-input"[^>]*value="abc"/)
     expect(html).toMatch(/<input[^>]*data-testid="filter-include-archived"[^>]*checked=""/)
+  })
+})
+
+describe('정의에서 빠진 타입의 노드', () => {
+  it('저장된 속성을 읽기 전용으로 보이고 입력칸이 없다', () => {
+    const node: NodeView = {
+      id: 'n1',
+      type: 'Gone',
+      label: '남은 노드',
+      properties: { name: '남은 노드', memo: '메모' },
+      revision: 1,
+      archived: false,
+      archivedAt: null,
+      createdAt: '2026-10-20T03:15:00Z',
+      createdBy: null,
+      updatedAt: '2026-10-20T03:15:00Z',
+      updatedBy: null,
+      reviewStatus: null,
+    }
+    const html = renderToStaticMarkup(withApp(<UndefinedTypeProperties node={node} />))
+    expect(html).toContain('data-testid="node-undefined-type"')
+    expect(html).toContain('name')
+    expect(html).toContain('남은 노드')
+    expect(html).toContain('메모')
+    expect(html).not.toContain('<input')
   })
 })
