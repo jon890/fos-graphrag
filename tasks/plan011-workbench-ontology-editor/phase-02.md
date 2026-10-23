@@ -13,9 +13,9 @@ ADMIN 이 보낸 온톨로지 정의를 미리보기(바뀐 점, 영향, 무시�
 ## 컨텍스트
 
 - phase 01 이 만든 것(`financial-workbench/api/src/main/kotlin/dev/fos/workbench/ontology/`):
-  - `OntologyHolder`: `current()`, `snapshot()`.
-  - `OntologyVersionStore`: `latest()`, `get(version)`, `append(edited, actorId, note, restoredFrom, expectedVersion)`. `append` 는 호출한 쓰기 트랜잭션 안에서 `OntologyHead` 를 잠그고, 번호가 `expectedVersion` 과 다르면 `RevisionConflictException` 을 던지고, 커밋 뒤 holder 를 바꾼다.
-  - `CodeOwned.merge(edited, repo)`, `CodeOwned.ignoredPaths(edited, repo)`, `CodeReadKeys.violations(edited, repo)`.
+  - `OntologyHolder`: `current()`, `snapshot()`, `snapshotOrNull()`, `internal replace(s)`(번호가 클 때만 바꾼다).
+  - `OntologyVersionStore`: `latestNumber()`(YAML 을 읽지 않는 최신 번호), `latest()`, `get(version)`, `append(edited, actorId, note, restoredFrom, expectedVersion)`. `append` 는 호출한 쓰기 트랜잭션 안에서 `OntologyHead` 를 잠그고, 번호가 `expectedVersion` 과 다르면 `RevisionConflictException` 을 던지고, 커밋 뒤 holder 를 바꾼다.
+  - `CodeOwned.merge(edited, repo)`, `CodeOwned.ignoredPaths(edited, merged)`(합친 결과와 비교), `CodeReadKeys.violations(edited, repo)`.
   - `OntologyLoader.parse(text)`, `toYaml(o)`, `loadDefault()`, `consistencyErrors(o)`(오류를 모두 모은다), `internal withDerivedClaimPredicate(o)`(Claim `predicate` 의 `values`, `valueLabels` 를 `claimPredicates` 로만 만든다). `CodeOwned.errors(edited, repo)` 가 저장소에 없는 타입의 `managedBy` 를 오류로 낸다.
   - `OntologyHolder.replace` 는 번호가 클 때만 바꾸고, 테스트가 holder 를 DB 최신 버전에 맞출 때도 쓴다.
   - `Neo4jSchemaInitializer.ensureRelationshipIndexes(types)`.
@@ -114,7 +114,7 @@ ADMIN 이 보낸 온톨로지 정의를 미리보기(바뀐 점, 영향, 무시�
 
 - 새 파일 `ontology/OntologyDiffTest.kt`: 저장소 YAML 에 타입 하나를 더하고, 속성 하나를 빼고, label 하나를 바꾼 정의의 `diff` 가 세 목록에 그 경로를 하나씩 담는다. enum 값을 빼면 `...values.V` 가 `removed` 에 있다.
 - `ontology/OntologyLabelsTest.kt` 에 「알 수 없는 키는 줄 번호와 함께 알린다」: `readEdited(yaml, loadDefault())` 가 `Invalid` 이고 문장에 키 이름과 「줄」 이 있으며 `dev.fos` 가 없다.
-- 새 파일 `ontology/OntologyEditIntegrationTest.kt`(`IntegrationTest` 상속). `@BeforeEach` 에 `holder.replace(versions.latest()!!)` 로 이 컨텍스트의 holder 를 DB 에 맞추고 시작 번호를 읽고, `@AfterEach` 에 ADMIN 으로 그 번호를 `restore`(`confirm: true`)해 정의를 되돌린다. 타입과 관계 키에는 테스트마다 다른 영문 접미사를 붙인다.
+- 새 파일 `ontology/OntologyEditIntegrationTest.kt`(`IntegrationTest` 상속). `@BeforeEach` 에 `holder.replace(versions.latest()!!)` 로 이 컨텍스트의 holder 를 DB 에 맞추고 시작 번호를 읽고, `@AfterEach` 에 `versions.latestNumber()` 가 시작 번호와 다를 때만 ADMIN 으로 시작 번호를 `restore`(`confirm: true`)해 정의를 되돌린다. 같으면 되돌릴 것이 없고, restore 하면 「바뀐 점이 없습니다」 로 `400` 이 나기 때문이다. 타입과 관계 키에는 테스트마다 다른 영문 접미사를 붙인다.
   - EDITOR 의 `POST /api/ontology/preview`, `POST /api/ontology/versions` 는 `403 FORBIDDEN` 이다.
   - 새 노드 타입을 YAML 로 더해 저장하면 `201`, 응답 헤더 `X-Ontology-Version` 이 새 번호다. 바로 EDITOR 가 그 타입의 노드를 `POST /api/nodes` 로 만들면 `201` 이다. `GET /api/changes?targetId=<새 번호>` 에 `targetKind == ONTOLOGY`, `action == UPDATE`, `changes.added` 가 있다.
   - 예전 `baseVersion` 으로 저장하면 `409 REVISION_CONFLICT` 다. 같은 `baseVersion` 으로 서로 다른 정의 두 개를 동시에(스레드 두 개) 저장하면 하나는 `201`, 하나는 `409` 다. 최신 번호는 하나만 늘어난다.
@@ -122,9 +122,10 @@ ADMIN 이 보낸 온톨로지 정의를 미리보기(바뀐 점, 영향, 무시�
   - 기존 타입(`Concept`)에 필수 속성을 더하는 정의의 미리보기 `impacts` 에 `NOW_REQUIRED`, `count` 가 그 타입 노드 수다.
   - 주장 종류 하나를 빼는 정의(그 종류의 주장이 하나 있다)의 미리보기가 `valid: true` 이고 `REMOVED_CLAIM_PREDICATE` 다. `confirm: true` 로 저장한 뒤 그 주장의 `PATCH /api/claims/{id}` 는 `400 ONTOLOGY_VIOLATION` 이고 검토는 된다.
   - `GET /api/nodes?types=<뺀 타입>` 은 `200` 이다.
+- `graph/SearchAndGraphIntegrationTest.kt` 의 `assertThat(alice.get("/api/nodes?types=Account").code).isEqualTo("ONTOLOGY_VIOLATION")` 는 타입 필터가 키 형식만 보게 되어 깨진다. 「`types=Account` 는 `200` 이고 `totalItems == 0`」 으로 바꾸고, 형식이 틀린 키(`types=bad-key`)가 `400 VALIDATION_FAILED` 인 단언을 더한다.
   - 값이 있는 속성을 빼는 정의: 미리보기의 `impacts` 에 `REMOVED_PROPERTY`, `count == 1` 이 있다. `confirm` 없이 저장하면 `409 ONTOLOGY_IMPACT_UNCONFIRMED` 와 `details.impacts`, `confirm: true` 면 `201` 이다. 그 뒤 노드 상세에 그 속성이 없고, 그 속성을 담은 `PATCH` 는 `400 ONTOLOGY_VIOLATION` 이다.
   - `Document.url` 을 뺀 정의는 미리보기가 `valid: false` 이고 저장이 `400 ONTOLOGY_INVALID` 다.
-  - `reviewStatuses.DRAFT.label` 을 바꾼 정의는 미리보기 `codeOwnedIgnored` 에 `reviewStatuses.DRAFT` 가 있고, 저장한 뒤 `GET /api/ontology` 의 그 label 은 저장소 값이다.
+  - `reviewStatuses.DRAFT.label` 만 바꾼 정의는 미리보기 `codeOwnedIgnored` 에 `reviewStatuses.DRAFT` 가 있고 `added`, `removed`, `changed` 가 비어 있다. 저장하면 `400 ONTOLOGY_INVALID`(「바뀐 점이 없습니다.」)이고 버전이 늘지 않는다. 같은 label 변경에 `Company.label` 변경을 더한 정의를 저장하면 `201` 이고, 그 뒤 `GET /api/ontology` 의 `reviewStatuses.DRAFT.label` 은 저장소 값, `nodeTypes.Company.label` 은 새 값이다.
   - 미리보기 응답의 `definition` 을 그대로 다시 미리보기로 보내면 `added`, `removed`, `changed` 가 모두 비어 있다.
   - 되돌리기: 시작 번호로 `restore` 하면 `201`, 새 버전의 `restoredFrom` 이 시작 번호이고 이력 `action` 이 `RESTORE` 다.
   - 새 관계 종류를 더해 저장하면 `SHOW INDEXES YIELD name` 에 `rel_<소문자 키>_id` 가 있다.
@@ -137,7 +138,7 @@ ADMIN 이 보낸 온톨로지 정의를 미리보기(바뀐 점, 영향, 무시�
 ## 검증
 
 ```bash
-cd financial-workbench/api && ./gradlew test --tests 'dev.fos.workbench.ontology.*' --tests 'dev.fos.workbench.knowledge.SeedLoaderIntegrationTest' --tests 'dev.fos.workbench.knowledge.TransactionConsistencyIntegrationTest'
+cd financial-workbench/api && ./gradlew test --tests 'dev.fos.workbench.ontology.*' --tests 'dev.fos.workbench.knowledge.SeedLoaderIntegrationTest' --tests 'dev.fos.workbench.knowledge.TransactionConsistencyIntegrationTest' --tests 'dev.fos.workbench.graph.SearchAndGraphIntegrationTest'
 cd financial-workbench/api && ./gradlew test
 git grep -q "ONTOLOGY_IMPACT_UNCONFIRMED" -- financial-workbench/api/src/main
 ```
@@ -167,3 +168,4 @@ git grep -q "ONTOLOGY_IMPACT_UNCONFIRMED" -- financial-workbench/api/src/main
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyEditIntegrationTest.kt` | 신규 |
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/knowledge/SeedLoaderIntegrationTest.kt` | 수정 |
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/knowledge/TransactionConsistencyIntegrationTest.kt` | 수정 |
+| `financial-workbench/api/src/test/kotlin/dev/fos/workbench/graph/SearchAndGraphIntegrationTest.kt` | 수정 |
