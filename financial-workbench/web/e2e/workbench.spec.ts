@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
-import { admin, exact, loginAs, newPage, shot, type TestUser } from './support'
+import { admin, exact, loginAs, newPage, shot, shotElement, type TestUser } from './support'
 
 // 두 편집자(A, B)와 관리자, 열람자가 같은 서버에서 협업하는 흐름을 순서대로 확인한다.
 // 로그인은 실제 Google 대신 가짜 OIDC 서버(navikt/mock-oauth2-server, interactiveLogin)를 거친다.
@@ -889,6 +889,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       await input.fill(lines.join('\n'))
       await pageAdmin.getByTestId('ontology-preview').click()
       await expect(pageAdmin.getByTestId('ontology-diff-added')).toContainText(`nodeTypes.${typeKey}`)
+      await shotElement(pageAdmin.getByTestId('ontology-preview-panel'), '09-ontology-preview')
       await pageAdmin.getByTestId('ontology-save').click()
       await expect(pageAdmin.getByTestId('ontology-message')).toHaveAttribute('data-kind', 'success')
       await shot(pageAdmin, '09-ontology-saved')
@@ -946,6 +947,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       await expect(person.locator(`[data-testid="ontology-form-prop"][data-prop="${propKey}"]`)).toBeVisible()
       await pageAdmin.getByTestId('ontology-preview').click()
       await expect(pageAdmin.getByTestId('ontology-diff-added')).toContainText(`nodeTypes.Person.properties.${propKey}`)
+      await shotElement(pageAdmin.getByTestId('ontology-preview-panel'), '09b-ontology-form-preview')
       await pageAdmin.getByTestId('ontology-save').click()
       await expect(pageAdmin.getByTestId('ontology-message')).toHaveAttribute('data-kind', 'success')
       await shot(pageAdmin, '09b-ontology-form')
