@@ -16,7 +16,8 @@ ADMIN 이 보낸 온톨로지 정의를 미리보기(바뀐 점, 영향, 무시�
   - `OntologyHolder`: `current()`, `snapshot()`.
   - `OntologyVersionStore`: `latest()`, `get(version)`, `append(edited, actorId, note, restoredFrom, expectedVersion)`. `append` 는 호출한 쓰기 트랜잭션 안에서 `OntologyHead` 를 잠그고, 번호가 `expectedVersion` 과 다르면 `RevisionConflictException` 을 던지고, 커밋 뒤 holder 를 바꾼다.
   - `CodeOwned.merge(edited, repo)`, `CodeOwned.ignoredPaths(edited, repo)`, `CodeReadKeys.violations(edited, repo)`.
-  - `OntologyLoader.parse(text)`, `toYaml(o)`, `loadDefault()`. `load` 는 읽기 → `withDerivedClaimPredicate` → `checkConsistency`(첫 오류에서 `require` 예외) 순서다.
+  - `OntologyLoader.parse(text)`, `toYaml(o)`, `loadDefault()`, `consistencyErrors(o)`(오류를 모두 모은다), `internal withDerivedClaimPredicate(o)`(Claim `predicate` 의 `values`, `valueLabels` 를 `claimPredicates` 로만 만든다). `CodeOwned.errors(edited, repo)` 가 저장소에 없는 타입의 `managedBy` 를 오류로 낸다.
+  - `OntologyHolder.replace` 는 번호가 클 때만 바꾸고, 테스트가 holder 를 DB 최신 버전에 맞출 때도 쓴다.
   - `Neo4jSchemaInitializer.ensureRelationshipIndexes(types)`.
   - `SecurityConfig` 가 `/api/ontology/preview`, `/api/ontology/versions/**` 를 ADMIN 으로 막는다. `POST /api/ontology/versions` 도 `/api/ontology/versions` 규칙에 걸린다.
   - `OntologyVersionHeaderFilter` 가 체인 전에 `X-Ontology-Version` 을 넣는다.
@@ -46,15 +47,14 @@ ADMIN 이 보낸 온톨로지 정의를 미리보기(바뀐 점, 영향, 무시�
 
 ## 작업 항목
 
-### 1. 로더: 오류를 모으는 읽기
+### 1. 로더: 편집한 정의 읽기
 
 `ontology/OntologyLoader.kt`
 
-- `checkConsistency` 를 `fun consistencyErrors(o: Ontology): List<String>` 로 바꿔 오류를 모두 모은다. 기존 `require` 하나하나가 목록에 문장을 더한다. `load` 는 목록이 비지 않으면 지금처럼 `IllegalArgumentException(첫 오류)` 를 던진다. 시작 동작과 기존 테스트는 바뀌지 않는다.
-- `fun readEdited(text: String): Result` 와 `fun readEdited(definition: JsonNode): Result` 를 더한다. `Result` 는 `Ok(ontology)` 나 `Invalid(errors)` 다. 읽기 → `CodeOwned.merge(read, loadDefault())` → `withDerivedClaimPredicate` → `consistencyErrors` → `CodeReadKeys.violations` → 더한 키의 형식 검사 순서다.
+- `sealed interface EditRead { data class Valid(val ontology: Ontology); data class Invalid(val errors: List<String>, val ontology: Ontology?) }` 와 `fun readEdited(text: String, latest: Ontology): EditRead`, `fun readEdited(definition: JsonNode, latest: Ontology): EditRead` 를 더한다. `kotlin.Result` 와 이름이 겹치지 않게 한다. 읽기 → `CodeOwned.merge(read, loadDefault())`(파생 포함) → `consistencyErrors` → `CodeReadKeys.violations` → `CodeOwned.errors` → 더한 키의 형식 검사 순서다. 읽기에 성공했으면 `Invalid` 에도 합친 정의를 담는다. 미리보기가 일관성 검사에서만 틀린 정의의 `yaml`, `definition` 을 돌려주기 위해서다.
   - 정의에서 `schemaVersion` 과 `claimRelationships` 는 없어도 되게 `Ontology` 의 두 필드에 기본값(`""`, `emptyMap()`)을 준다. `merge` 가 채운다.
   - Jackson 예외는 문장으로 바꾼다. `UnrecognizedPropertyException` 은 「알 수 없는 키 `<propertyName>` (줄 N)」, 그 밖의 `DatabindException` 은 「값의 형식이 맞지 않습니다: `<path 를 . 으로 이은 것>` (줄 N)」, YAML 문법 오류는 「YAML 을 읽지 못했습니다 (줄 N)」 다. 클래스 이름과 원래 메시지는 담지 않는다.
-  - 더한 키의 형식(최신 버전에 없던 키만): 노드 타입 `^[A-Z][A-Za-z0-9]*$`, 관계 종류와 주장 종류 `^[A-Z][A-Z0-9_]*$`, 속성 `^[a-z][A-Za-z0-9]*$`. 틀리면 「새 노드 타입 키는 영문 대문자로 시작하고 영문자와 숫자만 씁니다: `<키>`」 같은 문장이다.
+  - 더한 키의 형식(`latest` 에 없던 키만): 노드 타입 `^[A-Z][A-Za-z0-9]*$`, 관계 종류와 주장 종류 `^[A-Z][A-Z0-9_]*$`, 속성 `^[a-z][A-Za-z0-9]*$`. 틀리면 「새 노드 타입 키는 영문 대문자로 시작하고 영문자와 숫자만 씁니다: `<키>`」 같은 문장이다.
 
 ### 2. 바뀐 점과 영향
 
@@ -63,7 +63,7 @@ ADMIN 이 보낸 온톨로지 정의를 미리보기(바뀐 점, 영향, 무시�
 - `fun diff(latest: Ontology, edited: Ontology): DiffResult(added, removed, changed)`. 코드 소유 부분은 비교하지 않는다. 경로 규칙:
   - 노드 타입, 관계 종류, 주장 종류: 키가 생기거나 빠지면 `nodeTypes.X`, `relationshipTypes.X`, `claimPredicates.X`.
   - 속성: `nodeTypes.X.properties.p`. enum 값은 `nodeTypes.X.properties.p.values.V`.
-  - 그 밖의 필드가 바뀌면 `changed` 에 필드 경로(`nodeTypes.X.label`, `nodeTypes.X.properties.p.required`, `relationshipTypes.X.from` 등)를 담는다.
+  - 그 밖의 필드가 바뀌면(없던 `maxLength`, `min`, `max` 가 생긴 것 포함) `changed` 에 필드 경로(`nodeTypes.X.label`, `nodeTypes.X.properties.p.required`, `relationshipTypes.X.from` 등)를 담는다.
 - 목록은 사전순으로 정렬한다.
 
 새 파일 `ontology/OntologyImpactCounter.kt`
@@ -71,6 +71,7 @@ ADMIN 이 보낸 온톨로지 정의를 미리보기(바뀐 점, 영향, 무시�
 - `@Component class OntologyImpactCounter(client: Neo4jClient)` 의 `fun count(latest: Ontology, edited: Ontology): List<OntologyImpact>`. `OntologyImpact(path, kind, count)` 다. 보관된 것도 센다. `count == 0` 은 담지 않는다.
 - `kind` 와 세는 쿼리는 `data-schema.md` 「어긋나는 변경」 표를 따른다. `NARROWED_RANGE` 는 `maxLength` 면 `size(toString(n[$prop])) > $max`, `min`/`max` 면 `n[$prop] < $min OR n[$prop] > $max` 다. `NARROWED_RELATIONSHIP_ENDS` 는 `NOT a.type IN $from OR NOT b.type IN $to`, `NARROWED_CLAIM_TYPES` 는 `SUBJECT` 끝의 `type` 이 새 `subjectTypes` 밖이거나 `OBJECT` 끝의 `type` 이 새 `objectTypes` 밖인 그 종류의 주장 수다.
 - 빠진 타입의 속성은 따로 세지 않는다. `REMOVED_NODE_TYPE` 하나로 센다.
+- `NOW_REQUIRED` 는 기존 속성을 필수로 바꾼 것과, 기존 타입에 필수 속성을 새로 더한 것(그 타입의 노드 수)을 함께 센다. `NARROWED_RANGE` 는 없던 제한이 새로 생긴 것도 센다.
 
 ### 3. 편집 서비스와 API
 
@@ -79,13 +80,13 @@ ADMIN 이 보낸 온톨로지 정의를 미리보기(바뀐 점, 영향, 무시�
 - `fun preview(baseVersion: Int, input: EditInput): OntologyPreview`(읽기 트랜잭션). `EditInput` 은 `yaml: String?` 이나 `definition: JsonNode?` 가운데 하나다. 둘 다 있거나 둘 다 없으면 `ValidationFailedException(mapOf("yaml" to "yaml 이나 definition 가운데 하나만 보냅니다."))` 다.
   - 응답은 `api-contract.md` 의 `OntologyPreview` 다(`valid, errors, added, removed, changed, impacts, codeOwnedIgnored, yaml, definition`). 읽지 못하면 `valid: false`, `yaml`, `definition` 은 `null` 이다. 일관성 검사에서만 틀렸으면 `yaml`, `definition` 은 정규화한 값이다.
   - `baseVersion` 이 최신이 아니어도 미리보기는 답한다. 비교는 언제나 최신 버전과 한다.
-- `@Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS) fun save(baseVersion: Int, input: EditInput, note: String?, confirm: Boolean, actorId: String, restoredFrom: Int? = null): SaveResult`
-  1. 읽기와 검사. `Invalid` 면 `OntologyInvalidException(errors)`(`400 ONTOLOGY_INVALID`, `details.errors`).
+- `@Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS) fun save(baseVersion: Int, input: EditInput, note: String?, confirm: Boolean, actorId: String): SaveResult` 와 `@Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS) fun restore(version: Int, baseVersion: Int, note: String?, confirm: Boolean, actorId: String): SaveResult` 를 둔다. 두 메서드가 같은 `private fun saveInTransaction(..., restoredFrom: Int?)` 를 부른다. `restore` 가 `save` 를 직접 부르면 같은 클래스 안의 호출이라 Spring 프록시를 거치지 않아 트랜잭션이 열리지 않는다.
+  1. 읽기와 검사. `Invalid` 면 `OntologyInvalidException(errors)`(`400 ONTOLOGY_INVALID`, `details.errors`). `added`, `removed`, `changed` 가 모두 비면 `OntologyInvalidException(listOf("바뀐 점이 없습니다."))` 다.
   2. `versions.append(...)` 전에 최신 번호가 `baseVersion` 과 다르면 `RevisionConflictException`. `append` 도 잠근 뒤 다시 확인한다.
   3. 영향이 있고 `confirm` 이 아니면 `OntologyImpactUnconfirmedException(impacts)`(`409 ONTOLOGY_IMPACT_UNCONFIRMED`, `details.impacts`).
   4. `append`, 이력: `ChangeEventDraft(actorId, if (restoredFrom != null) RESTORE else UPDATE, 새 번호.toString(), TargetKind.ONTOLOGY, "Ontology", "버전 <새 번호>", 새 번호.toLong(), changes, note)`. `changes` 는 비지 않은 것만 `added → FieldChange(null, 목록)`, `removed → FieldChange(목록, null)`, `changed → FieldChange(null, 목록)` 이다.
   5. `SaveResult(summary, newRelationshipTypes)` 를 돌려준다.
-- `fun restore(version: Int, baseVersion: Int, note: String?, confirm: Boolean, actorId: String)`: `versions.get(version)` 이 없으면 `NotFoundException`. 그 YAML 로 `save(..., restoredFrom = version)` 를 부른다.
+- `restore` 는 `versions.get(version)` 이 없으면 `NotFoundException` 이고, 그 YAML 로 `saveInTransaction(..., restoredFrom = version)` 을 부른다.
 - `note` 는 1000자까지다. 넘으면 `ValidationFailedException(mapOf("note" to "1000자까지 적습니다."))`.
 
 `history/ChangeEventRecorder.kt`: `TargetKind` 에 `ONTOLOGY` 를 더한다.
@@ -105,30 +106,38 @@ ADMIN 이 보낸 온톨로지 정의를 미리보기(바뀐 점, 영향, 무시�
 - `KnowledgeReader.toNodeView`: 정의가 없으면 저장된 속성에서 `OntologyLoader.RESERVED_PROPERTIES` 와 `_` 로 시작하는 키를 뺀 나머지를 모두 담는다. 정의가 있으면 지금처럼 정의된 속성만 담는다.
 - `NodeQueryService.detail`: 관계를 `NOT type(r) IN $claimRelationships`(`ontology.claimRelationships.keys`)로 좁힌다. 빠진 관계 종류의 관계도 상세에 나온다.
 - 고치기와 만들기는 지금처럼 `requireNodeType`, `requireRelationshipType`, `requirePredicate` 가 `400 ONTOLOGY_VIOLATION` 을 낸다. 노드 보관과 복원은 정의를 읽지 않으므로 그대로 된다. 이 동작을 테스트로 고정한다.
+- `knowledge/ClaimService.kt` 의 `patch` 는 지금 predicate 를 확인하지 않는다. 잠근 뒤 `ontology.requirePredicate(before["predicate"] as String)` 를 불러, 빠진 주장 종류의 주장은 내용 고치기가 `400 ONTOLOGY_VIOLATION` 이 되게 한다(`data-schema.md`). 검토, 보관, 복원은 그대로다.
+- 타입 필터: `NodeQueryService.search` 와 `GraphService` 의 `types?.forEach { ontology.requireNodeType(it) }` 를 키 형식 검사(`^[A-Za-z][A-Za-z0-9_]*$`, 틀리면 `ValidationFailedException(mapOf("types" to "…"))`)로 바꾼다. 값은 지금처럼 parameter 로만 넘긴다. 빠진 타입으로도 좁혀 볼 수 있게 하려는 것이다.
+- 빠진 관계 종류의 관계를 보관하거나 복원하면 `RevisionGuard.lockRelationship` 이 찾지 못해 `404 NOT_FOUND` 다. 문서와 같으므로 코드는 그대로 두고 테스트로 고정한다.
 
 ### 5. 이 phase 를 검증하는 테스트
 
 - 새 파일 `ontology/OntologyDiffTest.kt`: 저장소 YAML 에 타입 하나를 더하고, 속성 하나를 빼고, label 하나를 바꾼 정의의 `diff` 가 세 목록에 그 경로를 하나씩 담는다. enum 값을 빼면 `...values.V` 가 `removed` 에 있다.
-- `ontology/OntologyLabelsTest.kt` 에 「오류를 모두 모은다」: `hintProperties: [nope]` 와 `searchProperties: [nope2]` 를 함께 넣은 정의의 `consistencyErrors` 가 두 문장이다. 「알 수 없는 키는 줄 번호와 함께 알린다」: `readEdited` 가 `Invalid` 이고 문장에 키 이름과 「줄」 이 있으며 `dev.fos` 가 없다.
-- 새 파일 `ontology/OntologyEditIntegrationTest.kt`(`IntegrationTest` 상속). `@BeforeEach` 에 시작 번호를 읽고, `@AfterEach` 에 ADMIN 으로 그 번호를 `restore`(`confirm: true`)해 정의를 되돌린다. 타입과 관계 키에는 테스트마다 다른 영문 접미사를 붙인다.
+- `ontology/OntologyLabelsTest.kt` 에 「알 수 없는 키는 줄 번호와 함께 알린다」: `readEdited(yaml, loadDefault())` 가 `Invalid` 이고 문장에 키 이름과 「줄」 이 있으며 `dev.fos` 가 없다.
+- 새 파일 `ontology/OntologyEditIntegrationTest.kt`(`IntegrationTest` 상속). `@BeforeEach` 에 `holder.replace(versions.latest()!!)` 로 이 컨텍스트의 holder 를 DB 에 맞추고 시작 번호를 읽고, `@AfterEach` 에 ADMIN 으로 그 번호를 `restore`(`confirm: true`)해 정의를 되돌린다. 타입과 관계 키에는 테스트마다 다른 영문 접미사를 붙인다.
   - EDITOR 의 `POST /api/ontology/preview`, `POST /api/ontology/versions` 는 `403 FORBIDDEN` 이다.
   - 새 노드 타입을 YAML 로 더해 저장하면 `201`, 응답 헤더 `X-Ontology-Version` 이 새 번호다. 바로 EDITOR 가 그 타입의 노드를 `POST /api/nodes` 로 만들면 `201` 이다. `GET /api/changes?targetId=<새 번호>` 에 `targetKind == ONTOLOGY`, `action == UPDATE`, `changes.added` 가 있다.
-  - 예전 `baseVersion` 으로 저장하면 `409 REVISION_CONFLICT` 다.
+  - 예전 `baseVersion` 으로 저장하면 `409 REVISION_CONFLICT` 다. 같은 `baseVersion` 으로 서로 다른 정의 두 개를 동시에(스레드 두 개) 저장하면 하나는 `201`, 하나는 `409` 다. 최신 번호는 하나만 늘어난다.
+  - 미리보기 결과와 같은 정의(바뀐 점 없음)를 저장하면 `400 ONTOLOGY_INVALID` 이고 버전이 늘지 않는다.
+  - 기존 타입(`Concept`)에 필수 속성을 더하는 정의의 미리보기 `impacts` 에 `NOW_REQUIRED`, `count` 가 그 타입 노드 수다.
+  - 주장 종류 하나를 빼는 정의(그 종류의 주장이 하나 있다)의 미리보기가 `valid: true` 이고 `REMOVED_CLAIM_PREDICATE` 다. `confirm: true` 로 저장한 뒤 그 주장의 `PATCH /api/claims/{id}` 는 `400 ONTOLOGY_VIOLATION` 이고 검토는 된다.
+  - `GET /api/nodes?types=<뺀 타입>` 은 `200` 이다.
   - 값이 있는 속성을 빼는 정의: 미리보기의 `impacts` 에 `REMOVED_PROPERTY`, `count == 1` 이 있다. `confirm` 없이 저장하면 `409 ONTOLOGY_IMPACT_UNCONFIRMED` 와 `details.impacts`, `confirm: true` 면 `201` 이다. 그 뒤 노드 상세에 그 속성이 없고, 그 속성을 담은 `PATCH` 는 `400 ONTOLOGY_VIOLATION` 이다.
   - `Document.url` 을 뺀 정의는 미리보기가 `valid: false` 이고 저장이 `400 ONTOLOGY_INVALID` 다.
   - `reviewStatuses.DRAFT.label` 을 바꾼 정의는 미리보기 `codeOwnedIgnored` 에 `reviewStatuses.DRAFT` 가 있고, 저장한 뒤 `GET /api/ontology` 의 그 label 은 저장소 값이다.
   - 미리보기 응답의 `definition` 을 그대로 다시 미리보기로 보내면 `added`, `removed`, `changed` 가 모두 비어 있다.
   - 되돌리기: 시작 번호로 `restore` 하면 `201`, 새 버전의 `restoredFrom` 이 시작 번호이고 이력 `action` 이 `RESTORE` 다.
   - 새 관계 종류를 더해 저장하면 `SHOW INDEXES YIELD name` 에 `rel_<소문자 키>_id` 가 있다.
-  - 새 타입의 노드를 만든 뒤 그 타입을 빼고(`confirm: true`) 저장하면, `GET /api/nodes/{id}` 가 `200` 이고 `label` 이 `name` 값, `properties` 에 저장한 값이 있다. `GET /api/nodes?q=<이름>` 도 `200` 이다. `PATCH` 는 `400 ONTOLOGY_VIOLATION`(`details.rule == unknown-node-type`), 보관은 `200` 이다.
-  - 새 관계 종류로 관계를 만든 뒤 그 종류를 빼고 저장하면, 시작 노드의 `GET /api/nodes/{id}`(`NodeController` 가 `NodeQueryService.detail` 로 답하는 상세) 관계 목록에 그 관계가 남아 있다.
+  - 새 타입(`labelProperty: title`, 속성 `title` 과 `name`)의 노드를 만든 뒤 그 타입을 빼고(`confirm: true`) 저장하면, `GET /api/nodes/{id}` 가 `200` 이고 `label` 이 `name` 값(정의가 없어 `title` 이 아니다), `properties` 에 저장한 값이 있다. `GET /api/nodes?q=<이름>` 도 `200` 이다. `PATCH` 는 `400 ONTOLOGY_VIOLATION`(`details.rule == unknown-node-type`), 보관은 `200` 이다.
+  - 새 관계 종류로 관계를 만든 뒤 그 종류를 빼고 저장하면, 시작 노드의 `GET /api/nodes/{id}`(`NodeController` 가 `NodeQueryService.detail` 로 답하는 상세) 관계 목록에 그 관계가 남아 있고, 그 관계의 보관은 `404 NOT_FOUND` 다.
   - 주석으로 100KiB 를 채운 YAML 의 미리보기는 `413` 이 아니다. 600KiB 는 `413 PAYLOAD_TOO_LARGE` 다.
-- `knowledge/SeedLoaderIntegrationTest.kt` 에 「최신 버전에 없는 타입을 쓰는 파일은 적용하지 않고 기록도 남기지 않는다」: `SeedFile(key = "test-unknown-<접미사>", nodes = listOf(SeedNode("a", "NoSuchType", mapOf("name" to "x"))))` 를 `applyInTransaction` 하면 `OntologyViolationException` 이고, `(:SeedRun {key})` 가 없다.
+- `knowledge/TransactionConsistencyIntegrationTest.kt`(이력 기록이 실패하는 컨텍스트)에 「온톨로지 저장에서 이력 기록이 실패하면 버전도 holder 도 그대로다」 를 더한다. ADMIN 저장이 `500` 이고, 저장 전과 뒤의 `GET /api/ontology` `version`, `OntologyHead.version`, `:OntologyVersion` 개수가 같다. 이 컨텍스트에서 바꾼 정의가 없으므로 되돌리기는 필요 없다.
+- `knowledge/SeedLoaderIntegrationTest.kt` 에 「최신 버전에 없는 타입을 쓰는 파일은 적용하지 않고 기록도 남기지 않는다」(지금 코드에서도 통과한다. 문서의 동작을 고정하려는 것이다): `SeedFile(key = "test-unknown-<접미사>", nodes = listOf(SeedNode("a", "NoSuchType", mapOf("name" to "x"))))` 를 `applyInTransaction` 하면 `OntologyViolationException` 이고, `(:SeedRun {key})` 가 없다.
 
 ## 검증
 
 ```bash
-cd financial-workbench/api && ./gradlew test --tests 'dev.fos.workbench.ontology.*' --tests 'dev.fos.workbench.knowledge.SeedLoaderIntegrationTest'
+cd financial-workbench/api && ./gradlew test --tests 'dev.fos.workbench.ontology.*' --tests 'dev.fos.workbench.knowledge.SeedLoaderIntegrationTest' --tests 'dev.fos.workbench.knowledge.TransactionConsistencyIntegrationTest'
 cd financial-workbench/api && ./gradlew test
 git grep -q "ONTOLOGY_IMPACT_UNCONFIRMED" -- financial-workbench/api/src/main
 ```
@@ -151,7 +160,10 @@ git grep -q "ONTOLOGY_IMPACT_UNCONFIRMED" -- financial-workbench/api/src/main
 | `financial-workbench/api/src/main/kotlin/dev/fos/workbench/config/Limits.kt` | 수정 |
 | `financial-workbench/api/src/main/kotlin/dev/fos/workbench/knowledge/KnowledgeReader.kt` | 수정 |
 | `financial-workbench/api/src/main/kotlin/dev/fos/workbench/knowledge/NodeQueryService.kt` | 수정 |
+| `financial-workbench/api/src/main/kotlin/dev/fos/workbench/knowledge/ClaimService.kt` | 수정 |
+| `financial-workbench/api/src/main/kotlin/dev/fos/workbench/graph/GraphService.kt` | 수정 |
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyDiffTest.kt` | 신규 |
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyLabelsTest.kt` | 수정 |
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyEditIntegrationTest.kt` | 신규 |
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/knowledge/SeedLoaderIntegrationTest.kt` | 수정 |
+| `financial-workbench/api/src/test/kotlin/dev/fos/workbench/knowledge/TransactionConsistencyIntegrationTest.kt` | 수정 |

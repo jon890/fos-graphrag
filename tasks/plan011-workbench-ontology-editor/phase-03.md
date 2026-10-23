@@ -33,7 +33,8 @@
 ### 1. 타입과 API
 
 - `web/src/api/types.ts`: `Ontology` 에 `version: number`, `versionCreatedAt: string`, `versionCreatedBy: UserRef | null` 를 더한다. `OntologyVersionSummary`, `OntologyVersionDetail`, `OntologyImpact`(`path`, `kind`, `count`), `OntologyImpactKind`(`data-schema.md` 영향 표의 열 개 값), `OntologyPreview`, `OntologyEditRequest`(`baseVersion`, `yaml?`, `definition?`, `note?`, `confirm?`)를 더한다. `ChangeEventView.targetKind` 에 `'ONTOLOGY'` 를 더한다.
-- `web/src/api/client.ts`: `setOntologyVersionListener(fn: ((version: number) => void) | null)` 를 더한다. `request` 가 응답을 받을 때마다(성공과 오류 모두) `X-Ontology-Version` 을 정수로 읽어 부른다. `api.ontology` 에 `versions(page)`, `version(n)`, `preview(body)`, `save(body)`, `restore(n, body)` 를 더한다. 내려받기 주소는 상수 `ONTOLOGY_EXPORT_URL = '/api/ontology/export'` 와 `ontologyVersionDownload(n)`(그 버전의 `yaml` 로 Blob 을 만들어 `financial-ontology-v<n>.yaml` 로 내려받는 함수)이다.
+- `web/src/api/types.ts` 의 `Ontology` 에 필드를 더하면 테스트 fixture 도 typecheck 에 걸린다(`tsconfig.app.json` 이 `src` 전체를 본다). `web/src/components/testSupport.tsx` 의 `testOntology`, `web/src/lib/labels.test.ts` 의 `bare` 두 곳, `web/src/lib/changes.test.ts` 의 온톨로지 fixture 에 `version: 1`, `versionCreatedAt`, `versionCreatedBy: null` 을 채운다.
+- `web/src/api/client.ts`: `setOntologyVersionListener(fn: ((version: number) => void) | null)` 를 더한다. `request` 가 응답을 받을 때마다(성공과 오류 모두) `X-Ontology-Version` 을 정수로 읽어 부른다. 지금 `api.ontology` 는 함수(`ontology: () => request<Ontology>('GET', '/api/ontology')`)다. 객체로 바꿔 `api.ontology.get()` 으로 두고 호출부(`App.tsx` 의 `.ontology()`)를 고친다. 그 객체에 `versions(page)`, `version(n)`, `preview(body)`, `save(body)`, `restore(n, body)` 를 더한다. 내려받기 주소는 상수 `ONTOLOGY_EXPORT_URL = '/api/ontology/export'` 와 `ontologyVersionDownload(n)`(그 버전의 `yaml` 로 Blob 을 만들어 `financial-ontology-v<n>.yaml` 로 내려받는 함수)이다.
 
 ### 2. 주소
 
@@ -52,10 +53,10 @@
 
 - `ontology/OntologyTab.tsx`: `view` 에 따라 보기, YAML 편집기, 버전 기록을 고른다. 머리에 「온톨로지」, `ontology-version`(「버전 N」), 저장한 사람과 시각(`versionCreatedBy` 가 `null` 이면 「시스템」)을 보인다. ADMIN 이면 「YAML 로 편집」(`ontology-edit-yaml`), 「버전 기록」(`ontology-history-open`), 「YAML 내려받기」(`ontology-export`, `href={ONTOLOGY_EXPORT_URL}` 와 `download` 를 단 링크)를 보인다. 초안이 있으면 단추 옆에 「편집 중인 초안이 있습니다」 를 보인다. 「읽기 전용입니다 …」 문장을 지운다. ADMIN 이 아니면 단추가 없다.
 - `ontology/OntologyView.tsx`: 지금 표들을 그대로 옮긴다. testid 는 바꾸지 않는다.
-- `ontology/OntologyYamlEditor.tsx`: 초안이 없으면 `GET /api/ontology/versions/{ontology.version}` 의 `yaml` 로 초안을 만든다(`baseVersion` 은 그 번호). 고정폭 글꼴 `Textarea`(testid `ontology-yaml-input`, `spellCheck={false}`)와 「저장 전에 확인」(`ontology-preview`), 「초안 버리기」(`ontology-draft-discard`)가 있다.
+- `ontology/OntologyYamlEditor.tsx`: 초안이 없으면 `GET /api/ontology/versions/{ontology.version}` 의 `yaml` 로 초안을 만든다(`baseVersion` 은 그 번호). 고정폭 글꼴 `Textarea`(testid `ontology-yaml-input`, `spellCheck={false}`)와 「저장 전에 확인」(`ontology-preview`), 「초안 버리기」(`ontology-draft-discard`)가 있다. 서버가 정규화한 YAML 에는 주석이 없으므로, 입력칸 위에 접힌 도움말(`<details>`, testid `ontology-yaml-help`)로 저장소 YAML 머리 주석의 키 설명(`label`, `valueLabels`, `description`, `valueAliases`, `hintProperties`, `display`, `searchProperties`, `createPicker`)과 흐름 표기의 따옴표 규칙을 한국어로 옮겨 둔다.
 - `ontology/OntologyPreviewPanel.tsx`: 미리보기 결과를 그린다(testid `ontology-preview-panel`).
   - `valid` 가 거짓이면 `errors` 를 목록(`ontology-preview-error` 각 줄)으로 보이고 저장 단추가 없다.
-  - 「더함」, 「뺌」, 「바뀜」 목록(`ontology-diff-added`, `-removed`, `-changed`)과 바뀐 점이 없을 때 「바뀐 점이 없습니다」.
+  - 「더함」, 「뺌」, 「바뀜」 목록(`ontology-diff-added`, `-removed`, `-changed`)과 바뀐 점이 없을 때 「바뀐 점이 없습니다」(`ontology-diff-empty`). 바뀐 점이 없으면 저장 단추를 두지 않는다.
   - 영향(`ontology-impact` 각 줄, `data-kind`)은 경로와 아래 문장이다. 문장 함수는 `web/src/lib/ontologyEdit.ts` 의 `impactText(kind, count)` 다.
 
     | `kind` | 문장 |
@@ -82,7 +83,8 @@
 
 ### 5. 정의에서 빠진 데이터
 
-- `DetailPanel.tsx`: `ontology.nodeTypes[node.type]` 이 없으면 속성 폼 대신 「이 타입은 온톨로지에서 빠졌습니다. 고칠 수 없고 보관과 복원만 됩니다.」(testid `node-undefined-type`)와 속성 키와 값 목록을 읽기 전용으로 보인다. 주장 만들기와 관계 더하기 단추도 숨긴다. 보관과 복원 단추는 그대로다.
+- 새 파일 `web/src/components/UndefinedTypeProperties.tsx`: props `node: NodeView` 만 받아 「이 타입은 온톨로지에서 빠졌습니다. 고칠 수 없고 보관과 복원만 됩니다.」(testid `node-undefined-type`)와 속성 키와 값 목록을 읽기 전용으로 그린다. `DetailPanel.tsx` 는 상세를 `useEffect` 로 읽어 정적 렌더링으로 테스트할 수 없으므로, 그리는 부분을 이 컴포넌트로 뺀다.
+- `DetailPanel.tsx`: `ontology.nodeTypes[node.type]` 이 없으면 속성 폼 대신 `UndefinedTypeProperties` 를 그린다. 주장 만들기와 관계 더하기 단추도 숨긴다. 보관과 복원 단추는 그대로다.
 - `RelationshipSection.tsx`: `ontology.relationshipTypes[r.type]` 가 없는 행은 `relationship-archive-toggle` 을 숨기고 「정의에서 빠진 관계」 배지(`relationship-undefined`)를 보인다.
 - `ChangesTab.tsx`, `lib/changes.ts`: `targetKind === 'ONTOLOGY'` 인 행의 대상 칸은 「온톨로지 버전 N」(`targetLabel`)과 「(온톨로지)」 이고 누를 수 없다. `added`, `removed`, `changed` 의 목록 값은 쉼표로 이어 보인다. 항목 이름은 지금 규칙대로 `changeFields` 의 label(「더한 항목」 등)이다.
 
@@ -97,12 +99,12 @@
 - 새 파일 `web/src/components/ontology/ontology.test.tsx`(`testSupport.tsx` 의 정적 렌더링): ADMIN 의 온톨로지 탭에 `ontology-edit-yaml`, `ontology-history-open`, `ontology-export` 가 있고 VIEWER 에게는 없다. 영향 하나를 담은 미리보기 패널은 `ontology-save-confirm` 이 있고 `ontology-save` 가 `disabled` 다. `valid: false` 미리보기는 `ontology-preview-error` 가 있고 `ontology-save` 가 없다.
 - `web/src/components/tabs.test.tsx` 의 온톨로지 단언은 새 위치의 컴포넌트로 바꾼다. `ontology-version` 단언은 유지한다.
 - `web/src/components/ChangesTab.test.tsx` 에 `targetKind: 'ONTOLOGY'`, `targetLabel: '버전 7'`, `changes: { added: { before: null, after: ['nodeTypes.Fund'] } }` 행이 「온톨로지」 와 `nodeTypes.Fund` 를 담고 링크 단추가 없음을 더한다.
-- `web/src/components/screens.test.tsx` 에 온톨로지에 없는 타입의 노드 상세가 `node-undefined-type` 을 담고 `NodeEditForm` 의 저장 단추가 없음을 더한다(그 파일이 상세를 렌더링하는 방식을 따른다).
+- `web/src/components/screens.test.tsx` 에 온톨로지에 없는 타입(`type: 'Gone'`, `properties: { name: '남은 노드', memo: '메모' }`)의 `UndefinedTypeProperties` 가 `node-undefined-type`, `name`, `남은 노드` 를 담고 입력칸(`<input`)이 없음을 더한다.
 - `web/e2e/workbench.spec.ts` 의 `8)` 뒤에 `9) 관리자가 YAML 로 새 타입을 더하면 편집자 화면에 안내가 나오고, 되돌리면 타입이 사라진다` 를 더한다.
   1. `pageA` 에서 온톨로지를 한 번 읽어 둔다(작업 공간을 연 상태).
-  2. `pageAdmin` 이 `/ontology` → `ontology-edit-yaml`. 입력칸 값의 `nodeTypes:` 줄 바로 다음에 `Fund<suffix>` 타입 블록(label 「펀드」, description, `labelProperty: name`, `name` 속성 string 필수)을 넣고 `fill` 한다. `ontology-preview` → `ontology-diff-added` 에 `nodeTypes.Fund<suffix>` → `ontology-save` → `ontology-message` 가 success. `shot(pageAdmin, '09-ontology-saved')`.
+  2. `pageAdmin` 이 `/ontology` 를 열고 `ontology-version` 의 번호를 저장 전 번호로 읽어 둔다 → `ontology-edit-yaml`. 입력칸 값에서 정확히 `nodeTypes:` 인 줄을 찾아 그 바로 다음에 들여쓰기 2칸으로 `Fund<suffix>` 타입 블록(label 「펀드」, description, `labelProperty: name`, `name` 속성 string 필수)을 넣고 `fill` 한다. `ontology-preview` → `ontology-diff-added` 에 `nodeTypes.Fund<suffix>` → `ontology-save` → `ontology-message` 가 success. `shot(pageAdmin, '09-ontology-saved')`.
   3. `pageA` 가 아무 API 를 부르는 동작(검색)을 하면 `ontology-stale` 이 보이고, `ontology-reload` 를 누르면 사라진다. 새 노드 만들기의 타입 선택지에 「펀드」 가 있다.
-  4. `pageAdmin` 이 `ontology-history-open` → 저장 전 번호의 행 → `ontology-restore` → 미리보기의 `ontology-diff-removed` 에 그 타입 → `ontology-save` → success. `shot(pageAdmin, '09-ontology-restored')`.
+  4. `pageAdmin` 이 `ontology-history-open` → 2단계에서 읽어 둔 저장 전 번호의 행(`data-version`) → `ontology-restore` → 미리보기의 `ontology-diff-removed` 에 그 타입 → `ontology-save` → success. `shot(pageAdmin, '09-ontology-restored')`.
 
 ## 검증
 
@@ -135,6 +137,10 @@ git grep -q "ontology-stale" -- financial-workbench/web/TESTIDS.md
 | `financial-workbench/web/src/lib/ontologyEdit.ts` | 신규 |
 | `financial-workbench/web/src/lib/ontologyEdit.test.ts` | 신규 |
 | `financial-workbench/web/src/components/DetailPanel.tsx` | 수정 |
+| `financial-workbench/web/src/components/UndefinedTypeProperties.tsx` | 신규 |
+| `financial-workbench/web/src/components/testSupport.tsx` | 수정 |
+| `financial-workbench/web/src/lib/labels.test.ts` | 수정 |
+| `financial-workbench/web/src/lib/changes.test.ts` | 수정 |
 | `financial-workbench/web/src/components/RelationshipSection.tsx` | 수정 |
 | `financial-workbench/web/src/components/ChangesTab.tsx` | 수정 |
 | `financial-workbench/web/src/lib/changes.ts` | 수정 |
