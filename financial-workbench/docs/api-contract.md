@@ -368,9 +368,9 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 | 메서드 | 경로 | 인증 | 응답 |
 | --- | --- | --- | --- |
 | GET | `/api/ontology` | 필요 | 최신 온톨로지 버전을 옮긴 JSON. `version`(정수), `versionCreatedAt`, `versionCreatedBy`(UserRef, 서버가 만든 버전이면 `null`)가 더 있다. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`), 주장 문장 틀(`claimPredicates.<predicate>.sentence`), 만들기 폼 정보(`nodeTypes.<타입>.hintProperties`, `relationshipTypes.<관계>.createPicker`), 타입의 색과 모양(`nodeTypes.<타입>.display`), 검색에 넣을 속성(`nodeTypes.<타입>.searchProperties`), 변경 이력의 항목 이름(`changeFields`), 예전 값 별칭(`valueAliases`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다. 뜻은 [데이터 스키마](data-schema.md) 의 「표시 이름」 과 그 아래 절이다 |
-| GET | `/api/ontology/versions` | ADMIN | 버전 목록. 최근 것부터 `[{"version","createdAt","createdBy":UserRef?,"note","restoredFrom"}]`. 쪽 나누기는 `page`, `size` |
+| GET | `/api/ontology/versions` | ADMIN | 버전 목록. 최근 것부터 `Page<{"version","createdAt","createdBy":UserRef?,"note","restoredFrom"}>`. 쪽 나누기는 `page`, `size` |
 | GET | `/api/ontology/versions/{version}` | ADMIN | 그 버전의 `{"version", "yaml", …목록의 필드}` |
-| GET | `/api/ontology/export` | ADMIN | 최신 버전의 YAML 파일. `Content-Type: application/yaml`, `Content-Disposition: attachment; filename="financial-ontology-v<버전>.yaml"` |
+| GET | `/api/ontology/export` | ADMIN | 최신 버전의 YAML 파일. `Content-Type: application/yaml;charset=UTF-8`, `Content-Disposition: attachment; filename="financial-ontology-v<버전>.yaml"` |
 | POST | `/api/ontology/preview` | ADMIN | 본문 `{"baseVersion", "yaml"}` 또는 `{"baseVersion", "definition"}`(JSON 정의). 저장하지 않고 `OntologyPreview` 를 돌려준다 |
 | POST | `/api/ontology/versions` | ADMIN | 저장. 본문은 preview 와 같고 `note`, `confirm` 이 더 있다. 응답 `201` 과 새 버전의 목록 항목 |
 | POST | `/api/ontology/versions/{version}/restore` | ADMIN | 그 버전의 내용으로 새 버전을 만든다. 본문 `{"baseVersion", "note", "confirm"}`. 영향 검사와 응답은 저장과 같다 |
@@ -385,7 +385,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
   "removed": ["relationshipTypes.RELATED_TO"],
   "changed": ["nodeTypes.Company.properties.name.label"],
   "impacts": [{ "path": "relationshipTypes.RELATED_TO", "kind": "REMOVED_RELATIONSHIP_TYPE", "count": 3 }],
-  "codeOwnedIgnored": ["reviewStatuses.DRAFT.label"],
+  "codeOwnedIgnored": ["reviewStatuses.DRAFT"],
   "yaml": "nodeTypes:\n  Company:\n …",
   "definition": { "nodeTypes": {}, "relationshipTypes": {}, "claimPredicates": {} }
 }
@@ -397,9 +397,10 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 - `valid` 가 거짓이면 `errors` 에 로더 검사 오류가 있고 저장할 수 없다(`400 ONTOLOGY_INVALID`, `details.errors`).
 - `impacts` 가 있는데 저장 요청에 `confirm: true` 가 없으면 `409 ONTOLOGY_IMPACT_UNCONFIRMED` 와 `details.impacts` 다.
 - `baseVersion` 이 최신이 아니면 `409 REVISION_CONFLICT`(`details.expectedRevision`, `details.currentRevision` 에 버전 번호)다.
-- `codeOwnedIgnored` 는 보낸 값 가운데 코드가 소유해 무시한 경로다.
+- `codeOwnedIgnored` 는 보낸 값 가운데 코드가 소유해 무시한 경로다. 경로는 한 단계 아래 키까지다(`reviewStatuses.DRAFT`, `nodeTypes.Claim`).
+- 최신 버전과 바뀐 점이 없으면(`added`, `removed`, `changed` 가 모두 비면) 저장과 되돌리기는 `400 ONTOLOGY_INVALID`(「바뀐 점이 없습니다.」)다. 새 버전을 만들지 않는다.
 - 저장과 되돌리기의 `note` 는 1000자까지다. 넘으면 `400 VALIDATION_FAILED` 다. `yaml` 과 `definition` 은 하나만 보낸다.
-- ADMIN 이 아니면 위 다섯 끝점은 `403 FORBIDDEN` 이다. `GET /api/ontology` 는 모든 역할이 읽는다.
+- ADMIN 이 아니면 `GET /api/ontology` 를 뺀 위 여섯 끝점은 `403 FORBIDDEN` 이다. `GET /api/ontology` 는 모든 역할이 읽는다.
 - 모든 API 응답에 `X-Ontology-Version` 헤더(최신 버전 번호)가 있다. 화면은 이 값이 들고 있는 버전과 다르면 온톨로지를 다시 읽으라는 안내를 보인다.
 
 ## 사용자 관리
