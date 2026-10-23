@@ -899,6 +899,97 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(bubble).toHaveCount(0)
   })
 
+  test('11) 편집자는 처음 로그인하면 연습 기업, 근거 문서, 주장을 따라 만들고, 끝내면 연습 항목이 보관된다', async ({ browser }) => {
+    // 따라하기는 주장의 대상으로 고를 산업이 있어야 열린다.
+    const sector = `가이드산업-${suffix}`
+    await createNode(pageAdmin, 'Sector', sector, { name: sector })
+
+    const page = await open(browser)
+    await loginAs(page, guideEditor, 'success', '/', { guide: 'keep' })
+    const bubble = page.getByTestId('guide-bubble')
+    await expect(bubble).toHaveAttribute('data-step', 'intro')
+    await page.getByTestId('guide-start').click()
+
+    // 1. 기업: 「다음」 없이 연습 이름을 채운 폼이 열린다.
+    await expect(bubble).toHaveAttribute('data-step', 'company')
+    await expect(page.getByTestId('guide-next')).toHaveCount(0)
+    const companyInput = page.getByTestId('create-prop-name')
+    await expect(companyInput).toHaveValue(/^\[연습\] /)
+    const practiceCompany = await companyInput.inputValue()
+    await page.getByTestId('create-submit').click()
+
+    // 2. 근거 문서: 제목이 채워진 폼이 열린다.
+    await expect(bubble).toHaveAttribute('data-step', 'document')
+    const titleInput = page.getByTestId('create-prop-title')
+    await expect(titleInput).not.toHaveValue('')
+    const practiceDocument = await titleInput.inputValue()
+    await page.getByTestId('create-submit').click()
+
+    // 3. 주장: 연습 기업의 상세에서 관계, 근거 문서, 설명이 채워진 주장 폼이 열린다.
+    await expect(bubble).toHaveAttribute('data-step', 'claim')
+    await expect(page.getByTestId('detail-panel')).toHaveAttribute('data-node-type', 'Company')
+    await expect(page.getByTestId('claim-predicate-select')).toHaveValue('BELONGS_TO_SECTOR')
+    await expect(page.getByTestId('claim-doc-selected')).toContainText(practiceDocument)
+    await expect(page.getByTestId('claim-description')).not.toHaveValue('')
+    await pick(page, 'claim-object-picker', sector)
+    await page.getByTestId('claim-add-submit').click()
+
+    // 4. 마침
+    await expect(bubble).toHaveAttribute('data-step', 'done')
+    await shot(page, '11-guide-practice-done')
+
+    const created = await page.evaluate(
+      () => (JSON.parse(localStorage.getItem('workbench.guide') ?? '{}') as { created?: Record<string, string> }).created ?? {},
+    )
+    const ids = [created.company, created.document, created.claim]
+    for (const id of ids) expect(id, '연습 항목 ID').toBeTruthy()
+    await page.getByTestId('guide-finish').click()
+    await expect(bubble).toHaveCount(0)
+
+    const base = new URL(page.url()).origin
+    for (const id of ids) {
+      await expect
+        .poll(async () => (await (await page.request.get(`${base}/api/nodes/${id}`)).json()).node.archived, { message: `${id} 보관` })
+        .toBe(true)
+    }
+    await page.getByTestId('search-input').fill(practiceCompany)
+    await page.getByTestId('search-submit').click()
+    await expect(page.getByTestId('search-empty')).toBeVisible()
+
+    await page.reload()
+    await expect(page.getByTestId('search-input')).toBeVisible()
+    // 가이드는 온톨로지를 받은 직후에 열린다. 열리지 않는 것을 보려면 그 시점이 지나도록 잠시 둔다.
+    await page.waitForTimeout(1000)
+    await expect(bubble).toHaveCount(0)
+  })
+
+  test('11b) 다시 연습하다 새로고침하면 이어서 하기를 묻고, 그만두면 만든 연습 항목을 보관한다', async () => {
+    const page = pageAdmin
+    await page.getByTestId('guide-open').click()
+    const bubble = page.getByTestId('guide-bubble')
+    await expect(bubble).toHaveAttribute('data-step', 'intro')
+    await page.getByTestId('guide-start').click()
+    await expect(bubble).toHaveAttribute('data-step', 'company')
+    await page.getByTestId('create-submit').click()
+    await expect(bubble).toHaveAttribute('data-step', 'document')
+    const companyId = await page.evaluate(
+      () => (JSON.parse(localStorage.getItem('workbench.guide') ?? '{}') as { created?: Record<string, string> }).created?.company ?? '',
+    )
+    expect(companyId, '연습 기업 ID').not.toBe('')
+
+    await page.reload()
+    await expect(bubble).toHaveAttribute('data-step', 'resume')
+    await expect(page.getByTestId('guide-resume')).toBeVisible()
+    await expect(page.getByTestId('guide-stop')).toBeVisible()
+    await page.getByTestId('guide-stop').click()
+    await expect(bubble).toHaveCount(0)
+
+    const base = new URL(page.url()).origin
+    await expect
+      .poll(async () => (await (await page.request.get(`${base}/api/nodes/${companyId}`)).json()).node.archived, { message: '연습 기업 보관' })
+      .toBe(true)
+  })
+
   test('9) 관리자가 YAML 로 새 타입을 더하면 편집자 화면에 안내가 나오고, 되돌리면 타입이 사라진다', async () => {
     const typeKey = `Fund${suffix}`
     // 1. 편집자 A 가 온톨로지를 한 번 읽어 둔 상태(작업 공간)로 둔다.

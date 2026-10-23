@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
-import type { GuideStep } from '../../lib/guide'
+import { PRACTICE_CREATE_STEPS, type GuideKind, type GuideStep } from '../../lib/guide'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -12,6 +12,7 @@ const MARGIN = 8
 const ANCHOR_WIDTH = 320
 
 interface Props {
+  kind: GuideKind
   step: GuideStep
   index: number
   total: number
@@ -20,7 +21,15 @@ interface Props {
   wide: boolean
   onNext: () => void
   onFinish: () => void
+  /** 소개의 「건너뛰기」 와 말풍선 안의 Escape. 따라하기면 만든 연습 항목을 보관한다 */
   onSkip: () => void
+  /** 따라하기의 「그만두기」 */
+  onStop?: () => void
+  /** 「이어서 하기」 */
+  onResume?: () => void
+  /** 「폼 다시 열기」. 만들기 폼을 취소했을 때만 보인다 */
+  onReopen?: () => void
+  canReopen?: boolean
 }
 
 type Placement = { mode: 'card' } | { mode: 'anchored'; top: number; left: number }
@@ -50,12 +59,15 @@ function samePlacement(a: Placement, b: Placement): boolean {
 }
 
 /** 가이드 한 단계의 말풍선. 화면을 덮지 않고 대상 요소만 강조한다 */
-export function GuideBubble({ step, index, total, busy, wide, onNext, onFinish, onSkip }: Props) {
+export function GuideBubble({ kind, step, index, total, busy, wide, onNext, onFinish, onSkip, onStop, onResume, onReopen, canReopen }: Props) {
   const titleId = useId()
   const ref = useRef<HTMLDivElement>(null)
   const [placement, setPlacement] = useState<Placement>({ mode: 'card' })
-  const isIntro = index === 0
+  const isResume = step.id === 'resume'
+  const isIntro = !isResume && index === 0
   const isLast = index === total - 1
+  const practice = kind === 'practice'
+  const creating = practice && PRACTICE_CREATE_STEPS.includes(step.id)
 
   // 대상을 찾아 강조 class 를 붙이고 위치를 다시 계산한다. React 가 다시 그리며 class 를 지울 수 있어 같은 주기로 다시 붙인다.
   useEffect(() => {
@@ -130,26 +142,46 @@ export function GuideBubble({ step, index, total, busy, wide, onNext, onFinish, 
         <h2 id={titleId} className="text-sm font-bold">
           {step.title}
         </h2>
-        <span className="shrink-0 text-xs text-muted-foreground">
-          {`${index + 1} / ${total}`}
-        </span>
+        {!isResume && (
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {`${index + 1} / ${total}`}
+          </span>
+        )}
       </div>
       <p className="mt-1.5 text-sm leading-relaxed">{step.body}</p>
       <div className="mt-3 flex flex-wrap justify-end gap-2">
-        <Button type="button" variant="ghost" size="sm" disabled={busy} data-testid="guide-skip" onClick={onSkip}>
-          건너뛰기
-        </Button>
+        {isResume || creating ? (
+          <Button type="button" variant="ghost" size="sm" disabled={busy} data-testid="guide-stop" onClick={onStop}>
+            그만두기
+          </Button>
+        ) : (
+          !(practice && isLast) && (
+            <Button type="button" variant="ghost" size="sm" disabled={busy} data-testid="guide-skip" onClick={onSkip}>
+              건너뛰기
+            </Button>
+          )
+        )}
+        {isResume && (
+          <Button type="button" size="sm" disabled={busy} data-testid="guide-resume" onClick={onResume}>
+            이어서 하기
+          </Button>
+        )}
+        {creating && canReopen && (
+          <Button type="button" variant="outline" size="sm" disabled={busy} data-testid="guide-reopen" onClick={onReopen}>
+            폼 다시 열기
+          </Button>
+        )}
         {isIntro && (
           <Button type="button" size="sm" disabled={busy} data-testid="guide-start" onClick={onNext}>
             시작
           </Button>
         )}
-        {!isIntro && !isLast && (
+        {!isResume && !isIntro && !isLast && !creating && (
           <Button type="button" size="sm" disabled={busy} data-testid="guide-next" onClick={onNext}>
             다음
           </Button>
         )}
-        {!isIntro && isLast && (
+        {!isResume && !isIntro && isLast && (
           <Button type="button" size="sm" disabled={busy} data-testid="guide-finish" onClick={onFinish}>
             끝내기
           </Button>

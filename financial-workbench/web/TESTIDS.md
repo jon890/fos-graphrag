@@ -27,12 +27,16 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 
 | testid | 요소 |
 | --- | --- |
-| `guide-bubble` | 말풍선(`role=dialog`). `data-step` 이 단계 id(`intro`, `search`, `graph`, `detail`)이고, `data-placement` 가 `anchored`(대상 옆) 또는 `card`(화면 아래쪽 카드)다 |
+| `guide-bubble` | 말풍선(`role=dialog`). `data-step` 이 단계 id 다. 둘러보기는 `intro`, `search`, `graph`, `detail`, 따라하기는 `intro`, `company`, `document`, `claim`, `done` 이다. 진행 중인 따라하기를 이어서 할지 묻는 단계는 `resume` 이다. `data-placement` 는 `anchored`(대상 옆) 또는 `card`(화면 아래쪽 카드)다 |
 | `guide-start` | 소개 단계의 「시작」 |
-| `guide-next` | 중간 단계의 「다음」 |
+| `guide-next` | 둘러보기 중간 단계의 「다음」. 따라하기의 만드는 단계에는 없다 |
 | `guide-finish` | 마지막 단계의 「끝내기」 |
-| `guide-skip` | 「건너뛰기」. 모든 단계에 있다. 말풍선 안에 초점이 있을 때 `Escape` 도 같다 |
-| `guide-message` | 끝낸 기록을 남기지 못했을 때 머리글 아래 안내 |
+| `guide-skip` | 「건너뛰기」. 둘러보기의 모든 단계와 따라하기의 소개에 있다. 말풍선 안에 초점이 있을 때 `Escape` 도 같다 |
+| `guide-stop` | 따라하기의 기업, 근거 문서, 주장 단계와 `resume` 단계의 「그만두기」. 만든 연습 항목을 보관하고 끝낸다 |
+| `guide-resume` | `resume` 단계의 「이어서 하기」. 저장된 단계로 연다 |
+| `guide-reopen` | 「폼 다시 열기」. 따라하기의 만드는 단계에서 만들기 폼을 취소했을 때만 나온다 |
+| `guide-message` | 끝낸 기록을 남기지 못했거나 연습 항목을 보관하지 못했을 때 머리글 아래 안내 |
+| `guide-archive-failed` | `guide-message` 안의 보관하지 못한 연습 항목 이름 한 줄. 누르면 `/workspace?node=<id>` 로 연다 |
 
 가이드가 가리키는 요소에는 class `guide-target` 이 붙는다. 단계가 바뀌거나 가이드가 닫히면 떨어진다.
 

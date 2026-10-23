@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, errorMessage } from '../api/client'
-import type { NodeDetail } from '../api/types'
+import type { NodeDetail, NodeView } from '../api/types'
 import { useApp, useLabels } from '../context'
 import type { EditDraft } from '../lib/conflict'
 import { formatDateTime, userName } from '../lib/format'
@@ -8,6 +8,7 @@ import { ClaimCard } from './ClaimCard'
 import { ClaimCreateForm } from './ClaimCreateForm'
 import { ClaimEditForm, ReviewControls } from './ClaimEditor'
 import { CopyLinkButton } from './CopyLinkButton'
+import { useGuide, type GuidePrefill } from './guide/GuideProvider'
 import { NodeEditForm } from './NodeEditForm'
 import { RelationshipSection } from './RelationshipSection'
 import { StatusBadge, TypeBadge } from './TypeBadge'
@@ -41,13 +42,40 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
   const [archiveReason, setArchiveReason] = useState('')
   const [addingClaim, setAddingClaim] = useState(false)
   const [draft, setDraft] = useState<EditDraft | null>(null)
+  const guide = useGuide()
+  const { prefill, consumePrefill } = guide
+  // 가이드가 연 주장 폼의 프리필과 미리 고른 근거 문서. 가이드의 값은 가져가면 비므로 여기에 복사해 둔다.
+  const [openedPrefill, setOpenedPrefill] = useState<{ prefill: GuidePrefill; documents: NodeView[] } | null>(null)
 
   useEffect(() => {
     setNotice(flash && flash.id === selectedId ? { kind: flash.kind ?? 'success', text: flash.text } : null)
     setAddingClaim(false)
+    setOpenedPrefill(null)
     setArchiveReason('')
     setDraft(null)
   }, [selectedId, flash])
+
+  // 가이드의 주장 프리필. 위 effect 가 폼을 닫은 뒤에 열리도록 상세와 근거 문서를 읽은 다음에 연다.
+  useEffect(() => {
+    if (!canEdit || !prefill?.subjectId || !detail || detail.node.id !== prefill.subjectId) return
+    let cancelled = false
+    const documentId = prefill.documentId
+    const documents: Promise<NodeView[]> = documentId
+      ? api.nodes
+          .get(documentId)
+          .then((d) => [d.node])
+          .catch(() => [])
+      : Promise.resolve([])
+    void documents.then((docs) => {
+      if (cancelled) return
+      setOpenedPrefill({ prefill, documents: docs })
+      setAddingClaim(true)
+      consumePrefill()
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [detail, prefill])
 
   useEffect(() => {
     if (!selectedId) {
@@ -301,10 +329,21 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
           )}
           {canEdit && addingClaim && (
             <ClaimCreateForm
+              key={openedPrefill?.prefill.documentId ?? ''}
               initialSubject={node}
-              onCancel={() => setAddingClaim(false)}
-              onCreated={() => {
+              initialPredicate={openedPrefill?.prefill.predicate}
+              initialDocuments={openedPrefill?.documents}
+              initialDescription={openedPrefill?.prefill.description}
+              initialEvidenceText={openedPrefill?.prefill.evidenceText}
+              onCancel={() => {
                 setAddingClaim(false)
+                setOpenedPrefill(null)
+                guide.cancelForm()
+              }}
+              onCreated={(claim) => {
+                setAddingClaim(false)
+                setOpenedPrefill(null)
+                guide.report({ kind: 'claim-created', node: claim })
                 succeed('주장을 만들었습니다. 다른 편집자의 검토를 기다립니다.')
               }}
             />

@@ -5,6 +5,7 @@ import { creatableTypes, useApp, useLabels } from '../context'
 import { withEulReul, withJosa } from '../lib/labels'
 import { ClaimCreateForm } from './ClaimCreateForm'
 import { NodeCreateForm } from './NodeCreateForm'
+import { useGuide, type GuidePrefill } from './guide/GuideProvider'
 import { Pager } from './Pager'
 import { StatusBadge, TypeBadge } from './TypeBadge'
 
@@ -38,6 +39,23 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
   const [error, setError] = useState<string | null>(null)
   const [createType, setCreateType] = useState<string>('')
   const [creating, setCreating] = useState(false)
+  const guide = useGuide()
+  // 가이드가 연 폼의 프리필. 가이드의 값은 가져가면 비므로 폼이 다시 만들어지지 않게 여기에 복사해 둔다.
+  const [openedPrefill, setOpenedPrefill] = useState<GuidePrefill | null>(null)
+  const { prefill, consumePrefill } = guide
+
+  useEffect(() => {
+    if (!canEdit || creating || !prefill?.type || !ontology.nodeTypes[prefill.type]) return
+    setOpenedPrefill(prefill)
+    setCreateType(prefill.type)
+    setCreating(true)
+    consumePrefill()
+  }, [canEdit, creating, prefill, ontology, consumePrefill])
+
+  const closeForm = () => {
+    setCreating(false)
+    setOpenedPrefill(null)
+  }
 
   const run = useCallback(async () => {
     setLoading(true)
@@ -210,25 +228,36 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
             <div className="hint">{ontology.nodeTypes[createType]?.description}</div>
             {createType === claimType ? (
               <ClaimCreateForm
-                onCancel={() => setCreating(false)}
+                onCancel={() => {
+                  closeForm()
+                  guide.cancelForm()
+                }}
                 onCreated={(claim) => {
-                  setCreating(false)
+                  closeForm()
+                  guide.report({ kind: 'claim-created', node: claim })
                   onCreated(claim, `「${labels.node(claim)}」 ${withEulReul(labels.type(claim.type))} 만들었습니다. 다른 편집자의 검토를 기다립니다.`)
                   void run()
                 }}
               />
             ) : (
               <NodeCreateForm
-                key={createType}
+                key={openedPrefill ? `${createType}:${openedPrefill.step}` : createType}
                 type={createType}
                 testIdPrefix="create"
-                onCancel={() => setCreating(false)}
+                initialValues={openedPrefill?.values}
+                onCancel={() => {
+                  closeForm()
+                  guide.cancelForm()
+                }}
                 onUseExisting={(n) => {
-                  setCreating(false)
+                  // 있는 항목을 여는 것은 만들기가 아니다. 가이드는 그 단계에 남고 폼을 다시 열 수 있다.
+                  closeForm()
+                  guide.cancelForm()
                   onFocus(n.id)
                 }}
                 onCreated={(node, linkError) => {
-                  setCreating(false)
+                  closeForm()
+                  guide.report({ kind: 'node-created', node })
                   if (linkError) {
                     const pickerLabel =
                       Object.values(ontology.relationshipTypes).find((r) => r.createPicker && r.to.includes(node.type))?.createPicker?.label ?? '관계'
