@@ -398,6 +398,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 - `impacts` 가 있는데 저장 요청에 `confirm: true` 가 없으면 `409 ONTOLOGY_IMPACT_UNCONFIRMED` 와 `details.impacts` 다.
 - `baseVersion` 이 최신이 아니면 `409 REVISION_CONFLICT`(`details.expectedRevision`, `details.currentRevision` 에 버전 번호)다.
 - `codeOwnedIgnored` 는 보낸 값 가운데 코드가 소유해 무시한 경로다.
+- 저장과 되돌리기의 `note` 는 1000자까지다. 넘으면 `400 VALIDATION_FAILED` 다. `yaml` 과 `definition` 은 하나만 보낸다.
 - ADMIN 이 아니면 위 다섯 끝점은 `403 FORBIDDEN` 이다. `GET /api/ontology` 는 모든 역할이 읽는다.
 - 모든 API 응답에 `X-Ontology-Version` 헤더(최신 버전 번호)가 있다. 화면은 이 값이 들고 있는 버전과 다르면 온톨로지를 다시 읽으라는 안내를 보인다.
 
