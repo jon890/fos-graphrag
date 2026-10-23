@@ -1,13 +1,11 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
-import { PRACTICE_CREATE_STEPS, type GuideKind, type GuideStep } from '../../lib/guide'
+import { anchorOf, PRACTICE_CREATE_STEPS, type GuideKind, type GuideStep } from '../../lib/guide'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const TARGET_CLASS = 'guide-target'
 const RETRY_MS = 300
 const WAIT_MS = 5000
-const GAP = 12
-const MARGIN = 8
 /** 대상 옆에 둘 때의 폭. styles.css 의 .guide-bubble 과 같다 */
 const ANCHOR_WIDTH = 320
 
@@ -36,21 +34,6 @@ type Placement = { mode: 'card' } | { mode: 'anchored'; top: number; left: numbe
 
 function findTarget(testId: string): HTMLElement | null {
   return document.querySelector<HTMLElement>(`[data-testid="${testId}"]`)
-}
-
-/** 대상 옆에 말풍선을 둘 자리. 대상이 보이지 않거나 둘 자리가 없으면 null */
-function anchorOf(rect: DOMRect, width: number, height: number): { top: number; left: number } | null {
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  if (rect.width === 0 || rect.height === 0 || rect.bottom <= 0 || rect.top >= vh || rect.right <= 0 || rect.left >= vw) return null
-  const top = Math.min(Math.max(rect.top, MARGIN), Math.max(vh - height - MARGIN, MARGIN))
-  if (rect.right + GAP + width <= vw - MARGIN) return { top, left: rect.right + GAP }
-  if (rect.left - GAP - width >= MARGIN) return { top, left: rect.left - GAP - width }
-  const below = rect.bottom + GAP
-  if (below + height <= vh - MARGIN) {
-    return { top: below, left: Math.min(Math.max(rect.left, MARGIN), vw - width - MARGIN) }
-  }
-  return null
 }
 
 function samePlacement(a: Placement, b: Placement): boolean {
@@ -82,7 +65,7 @@ export function GuideBubble({ kind, step, index, total, busy, wide, onNext, onFi
       if (el) found = true
       let nextPlacement: Placement = { mode: 'card' }
       if (wide && el && ref.current) {
-        const anchor = anchorOf(el.getBoundingClientRect(), ANCHOR_WIDTH, ref.current.offsetHeight)
+        const anchor = anchorOf(el.getBoundingClientRect(), ANCHOR_WIDTH, ref.current.offsetHeight, window.innerWidth, window.innerHeight)
         if (anchor) nextPlacement = { mode: 'anchored', ...anchor }
       }
       setPlacement((prev) => (samePlacement(prev, nextPlacement) ? prev : nextPlacement))

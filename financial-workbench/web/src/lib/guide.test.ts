@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { CurrentUser, Ontology } from '../api/types'
 import { testOntology } from '../components/testSupport'
 import {
+  anchorOf,
   archiveOrder,
   BROWSE_STEPS,
   clearProgress,
@@ -147,5 +148,27 @@ describe('첫 접속 가이드', () => {
     expect(steps.map((s) => s.pane)).toEqual([null, 'search', 'search', 'detail', 'graph'])
     expect(steps[3].body).toContain('대상에 산업 하나를 고르고')
     expect(steps[3].title).toContain('속한다')
+  })
+
+  describe('anchorOf', () => {
+    const box = (left: number, top: number, width: number, height: number) => ({ left, top, width, height, right: left + width, bottom: top + height })
+
+    it('큰 대상이면 안쪽 오른쪽 위 모서리에 둔다', () => {
+      // 그래프 칸: 폭 700, 높이 600. 말풍선 320x160 은 폭 1.5배, 높이 2배 이상이다
+      expect(anchorOf(box(300, 100, 700, 600), 320, 160, 1440, 900)).toEqual({ top: 116, left: 300 + 700 - 16 - 320 })
+    })
+
+    it('작은 대상이면 옆에 둔다', () => {
+      expect(anchorOf(box(100, 200, 240, 36), 320, 160, 1440, 900)).toEqual({ top: 200, left: 352 })
+    })
+
+    it('오른쪽 끝에 붙은 작은 대상이면 왼쪽으로, 왼쪽도 모자라면 아래로 옮긴다', () => {
+      expect(anchorOf(box(1300, 200, 120, 36), 320, 160, 1440, 900)).toEqual({ top: 200, left: 1300 - 12 - 320 })
+      expect(anchorOf(box(200, 200, 120, 36), 320, 160, 500, 900)).toEqual({ top: 248, left: 500 - 320 - 8 })
+    })
+
+    it('보이지 않는 대상이면 null 이다', () => {
+      expect(anchorOf(box(0, 0, 0, 0), 320, 160, 1440, 900)).toBeNull()
+    })
   })
 })

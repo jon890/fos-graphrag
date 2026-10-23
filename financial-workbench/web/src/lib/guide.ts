@@ -213,3 +213,41 @@ export function clearProgress(storage?: Storage | null): void {
 export function shouldAutoStart(user: CurrentUser, progress: GuideProgress | null = null): boolean {
   return user.guideDoneAt == null || progress?.kind === 'practice'
 }
+
+const ANCHOR_GAP = 12
+const ANCHOR_MARGIN = 8
+/** 큰 대상 안쪽에 둘 때 모서리에서 띄우는 간격 */
+const ANCHOR_INSET = 16
+
+interface Box {
+  top: number
+  left: number
+  right: number
+  bottom: number
+  width: number
+  height: number
+}
+
+/**
+ * 넓은 화면에서 대상에 붙일 말풍선의 자리. 대상이 보이지 않거나 둘 자리가 없으면 null.
+ * 대상이 말풍선보다 충분히 크면(폭 1.5배, 높이 2배 이상) 바깥에 두면 옆 칸을 덮으므로 안쪽 오른쪽 위에 둔다.
+ */
+export function anchorOf(rect: Box, width: number, height: number, vw: number, vh: number): { top: number; left: number } | null {
+  if (rect.width === 0 || rect.height === 0 || rect.bottom <= 0 || rect.top >= vh || rect.right <= 0 || rect.left >= vw) return null
+  const clampTop = (t: number) => Math.min(Math.max(t, ANCHOR_MARGIN), Math.max(vh - height - ANCHOR_MARGIN, ANCHOR_MARGIN))
+  if (rect.width >= width * 1.5 && rect.height >= height * 2) {
+    // 화면 밖으로 잘린 대상이면 보이는 부분의 안쪽 모서리에 맞춘다
+    const right = Math.min(rect.right, vw)
+    const top = clampTop(Math.max(rect.top, 0) + ANCHOR_INSET)
+    const left = Math.max(right - ANCHOR_INSET - width, rect.left + ANCHOR_INSET, ANCHOR_MARGIN)
+    return { top, left }
+  }
+  const top = clampTop(rect.top)
+  if (rect.right + ANCHOR_GAP + width <= vw - ANCHOR_MARGIN) return { top, left: rect.right + ANCHOR_GAP }
+  if (rect.left - ANCHOR_GAP - width >= ANCHOR_MARGIN) return { top, left: rect.left - ANCHOR_GAP - width }
+  const below = rect.bottom + ANCHOR_GAP
+  if (below + height <= vh - ANCHOR_MARGIN) {
+    return { top: below, left: Math.min(Math.max(rect.left, ANCHOR_MARGIN), vw - width - ANCHOR_MARGIN) }
+  }
+  return null
+}
