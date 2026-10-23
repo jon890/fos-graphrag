@@ -57,7 +57,7 @@
 - `GET /api/auth/me` 의 `guideDoneAt` 이 `null` 이다.
 - `POST /api/auth/me/guide-done` 이 `200` 이고 `guideDoneAt` 이 채워져 있다. 그 사용자 노드의 `revision`, `updatedAt` 은 호출 전과 같다.
 - 한 번 더 부르면 `200` 이고 `guideDoneAt` 이 처음 값과 같다. `GET /api/auth/me` 도 같은 값이다.
-- CSRF 토큰 없이 보내면 `403 CSRF_REJECTED`, 로그인하지 않으면 `401` 이다.
+- CSRF 토큰 없이 보내면 `403 CSRF_REJECTED` 다. 로그인하지 않은 `anonymous()` 는 먼저 `get("/api/auth/csrf")` 로 토큰을 받은 뒤 보내야 `401` 이 나온다(토큰이 없으면 CSRF 필터가 먼저 `403` 으로 막는다. 「인증 없는 조회와 변경을 막는다」 테스트의 순서를 따른다).
 
 ## 검증
 
