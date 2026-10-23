@@ -148,7 +148,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | --- | --- |
 | `web/src/api/` | fetch 래퍼, CSRF 처리, 계약 타입 |
 | `web/src/components/` | 화면 조각. 그래프, 상세 패널, 표, 폼. `ErrorBoundary` 가 탭 단위로 렌더링 오류를 붙잡아 머리글과 탭을 지키고, 앱 최상위(`main.tsx`)에도 하나 있다 |
-| `web/src/lib/` | 그래프 병합과 주장 접기(`graph.ts` 의 `collapseClaims`), 입력값 변환(`formValues.ts`), 충돌 때 세 값 비교(`conflict.ts`), 표시 이름과 구분 정보 조회, 문장 틀 채우기(`labels.ts`)처럼 화면과 무관한 함수와 단위 테스트. `utils.ts` 의 `cn` 은 Tailwind class 를 합친다. shadcn 부품도 이것을 import 한다. registry 가 내려주는 `import { cn } from "cn"` 은 `@/lib/utils` 로 바꾸고 `cn` 패키지는 들이지 않는다 |
+| `web/src/lib/` | 그래프 병합과 주장 접기(`graph.ts` 의 `collapseClaims`), 입력값 변환(`formValues.ts`), 충돌 때 세 값 비교(`conflict.ts`), 표시 이름과 구분 정보 조회, 문장 틀 채우기(`labels.ts`)처럼 화면과 무관한 함수와 단위 테스트. 첫 접속 가이드의 단계 정의와 진행 상태 저장, 자동 시작 판정(`guide.ts`), `utils.ts` 의 `cn` 은 Tailwind class 를 합친다. shadcn 부품도 이것을 import 한다. registry 가 내려주는 `import { cn } from "cn"` 은 `@/lib/utils` 로 바꾸고 `cn` 패키지는 들이지 않는다 |
 | `web/src/components/ui/` | shadcn 으로 복사한 화면 부품(Button, Input, Textarea, NativeSelect, Tabs, Card, Badge, Table, Alert, Label). 저장소가 소스를 소유한다. 고칠 때는 이 폴더를 직접 고친다 |
 | `web/components.json` | shadcn CLI 설정. 부품을 더할 때 CLI 가 읽는다 |
 | `web/src/hooks/` | 화면 상태 훅. `useMediaQuery` 가 배치 경계를 판정한다 |

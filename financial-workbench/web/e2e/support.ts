@@ -74,7 +74,10 @@ export async function loginAs(
     .then(() => true)
     .catch(() => false)
   if (!opened) return
-  await page.getByTestId('guide-skip').click()
+  // 따라하기 진행 상태가 남아 있으면 첫 단계는 「이어서 하기」 질문이라 건너뛰기 대신 그만두기를 누른다.
+  const stop = page.getByTestId('guide-stop')
+  if (await stop.isVisible()) await stop.click()
+  else await page.getByTestId('guide-skip').click()
   await expect(bubble).toHaveCount(0)
 }
 

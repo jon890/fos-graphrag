@@ -75,6 +75,8 @@
     background: var(--card);
     color: var(--card-foreground);
     padding: 12px 14px;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
     box-shadow: 0 8px 24px rgb(15 23 42 / 0.18);
   }
   /* 좁은 화면이나 대상이 없을 때의 아래쪽 카드 */

@@ -72,12 +72,14 @@ export function GuideBubble({ kind, step, index, total, busy, wide, onNext, onFi
   // 대상을 찾아 강조 class 를 붙이고 위치를 다시 계산한다. React 가 다시 그리며 class 를 지울 수 있어 같은 주기로 다시 붙인다.
   useEffect(() => {
     let marked: HTMLElement | null = null
+    let found = false
     const startedAt = Date.now()
     const update = () => {
       const el = step.target ? findTarget(step.target) : null
       if (marked && marked !== el) marked.classList.remove(TARGET_CLASS)
       if (el && !el.classList.contains(TARGET_CLASS)) el.classList.add(TARGET_CLASS)
       marked = el
+      if (el) found = true
       let nextPlacement: Placement = { mode: 'card' }
       if (wide && el && ref.current) {
         const anchor = anchorOf(el.getBoundingClientRect(), ANCHOR_WIDTH, ref.current.offsetHeight)
@@ -87,8 +89,8 @@ export function GuideBubble({ kind, step, index, total, busy, wide, onNext, onFi
     }
     update()
     const timer = window.setInterval(() => {
-      // 대상이 끝내 없으면 5초 뒤로는 아래쪽 카드로 둔 채 강조만 다시 확인한다.
-      if (step.target && !marked && Date.now() - startedAt > WAIT_MS) return
+      // 대상을 한 번도 못 찾았으면 5초 뒤로는 아래쪽 카드로 둔다. 한 번 찾은 뒤에는 폼을 닫았다 다시 열어도 계속 찾는다.
+      if (step.target && !found && Date.now() - startedAt > WAIT_MS) return
       update()
     }, RETRY_MS)
     window.addEventListener('resize', update)

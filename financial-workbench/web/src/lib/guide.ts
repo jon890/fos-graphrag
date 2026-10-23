@@ -211,5 +211,5 @@ export function clearProgress(storage?: Storage | null): void {
 
 /** 로그인한 뒤 작업 공간에서 가이드를 저절로 열지. 진행 중인 따라하기는 끝낸 기록과 상관없이 연다 */
 export function shouldAutoStart(user: CurrentUser, progress: GuideProgress | null = null): boolean {
-  return user.guideDoneAt === null || progress?.kind === 'practice'
+  return user.guideDoneAt == null || progress?.kind === 'practice'
 }
