@@ -93,7 +93,7 @@ Neo4j 는 온톨로지 규칙을 집행하지 않는다. 아래 제약 조건은
 | `nodeTypes.<타입>`, `nodeTypes.<타입>.properties.<속성>`, `relationshipTypes.<관계>`, `claimRelationships.<관계>`, `claimPredicates.<predicate>` | `label` | 화면에 보일 이름. 없으면 화면이 키를 그대로 보인다 |
 | enum 속성 | `valueLabels` | 선택지 표시 이름. 키는 `values` 안에 있어야 한다 |
 | `reviewStatuses.<상태>`, `changeActions.<작업>` | `label`, `description` | Claim 검토 상태와 변경 이력 작업의 표시 이름. 키는 서버가 정한 값이다 |
-| `changeFields.<키>` | `label` | 변경 이력의 `changes` 에 나오는 키 가운데 온톨로지 속성이 아닌 것(`subjectId`, `objectId`, `documentIds`, `fromId`, `toId`, `reviewStatus`, `reviewedBy`, `reviewedAt`, `reviewNote`, `archived`, `email`, `displayName`, `role`, `enabled`)의 표시 이름. 속성인 키는 그 속성의 `label` 을 쓴다. 서버가 이 목록을 상수로 두고 테스트가 YAML 과 대조한다 |
+| `changeFields.<키>` | `label` | 변경 이력의 `changes` 에 나오는 키 가운데 온톨로지 속성이 아닌 것(`subjectId`, `objectId`, `documentIds`, `fromId`, `toId`, `reviewStatus`, `reviewedBy`, `reviewedAt`, `reviewNote`, `archived`, `email`, `displayName`, `role`, `enabled`, 온톨로지 이력의 `added`, `removed`, `changed`)의 표시 이름. 속성인 키는 그 속성의 `label` 을 쓴다. 서버가 이 목록을 상수로 두고 테스트가 YAML 과 대조한다 |
 | 속성 | `description` | 입력칸 바로 아래에 보이는 도움말. 개발 용어 없이 쓴다 |
 | `claimPredicates.<predicate>` | `sentence` | 주장 만들기 폼의 문장 틀. `{subject}` 와 `{object}` 자리에 고르기 칸이 들어간다. 조사는 `이(가)`, `은(는)`, `을(를)`, `와(과)` 로 적으면 화면이 고른 이름의 끝소리에 맞춰 하나로 바꾼다. 없으면 「{subject} {object} 관계 이름」 순서로 보인다 |
 
