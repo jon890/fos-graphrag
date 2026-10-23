@@ -64,6 +64,7 @@ ADMIN 이 보낸 온톨로지 정의를 미리보기(바뀐 점, 영향, 무시�
   - 노드 타입, 관계 종류, 주장 종류: 키가 생기거나 빠지면 `nodeTypes.X`, `relationshipTypes.X`, `claimPredicates.X`.
   - 속성: `nodeTypes.X.properties.p`. enum 값은 `nodeTypes.X.properties.p.values.V`.
   - 그 밖의 필드가 바뀌면(없던 `maxLength`, `min`, `max` 가 생긴 것 포함) `changed` 에 필드 경로(`nodeTypes.X.label`, `nodeTypes.X.properties.p.required`, `relationshipTypes.X.from` 등)를 담는다.
+- `schemaVersion` 은 비교하지 않는다. 비교 대상은 `nodeTypes`, `relationshipTypes`, `claimPredicates` 뿐이다.
 - 목록은 사전순으로 정렬한다.
 
 새 파일 `ontology/OntologyImpactCounter.kt`
@@ -129,7 +130,7 @@ ADMIN 이 보낸 온톨로지 정의를 미리보기(바뀐 점, 영향, 무시�
   - 미리보기 응답의 `definition` 을 그대로 다시 미리보기로 보내면 `added`, `removed`, `changed` 가 모두 비어 있다.
   - 되돌리기: 시작 번호로 `restore` 하면 `201`, 새 버전의 `restoredFrom` 이 시작 번호이고 이력 `action` 이 `RESTORE` 다.
   - 새 관계 종류를 더해 저장하면 `SHOW INDEXES YIELD name` 에 `rel_<소문자 키>_id` 가 있다.
-  - 새 타입(`labelProperty: title`, 속성 `title` 과 `name`)의 노드를 만든 뒤 그 타입을 빼고(`confirm: true`) 저장하면, `GET /api/nodes/{id}` 가 `200` 이고 `label` 이 `name` 값(정의가 없어 `title` 이 아니다), `properties` 에 저장한 값이 있다. `GET /api/nodes?q=<이름>` 도 `200` 이다. `PATCH` 는 `400 ONTOLOGY_VIOLATION`(`details.rule == unknown-node-type`), 보관은 `200` 이다.
+  - 새 타입(`labelProperty: title`, 속성 `title` 과 `name`)의 노드를 만든 뒤 그 타입을 빼고(`confirm: true`) 저장하면, `GET /api/nodes/{id}` 가 `200` 이고 `label` 이 `name` 값(정의가 없어 `title` 이 아니다), `properties` 에 저장한 값이 있다. `GET /api/nodes?q=<title 값>` 도 `200` 이고 `totalItems >= 1` 이다(`searchText` 가 `title` 로 만들어지므로 `name` 으로 찾으면 빈 결과라 고친 경로를 지나지 않는다). `PATCH` 는 `400 ONTOLOGY_VIOLATION`(`details.rule == unknown-node-type`), 보관은 `200` 이다.
   - 새 관계 종류로 관계를 만든 뒤 그 종류를 빼고 저장하면, 시작 노드의 `GET /api/nodes/{id}`(`NodeController` 가 `NodeQueryService.detail` 로 답하는 상세) 관계 목록에 그 관계가 남아 있고, 그 관계의 보관은 `404 NOT_FOUND` 다.
   - 주석으로 100KiB 를 채운 YAML 의 미리보기는 `413` 이 아니다. 600KiB 는 `413 PAYLOAD_TOO_LARGE` 다.
 - `knowledge/TransactionConsistencyIntegrationTest.kt`(이력 기록이 실패하는 컨텍스트)에 「온톨로지 저장에서 이력 기록이 실패하면 버전도 holder 도 그대로다」 를 더한다. ADMIN 저장이 `500` 이고, 저장 전과 뒤의 `GET /api/ontology` `version`, `OntologyHead.version`, `:OntologyVersion` 개수가 같다. 이 컨텍스트에서 바꾼 정의가 없으므로 되돌리기는 필요 없다.

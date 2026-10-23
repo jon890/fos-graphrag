@@ -94,6 +94,8 @@
 - `OntologyValidator` 도 같다. `validateCreate`, `validatePatch` 등 public 메서드마다 한 번 받는다.
 - `SeedLoaderIntegrationTest` 의 `@Autowired lateinit var ontology: Ontology` 는 `@Autowired lateinit var holder: OntologyHolder` 로 바꾼다. 「seeds enabled 가 false 이면 …」 테스트가 `SeedLoader(neo4j, nodes, relationships, ontology, …)` 를 직접 만들므로 그 자리에 `holder` 를 넘긴다. 온톨로지 값이 필요한 곳은 `holder.current()` 다.
 
+- `LegacyValueCleanup` 의 `targets` 는 생성 시점 필드 초기화에서 온톨로지를 읽는다. 필드에서 지우고 `run()` 안에서 `holder.current()` 로 계산한다. 빈을 만드는 시점에는 holder 가 비어 있어 필드 초기화에서 부르면 컨텍스트가 뜨지 않는다.
+
 ### 6. 읽기 API 와 헤더
 
 `ontology/OntologyController.kt`
@@ -107,9 +109,11 @@
 
 새 파일 `ontology/OntologyVersionHeaderFilter.kt`
 
-- `OncePerRequestFilter` 다. `/api/` 로 시작하는 요청이면 체인을 부르기 전에 `X-Ontology-Version: <holder.snapshotOrNull()?.version>` 을 `setHeader` 로 넣는다. holder 가 비어 있으면 넣지 않는다. 인증 실패(401)와 오류 응답에도 붙도록 Security 필터보다 앞에서 돈다(`@Order(Ordered.HIGHEST_PRECEDENCE + 1)`, `web/RequestSizeFilter.kt` 와 같은 방식).
+- `OncePerRequestFilter` 다. `/api/` 로 시작하는 요청이면 체인을 부르기 전에 `X-Ontology-Version: <holder.snapshotOrNull()?.version>` 을 `setHeader` 로 넣는다. holder 가 비어 있으면 넣지 않는다. 인증 실패(401)와 오류 응답에도 붙도록 Security 필터보다 앞에서 돈다(`RequestSizeFilter` 가 더 앞이라 413, 411 응답에는 붙지 않는다. 받아들이는 예외다)(`@Order(Ordered.HIGHEST_PRECEDENCE + 1)`, `web/RequestSizeFilter.kt` 와 같은 방식).
 
 ### 7. 저장소 YAML 과 문서
+
+- `financial-workbench/docs/api-contract.md` 의 역할 표에서 ADMIN 권한에 온톨로지 편집을 더하고, 「온톨로지 정의는 Git 의 YAML 로 관리하고 웹에서 바꾸지 않는다」 문장을 새 동작에 맞게 고친다. 변경 파일 표에 이 문서를 더한다.
 
 - `financial-workbench/ontology/financial-ontology.yaml` 머리 주석의 첫 네 줄을 바꾼다. 「이 파일은 DB 가 비었을 때의 첫 버전과, 서버 코드가 소유하는 부분(reviewStatuses, changeActions, changeFields, claimRelationships, Claim 타입)의 원본이다. 그 밖의 부분은 첫 버전을 만든 뒤 ADMIN 이 웹에서 고친다. docs/data-schema.md 의 「온톨로지 버전」.」 과 「schemaVersion 은 저장할 때 서버가 버전 번호로 바꾼다.」 를 쓴다.
 - `changeFields` 끝에 phase 02 의 온톨로지 이력이 쓸 키를 더한다: `added: { label: 더한 항목 }`, `removed: { label: 뺀 항목 }`, `changed: { label: 바뀐 항목 }`. 같은 이름의 기존 키가 없는지 `git grep -n "added\|removed\|changed" financial-workbench/ontology` 로 확인한다. `history/ChangeController.kt` 의 `CHANGE_FIELD_KEYS` 에도 세 키를 더한다. `OntologyLabelsTest` 가 `changeFields.keys` 와 이 목록이 정확히 같은지 본다.
@@ -146,6 +150,7 @@ git grep -q "ontology_version_unique" -- financial-workbench/api/src/main
 | 파일 | 변경 |
 | --- | --- |
 | `financial-workbench/ontology/financial-ontology.yaml` | 수정 |
+| `financial-workbench/docs/api-contract.md` | 수정 |
 | `financial-workbench/api/src/main/kotlin/dev/fos/workbench/ontology/OntologyLoader.kt` | 수정 |
 | `financial-workbench/api/src/main/kotlin/dev/fos/workbench/ontology/CodeOwned.kt` | 신규 |
 | `financial-workbench/api/src/main/kotlin/dev/fos/workbench/ontology/OntologyHolder.kt` | 신규 |

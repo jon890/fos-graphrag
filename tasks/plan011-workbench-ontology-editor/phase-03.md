@@ -103,6 +103,7 @@
 - `web/e2e/workbench.spec.ts` 의 `8)` 뒤에 `9) 관리자가 YAML 로 새 타입을 더하면 편집자 화면에 안내가 나오고, 되돌리면 타입이 사라진다` 를 더한다.
   1. `pageA` 에서 온톨로지를 한 번 읽어 둔다(작업 공간을 연 상태).
   2. `pageAdmin` 이 `/ontology` 를 열고 `ontology-version` 의 번호를 저장 전 번호로 읽어 둔다 → `ontology-edit-yaml`. 입력칸 값에서 정확히 `nodeTypes:` 인 줄을 찾아 그 바로 다음에 들여쓰기 2칸으로 `Fund<suffix>` 타입 블록(label 「펀드」, description, `labelProperty: name`, `name` 속성 string 필수)을 넣고 `fill` 한다. `ontology-preview` → `ontology-diff-added` 에 `nodeTypes.Fund<suffix>` → `ontology-save` → `ontology-message` 가 success. `shot(pageAdmin, '09-ontology-saved')`.
+  4. 정리: 2 단계 전에 읽어 둔 번호를 `try/finally` 로 API restore(`confirm: true`)해 되돌린다. 단계가 중간에 실패해도 `Fund<suffix>` 가 남아 다음 실행의 타입 선택지 단언을 깨지 않게 한다. 바뀐 점이 없어 400 이 나면 무시한다.
   3. `pageA` 가 아무 API 를 부르는 동작(검색)을 하면 `ontology-stale` 이 보이고, `ontology-reload` 를 누르면 사라진다. 새 노드 만들기의 타입 선택지에 「펀드」 가 있다.
   4. `pageAdmin` 이 `ontology-history-open` → 2단계에서 읽어 둔 저장 전 번호의 행(`data-version`) → `ontology-restore` → 미리보기의 `ontology-diff-removed` 에 그 타입 → `ontology-save` → success. `shot(pageAdmin, '09-ontology-restored')`.
 
