@@ -84,7 +84,7 @@
 | 403 | `CSRF_REJECTED` | CSRF 토큰이 없거나 틀렸다 |
 | 403 | `FORBIDDEN` | 역할이 모자라다 |
 | 411 | `LENGTH_REQUIRED` | 본문이 있는 `/api` 요청에 Content-Length 가 없다(chunked 전송) |
-| 413 | `PAYLOAD_TOO_LARGE` | 요청 본문이 64KiB 를 넘는다 |
+| 413 | `PAYLOAD_TOO_LARGE` | 요청 본문이 64KiB 를 넘는다. 온톨로지 미리보기, 저장, 되돌리기는 512KiB 다 |
 | 403 | `SELF_REVIEW_FORBIDDEN` | 자기가 작성한 Claim 을 검토하려 했다 |
 | 404 | `NOT_FOUND` | 그 ID 의 노드나 관계가 없다 |
 | 409 | `REVISION_CONFLICT` | `expectedRevision` 이 현재 revision 과 다르다. `details` 에 두 값이 있다 |
@@ -176,7 +176,7 @@ Neo4j 예외는 시간 초과(`QUERY_TIMEOUT`), 연결 불가(`DATABASE_UNAVAILA
 
 | 항목 | 상한 | 넘으면 |
 | --- | --- | --- |
-| 요청 본문 | 64KiB, Content-Length 필수 | `413 PAYLOAD_TOO_LARGE`, `411 LENGTH_REQUIRED` |
+| 요청 본문 | 64KiB, 온톨로지 미리보기와 저장, 되돌리기(`POST /api/ontology/**`)는 512KiB. Content-Length 필수 | `413 PAYLOAD_TOO_LARGE`, `411 LENGTH_REQUIRED` |
 | 검색어 `q` | 100자 | `400 VALIDATION_FAILED` |
 | Claim 의 `documentIds` | 20개 | `400 VALIDATION_FAILED` |
 | 페이지 크기 `size` | 100 | `400 VALIDATION_FAILED` |
