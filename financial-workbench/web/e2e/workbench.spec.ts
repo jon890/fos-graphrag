@@ -925,4 +925,55 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       }
     }
   })
+
+  test('9b) 관리자가 폼으로 인물에 속성을 더하면 편집자의 고치기 폼에 그 칸이 나오고, 되돌린다', async () => {
+    const propKey = `nickname${suffix}`
+    // 1. 관리자가 저장 전 버전 번호를 읽어 둔다.
+    await pageAdmin.getByTestId('tab-ontology').click()
+    const versionText = await pageAdmin.getByTestId('ontology-version').innerText()
+    const before = Number(/\d+/.exec(versionText)?.[0])
+    expect(before, '저장 전 온톨로지 버전').toBeGreaterThan(0)
+
+    try {
+      // 2. 폼에서 인물에 string 속성을 더하고 확인한 뒤 저장한다.
+      await pageAdmin.getByTestId('ontology-edit-form').click()
+      const person = pageAdmin.locator('[data-testid="ontology-form-type"][data-type="Person"]')
+      await expect(person).toBeVisible()
+      await person.getByTestId('ontology-form-prop-add').click()
+      await person.getByTestId('ontology-form-new-key').fill(propKey)
+      await person.getByTestId('ontology-form-new-label').fill('별명')
+      await person.getByTestId('ontology-form-new-submit').click()
+      await expect(person.locator(`[data-testid="ontology-form-prop"][data-prop="${propKey}"]`)).toBeVisible()
+      await pageAdmin.getByTestId('ontology-preview').click()
+      await expect(pageAdmin.getByTestId('ontology-diff-added')).toContainText(`nodeTypes.Person.properties.${propKey}`)
+      await pageAdmin.getByTestId('ontology-save').click()
+      await expect(pageAdmin.getByTestId('ontology-message')).toHaveAttribute('data-kind', 'success')
+      await shot(pageAdmin, '09b-ontology-form')
+
+      // 3. 편집자 A 가 API 를 부르는 동작을 하면 안내가 나오고, 다시 읽으면 인물의 고치기 폼에 「별명」 칸이 있다.
+      await pageA.getByTestId('tab-workspace').click()
+      await pageA.getByTestId('search-input').fill('Warren Buffett')
+      await pageA.getByTestId('search-submit').click()
+      await expect(pageA.getByTestId('ontology-stale')).toBeVisible()
+      await pageA.getByTestId('ontology-reload').click()
+      await expect(pageA.getByTestId('ontology-stale')).toHaveCount(0)
+      await searchResult(pageA, '워런 버핏').click()
+      await expect(pageA.getByTestId(`edit-prop-${propKey}`)).toBeVisible()
+      await expect(pageA.getByTestId('node-edit-form')).toContainText('별명')
+    } finally {
+      // 단계가 중간에 실패해도 속성이 남지 않게 저장 전 버전으로 되돌린다.
+      const base = new URL(pageAdmin.url()).origin
+      await pageAdmin.request.get(`${base}/api/auth/csrf`)
+      const xsrf = (await pageAdmin.context().cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value
+      const latest = ((await (await pageAdmin.request.get(`${base}/api/ontology`)).json()) as { version: number }).version
+      if (latest !== before) {
+        const res = await pageAdmin.request.post(`${base}/api/ontology/versions/${before}/restore`, {
+          headers: { 'X-XSRF-TOKEN': xsrf ?? '', 'Content-Type': 'application/json' },
+          data: { baseVersion: latest, note: '테스트 정리', confirm: true },
+        })
+        // 이미 되돌려 바뀐 점이 없으면 서버가 400 으로 답한다.
+        expect([201, 400]).toContain(res.status())
+      }
+    }
+  })
 })

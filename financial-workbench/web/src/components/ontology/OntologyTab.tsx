@@ -9,6 +9,7 @@ import { TAB_PATHS, ontologySearch, parseOntologyQuery, type OntologyQuery } fro
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { OntologyHistory } from './OntologyHistory'
+import { OntologyFormEditor } from './OntologyFormEditor'
 import { OntologyView } from './OntologyView'
 import { OntologyYamlEditor } from './OntologyYamlEditor'
 
@@ -50,6 +51,9 @@ export function OntologyTab({ draft, onDraftChange, reloadOntology }: Props) {
       </p>
       {isAdmin && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Button type="button" data-testid="ontology-edit-form" onClick={() => open({ view: 'form' })}>
+            폼으로 편집
+          </Button>
           <Button type="button" data-testid="ontology-edit-yaml" onClick={() => open({ view: 'yaml' })}>
             YAML 로 편집
           </Button>
@@ -70,6 +74,16 @@ export function OntologyTab({ draft, onDraftChange, reloadOntology }: Props) {
         </Alert>
       )}
 
+      {query.view === 'form' && (
+        <OntologyFormEditor
+          draft={draft}
+          onDraftChange={onDraftChange}
+          reloadOntology={reloadOntology}
+          onSaved={(s) => void saved(s)}
+          onClose={() => navigate(TAB_PATHS.ontology)}
+          onOpenYaml={() => open({ view: 'yaml' })}
+        />
+      )}
       {query.view === 'yaml' && (
         <OntologyYamlEditor
           draft={draft}
@@ -77,6 +91,7 @@ export function OntologyTab({ draft, onDraftChange, reloadOntology }: Props) {
           reloadOntology={reloadOntology}
           onSaved={(s) => void saved(s)}
           onClose={() => navigate(TAB_PATHS.ontology)}
+          onOpenForm={() => open({ view: 'form' })}
         />
       )}
       {query.view === 'history' && (

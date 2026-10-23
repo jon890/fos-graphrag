@@ -157,7 +157,7 @@ export function changesSearch(q: ChangesQuery): string {
 }
 
 export interface OntologyQuery {
-  view?: 'yaml' | 'history'
+  view?: 'form' | 'yaml' | 'history'
   version?: number
 }
 
@@ -166,7 +166,7 @@ export function parseOntologyQuery(search: string): OntologyQuery {
   const view = p.get('view')
   const version = p.get('version')
   const q: OntologyQuery = {}
-  if (view === 'yaml' || view === 'history') q.view = view
+  if (view === 'form' || view === 'yaml' || view === 'history') q.view = view
   if (version !== null && /^\d+$/.test(version)) q.version = Number(version)
   return q
 }

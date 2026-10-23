@@ -268,6 +268,9 @@ export interface Ontology {
   changeFields?: Record<string, LabelDef>
 }
 
+/** 서버에 보내는 온톨로지 정의. Ontology 에서 버전 정보를 뺀 모양이다 */
+export type OntologyDefinition = Omit<Ontology, 'version' | 'versionCreatedAt' | 'versionCreatedBy'>
+
 export interface OntologyVersionSummary {
   version: number
   createdAt: string
@@ -308,14 +311,14 @@ export interface OntologyPreview {
   impacts: OntologyImpact[]
   codeOwnedIgnored: string[]
   yaml: string | null
-  definition: unknown
+  definition: OntologyDefinition | null
 }
 
 /** 미리보기와 저장의 본문. yaml 과 definition 은 하나만 보낸다. note 와 confirm 은 저장만 읽는다 */
 export interface OntologyEditRequest {
   baseVersion: number
   yaml?: string
-  definition?: unknown
+  definition?: OntologyDefinition
   note?: string
   confirm?: boolean
 }

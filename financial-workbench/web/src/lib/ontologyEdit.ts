@@ -1,4 +1,4 @@
-import type { OntologyImpactKind } from '../api/types'
+import type { OntologyDefinition, OntologyImpactKind } from '../api/types'
 
 const IMPACT_TEXT: Record<OntologyImpactKind, string> = {
   REMOVED_NODE_TYPE: '이 타입의 노드 {n}개가 정의 없이 남습니다',
@@ -19,10 +19,17 @@ export function impactText(kind: OntologyImpactKind, count: number): string {
   return template ? template.replace('{n}', String(count)) : `${kind} ${count}`
 }
 
-/** 온톨로지 편집 초안. App 이 들고 있어 탭을 옮겨도 남는다. baseVersion 은 초안을 시작한 버전이다 */
+/**
+ * 온톨로지 편집 초안. App 이 들고 있어 탭을 옮겨도 남는다. baseVersion 은 초안을 시작한 버전이다.
+ * source 가 yaml 이면 yaml 이, form 이면 definition 과 removed 가 초안의 내용이다. 나머지는 null 이거나 비어 있다.
+ */
 export interface OntologyDraft {
   baseVersion: number
-  yaml: string
+  source: 'yaml' | 'form'
+  yaml: string | null
+  definition: OntologyDefinition | null
+  /** 폼에서 「뺄 예정」 으로 표시한 경로. 미리보기와 YAML 로 옮길 때 definition 에서 뺀다 */
+  removed: string[]
   /** 사람이 고친 적이 있는가. 고친 초안이 있으면 창을 닫기 전에 묻는다 */
   dirty: boolean
 }

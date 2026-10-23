@@ -2,6 +2,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { CurrentUser, OntologyPreview } from '../../api/types'
 import { testOntology, withApp } from '../testSupport'
+import { toDefinition } from '../../lib/ontologyDraft'
+import { OntologyFormEditor } from './OntologyFormEditor'
 import { OntologyPreviewPanel } from './OntologyPreviewPanel'
 import { OntologyTab } from './OntologyTab'
 
@@ -32,6 +34,7 @@ const renderPanel = (p: OntologyPreview) =>
 describe('온톨로지 탭의 편집 단추', () => {
   it('관리자에게는 편집, 버전 기록, 내려받기가 있고 버전 번호를 보인다', () => {
     const html = renderTab(admin)
+    expect(html).toContain('data-testid="ontology-edit-form"')
     expect(html).toContain('data-testid="ontology-edit-yaml"')
     expect(html).toContain('data-testid="ontology-history-open"')
     expect(html).toMatch(/<a[^>]*data-testid="ontology-export"[^>]*href="\/api\/ontology\/export"/)
@@ -40,6 +43,7 @@ describe('온톨로지 탭의 편집 단추', () => {
 
   it('열람자에게는 편집 단추가 없다', () => {
     const html = renderTab(viewer)
+    expect(html).not.toContain('ontology-edit-form')
     expect(html).not.toContain('ontology-edit-yaml')
     expect(html).not.toContain('ontology-history-open')
     expect(html).not.toContain('ontology-export')
@@ -73,5 +77,34 @@ describe('OntologyPreviewPanel', () => {
     const html = renderPanel(preview({ added: [] }))
     expect(html).toContain('data-testid="ontology-diff-empty"')
     expect(html).not.toContain('data-testid="ontology-save"')
+  })
+})
+
+describe('OntologyFormEditor', () => {
+  const html = renderToStaticMarkup(
+    withApp(
+      <OntologyFormEditor
+        draft={{ baseVersion: 1, source: 'form', yaml: null, definition: toDefinition(testOntology), removed: [], dirty: false }}
+        onDraftChange={() => {}}
+        reloadOntology={async () => {}}
+        onSaved={() => {}}
+        onClose={() => {}}
+        onOpenYaml={() => {}}
+      />,
+      testOntology,
+      admin,
+      '/ontology?view=form',
+    ),
+  )
+
+  it('Claim 을 뺀 노드 타입 카드를 그린다', () => {
+    expect(html).toContain('data-testid="ontology-form"')
+    expect(html).toContain('data-type="Company"')
+    expect(html).not.toContain('data-type="Claim"')
+  })
+
+  it('코드가 읽는 속성은 빼기 단추가 꺼져 있다', () => {
+    const row = /<div[^>]*data-testid="ontology-form-prop"[^>]*data-prop="url"[\s\S]*?<\/div><div class="mt-2/.exec(html)?.[0] ?? ''
+    expect(row).toMatch(/<button[^>]*data-testid="ontology-form-remove"[^>]*disabled/)
   })
 })

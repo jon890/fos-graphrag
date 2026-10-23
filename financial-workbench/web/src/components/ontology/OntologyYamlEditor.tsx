@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { OntologyPreview, OntologyVersionSummary } from '../../api/types'
 import { useApp } from '../../context'
+import { applyRemoved } from '../../lib/ontologyDraft'
 import type { OntologyDraft } from '../../lib/ontologyEdit'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,8 @@ interface Props {
   onSaved: (saved: OntologyVersionSummary) => void
   /** 초안을 버린 뒤 보기 화면으로 돌아간다 */
   onClose: () => void
+  /** 폼 편집기로 옮긴다 */
+  onOpenForm: () => void
 }
 
 function YamlHelp() {
@@ -60,31 +63,52 @@ function YamlHelp() {
   )
 }
 
-export function OntologyYamlEditor({ draft, onDraftChange, reloadOntology, onSaved, onClose }: Props) {
+export function OntologyYamlEditor({ draft, onDraftChange, reloadOntology, onSaved, onClose, onOpenForm }: Props) {
   const { ontology } = useApp()
   const [loadError, setLoadError] = useState<string | null>(null)
   const [preview, setPreview] = useState<OntologyPreview | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  // 초안이 없으면 지금 버전의 YAML 로 만든다.
+  // 초안이 없으면 지금 버전의 YAML 로 만들고, 폼 초안이면 미리보기 API 가 정리한 YAML 로 바꾼다.
   useEffect(() => {
-    if (draft) return
     let live = true
-    setLoadError(null)
-    api.ontology
-      .version(ontology.version)
-      .then((detail) => live && onDraftChange({ baseVersion: detail.version, yaml: detail.yaml, dirty: false }))
-      .catch((e) => live && setLoadError(errorMessage(e)))
+    if (!draft) {
+      setLoadError(null)
+      api.ontology
+        .version(ontology.version)
+        .then(
+          (detail) =>
+            live && onDraftChange({ baseVersion: detail.version, source: 'yaml', yaml: detail.yaml, definition: null, removed: [], dirty: false }),
+        )
+        .catch((e) => live && setLoadError(errorMessage(e)))
+    } else if (draft.source === 'form' && draft.definition) {
+      setLoadError(null)
+      api.ontology
+        .preview({ baseVersion: draft.baseVersion, definition: applyRemoved(draft.definition, draft.removed) })
+        .then((p) => {
+          if (!live) return
+          if (p.yaml === null) setLoadError(p.errors.join('\n') || 'YAML 로 옮기지 못했습니다')
+          else onDraftChange({ baseVersion: draft.baseVersion, source: 'yaml', yaml: p.yaml, definition: null, removed: [], dirty: draft.dirty })
+        })
+        .catch((e) => live && setLoadError(errorMessage(e)))
+    }
     return () => {
       live = false
     }
   }, [draft, ontology.version, onDraftChange])
 
-  if (!draft) {
+  if (!draft || draft.yaml === null) {
     return loadError ? (
       <Alert role={undefined} variant="destructive" data-testid="ontology-yaml-error">
-        <AlertDescription>{loadError}</AlertDescription>
+        <AlertDescription>
+          <p className="m-0 whitespace-pre-line">{loadError}</p>
+          {draft && (
+            <Button type="button" variant="outline" size="sm" className="mt-2" data-testid="ontology-yaml-back-to-form" onClick={onOpenForm}>
+              폼으로 돌아가기
+            </Button>
+          )}
+        </AlertDescription>
       </Alert>
     ) : (
       <div className="p-6 text-center text-muted-foreground">YAML 을 불러오는 중…</div>
@@ -110,9 +134,10 @@ export function OntologyYamlEditor({ draft, onDraftChange, reloadOntology, onSav
     onDraftChange(null)
   }
 
+  const yaml = draft.yaml
   const rebase = (currentVersion: number) => {
     onDraftChange({ ...draft, baseVersion: currentVersion })
-    void runPreview(currentVersion, draft.yaml)
+    void runPreview(currentVersion, yaml)
   }
 
   return (
@@ -123,15 +148,18 @@ export function OntologyYamlEditor({ draft, onDraftChange, reloadOntology, onSav
         className="min-h-96 font-mono text-xs"
         data-testid="ontology-yaml-input"
         spellCheck={false}
-        value={draft.yaml}
+        value={yaml}
         onChange={(e) => {
           setPreview(null)
           onDraftChange({ ...draft, yaml: e.target.value, dirty: true })
         }}
       />
       <div className="mt-2 flex flex-wrap gap-2">
-        <Button type="button" data-testid="ontology-preview" disabled={busy} onClick={() => void runPreview(draft.baseVersion, draft.yaml)}>
+        <Button type="button" data-testid="ontology-preview" disabled={busy} onClick={() => void runPreview(draft.baseVersion, yaml)}>
           저장 전에 확인
+        </Button>
+        <Button type="button" variant="outline" data-testid="ontology-yaml-to-form" onClick={onOpenForm}>
+          폼으로 보기
         </Button>
         <Button
           type="button"
@@ -155,7 +183,7 @@ export function OntologyYamlEditor({ draft, onDraftChange, reloadOntology, onSav
         <OntologyPreviewPanel
           preview={preview}
           onSave={({ note, confirm }) =>
-            api.ontology.save({ baseVersion: draft.baseVersion, yaml: draft.yaml, note: note || undefined, confirm })
+            api.ontology.save({ baseVersion: draft.baseVersion, yaml, note: note || undefined, confirm })
           }
           onSaved={onSaved}
           onRestart={() => void restart()}

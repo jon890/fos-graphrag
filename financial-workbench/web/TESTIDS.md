@@ -206,10 +206,20 @@ ADMIN 에게만 나오는 요소다.
 
 | testid | 요소 |
 | --- | --- |
-| `ontology-edit-yaml`, `ontology-history-open` | 「YAML 로 편집」, 「버전 기록」 |
+| `ontology-edit-form`, `ontology-edit-yaml`, `ontology-history-open` | 「폼으로 편집」, 「YAML 로 편집」, 「버전 기록」 |
 | `ontology-export` | 「YAML 내려받기」 링크 |
 | `ontology-yaml-editor`, `ontology-yaml-help`, `ontology-yaml-input`, `ontology-yaml-error` | YAML 편집기, 접힌 도움말, YAML 입력칸, 초안을 읽지 못한 오류 |
-| `ontology-preview`, `ontology-preview-failed`, `ontology-draft-discard` | 「저장 전에 확인」, 미리보기 요청 오류, 「초안 버리기」 |
+| `ontology-preview`, `ontology-preview-failed`, `ontology-draft-discard` | 「저장 전에 확인」, 미리보기 요청 오류, 「초안 버리기」. 폼과 YAML 편집기가 같은 id 를 쓴다 |
+| `ontology-yaml-to-form`, `ontology-yaml-back-to-form` | YAML 편집기의 「폼으로 보기」, 폼 초안을 YAML 로 옮기지 못했을 때의 「폼으로 돌아가기」 |
+| `ontology-form`, `ontology-form-convert-error`, `ontology-form-back-to-yaml` | 폼 편집기, YAML 을 폼으로 옮기지 못한 오류, 「YAML 로 돌아가기」 |
+| `ontology-form-type` *(`data-type`)*, `ontology-form-type-label` | 노드 타입 카드, 그 표시 이름 입력칸 |
+| `ontology-form-prop` *(`data-prop`)*, `ontology-form-required`, `ontology-form-enum-value` *(`data-value`)* | 속성 한 줄, 필수 확인란, enum 값 한 줄 |
+| `ontology-form-rel` *(`data-rel`)*, `ontology-form-predicate` *(`data-predicate`)* | 관계 종류 행, 주장 종류 행 |
+| `ontology-form-remove`, `ontology-form-restore` | 「빼기」, 「되살리기」(뺄 예정인 행에만 나온다) |
+| `ontology-form-type-add`, `ontology-form-prop-add`, `ontology-form-rel-add`, `ontology-form-predicate-add` | 「노드 타입 더하기」, 「속성 더하기」(타입 카드 안), 「관계 종류 더하기」, 「주장 종류 더하기」 |
+| `ontology-form-new` | 더하기 입력 영역. 안에 `ontology-form-new-key`, `-new-type`(속성 값 타입), `-new-label`, `-new-values`(enum 값), `-new-sentence`(문장 틀), `-new-submit`(「더하기」) |
+| `ontology-form-error`, `ontology-form-emptied` | 키나 문장 틀 오류, 「이 종류도 함께 빼야 합니다」 |
+| `ontology-form-to-yaml` | 폼의 「YAML 로 보기」 |
 | `ontology-preview-panel` | 미리보기 결과 |
 | `ontology-preview-error` * | 틀린 YAML 이나 저장 거절의 오류 한 줄 |
 | `ontology-diff-added`, `ontology-diff-removed`, `ontology-diff-changed`, `ontology-diff-empty` | 더함, 뺌, 바뀜 경로 목록과 「바뀐 점이 없습니다」 |
