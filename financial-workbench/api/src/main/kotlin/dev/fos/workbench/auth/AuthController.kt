@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
-data class CurrentUser(val id: String, val email: String, val displayName: String, val role: Role)
+data class CurrentUser(val id: String, val email: String, val displayName: String, val role: Role, val guideDoneAt: String?)
 
 @RestController
 @RequestMapping("/api/auth")
@@ -26,7 +26,14 @@ class AuthController(private val users: UserRepository) {
     @GetMapping("/me")
     fun me(@AuthenticationPrincipal principal: WorkbenchPrincipal): CurrentUser {
         val user = users.findById(principal.id) ?: throw IllegalStateException("세션 사용자가 없다")
-        return CurrentUser(user.id, user.email, user.displayName, user.role)
+        return CurrentUser(user.id, user.email, user.displayName, user.role, user.guideDoneAt)
+    }
+
+    /** 첫 접속 가이드를 끝냈거나 건너뛴 시각을 기록한다. 이미 있으면 그대로 둔다. */
+    @PostMapping("/me/guide-done")
+    fun guideDone(@AuthenticationPrincipal principal: WorkbenchPrincipal): CurrentUser {
+        val user = users.markGuideDone(principal.id) ?: throw IllegalStateException("세션 사용자가 없다")
+        return CurrentUser(user.id, user.email, user.displayName, user.role, user.guideDoneAt)
     }
 
     @PostMapping("/logout")

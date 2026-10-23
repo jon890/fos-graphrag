@@ -51,6 +51,7 @@ class SecurityConfig {
                     .requestMatchers("/api/ontology/versions", "/api/ontology/versions/**", "/api/ontology/export", "/api/ontology/preview").hasRole("ADMIN")
                     .requestMatchers(HttpMethod.GET, "/api/**").hasRole("VIEWER")
                     .requestMatchers("/api/auth/logout").authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/auth/me/guide-done").authenticated()
                     .requestMatchers("/api/**").hasRole("EDITOR")
                     // 정적 파일, OAuth 경로, 오류 페이지
                     .anyRequest().permitAll()
