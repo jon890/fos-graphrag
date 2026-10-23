@@ -4,6 +4,9 @@ import {
   addNodeType,
   applyRemoved,
   keyError,
+  RELOAD_FAILED_HINT,
+  reloadSucceeded,
+  savedMessage,
   sentenceError,
   toDefinition,
   toggleRemoved,
@@ -154,5 +157,17 @@ describe('sentenceError', () => {
 
   it('한 번씩 있으면 오류가 아니다', () => {
     expect(sentenceError('{subject}이(가) {object}을(를) 강조한다')).toBeNull()
+  })
+})
+
+describe('reloadSucceeded', () => {
+  it('다시 읽기가 실패해도 던지지 않고 false 를 돌려준다', async () => {
+    expect(await reloadSucceeded(async () => {})).toBe(true)
+    expect(await reloadSucceeded(() => Promise.reject(new Error('down')))).toBe(false)
+  })
+
+  it('저장 안내는 다시 읽지 못했을 때 그 사실을 덧붙인다', () => {
+    expect(savedMessage(3, true)).toBe('버전 3 을 저장했습니다.')
+    expect(savedMessage(3, false)).toBe(`버전 3 을 저장했지만 ${RELOAD_FAILED_HINT}`)
   })
 })

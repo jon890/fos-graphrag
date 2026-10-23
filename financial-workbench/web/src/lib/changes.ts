@@ -21,13 +21,13 @@ function refName(o: Ontology, ref: ChangeRef | undefined): string {
 }
 
 /** 이력 값 하나를 보일 말로. refs 에 있는 ID 는 이름, 목록은 쉼표로 잇는다 */
-export function changeValueText(o: Ontology, targetType: string, key: string, value: unknown, refs: Record<string, ChangeRef>): string {
+export function changeValueText(o: Ontology, targetType: string, key: string, value: unknown, refs: Record<string, ChangeRef>, targetKind?: string): string {
   if (value === null || value === undefined || value === '') return '(없음)'
   if (REF_KEYS.has(key)) {
     const ids = Array.isArray(value) ? value : [value]
     return ids.map((id) => refName(o, refs[String(id)])).join(', ')
   }
-  if (ONTOLOGY_PATH_KEYS.has(key) && Array.isArray(value)) return value.join(', ')
+  if (targetKind === 'ONTOLOGY' && ONTOLOGY_PATH_KEYS.has(key) && Array.isArray(value)) return value.join(', ')
   if (key === 'reviewedAt') return formatDateTime(String(value))
   if (key === 'reviewStatus') return reviewStatusLabel(o, String(value))
   if (key === 'role') return ROLE_LABEL[String(value)] ?? String(value)

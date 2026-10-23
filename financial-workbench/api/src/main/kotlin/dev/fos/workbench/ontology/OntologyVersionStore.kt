@@ -55,11 +55,11 @@ class OntologyVersionStore(
     fun list(page: PageQuery): Page<OntologyVersionSummary> {
         val total = client.query("MATCH (v:OntologyVersion) RETURN count(v) AS total")
             .fetch().one().map { (it["total"] as Number).toLong() }.orElse(0L)
-        @Suppress("UNCHECKED_CAST")
         val items = client.query(
-            "MATCH (v:OntologyVersion) RETURN properties(v) AS v ORDER BY v.version DESC SKIP \$skip LIMIT \$limit",
+            "MATCH (v:OntologyVersion) RETURN v.version AS version, v.createdAt AS createdAt, v.createdBy AS createdBy, v.note AS note, " +
+                "v.restoredFrom AS restoredFrom ORDER BY v.version DESC SKIP \$skip LIMIT \$limit",
         ).bindAll(mapOf("skip" to page.skip, "limit" to page.size)).fetch().all()
-            .map { toSummary(it["v"] as Map<String, Any?>) }
+            .map { toSummary(it) }
         return page.of(items, total)
     }
 

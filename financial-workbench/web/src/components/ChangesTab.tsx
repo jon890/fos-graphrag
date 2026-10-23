@@ -39,7 +39,7 @@ function ActionBadge({ action, children }: { action: string; children: ReactNode
 /** 값 하나. 노드 ID 한 개이고 이름을 알면 누르면 그 노드를 여는 링크로, 아니면 글자로 보인다 */
 function ChangeValue({ c, k, value, onOpen }: { c: ChangeEventView; k: string; value: unknown; onOpen: (id: string) => void }) {
   const { ontology } = useApp()
-  const text = changeValueText(ontology, c.targetType, k, value, c.refs)
+  const text = changeValueText(ontology, c.targetType, k, value, c.refs, c.targetKind)
   const ref = typeof value === 'string' ? c.refs[value] : undefined
   if (ref && ref.type !== 'User' && REF_KEYS.has(k)) {
     return (

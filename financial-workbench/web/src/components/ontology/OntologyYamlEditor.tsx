@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api/client'
 import type { OntologyPreview, OntologyVersionSummary } from '../../api/types'
 import { useApp } from '../../context'
-import { applyRemoved } from '../../lib/ontologyDraft'
+import { applyRemoved, RELOAD_FAILED_HINT, reloadSucceeded } from '../../lib/ontologyDraft'
 import type { OntologyDraft } from '../../lib/ontologyEdit'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -129,8 +129,11 @@ export function OntologyYamlEditor({ draft, onDraftChange, reloadOntology, onSav
   }
 
   const restart = async () => {
+    if (!(await reloadSucceeded(reloadOntology))) {
+      setPreviewError(RELOAD_FAILED_HINT)
+      return
+    }
     setPreview(null)
-    await reloadOntology()
     onDraftChange(null)
   }
 

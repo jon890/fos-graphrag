@@ -18,6 +18,8 @@ import {
   updateNodeType,
   updateProperty,
   updateRelationshipType,
+  RELOAD_FAILED_HINT,
+  reloadSucceeded,
 } from '../../lib/ontologyDraft'
 import type { OntologyDraft } from '../../lib/ontologyEdit'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -776,8 +778,11 @@ export function OntologyFormEditor({ draft, onDraftChange, reloadOntology, onSav
   }
 
   const restart = async () => {
+    if (!(await reloadSucceeded(reloadOntology))) {
+      setPreviewError(RELOAD_FAILED_HINT)
+      return
+    }
     setPreview(null)
-    await reloadOntology()
     onDraftChange(null)
   }
 

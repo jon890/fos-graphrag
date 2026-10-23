@@ -1,3 +1,4 @@
+import { reloadSucceeded, savedMessage } from '../../lib/ontologyDraft'
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { ONTOLOGY_EXPORT_URL } from '../../api/client'
@@ -35,10 +36,10 @@ export function OntologyTab({ draft, onDraftChange, reloadOntology }: Props) {
   }
 
   const saved = async (summary: OntologyVersionSummary) => {
-    await reloadOntology()
+    const reloaded = await reloadSucceeded(reloadOntology)
     onDraftChange(null)
     navigate(TAB_PATHS.ontology)
-    setMessage(`버전 ${summary.version} 을 저장했습니다.`)
+    setMessage(savedMessage(summary.version, reloaded))
   }
 
   return (
