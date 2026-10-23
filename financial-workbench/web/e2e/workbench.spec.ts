@@ -978,4 +978,51 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       }
     }
   })
+
+  test('9c) 관리자가 기존 데이터와 어긋나는 변경을 미리보면 영향과 확인란이 보이고, 저장하지 않고 초안을 버린다', async () => {
+    const propKey = `required${suffix}`
+    // 1. 관리자가 시작 전 버전 번호를 읽어 둔다. 9b 의 정리는 API 로 되돌려 화면이 예전 버전을 들고 있으므로 새로고침해 최신 버전을 읽는다.
+    await pageAdmin.getByTestId('tab-ontology').click()
+    await pageAdmin.reload()
+    await expect(pageAdmin.getByTestId('ontology-stale')).toHaveCount(0)
+    const before = Number(/\d+/.exec(await pageAdmin.getByTestId('ontology-version').innerText())?.[0])
+    expect(before, '시작 전 온톨로지 버전').toBeGreaterThan(0)
+
+    // 2. YAML 의 Concept 타입 properties 아래에 필수 속성을 더한다. 시작 때 들어간 개념에는 이 값이 없다.
+    await pageAdmin.getByTestId('ontology-edit-yaml').click()
+    const input = pageAdmin.getByTestId('ontology-yaml-input')
+    await expect(input).not.toHaveValue('')
+    const lines = (await input.inputValue()).split('\n')
+    const concept = lines.findIndex((line) => line === '  Concept:')
+    expect(concept, '정규화된 YAML 의 Concept 줄').toBeGreaterThanOrEqual(0)
+    const props = lines.findIndex((line, i) => i > concept && line === '    properties:')
+    expect(props, 'Concept 의 properties 줄').toBeGreaterThan(concept)
+    lines.splice(
+      props + 1,
+      0,
+      `      ${propKey}:`,
+      '        type: string',
+      '        label: 필수 시험',
+      '        required: true',
+      '        maxLength: 50',
+    )
+    await input.fill(lines.join('\n'))
+
+    // 3. 영향 행과 개수, 꺼진 저장 단추, 확인란을 확인한다. 저장은 누르지 않는다.
+    await pageAdmin.getByTestId('ontology-preview').click()
+    const impact = pageAdmin.locator('[data-testid="ontology-impact"][data-kind="NOW_REQUIRED"]')
+    await expect(impact).toBeVisible()
+    await expect(impact).toContainText(/\d+개/)
+    // 더한 것은 이 단계의 속성 하나뿐이다. 앞 단계가 남긴 항목이 섞이지 않는다.
+    await expect(pageAdmin.getByTestId('ontology-diff-added').locator('li')).toHaveCount(1)
+    const save = pageAdmin.getByTestId('ontology-save')
+    await expect(save).toBeDisabled()
+    await pageAdmin.getByTestId('ontology-save-confirm').check()
+    await expect(save).toBeEnabled()
+    await shotElement(pageAdmin.getByTestId('ontology-preview-panel'), '09c-ontology-impact')
+
+    // 4. 초안을 버리면 버전이 그대로다.
+    await pageAdmin.getByTestId('ontology-draft-discard').click()
+    await expect(pageAdmin.getByTestId('ontology-version')).toHaveText(`버전 ${before}`)
+  })
 })

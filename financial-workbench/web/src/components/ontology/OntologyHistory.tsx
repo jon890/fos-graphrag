@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, errorMessage, ontologyVersionDownload } from '../../api/client'
 import type { OntologyPreview, OntologyVersionDetail, OntologyVersionSummary, Page } from '../../api/types'
 import { useApp } from '../../context'
+import { restartError } from '../../lib/ontologyDraft'
 import { formatDateTime, userName } from '../../lib/format'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -69,6 +70,16 @@ export function OntologyHistory({ version, onOpenVersion, reloadOntology, onSave
     } finally {
       setBusy(false)
     }
+  }
+
+  const restart = async () => {
+    const error = await restartError(reloadOntology)
+    if (error) {
+      setActionError(error)
+      return
+    }
+    setActionError(null)
+    setPreview(null)
   }
 
   const download = async () => {
@@ -150,10 +161,7 @@ export function OntologyHistory({ version, onOpenVersion, reloadOntology, onSave
                 api.ontology.restore(detail.version, { baseVersion: ontology.version, note: note || undefined, confirm })
               }
               onSaved={onSaved}
-              onRestart={() => {
-                setPreview(null)
-                void reloadOntology()
-              }}
+              onRestart={() => void restart()}
             />
           )}
         </section>
