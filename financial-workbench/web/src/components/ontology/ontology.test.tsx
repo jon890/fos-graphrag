@@ -7,8 +7,8 @@ import { OntologyFormEditor } from './OntologyFormEditor'
 import { OntologyPreviewPanel } from './OntologyPreviewPanel'
 import { OntologyTab } from './OntologyTab'
 
-const admin: CurrentUser = { id: 'u0', email: 'admin@example.com', displayName: '관리자', role: 'ADMIN' }
-const viewer: CurrentUser = { id: 'u9', email: 'v@example.com', displayName: '열람자', role: 'VIEWER' }
+const admin: CurrentUser = { id: 'u0', email: 'admin@example.com', displayName: '관리자', role: 'ADMIN', guideDoneAt: null }
+const viewer: CurrentUser = { id: 'u9', email: 'v@example.com', displayName: '열람자', role: 'VIEWER', guideDoneAt: null }
 
 const renderTab = (user: CurrentUser) =>
   renderToStaticMarkup(withApp(<OntologyTab draft={null} onDraftChange={() => {}} reloadOntology={async () => {}} />, testOntology, user, '/ontology'))

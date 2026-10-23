@@ -60,3 +60,42 @@
     border-color: var(--color-border);
   }
 }
+
+/* 첫 접속 가이드. 말풍선 위치(top, left)만 화면 코드가 style 속성으로 둔다 */
+@layer components {
+  .guide-bubble {
+    position: fixed;
+    z-index: 50;
+    width: 320px;
+    max-width: calc(100vw - 32px);
+    max-height: 40vh;
+    overflow-y: auto;
+    border: 1px solid var(--primary);
+    border-radius: var(--radius);
+    background: var(--card);
+    color: var(--card-foreground);
+    padding: 12px 14px;
+    box-shadow: 0 8px 24px rgb(15 23 42 / 0.18);
+  }
+  /* 좁은 화면이나 대상이 없을 때의 아래쪽 카드 */
+  .guide-bubble-card {
+    top: auto;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    width: auto;
+    max-width: none;
+  }
+  @media (min-width: 1024px) {
+    .guide-bubble-card {
+      max-width: 480px;
+      margin: 0 auto;
+    }
+  }
+  /* 칸 전체를 가리킬 때 부모의 overflow 에 잘리지 않게 테두리를 안쪽에 그린다 */
+  .guide-target {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+    box-shadow: 0 0 0 6px rgb(29 78 216 / 0.2);
+  }
+}

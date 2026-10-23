@@ -34,6 +34,9 @@ const editorA: TestUser = { sub: `editor-a-${suffix}`, email: `editor-a-${suffix
 const editorB: TestUser = { sub: `editor-b-${suffix}`, email: `editor-b-${suffix}@example.com`, name: '편집자B' }
 const viewer: TestUser = { sub: `viewer-${suffix}`, email: `viewer-${suffix}@example.com`, name: '열람자' }
 const stranger: TestUser = { sub: `stranger-${suffix}`, email: `stranger-${suffix}@example.com`, name: '외부인' }
+// 첫 접속 가이드를 처음 보는 사용자. 다른 테스트의 로그인은 가이드를 건너뛰어 끝낸 기록이 남는다.
+const guideViewer: TestUser = { sub: `guide-viewer-${suffix}`, email: `guide-viewer-${suffix}@example.com`, name: '가이드열람자' }
+const guideEditor: TestUser = { sub: `guide-editor-${suffix}`, email: `guide-editor-${suffix}@example.com`, name: '가이드편집자' }
 
 async function addUser(page: Page, user: TestUser, role: 'VIEWER' | 'EDITOR' | 'ADMIN'): Promise<void> {
   await page.getByTestId('users-add-email').fill(user.email)
@@ -126,6 +129,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await addUser(pageAdmin, editorA, 'EDITOR')
     await addUser(pageAdmin, editorB, 'EDITOR')
     await addUser(pageAdmin, viewer, 'VIEWER')
+    await addUser(pageAdmin, guideViewer, 'VIEWER')
+    await addUser(pageAdmin, guideEditor, 'EDITOR')
     await shot(pageAdmin, '00-users-admin')
   })
 
@@ -852,6 +857,46 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageViewer.getByTestId('login-google')).toBeVisible()
     await expect(pageViewer.getByTestId('current-user-name')).toHaveCount(0)
     await shot(pageViewer, '08-disabled')
+  })
+
+  test('10) 열람자는 처음 로그인하면 둘러보기 가이드가 열리고, 끝내면 다시 열리지 않으며 「사용법」 으로 다시 본다', async ({ browser }) => {
+    const page = await open(browser)
+    await loginAs(page, guideViewer, 'success', '/', { guide: 'keep' })
+    const bubble = page.getByTestId('guide-bubble')
+    await expect(bubble).toHaveAttribute('data-step', 'intro')
+    await page.getByTestId('guide-start').click()
+
+    const steps: [string, string][] = [
+      ['search', 'search-input'],
+      ['graph', 'graph-canvas'],
+      ['detail', 'workspace-pane-detail'],
+    ]
+    for (const [step, target] of steps) {
+      await expect(bubble).toHaveAttribute('data-step', step)
+      await expect(page.getByTestId(target)).toHaveClass(/(^|\s)guide-target(\s|$)/)
+      if (step === 'graph') await shot(page, '10-guide-browse')
+      if (step !== 'detail') await page.getByTestId('guide-next').click()
+    }
+    await page.getByTestId('guide-finish').click()
+    await expect(bubble).toHaveCount(0)
+    await expect(page.locator('.guide-target')).toHaveCount(0)
+
+    // 끝낸 기록이 서버에 남은 뒤에는 새로고침해도 열리지 않는다.
+    const base = new URL(page.url()).origin
+    await expect
+      .poll(async () => (await (await page.request.get(`${base}/api/auth/me`)).json()).guideDoneAt, { message: 'guideDoneAt' })
+      .not.toBeNull()
+    await page.reload()
+    await expect(page.getByTestId('search-input')).toBeVisible()
+    // 가이드는 온톨로지를 받은 직후에 열린다. 열리지 않는 것을 보려면 그 시점이 지나도록 잠시 둔다.
+    await page.waitForTimeout(1000)
+    await expect(bubble).toHaveCount(0)
+
+    // 「사용법」 은 끝낸 기록과 상관없이 처음부터 다시 연다.
+    await page.getByTestId('guide-open').click()
+    await expect(bubble).toHaveAttribute('data-step', 'intro')
+    await page.getByTestId('guide-skip').click()
+    await expect(bubble).toHaveCount(0)
   })
 
   test('9) 관리자가 YAML 로 새 타입을 더하면 편집자 화면에 안내가 나오고, 되돌리면 타입이 사라진다', async () => {

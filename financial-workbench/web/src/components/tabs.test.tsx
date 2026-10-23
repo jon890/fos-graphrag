@@ -74,7 +74,7 @@ describe('머리글 밖 탭의 첫 렌더', () => {
   })
 
   it('ReviewTab 은 열람자에게 구역 없이 한 목록만 보인다', () => {
-    const viewer: CurrentUser = { id: 'v1', email: 'v@example.com', displayName: 'V', role: 'VIEWER' }
+    const viewer: CurrentUser = { id: 'v1', email: 'v@example.com', displayName: 'V', role: 'VIEWER', guideDoneAt: null }
     const html = renderToStaticMarkup(withApp(<ReviewTab onOpen={() => {}} />, testOntology, viewer))
     expect(html).not.toContain('review-section-')
     expect(html).toContain('data-testid="review-table"')

@@ -28,6 +28,7 @@ import { ChangesTab } from './components/ChangesTab'
 import { OntologyTab } from './components/ontology/OntologyTab'
 import { UsersTab } from './components/UsersTab'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { GuideMessage, GuideOpenButton, GuideProvider } from './components/guide/GuideProvider'
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'workspace', label: '작업 공간' },
@@ -223,85 +224,90 @@ export default function App() {
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex shrink-0 flex-wrap items-center gap-x-2 bg-slate-900 px-2 text-slate-200 lg:h-12 lg:flex-nowrap lg:gap-x-6 lg:px-4">
-        <div className="min-w-0 flex-1 truncate py-2 font-bold lg:flex-none lg:py-0">금융 온톨로지 워크벤치</div>
-        <nav className="order-3 flex min-w-0 basis-full flex-nowrap gap-1 overflow-x-auto lg:order-none lg:flex-1 lg:basis-auto" role="tablist">
-          {visibleTabs.map((t) => (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={activeTab === t.key}
-              className="shrink-0 cursor-pointer rounded-none border-0 border-b-[3px] border-transparent bg-transparent px-2.5 py-2.5 text-sm text-slate-300 aria-selected:border-blue-400 aria-selected:text-white lg:px-3 lg:py-3"
-              data-testid={`tab-${t.key}`}
-              onClick={() => openTab(t.key)}
+      {/* 탭 단위 ErrorBoundary 바깥이라 탭을 옮겨도 가이드가 남는다. 로그인 화면이 되면 함께 사라진다 */}
+      <GuideProvider user={user} onUserChange={(u) => setAuth({ status: 'signed-in', user: u })} ontology={ontology}>
+        <header className="flex shrink-0 flex-wrap items-center gap-x-2 bg-slate-900 px-2 text-slate-200 lg:h-12 lg:flex-nowrap lg:gap-x-6 lg:px-4">
+          <div className="min-w-0 flex-1 truncate py-2 font-bold lg:flex-none lg:py-0">금융 온톨로지 워크벤치</div>
+          <nav className="order-3 flex min-w-0 basis-full flex-nowrap gap-1 overflow-x-auto lg:order-none lg:flex-1 lg:basis-auto" role="tablist">
+            {visibleTabs.map((t) => (
+              <button
+                key={t.key}
+                role="tab"
+                aria-selected={activeTab === t.key}
+                className="shrink-0 cursor-pointer rounded-none border-0 border-b-[3px] border-transparent bg-transparent px-2.5 py-2.5 text-sm text-slate-300 aria-selected:border-blue-400 aria-selected:text-white lg:px-3 lg:py-3"
+                data-testid={`tab-${t.key}`}
+                onClick={() => openTab(t.key)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+          <div className="flex shrink-0 items-center gap-1 text-sm">
+            <GuideOpenButton />
+            <span data-testid="current-user-name">{user.displayName}</span>
+            <span className="hidden text-slate-400 lg:inline" data-testid="current-user-email">
+              {' '}
+              {user.email}
+            </span>
+            <Badge
+              className={cn('ml-1.5 rounded-[3px] px-1.5 py-px', ROLE_BADGE_CLASS[user.role] ?? 'bg-slate-700 text-slate-200')}
+              data-testid="current-user-role"
+              data-role={user.role}
             >
-              {t.label}
-            </button>
-          ))}
-        </nav>
-        <div className="flex shrink-0 items-center gap-1 text-sm">
-          <span data-testid="current-user-name">{user.displayName}</span>
-          <span className="hidden text-slate-400 lg:inline" data-testid="current-user-email">
-            {' '}
-            {user.email}
-          </span>
-          <Badge
-            className={cn('ml-1.5 rounded-[3px] px-1.5 py-px', ROLE_BADGE_CLASS[user.role] ?? 'bg-slate-700 text-slate-200')}
-            data-testid="current-user-role"
-            data-role={user.role}
-          >
-            {ROLE_LABEL[user.role] ?? user.role}
-          </Badge>
-          <Button variant="link" size="sm" className="ml-2 h-auto px-1 py-0 text-blue-300" data-testid="logout-button" onClick={logout}>
-            로그아웃
-          </Button>
-        </div>
-      </header>
-      <main className="app-main min-h-0 flex-1 overflow-auto">
-        {ontologyError && (
-          <Alert role={undefined} variant="destructive" className="m-2 w-auto" data-testid="ontology-error">
-            <AlertDescription>{ontologyError}</AlertDescription>
-          </Alert>
-        )}
-        {ontology && latestVersion > ontology.version && (
-          <Alert role={undefined} className="m-2 w-auto" data-testid="ontology-stale">
-            <AlertDescription className="flex flex-wrap items-center gap-2">
-              <span>온톨로지가 바뀌었습니다(버전 {latestVersion}). 다시 읽으면 바뀐 타입과 칸이 보입니다.</span>
-              <Button type="button" size="sm" variant="outline" data-testid="ontology-reload" onClick={() => void reloadOntology().catch((e) => setOntologyError(errorMessage(e)))}>
-                다시 읽기
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
-        {!ontology && !ontologyError && <div className="p-12 text-center text-muted-foreground">온톨로지를 불러오는 중…</div>}
-        {ontology && (
-          <AppContext.Provider value={{ user, ontology, canEdit }}>
-            <ErrorBoundary resetKey={activeTab ?? undefined}>
-              {activeTab === 'workspace' && (
-                <Workspace
-                  centerId={workspaceQuery.center ?? workspaceQuery.node}
-                  focusSeq={focusSeq}
-                  selectedId={workspaceQuery.node}
-                  onFocus={focusNode}
-                  onSelect={selectNode}
-                  onOpenHistory={openHistory}
-                />
-              )}
-              {activeTab === 'list' && <ListTab onOpen={focusNode} />}
-              {activeTab === 'review' && <ReviewTab onOpen={focusNode} />}
-              {activeTab === 'changes' && (
-                <ChangesTab
-                  targetId={changesQuery.target}
-                  onTargetIdChange={(id) => go(TAB_PATHS.changes + changesSearch({ ...changesQuery, target: id, page: 0 }), true)}
-                  onOpen={focusNode}
-                />
-              )}
-              {activeTab === 'ontology' && <OntologyTab draft={ontologyDraft} onDraftChange={setOntologyDraft} reloadOntology={reloadOntology} />}
-              {activeTab === 'users' && user.role === 'ADMIN' && <UsersTab onOpenHistory={openHistory} />}
-            </ErrorBoundary>
-          </AppContext.Provider>
-        )}
-      </main>
+              {ROLE_LABEL[user.role] ?? user.role}
+            </Badge>
+            <Button variant="link" size="sm" className="ml-2 h-auto px-1 py-0 text-blue-300" data-testid="logout-button" onClick={logout}>
+              로그아웃
+            </Button>
+          </div>
+        </header>
+        <GuideMessage />
+        <main className="app-main min-h-0 flex-1 overflow-auto">
+          {ontologyError && (
+            <Alert role={undefined} variant="destructive" className="m-2 w-auto" data-testid="ontology-error">
+              <AlertDescription>{ontologyError}</AlertDescription>
+            </Alert>
+          )}
+          {ontology && latestVersion > ontology.version && (
+            <Alert role={undefined} className="m-2 w-auto" data-testid="ontology-stale">
+              <AlertDescription className="flex flex-wrap items-center gap-2">
+                <span>온톨로지가 바뀌었습니다(버전 {latestVersion}). 다시 읽으면 바뀐 타입과 칸이 보입니다.</span>
+                <Button type="button" size="sm" variant="outline" data-testid="ontology-reload" onClick={() => void reloadOntology().catch((e) => setOntologyError(errorMessage(e)))}>
+                  다시 읽기
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+          {!ontology && !ontologyError && <div className="p-12 text-center text-muted-foreground">온톨로지를 불러오는 중…</div>}
+          {ontology && (
+            <AppContext.Provider value={{ user, ontology, canEdit }}>
+              <ErrorBoundary resetKey={activeTab ?? undefined}>
+                {activeTab === 'workspace' && (
+                  <Workspace
+                    centerId={workspaceQuery.center ?? workspaceQuery.node}
+                    focusSeq={focusSeq}
+                    selectedId={workspaceQuery.node}
+                    onFocus={focusNode}
+                    onSelect={selectNode}
+                    onOpenHistory={openHistory}
+                  />
+                )}
+                {activeTab === 'list' && <ListTab onOpen={focusNode} />}
+                {activeTab === 'review' && <ReviewTab onOpen={focusNode} />}
+                {activeTab === 'changes' && (
+                  <ChangesTab
+                    targetId={changesQuery.target}
+                    onTargetIdChange={(id) => go(TAB_PATHS.changes + changesSearch({ ...changesQuery, target: id, page: 0 }), true)}
+                    onOpen={focusNode}
+                  />
+                )}
+                {activeTab === 'ontology' && <OntologyTab draft={ontologyDraft} onDraftChange={setOntologyDraft} reloadOntology={reloadOntology} />}
+                {activeTab === 'users' && user.role === 'ADMIN' && <UsersTab onOpenHistory={openHistory} />}
+              </ErrorBoundary>
+            </AppContext.Provider>
+          )}
+        </main>
+      </GuideProvider>
     </div>
   )
 }

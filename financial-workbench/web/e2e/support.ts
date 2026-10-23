@@ -39,12 +39,14 @@ export function exact(text: string): RegExp {
 /**
  * 앱의 「Google 로 로그인」 을 눌러 가짜 OIDC 서버의 로그인 폼을 채운다.
  * expect 가 success 면 앱에 로그인된 것을, denied 면 「접근 권한이 없습니다」 화면을 확인한다.
+ * 첫 접속 가이드가 열리면 기본으로 건너뛴다. 가이드를 확인하는 테스트만 guide: 'keep' 으로 남긴다.
  */
 export async function loginAs(
   page: Page,
   user: TestUser,
   expectResult: 'success' | 'denied' = 'success',
   startPath = '/',
+  options: { guide?: 'skip' | 'keep' } = {},
 ): Promise<void> {
   await page.goto(startPath)
   await page.getByTestId('login-google').click()
@@ -64,6 +66,16 @@ export async function loginAs(
   await expect(page.getByTestId('current-user-name')).toHaveText(user.name)
   // 온톨로지를 받아야 작업 공간이 그려진다.
   await expect(page.getByTestId('search-input')).toBeVisible()
+  if (options.guide === 'keep') return
+  // 끝낸 기록이 있는 사용자나 다른 탭으로 들어온 사용자는 가이드가 열리지 않는다.
+  const bubble = page.getByTestId('guide-bubble')
+  const opened = await bubble
+    .waitFor({ state: 'visible', timeout: 3000 })
+    .then(() => true)
+    .catch(() => false)
+  if (!opened) return
+  await page.getByTestId('guide-skip').click()
+  await expect(bubble).toHaveCount(0)
 }
 
 export async function newPage(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {

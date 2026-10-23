@@ -176,6 +176,8 @@ export const api = {
       window.location.href = GOOGLE_LOGIN_PATH
     },
     logout: () => request<void>('POST', '/api/auth/logout', undefined, { noAuthRedirect: true }),
+    /** 첫 접속 가이드를 끝냈다고 기록한다. 이미 기록돼 있으면 서버가 처음 값을 그대로 둔다 */
+    guideDone: () => request<CurrentUser>('POST', '/api/auth/me/guide-done'),
   },
   users: {
     list: () => request<UserView[]>('GET', '/api/users'),

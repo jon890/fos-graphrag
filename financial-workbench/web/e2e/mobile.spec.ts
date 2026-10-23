@@ -147,3 +147,31 @@ test('휴대폰 폭에서 온톨로지 폼 편집기가 가로 스크롤 없이 
   await expectNoHorizontalOverflow(page)
   await shot(page, 'm-ontology-form')
 })
+
+test('휴대폰 폭에서 사용법 가이드가 아래쪽 카드로 열리고 단계마다 탭을 옮긴다', async ({ page }) => {
+  await loginAs(page, admin)
+  // 상세 탭에서 시작해 가이드가 검색 탭으로 옮기는지 본다.
+  await page.getByTestId('workspace-tab-detail').click()
+  await expect(page.getByTestId('workspace-tab-detail')).toHaveAttribute('aria-selected', 'true')
+
+  await page.getByTestId('guide-open').click()
+  const bubble = page.getByTestId('guide-bubble')
+  await expect(bubble).toHaveAttribute('data-step', 'intro')
+  await expect(bubble).toHaveAttribute('data-placement', 'card')
+  await page.getByTestId('guide-start').click()
+
+  await expect(bubble).toHaveAttribute('data-step', 'search')
+  await expect(page.getByTestId('workspace-tab-search')).toHaveAttribute('aria-selected', 'true')
+  await page.getByTestId('guide-next').click()
+  await expect(bubble).toHaveAttribute('data-step', 'graph')
+  await expect(page.getByTestId('workspace-tab-graph')).toHaveAttribute('aria-selected', 'true')
+  await page.getByTestId('guide-next').click()
+  await expect(bubble).toHaveAttribute('data-step', 'detail')
+  await expect(page.getByTestId('workspace-tab-detail')).toHaveAttribute('aria-selected', 'true')
+  await expect(bubble).toHaveAttribute('data-placement', 'card')
+  await expectNoHorizontalOverflow(page)
+  await shot(page, 'm-guide')
+
+  await page.getByTestId('guide-skip').click()
+  await expect(bubble).toHaveCount(0)
+})

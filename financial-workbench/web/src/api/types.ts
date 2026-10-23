@@ -18,6 +18,8 @@ export const ROLES: Role[] = ['VIEWER', 'EDITOR', 'ADMIN']
 /** GET /api/auth/me */
 export interface CurrentUser extends UserRef {
   role: Role
+  /** 첫 접속 가이드를 끝냈거나 건너뛴 시각. 아직이면 null */
+  guideDoneAt: string | null
 }
 
 /** GET /api/users 의 한 행. ADMIN 만 받는다 */
