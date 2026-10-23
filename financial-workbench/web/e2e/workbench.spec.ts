@@ -34,6 +34,9 @@ const editorA: TestUser = { sub: `editor-a-${suffix}`, email: `editor-a-${suffix
 const editorB: TestUser = { sub: `editor-b-${suffix}`, email: `editor-b-${suffix}@example.com`, name: '편집자B' }
 const viewer: TestUser = { sub: `viewer-${suffix}`, email: `viewer-${suffix}@example.com`, name: '열람자' }
 const stranger: TestUser = { sub: `stranger-${suffix}`, email: `stranger-${suffix}@example.com`, name: '외부인' }
+// 첫 접속 가이드를 처음 보는 사용자. 다른 테스트의 로그인은 가이드를 건너뛰어 끝낸 기록이 남는다.
+const guideViewer: TestUser = { sub: `guide-viewer-${suffix}`, email: `guide-viewer-${suffix}@example.com`, name: '가이드열람자' }
+const guideEditor: TestUser = { sub: `guide-editor-${suffix}`, email: `guide-editor-${suffix}@example.com`, name: '가이드편집자' }
 
 async function addUser(page: Page, user: TestUser, role: 'VIEWER' | 'EDITOR' | 'ADMIN'): Promise<void> {
   await page.getByTestId('users-add-email').fill(user.email)
@@ -126,6 +129,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await addUser(pageAdmin, editorA, 'EDITOR')
     await addUser(pageAdmin, editorB, 'EDITOR')
     await addUser(pageAdmin, viewer, 'VIEWER')
+    await addUser(pageAdmin, guideViewer, 'VIEWER')
+    await addUser(pageAdmin, guideEditor, 'EDITOR')
     await shot(pageAdmin, '00-users-admin')
   })
 
@@ -852,6 +857,147 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageViewer.getByTestId('login-google')).toBeVisible()
     await expect(pageViewer.getByTestId('current-user-name')).toHaveCount(0)
     await shot(pageViewer, '08-disabled')
+  })
+
+  test('10) 열람자는 처음 로그인하면 둘러보기 가이드가 열리고, 끝내면 다시 열리지 않으며 「사용법」 으로 다시 본다', async ({ browser }) => {
+    const page = await open(browser)
+    await loginAs(page, guideViewer, 'success', '/', { guide: 'keep' })
+    const bubble = page.getByTestId('guide-bubble')
+    await expect(bubble).toHaveAttribute('data-step', 'intro')
+    await page.getByTestId('guide-start').click()
+
+    const steps: [string, string][] = [
+      ['search', 'search-input'],
+      ['graph', 'graph-canvas'],
+      ['detail', 'workspace-pane-detail'],
+    ]
+    for (const [step, target] of steps) {
+      await expect(bubble).toHaveAttribute('data-step', step)
+      await expect(page.getByTestId(target)).toHaveClass(/(^|\s)guide-target(\s|$)/)
+      if (step === 'graph') await shot(page, '10-guide-browse')
+      if (step !== 'detail') await page.getByTestId('guide-next').click()
+    }
+    await page.getByTestId('guide-finish').click()
+    await expect(bubble).toHaveCount(0)
+    await expect(page.locator('.guide-target')).toHaveCount(0)
+
+    // 끝낸 기록이 서버에 남은 뒤에는 새로고침해도 열리지 않는다.
+    const base = new URL(page.url()).origin
+    await expect
+      .poll(async () => (await (await page.request.get(`${base}/api/auth/me`)).json()).guideDoneAt, { message: 'guideDoneAt' })
+      .not.toBeNull()
+    await page.reload()
+    await expect(page.getByTestId('search-input')).toBeVisible()
+    // 가이드는 온톨로지를 받은 직후에 열린다. 열리지 않는 것을 보려면 그 시점이 지나도록 잠시 둔다.
+    await page.waitForTimeout(1000)
+    await expect(bubble).toHaveCount(0)
+
+    // 「사용법」 은 끝낸 기록과 상관없이 처음부터 다시 연다.
+    await page.getByTestId('guide-open').click()
+    await expect(bubble).toHaveAttribute('data-step', 'intro')
+    await page.getByTestId('guide-skip').click()
+    await expect(bubble).toHaveCount(0)
+  })
+
+  test('11) 편집자는 처음 로그인하면 연습 기업, 근거 문서, 주장을 따라 만들고, 끝내면 연습 항목이 보관된다', async ({ browser }) => {
+    // 따라하기는 주장의 대상으로 고를 산업이 있어야 열린다.
+    const sector = `가이드산업-${suffix}`
+    await createNode(pageAdmin, 'Sector', sector, { name: sector })
+
+    const page = await open(browser)
+    await loginAs(page, guideEditor, 'success', '/', { guide: 'keep' })
+    const bubble = page.getByTestId('guide-bubble')
+    await expect(bubble).toHaveAttribute('data-step', 'intro')
+    await page.getByTestId('guide-start').click()
+
+    // 1. 기업: 「다음」 없이 연습 이름을 채운 폼이 열린다.
+    await expect(bubble).toHaveAttribute('data-step', 'company')
+    await expect(page.getByTestId('guide-next')).toHaveCount(0)
+    const companyInput = page.getByTestId('create-prop-name')
+    await expect(companyInput).toHaveValue(/^\[연습\] /)
+    const practiceCompany = await companyInput.inputValue()
+    await page.getByTestId('create-submit').click()
+
+    // 2. 근거 문서: 제목이 채워진 폼이 열린다.
+    await expect(bubble).toHaveAttribute('data-step', 'document')
+    const titleInput = page.getByTestId('create-prop-title')
+    await expect(titleInput).not.toHaveValue('')
+    const practiceDocument = await titleInput.inputValue()
+    await page.getByTestId('create-submit').click()
+
+    // 3. 주장: 연습 기업의 상세에서 관계, 근거 문서, 설명이 채워진 주장 폼이 열린다.
+    await expect(bubble).toHaveAttribute('data-step', 'claim')
+    await expect(page.getByTestId('detail-panel')).toHaveAttribute('data-node-type', 'Company')
+    await expect(page.getByTestId('claim-predicate-select')).toHaveValue('BELONGS_TO_SECTOR')
+    await expect(page.getByTestId('claim-doc-selected')).toContainText(practiceDocument)
+    await expect(page.getByTestId('claim-description')).not.toHaveValue('')
+    await pick(page, 'claim-object-picker', sector)
+    await page.getByTestId('claim-add-submit').click()
+
+    // 4. 마침
+    await expect(bubble).toHaveAttribute('data-step', 'done')
+    // 그래프처럼 큰 대상이면 말풍선이 그 안쪽에 있어 상세 칸의 성공 안내와 입력칸을 덮지 않는다.
+    await expect(bubble).toHaveAttribute('data-placement', 'anchored')
+    await expect
+      .poll(async () => {
+        const b = await bubble.boundingBox()
+        const d = await page.getByTestId('detail-panel').boundingBox()
+        if (!b || !d) return null
+        return b.x < d.x + d.width && d.x < b.x + b.width && b.y < d.y + d.height && d.y < b.y + b.height
+      }, { message: '마침 말풍선과 상세 칸이 겹치지 않는다' })
+      .toBe(false)
+    await shot(page, '11-guide-practice-done')
+
+    const created = await page.evaluate(
+      () => (JSON.parse(localStorage.getItem('workbench.guide') ?? '{}') as { created?: Record<string, string> }).created ?? {},
+    )
+    const ids = [created.company, created.document, created.claim]
+    for (const id of ids) expect(id, '연습 항목 ID').toBeTruthy()
+    await page.getByTestId('guide-finish').click()
+    await expect(bubble).toHaveCount(0)
+
+    const base = new URL(page.url()).origin
+    for (const id of ids) {
+      await expect
+        .poll(async () => (await (await page.request.get(`${base}/api/nodes/${id}`)).json()).node.archived, { message: `${id} 보관` })
+        .toBe(true)
+    }
+    await page.getByTestId('search-input').fill(practiceCompany)
+    await page.getByTestId('search-submit').click()
+    await expect(page.getByTestId('search-empty')).toBeVisible()
+
+    await page.reload()
+    await expect(page.getByTestId('search-input')).toBeVisible()
+    // 가이드는 온톨로지를 받은 직후에 열린다. 열리지 않는 것을 보려면 그 시점이 지나도록 잠시 둔다.
+    await page.waitForTimeout(1000)
+    await expect(bubble).toHaveCount(0)
+  })
+
+  test('11b) 다시 연습하다 새로고침하면 이어서 하기를 묻고, 그만두면 만든 연습 항목을 보관한다', async () => {
+    const page = pageAdmin
+    await page.getByTestId('guide-open').click()
+    const bubble = page.getByTestId('guide-bubble')
+    await expect(bubble).toHaveAttribute('data-step', 'intro')
+    await page.getByTestId('guide-start').click()
+    await expect(bubble).toHaveAttribute('data-step', 'company')
+    await page.getByTestId('create-submit').click()
+    await expect(bubble).toHaveAttribute('data-step', 'document')
+    const companyId = await page.evaluate(
+      () => (JSON.parse(localStorage.getItem('workbench.guide') ?? '{}') as { created?: Record<string, string> }).created?.company ?? '',
+    )
+    expect(companyId, '연습 기업 ID').not.toBe('')
+
+    await page.reload()
+    await expect(bubble).toHaveAttribute('data-step', 'resume')
+    await expect(page.getByTestId('guide-resume')).toBeVisible()
+    await expect(page.getByTestId('guide-stop')).toBeVisible()
+    await page.getByTestId('guide-stop').click()
+    await expect(bubble).toHaveCount(0)
+
+    const base = new URL(page.url()).origin
+    await expect
+      .poll(async () => (await (await page.request.get(`${base}/api/nodes/${companyId}`)).json()).node.archived, { message: '연습 기업 보관' })
+      .toBe(true)
   })
 
   test('9) 관리자가 YAML 로 새 타입을 더하면 편집자 화면에 안내가 나오고, 되돌리면 타입이 사라진다', async () => {

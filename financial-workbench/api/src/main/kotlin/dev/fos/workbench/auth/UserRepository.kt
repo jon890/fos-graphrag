@@ -19,6 +19,7 @@ data class UserRecord(
     val createdAt: String,
     val updatedAt: String,
     val lastLoginAt: String?,
+    val guideDoneAt: String?,
 ) {
     fun toRef() = UserRef(id, email, displayName)
 
@@ -34,6 +35,7 @@ data class UserRecord(
             createdAt = u["createdAt"] as String,
             updatedAt = (u["updatedAt"] ?: u["createdAt"]) as String,
             lastLoginAt = u["lastLoginAt"] as String?,
+            guideDoneAt = u["guideDoneAt"] as String?,
         )
     }
 }
@@ -88,6 +90,13 @@ class UserRepository(private val client: Neo4jClient) {
     fun touchLogin(id: String) {
         client.query("MATCH (u:User {id: \$id}) SET u.lastLoginAt = \$now").bindAll(mapOf("id" to id, "now" to Timestamps.now())).run()
     }
+
+    /** 첫 접속 가이드를 끝낸 시각을 처음 한 번만 쓴다. 화면 상태라 revision, updatedAt, updatedBy 는 바꾸지 않는다. */
+    fun markGuideDone(id: String): UserRecord? =
+        one(
+            "MATCH (u:User {id: \$v}) SET u.guideDoneAt = coalesce(u.guideDoneAt, \$now) RETURN properties(u) AS u",
+            id, "now" to Timestamps.now(),
+        )
 
     @Suppress("UNCHECKED_CAST")
     private fun one(cypher: String, value: String, vararg extra: Pair<String, Any?>): UserRecord? =

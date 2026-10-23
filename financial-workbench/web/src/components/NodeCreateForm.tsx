@@ -18,16 +18,18 @@ interface Props {
   onUseExisting?: (node: NodeView) => void
   /** 그 단추의 글자. 기본 「열기」 */
   useExistingLabel?: string
+  /** 폼의 처음 값 위에 덮어쓸 값. 첫 접속 가이드가 연습 이름을 넣는다 */
+  initialValues?: FormValues
 }
 
 /** 온톨로지 속성 정의로 생성 폼을 만든다. */
-export function NodeCreateForm({ type, onCreated, onCancel, testIdPrefix, onUseExisting, useExistingLabel }: Props) {
+export function NodeCreateForm({ type, onCreated, onCancel, testIdPrefix, onUseExisting, useExistingLabel, initialValues }: Props) {
   const { ontology } = useApp()
   const labels = useLabels()
   const typeDef = ontology.nodeTypes[type]
   const defs = typeDef?.properties ?? {}
   const labelProperty = typeDef?.labelProperty ?? ''
-  const [values, setValues] = useState<FormValues>(() => initialCreateValues(defs))
+  const [values, setValues] = useState<FormValues>(() => ({ ...initialCreateValues(defs), ...initialValues }))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)

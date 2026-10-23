@@ -147,3 +147,44 @@ test('휴대폰 폭에서 온톨로지 폼 편집기가 가로 스크롤 없이 
   await expectNoHorizontalOverflow(page)
   await shot(page, 'm-ontology-form')
 })
+
+test('휴대폰 폭에서 사용법 따라하기가 아래쪽 카드로 열리고 검색 탭의 만들기 폼을 가리지 않는다', async ({ page }) => {
+  await loginAs(page, admin)
+  // 관리자의 따라하기는 주장의 대상으로 고를 산업이 있어야 열린다.
+  const sector = `모바일산업-${suffix}`
+  await createNodeOnMobile(page, 'Sector', sector, { name: sector })
+  // 상세 탭에서 시작해 가이드가 검색 탭으로 옮기는지 본다.
+  await page.getByTestId('workspace-tab-detail').click()
+  await expect(page.getByTestId('workspace-tab-detail')).toHaveAttribute('aria-selected', 'true')
+
+  await page.getByTestId('guide-open').click()
+  const bubble = page.getByTestId('guide-bubble')
+  await expect(bubble).toHaveAttribute('data-step', 'intro')
+  await expect(bubble).toHaveAttribute('data-placement', 'card')
+  await page.getByTestId('guide-start').click()
+
+  await expect(bubble).toHaveAttribute('data-step', 'company')
+  await expect(page.getByTestId('workspace-tab-search')).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByTestId('create-form')).toBeVisible()
+  await expect(bubble).toBeVisible()
+  await expect(bubble).toHaveAttribute('data-placement', 'card')
+
+  // 카드가 열린 동안 본문 아래에 여백이 있어 만들기 단추를 카드 위로 올려 볼 수 있다.
+  const submit = page.getByTestId('create-submit')
+  await submit.scrollIntoViewIfNeeded()
+  await expect
+    .poll(
+      async () => {
+        const [a, b] = await Promise.all([submit.boundingBox(), bubble.boundingBox()])
+        if (!a || !b) return true
+        return a.y < b.y + b.height && b.y < a.y + a.height && a.x < b.x + b.width && b.x < a.x + a.width
+      },
+      { message: '만들기 단추가 가이드 카드에 가린다' },
+    )
+    .toBe(false)
+  await expectNoHorizontalOverflow(page)
+  await shot(page, 'm-guide')
+
+  await page.getByTestId('guide-stop').click()
+  await expect(bubble).toHaveCount(0)
+})

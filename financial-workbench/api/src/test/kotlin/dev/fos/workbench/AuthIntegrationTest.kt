@@ -1,5 +1,6 @@
 package dev.fos.workbench
 
+import dev.fos.workbench.auth.Role
 import dev.fos.workbench.support.IntegrationTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -75,6 +76,37 @@ class AuthIntegrationTest : IntegrationTest() {
         val response = client.send("POST", "/api/auth/logout", null, withCsrf = false)
         assertThat(response.status).isEqualTo(403)
         assertThat(response.code).isEqualTo("CSRF_REJECTED")
+    }
+
+    @Test
+    fun `가이드 완료는 열람자도 기록하고 한 번만 쓴다`() {
+        val email = "guide-${System.nanoTime()}@example.com"
+        val created = users.create(email, "Guide", Role.VIEWER, "system")
+        val client = loggedIn(email)
+        fun nodeState() = neo4j.query("MATCH (u:User {id: \$id}) RETURN u.revision AS r, u.updatedAt AS t")
+            .bind(created.id).to("id").fetch().one().get()
+
+        assertThat(client.get("/api/auth/me").body["guideDoneAt"].isNull).isTrue()
+        val before = nodeState()
+
+        val first = client.post("/api/auth/me/guide-done")
+        assertThat(first.status).isEqualTo(200)
+        val doneAt = first.body["guideDoneAt"].asString()
+        assertThat(doneAt).isNotBlank()
+        assertThat(nodeState()).isEqualTo(before)
+
+        val second = client.post("/api/auth/me/guide-done")
+        assertThat(second.status).isEqualTo(200)
+        assertThat(second.body["guideDoneAt"].asString()).isEqualTo(doneAt)
+        assertThat(client.get("/api/auth/me").body["guideDoneAt"].asString()).isEqualTo(doneAt)
+
+        val noCsrf = client.send("POST", "/api/auth/me/guide-done", null, withCsrf = false)
+        assertThat(noCsrf.status).isEqualTo(403)
+        assertThat(noCsrf.code).isEqualTo("CSRF_REJECTED")
+
+        val anon = anonymous()
+        anon.get("/api/auth/csrf")
+        assertThat(anon.post("/api/auth/me/guide-done").status).isEqualTo(401)
     }
 
     @Test

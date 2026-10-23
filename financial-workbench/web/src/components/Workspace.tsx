@@ -187,7 +187,9 @@ export function Workspace({ centerId, focusSeq, selectedId, onFocus, onSelect, o
       <div className="workspace">
         <aside className="pane pane-left">{searchPanel}</aside>
         <section className="pane pane-center">{graphPanel}</section>
-        <aside className="pane pane-right">{detailPanel}</aside>
+        <aside className="pane pane-right" data-testid="workspace-pane-detail">
+          {detailPanel}
+        </aside>
       </div>
     )
   }
@@ -222,7 +224,7 @@ export function Workspace({ centerId, focusSeq, selectedId, onFocus, onSelect, o
           </div>
         )}
       </TabsContent>
-      <TabsContent value="detail" forceMount className={cn('pane', content)}>
+      <TabsContent value="detail" forceMount className={cn('pane', content)} data-testid="workspace-pane-detail">
         {detailPanel}
       </TabsContent>
     </Tabs>

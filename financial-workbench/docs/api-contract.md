@@ -42,13 +42,16 @@
 | GET | `/api/health` | 불필요 | `200 {"status":"UP"}` | `503 {"status":"DOWN"}` |
 | GET | `/api/auth/csrf` | 불필요 | `200 {"headerName":"X-XSRF-TOKEN","cookieName":"XSRF-TOKEN"}` 와 쿠키 | 없음 |
 | GET | `/api/auth/me` | 필요 | `200 CurrentUser` | `401 UNAUTHENTICATED` |
+| POST | `/api/auth/me/guide-done` | 필요(모든 역할) | `200 CurrentUser`. 첫 접속 가이드를 끝냈거나 건너뛰었다고 기록한다. 이미 기록돼 있으면 그대로 둔다 | `401 UNAUTHENTICATED`, `403 CSRF_REJECTED` |
 | POST | `/api/auth/logout` | 필요 | `204` | `403 CSRF_REJECTED` |
 
 `CurrentUser`
 
 ```json
-{ "id": "uuid", "email": "alice@example.com", "displayName": "Alice", "role": "EDITOR" }
+{ "id": "uuid", "email": "alice@example.com", "displayName": "Alice", "role": "EDITOR", "guideDoneAt": null }
 ```
+
+`guideDoneAt` 은 첫 접속 가이드를 끝냈거나 건너뛴 시각이고, 아직이면 `null` 이다. 화면은 `null` 이면 로그인한 뒤 가이드를 연다.
 
 ## 역할
 

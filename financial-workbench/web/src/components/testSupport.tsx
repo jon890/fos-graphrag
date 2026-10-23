@@ -85,7 +85,7 @@ export const testOntology: Ontology = {
   changeActions: { CREATE: { label: '만들기' }, ARCHIVE: { label: '보관' } },
 }
 
-const editor: CurrentUser = { id: 'u1', email: 'a@example.com', displayName: 'A', role: 'EDITOR' }
+const editor: CurrentUser = { id: 'u1', email: 'a@example.com', displayName: 'A', role: 'EDITOR', guideDoneAt: null }
 
 export function withApp(children: ReactNode, ontology: Ontology = testOntology, user: CurrentUser = editor, initialPath = '/workspace') {
   return (

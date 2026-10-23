@@ -19,6 +19,11 @@ interface Props {
   initialSubject?: NodeView | null
   onCreated: (claim: ClaimView) => void
   onCancel: () => void
+  /** 처음 고를 관계 종류. 주체 타입을 받지 않으면 무시한다 */
+  initialPredicate?: string
+  initialDocuments?: NodeView[]
+  initialDescription?: string
+  initialEvidenceText?: string
 }
 
 /** 관계 종류가 받지 않는 타입의 주체와 대상을 비운다. 정의가 없으면 그대로 둔다 */
@@ -35,22 +40,32 @@ export function keepAccepted(
 }
 
 /** 문장 채우기로 주장을 만든다. form 요소를 쓰지 않는다: 안에 문서 생성 form 이 들어간다. */
-export function ClaimCreateForm({ initialSubject = null, onCreated, onCancel }: Props) {
+export function ClaimCreateForm({
+  initialSubject = null,
+  onCreated,
+  onCancel,
+  initialPredicate,
+  initialDocuments,
+  initialDescription,
+  initialEvidenceText,
+}: Props) {
   const { ontology } = useApp()
   const labels = useLabels()
   const predicateNames = Object.keys(ontology.claimPredicates)
+  const accepts = (name: string) => !initialSubject || ontology.claimPredicates[name].subjectTypes.includes(initialSubject.type)
   const [predicate, setPredicate] = useState(
     () =>
-      (initialSubject && predicateNames.find((n) => ontology.claimPredicates[n].subjectTypes.includes(initialSubject.type))) ||
+      (initialPredicate && ontology.claimPredicates[initialPredicate] && accepts(initialPredicate) ? initialPredicate : null) ||
+      (initialSubject && predicateNames.find(accepts)) ||
       predicateNames[0] ||
       '',
   )
   const [subject, setSubject] = useState<NodeView | null>(initialSubject)
   const [object, setObject] = useState<NodeView | null>(null)
-  const [documents, setDocuments] = useState<NodeView[]>([])
+  const [documents, setDocuments] = useState<NodeView[]>(() => initialDocuments ?? [])
   const [creatingDoc, setCreatingDoc] = useState(false)
-  const [description, setDescription] = useState('')
-  const [evidenceText, setEvidenceText] = useState('')
+  const [description, setDescription] = useState(initialDescription ?? '')
+  const [evidenceText, setEvidenceText] = useState(initialEvidenceText ?? '')
   const [validFrom, setValidFrom] = useState('')
   const [validTo, setValidTo] = useState('')
   const [error, setError] = useState<string | null>(null)

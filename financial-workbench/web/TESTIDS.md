@@ -16,9 +16,29 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `tab-users` | 사용자 탭. ADMIN 에게만 나온다 |
 | `current-user-name`, `current-user-email` | 로그인 사용자의 표시 이름, 이메일 |
 | `current-user-role` | 역할 배지. `data-role` 이 VIEWER, EDITOR, ADMIN |
+| `guide-open` | 머리글의 「사용법」. 작업 공간으로 옮겨 첫 접속 가이드를 처음부터 연다 |
 | `logout-button` | 로그아웃 |
 | `ontology-error` | 온톨로지를 받지 못했을 때 |
 | `ontology-stale`, `ontology-reload` | 다른 곳에서 온톨로지 버전이 바뀌었다는 안내와 「다시 읽기」 단추. 응답 헤더의 버전이 들고 있는 버전보다 클 때만 나온다 |
+
+## 첫 접속 가이드
+
+`guideDoneAt` 이 없는 사용자가 작업 공간에 들어오거나 「사용법」(`guide-open`)을 누르면 열린다. `e2e/support.ts` 의 `loginAs` 는 기본으로 가이드를 건너뛴다. 가이드를 확인하는 테스트만 `{ guide: 'keep' }` 을 넘긴다.
+
+| testid | 요소 |
+| --- | --- |
+| `guide-bubble` | 말풍선(`role=dialog`). `data-step` 이 단계 id 다. 둘러보기는 `intro`, `search`, `graph`, `detail`, 따라하기는 `intro`, `company`, `document`, `claim`, `done` 이다. 진행 중인 따라하기를 이어서 할지 묻는 단계는 `resume` 이다. `data-placement` 는 `anchored`(대상 옆) 또는 `card`(화면 아래쪽 카드)다 |
+| `guide-start` | 소개 단계의 「시작」 |
+| `guide-next` | 둘러보기 중간 단계의 「다음」. 따라하기의 만드는 단계에는 없다 |
+| `guide-finish` | 마지막 단계의 「끝내기」 |
+| `guide-skip` | 「건너뛰기」. 둘러보기의 모든 단계와 따라하기의 소개에 있다. 말풍선 안에 초점이 있을 때 `Escape` 도 같다 |
+| `guide-stop` | 따라하기의 기업, 근거 문서, 주장 단계와 `resume` 단계의 「그만두기」. 만든 연습 항목을 보관하고 끝낸다 |
+| `guide-resume` | `resume` 단계의 「이어서 하기」. 저장된 단계로 연다 |
+| `guide-reopen` | 「폼 다시 열기」. 따라하기의 만드는 단계에서 만들기 폼을 취소했을 때만 나온다 |
+| `guide-message` | 끝낸 기록을 남기지 못했거나 연습 항목을 보관하지 못했을 때 머리글 아래 안내 |
+| `guide-archive-failed` | `guide-message` 안의 보관하지 못한 연습 항목 이름 한 줄. 누르면 `/workspace?node=<id>` 로 연다 |
+
+가이드가 가리키는 요소에는 class `guide-target` 이 붙는다. 단계가 바뀌거나 가이드가 닫히면 떨어진다.
 
 ## 작업 공간: 좁은 화면
 
@@ -83,6 +103,7 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 
 | testid | 요소 |
 | --- | --- |
+| `workspace-pane-detail` | 상세 칸. 넓은 화면에서는 오른쪽 칸(`aside.pane-right`), 좁은 화면에서는 상세 탭의 내용이다. 항목을 고르지 않아도 있다 |
 | `detail-empty`, `detail-error` | 선택 없음, 상세 조회 실패 |
 | `detail-panel` | 상세 전체. `data-node-id`, `data-node-type` |
 | `detail-label`, `detail-archived` | 노드 이름, 「보관됨」 표시 |
