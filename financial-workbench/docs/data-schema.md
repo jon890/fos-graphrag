@@ -232,7 +232,7 @@ Claim 노드 하나와 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 관계로 저장한�
 
 ## 사용자
 
-`(:User {id, email, displayName, role, enabled, googleSub, revision, createdAt, createdBy, updatedAt, updatedBy, lastLoginAt})`
+`(:User {id, email, displayName, role, enabled, googleSub, revision, createdAt, createdBy, updatedAt, updatedBy, lastLoginAt, guideDoneAt})`
 
 - `email` 은 소문자로 저장한다. 허용 목록의 키다.
 - 사용자 강등이나 비활성화는 대상과 활성 ADMIN 을 ID 순서로 한 번에 잠근 뒤 마지막 관리자인지 판정한다.
@@ -241,6 +241,7 @@ Claim 노드 하나와 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 관계로 저장한�
 - 비밀번호는 저장하지 않는다. 로그인은 Google OpenID Connect 로만 한다.
 - 개인 계좌 키, 잔고, 주문 내역은 이 모델에 넣지 않는다.
 - `:User` 는 `:Knowledge` label 이 없어 검색과 그래프에 나오지 않는다.
+- `guideDoneAt` 은 첫 접속 가이드를 끝내거나 건너뛴 시각이다. 없으면 로그인할 때 가이드가 열린다([흐름](flow.md) 의 「첫 접속 가이드」). 화면 상태라 `revision`, `updatedAt`, `updatedBy` 를 바꾸지 않고 ChangeEvent 도 남기지 않는다. 한 번 쓰면 지우지 않는다.
 - 사용자 관리 변경도 ChangeEvent(`targetKind = USER`)로 남는다. 첫 관리자를 만든 이벤트의 actor 는 `system` 이다.
 
 ## 변경 이력
