@@ -8,7 +8,7 @@ import dev.fos.workbench.history.ChangeEventRecorder
 import dev.fos.workbench.history.FieldChange
 import dev.fos.workbench.history.TargetKind
 import dev.fos.workbench.history.diff
-import dev.fos.workbench.ontology.Ontology
+import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.ontology.OntologyValidator
 import dev.fos.workbench.web.ArchivedException
 import dev.fos.workbench.web.NotFoundException
@@ -25,7 +25,7 @@ enum class ReviewStatus { DRAFT, REVIEWED, REJECTED }
 @Service
 class ClaimService(
     private val client: Neo4jClient,
-    private val ontology: Ontology,
+    private val holder: OntologyHolder,
     private val validator: OntologyValidator,
     private val guard: RevisionGuard,
     private val recorder: ChangeEventRecorder,
@@ -34,6 +34,7 @@ class ClaimService(
 
     @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun create(request: CreateClaimRequest, actorId: String): ClaimView {
+        val ontology = holder.current()
         val predicate = ontology.requirePredicate(request.predicate)
         if (request.documentIds.isEmpty()) throw ValidationFailedException(mapOf("documentIds" to "근거 문서를 하나 이상 고르세요."))
         if (request.documentIds.distinct().size > Limits.MAX_DOCUMENTS_PER_CLAIM) {
@@ -121,6 +122,8 @@ class ClaimService(
             throw OntologyViolationException("claim-immutable-field", "Claim 의 ${immutable.joinToString()} 은 바꿀 수 없습니다. 보관하고 새로 만드세요.")
         }
         val before = lockClaim(id)
+        // 정의에서 빠진 주장 종류의 주장은 내용을 고칠 수 없다. 검토, 보관, 복원은 된다
+        holder.current().requirePredicate(before["predicate"] as String)
         guard.requireRevision(before, expected)
         guard.requireActive(before)
         val changes = validator.validatePatch(CLAIM, requested)

@@ -4,6 +4,7 @@ import dev.fos.workbench.config.Limits
 import dev.fos.workbench.config.WorkbenchProperties
 import dev.fos.workbench.config.params
 import dev.fos.workbench.ontology.Ontology
+import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.web.Page
 import dev.fos.workbench.web.PageQuery
 import dev.fos.workbench.web.ValidationFailedException
@@ -14,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class NodeQueryService(
     private val client: Neo4jClient,
-    private val ontology: Ontology,
+    private val holder: OntologyHolder,
     private val reader: KnowledgeReader,
     private val relationships: RelationshipService,
     properties: WorkbenchProperties,
@@ -23,16 +24,17 @@ class NodeQueryService(
 
     @Transactional(readOnly = true)
     fun detail(id: String): NodeDetail {
+        val ontology = holder.current()
         val node = reader.node(id)
         val relationshipRows = client.query(
             """
             MATCH (a:Knowledge)-[r]->(b:Knowledge)
-            WHERE (a.id = ${'$'}id OR b.id = ${'$'}id) AND type(r) IN ${'$'}types
+            WHERE (a.id = ${'$'}id OR b.id = ${'$'}id) AND NOT type(r) IN ${'$'}claimRelationships
             RETURN type(r) AS type, properties(r) AS r, properties(a) AS a, properties(b) AS b
             ORDER BY r.createdAt, r.id
             LIMIT ${'$'}limit
             """,
-        ).bindAll(mapOf("id" to id, "types" to ontology.relationshipTypes.keys.toList(), "limit" to limits.maxRelationships + 1L))
+        ).bindAll(mapOf("id" to id, "claimRelationships" to ontology.claimRelationships.keys.toList(), "limit" to limits.maxRelationships + 1L))
             .fetch().all().toList()
         val claimIds = client.query(
             """
@@ -58,7 +60,7 @@ class NodeQueryService(
     @Transactional(readOnly = true)
     @Suppress("UNCHECKED_CAST")
     fun search(q: String?, types: List<String>?, reviewStatus: String?, includeArchived: Boolean, page: PageQuery): Page<NodeView> {
-        types?.forEach { ontology.requireNodeType(it) }
+        Ontology.requireTypeFilter(types)
         if ((q?.trim()?.length ?: 0) > Limits.MAX_QUERY_LENGTH) {
             throw ValidationFailedException(mapOf("q" to "검색어는 ${Limits.MAX_QUERY_LENGTH}자 이하여야 합니다."))
         }

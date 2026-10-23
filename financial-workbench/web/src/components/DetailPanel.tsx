@@ -11,6 +11,7 @@ import { CopyLinkButton } from './CopyLinkButton'
 import { NodeEditForm } from './NodeEditForm'
 import { RelationshipSection } from './RelationshipSection'
 import { StatusBadge, TypeBadge } from './TypeBadge'
+import { UndefinedTypeProperties } from './UndefinedTypeProperties'
 
 interface Props {
   selectedId: string | null
@@ -123,6 +124,7 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
   if (!detail) return <div className="muted">불러오는 중…</div>
 
   const { node, claim } = detail
+  const typeDefined = !!ontology.nodeTypes[node.type]
   const hasClaimPredicates = Object.values(ontology.claimPredicates).some((p) => p.subjectTypes.includes(node.type))
 
   const archiveOrRestore = async () => {
@@ -243,19 +245,25 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
       ) : (
         <section className="detail-section">
           <h3>속성</h3>
-          <div className="hint">{ontology.nodeTypes[node.type]?.description}</div>
-          <NodeEditForm
-            key={`${node.id}:${node.revision}`}
-            node={node}
-            onSaved={() => {
-              setDraft(null)
-              succeed('저장했습니다.')
-            }}
-            onError={fail}
-            draft={draft}
-            onConflict={setDraft}
-            onDraftDone={() => setDraft(null)}
-          />
+          {typeDefined ? (
+            <>
+              <div className="hint">{ontology.nodeTypes[node.type]?.description}</div>
+              <NodeEditForm
+                key={`${node.id}:${node.revision}`}
+                node={node}
+                onSaved={() => {
+                  setDraft(null)
+                  succeed('저장했습니다.')
+                }}
+                onError={fail}
+                draft={draft}
+                onConflict={setDraft}
+                onDraftDone={() => setDraft(null)}
+              />
+            </>
+          ) : (
+            <UndefinedTypeProperties node={node} />
+          )}
         </section>
       )}
 
@@ -286,7 +294,7 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
           {detail.claims.map((c) => (
             <ClaimCard key={c.id} claim={c} onOpenNode={onSelect} showOpen />
           ))}
-          {canEdit && hasClaimPredicates && !addingClaim && (
+          {canEdit && typeDefined && hasClaimPredicates && !addingClaim && (
             <button data-testid="claim-add-toggle" disabled={node.archived} onClick={() => setAddingClaim(true)}>
               주장 추가
             </button>

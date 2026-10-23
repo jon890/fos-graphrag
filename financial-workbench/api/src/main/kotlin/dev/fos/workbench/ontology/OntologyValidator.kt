@@ -16,11 +16,11 @@ import java.time.format.DateTimeParseException
  * 반환 맵의 값은 Neo4j 에 그대로 넣을 수 있는 String, Double, Long, Boolean 이다.
  */
 @Component
-class OntologyValidator(private val ontology: Ontology) {
+class OntologyValidator(private val holder: OntologyHolder) {
 
     /** 생성할 노드의 속성 전체를 검증한다. 필수 속성이 모두 있어야 한다. */
     fun validateCreate(type: String, properties: Map<String, Any?>): Map<String, Any> {
-        val def = ontology.requireNodeType(type)
+        val def = holder.current().requireNodeType(type)
         rejectUnknown(type, def, properties.keys)
         val errors = linkedMapOf<String, String>()
         val result = linkedMapOf<String, Any>()
@@ -38,7 +38,7 @@ class OntologyValidator(private val ontology: Ontology) {
      * 반환 맵의 null 값은 삭제를 뜻한다.
      */
     fun validatePatch(type: String, changes: Map<String, Any?>): Map<String, Any?> {
-        val def = ontology.requireNodeType(type)
+        val def = holder.current().requireNodeType(type)
         rejectUnknown(type, def, changes.keys)
         val errors = linkedMapOf<String, String>()
         val result = linkedMapOf<String, Any?>()

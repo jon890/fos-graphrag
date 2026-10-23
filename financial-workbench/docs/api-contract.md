@@ -58,10 +58,10 @@
 | --- | --- |
 | `VIEWER` | 모든 `GET` 조회(검색, 상세, 주변 그래프, 목록, 변경 이력, 온톨로지) |
 | `EDITOR` | VIEWER 권한과 노드, 관계, Claim 의 생성, 수정, 검토, 보관, 복원 |
-| `ADMIN` | EDITOR 권한과 `/api/users` 의 사용자 관리 |
+| `ADMIN` | EDITOR 권한과 `/api/users` 의 사용자 관리, `/api/ontology` 아래의 온톨로지 편집(버전 목록, 내보내기, 미리보기, 저장, 되돌리기) |
 
 역할이 모자라면 `403 FORBIDDEN` 이다.
-온톨로지 정의(타입, 관계, 속성)는 Git 의 YAML 로 관리하고 웹에서 바꾸지 않는다. 나중에 웹 편집을 더하면 `ADMIN` 만 하게 한다.
+온톨로지 정의(타입, 관계, 속성)는 Neo4j 에 버전으로 쌓이고 `ADMIN` 만 웹에서 바꾼다. 저장소의 YAML 은 첫 버전과 서버 코드가 소유하는 부분의 원본이다(「온톨로지」, [데이터 스키마](data-schema.md) 의 「온톨로지 버전」).
 
 ## 오류 형식
 
@@ -79,13 +79,14 @@
 | --- | --- | --- |
 | 400 | `VALIDATION_FAILED` | 본문 형식, 필수 값, 길이, 날짜 형식이 틀렸다. `details.fieldErrors` 에 `{필드: 사유}` 가 있다 |
 | 400 | `ONTOLOGY_VIOLATION` | 온톨로지에 없는 타입, 속성, 관계, predicate 이거나 시작·끝 노드 타입이 맞지 않는다. `details.rule` 에 위반한 규칙 이름이 있다 |
+| 400 | `ONTOLOGY_INVALID` | 저장하려는 온톨로지 정의가 일관성 검사를 통과하지 못했다. `details.errors` 에 오류 문장 목록이 있다 |
 | 401 | `UNAUTHENTICATED` | 세션이 없다 |
 | 403 | `CSRF_REJECTED` | CSRF 토큰이 없거나 틀렸다 |
 | 403 | `FORBIDDEN` | 역할이 모자라다 |
 | 411 | `LENGTH_REQUIRED` | 본문이 있는 `/api` 요청에 Content-Length 가 없다(chunked 전송) |
-| 413 | `PAYLOAD_TOO_LARGE` | 요청 본문이 64KiB 를 넘는다 |
+| 413 | `PAYLOAD_TOO_LARGE` | 요청 본문이 64KiB 를 넘는다. 온톨로지 미리보기, 저장, 되돌리기는 512KiB 다 |
 | 403 | `SELF_REVIEW_FORBIDDEN` | 자기가 작성한 Claim 을 검토하려 했다 |
-| 404 | `NOT_FOUND` | 그 ID 의 노드나 관계가 없다 |
+| 404 | `NOT_FOUND` | 그 ID 의 노드나 관계가 없다. 온톨로지 버전 조회와 되돌리기에서는 그 버전 번호가 없다 |
 | 409 | `REVISION_CONFLICT` | `expectedRevision` 이 현재 revision 과 다르다. `details` 에 두 값이 있다 |
 | 409 | `ARCHIVED` | 보관된 대상을 수정하려 했다. 먼저 복원한다 |
 | 409 | `NOT_ARCHIVED` | 보관되지 않은 대상을 복원하려 했다 |
@@ -94,6 +95,7 @@
 | 409 | `LAST_EVIDENCE` | 어떤 활성 Claim 의 유일한 활성 근거 Document 를 보관하려 했다. `details.claimIds` 에 그 Claim 이 있다 |
 | 409 | `NO_ACTIVE_EVIDENCE` | 활성 근거 문서가 없는 Claim 을 복원하거나 `REVIEWED` 로 검토하려 했다 |
 | 409 | `TRANSIENT_CONFLICT` | 동시에 처리 중인 다른 요청과 잠금이 겹쳤다. Neo4j 오류 코드가 `DeadlockDetected`, `LockAcquisitionTimeout` 일 때만이다. 최신 내용을 다시 읽고 다시 시도한다 |
+| 409 | `ONTOLOGY_IMPACT_UNCONFIRMED` | 기존 데이터와 어긋나는 온톨로지 변경을 `confirm: true` 없이 저장하려 했다. `details.impacts` 에 영향 목록이 있다 |
 | 500 | `INTERNAL_ERROR` | 그 밖의 서버 오류. 내부 메시지는 응답에 담지 않는다 |
 | 503 | `QUERY_TIMEOUT` | 트랜잭션이 시간 제한을 넘었다. 그래프 조회는 5초, 쓰기는 8초다 |
 | 503 | `DATABASE_UNAVAILABLE` | Neo4j 에 연결할 수 없다. 백업 중이거나 재시작 중이다. 연결 끊김은 Spring 이 일시 예외로 감싸도 이 코드다 |
@@ -174,7 +176,7 @@ Neo4j 예외는 시간 초과(`QUERY_TIMEOUT`), 연결 불가(`DATABASE_UNAVAILA
 
 | 항목 | 상한 | 넘으면 |
 | --- | --- | --- |
-| 요청 본문 | 64KiB, Content-Length 필수 | `413 PAYLOAD_TOO_LARGE`, `411 LENGTH_REQUIRED` |
+| 요청 본문 | 64KiB, 온톨로지 미리보기와 저장, 되돌리기(`POST /api/ontology/**`)는 512KiB. Content-Length 필수 | `413 PAYLOAD_TOO_LARGE`, `411 LENGTH_REQUIRED` |
 | 검색어 `q` | 100자 | `400 VALIDATION_FAILED` |
 | Claim 의 `documentIds` | 20개 | `400 VALIDATION_FAILED` |
 | 페이지 크기 `size` | 100 | `400 VALIDATION_FAILED` |
@@ -355,7 +357,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 사용자 관리 이벤트(`targetKind = USER`)는 ADMIN 에게만 보인다. 다른 역할의 응답에서는 `targetId`, `actor` 필터와 상관없이 빠진다.
 허용 목록의 이메일이 이력으로 새지 않게 하기 위해서다.
 
-`action` 은 `CREATE`, `UPDATE`, `REVIEW`, `ARCHIVE`, `RESTORE` 가운데 하나다. `targetKind` 는 `NODE`, `RELATIONSHIP`, `USER` 가운데 하나다. 사용자 관리 변경도 같은 형식으로 남는다.
+`action` 은 `CREATE`, `UPDATE`, `REVIEW`, `ARCHIVE`, `RESTORE` 가운데 하나다. `targetKind` 는 `NODE`, `RELATIONSHIP`, `USER`, `ONTOLOGY` 가운데 하나다. `ONTOLOGY` 의 `targetId` 는 버전 번호(문자열)다. 사용자 관리 변경도 같은 형식으로 남는다.
 `revision` 은 변경 뒤의 revision 이다. 이력은 지우거나 고치는 API 가 없다.
 
 `refs` 는 `changes` 안의 ID 를 지금 이름으로 바꾼 맵이다. 키는 ID, 값은 `{"id","type","label","archived"}` 다. 노드 ID 키는 `subjectId`, `objectId`, `documentIds`, `fromId`, `toId` 이고 `type` 은 노드 타입이다. 사용자 ID 키는 `reviewedBy` 이고 `type` 은 `User`, `label` 은 표시 이름, `archived` 는 `false` 다. 이 키의 `before`, `after` 에 든 ID 를 모두 담는다. 찾지 못한 ID 는 빠진다.
@@ -365,7 +367,41 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 
 | 메서드 | 경로 | 인증 | 응답 |
 | --- | --- | --- | --- |
-| GET | `/api/ontology` | 필요 | 온톨로지 YAML 을 그대로 옮긴 JSON. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`), 주장 문장 틀(`claimPredicates.<predicate>.sentence`), 만들기 폼 정보(`nodeTypes.<타입>.hintProperties`, `relationshipTypes.<관계>.createPicker`), 타입의 색과 모양(`nodeTypes.<타입>.display`), 검색에 넣을 속성(`nodeTypes.<타입>.searchProperties`), 변경 이력의 항목 이름(`changeFields`), 예전 값 별칭(`valueAliases`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다. 뜻은 [데이터 스키마](data-schema.md) 의 「표시 이름」 과 그 아래 절이다 |
+| GET | `/api/ontology` | 필요 | 최신 온톨로지 버전을 옮긴 JSON. `version`(정수), `versionCreatedAt`, `versionCreatedBy`(UserRef, 서버가 만든 버전이면 `null`)가 더 있다. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`), 주장 문장 틀(`claimPredicates.<predicate>.sentence`), 만들기 폼 정보(`nodeTypes.<타입>.hintProperties`, `relationshipTypes.<관계>.createPicker`), 타입의 색과 모양(`nodeTypes.<타입>.display`), 검색에 넣을 속성(`nodeTypes.<타입>.searchProperties`), 변경 이력의 항목 이름(`changeFields`), 예전 값 별칭(`valueAliases`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다. 뜻은 [데이터 스키마](data-schema.md) 의 「표시 이름」 과 그 아래 절이다 |
+| GET | `/api/ontology/versions` | ADMIN | 버전 목록. 최근 것부터 `Page<{"version","createdAt","createdBy":UserRef?,"note","restoredFrom"}>`. 쪽 나누기는 `page`, `size` |
+| GET | `/api/ontology/versions/{version}` | ADMIN | 그 버전의 `{"version", "yaml", …목록의 필드}` |
+| GET | `/api/ontology/export` | ADMIN | 최신 버전의 YAML 파일. `Content-Type: application/yaml;charset=UTF-8`, `Content-Disposition: attachment; filename="financial-ontology-v<버전>.yaml"` |
+| POST | `/api/ontology/preview` | ADMIN | 본문 `{"baseVersion", "yaml"}` 또는 `{"baseVersion", "definition"}`(JSON 정의). 저장하지 않고 `OntologyPreview` 를 돌려준다 |
+| POST | `/api/ontology/versions` | ADMIN | 저장. 본문은 preview 와 같고 `note`, `confirm` 이 더 있다. 응답 `201` 과 새 버전의 목록 항목 |
+| POST | `/api/ontology/versions/{version}/restore` | ADMIN | 그 버전의 내용으로 새 버전을 만든다. 본문 `{"baseVersion", "note", "confirm"}`. 영향 검사와 응답은 저장과 같다 |
+
+`OntologyPreview`
+
+```json
+{
+  "valid": true,
+  "errors": [],
+  "added": ["nodeTypes.Book", "nodeTypes.Person.properties.nickname"],
+  "removed": ["relationshipTypes.RELATED_TO"],
+  "changed": ["nodeTypes.Company.properties.name.label"],
+  "impacts": [{ "path": "relationshipTypes.RELATED_TO", "kind": "REMOVED_RELATIONSHIP_TYPE", "count": 3 }],
+  "codeOwnedIgnored": ["reviewStatuses.DRAFT"],
+  "yaml": "nodeTypes:\n  Company:\n …",
+  "definition": { "nodeTypes": {}, "relationshipTypes": {}, "claimPredicates": {} }
+}
+```
+
+- `yaml` 과 `definition` 은 보낸 정의를 정규화하고 코드 소유 부분을 저장소 값으로 바꾼 결과다. 화면은 폼과 YAML 편집기를 오갈 때 이것으로 바꾼다. `valid` 가 거짓이고 YAML 을 읽지도 못했으면 둘 다 `null` 이다.
+- `added`, `removed`, `changed` 는 `baseVersion` 이 아니라 최신 버전과 비교한 경로다.
+
+- `valid` 가 거짓이면 `errors` 에 로더 검사 오류가 있고 저장할 수 없다(`400 ONTOLOGY_INVALID`, `details.errors`).
+- `impacts` 가 있는데 저장 요청에 `confirm: true` 가 없으면 `409 ONTOLOGY_IMPACT_UNCONFIRMED` 와 `details.impacts` 다.
+- `baseVersion` 이 최신이 아니면 `409 REVISION_CONFLICT`(`details.expectedRevision`, `details.currentRevision` 에 버전 번호)다.
+- `codeOwnedIgnored` 는 보낸 값 가운데 코드가 소유해 무시한 경로다. 경로는 한 단계 아래 키까지다(`reviewStatuses.DRAFT`, `nodeTypes.Claim`).
+- 최신 버전과 바뀐 점이 없으면(`added`, `removed`, `changed` 가 모두 비면) 저장과 되돌리기는 `400 ONTOLOGY_INVALID`(「바뀐 점이 없습니다.」)다. 새 버전을 만들지 않는다.
+- 저장과 되돌리기의 `note` 는 1000자까지다. 넘으면 `400 VALIDATION_FAILED` 다. `yaml` 과 `definition` 은 하나만 보낸다.
+- ADMIN 이 아니면 `GET /api/ontology` 를 뺀 위 여섯 끝점은 `403 FORBIDDEN` 이다. `GET /api/ontology` 는 모든 역할이 읽는다.
+- 모든 API 응답에 `X-Ontology-Version` 헤더(최신 버전 번호)가 있다. 요청 크기 검사가 거절한 `413`, `411` 응답에는 붙지 않는다. 화면은 이 값이 들고 있는 버전과 다르면 온톨로지를 다시 읽으라는 안내를 보인다.
 
 ## 사용자 관리
 

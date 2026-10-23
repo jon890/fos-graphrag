@@ -5,6 +5,7 @@ import dev.fos.workbench.config.Limits
 import dev.fos.workbench.config.Timestamps
 import dev.fos.workbench.config.WorkbenchProperties
 import dev.fos.workbench.ontology.Ontology
+import dev.fos.workbench.ontology.OntologyHolder
 import org.slf4j.LoggerFactory
 import org.springframework.core.io.Resource
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver
@@ -27,7 +28,7 @@ class SeedLoader(
     private val client: Neo4jClient,
     private val nodes: NodeService,
     private val relationships: RelationshipService,
-    private val ontology: Ontology,
+    private val holder: OntologyHolder,
     private val properties: WorkbenchProperties,
     transactionManager: PlatformTransactionManager,
 ) {
@@ -67,6 +68,7 @@ class SeedLoader(
 
     /** 바깥 트랜잭션 안에서 부른다. 서비스가 던진 예외는 잡지 않는다(잡아도 트랜잭션은 rollback-only 다) */
     internal fun apply(file: SeedFile) {
+        val ontology = holder.current()
         val ids = mutableMapOf<String, String>()
         file.nodes.forEach { node ->
             // 이름이 없으면 기존 노드에 묶지 않고 생성 검증이 실패하게 둔다
@@ -81,7 +83,7 @@ class SeedLoader(
                 log.warn("초기 데이터 {} 의 관계 {} → {} 는 노드를 찾지 못해 건너뛴다", file.key, rel.from, rel.to)
                 return@forEach
             }
-            if (!relationshipExists(rel.type, fromId, toId)) {
+            if (!relationshipExists(ontology, rel.type, fromId, toId)) {
                 relationships.create(CreateRelationshipRequest(rel.type, fromId, toId), BootstrapAdmin.SYSTEM_ACTOR)
             }
         }
@@ -91,7 +93,7 @@ class SeedLoader(
 
     /** 같은 타입에 같은 이름(앞뒤 공백과 대소문자 무시)의 보관되지 않은 노드 id. 없으면 null */
     internal fun findExisting(type: String, name: String): String? {
-        val labelProperty = ontology.requireNodeType(type).labelProperty
+        val labelProperty = holder.current().requireNodeType(type).labelProperty
         return client.query(
             """
             MATCH (n:Knowledge)
@@ -103,7 +105,7 @@ class SeedLoader(
     }
 
     // 관계 타입은 온톨로지의 허용 목록에서 확인한 값만 Cypher 에 넣는다
-    private fun relationshipExists(type: String, fromId: String, toId: String): Boolean {
+    private fun relationshipExists(ontology: Ontology, type: String, fromId: String, toId: String): Boolean {
         ontology.requireRelationshipType(type)
         return client.query(
             "MATCH (:Knowledge {id: \$from})-[r:`$type`]->(:Knowledge {id: \$to}) WHERE r.archived = false RETURN count(r) > 0 AS found",

@@ -7,7 +7,7 @@
 
 | 경로 | 내용 |
 | --- | --- |
-| `ontology/financial-ontology.yaml` | 온톨로지 정의. 타입, 속성, 관계, Claim predicate, 스키마 버전 |
+| `ontology/financial-ontology.yaml` | 온톨로지의 첫 버전과 서버 코드가 소유하는 부분(검토 상태, 이력 이름, 주장 관계, Claim 타입). 그 뒤의 버전은 DB 에 쌓이고 ADMIN 이 웹에서 고친다 |
 | `ontology/seeds/` | 시작할 때 한 번 넣는 초기 데이터. key 마다 한 번만 적용한다 |
 | `api/` | Kotlin, Spring Boot 4.1, Neo4jClient. Google 로그인과 역할, 검증, 변경 이력, 조회 제한 |
 | `web/` | React, TypeScript, Vite, Cytoscape.js |

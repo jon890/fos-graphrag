@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Ontology } from '../api/types'
 import { testOntology } from '../components/testSupport'
+import { summarizeValue } from './format'
 import { changeFieldLabel, changeValueText } from './changes'
 
 const o: Ontology = {
@@ -46,6 +47,11 @@ describe('changeValueText', () => {
     expect(changeValueText(o, 'Claim', 'reviewStatus', 'DRAFT', {})).toBe('초안')
     expect(changeValueText(o, 'User', 'role', 'EDITOR', {})).toBe('편집자')
     expect(changeValueText(o, 'Company', 'name', null, {})).toBe('(없음)')
+  })
+
+  it('온톨로지 이력의 경로 목록만 쉼표로 잇는다', () => {
+    expect(changeValueText(o, 'Ontology', 'added', ['nodeTypes.Fund', 'nodeTypes.Bond'], {}, 'ONTOLOGY')).toBe('nodeTypes.Fund, nodeTypes.Bond')
+    expect(changeValueText(o, 'Company', 'added', ['a', 'b'], {}, 'NODE')).toBe(summarizeValue(['a', 'b']))
   })
 
   it('enum 속성은 선택지 이름으로 보인다', () => {

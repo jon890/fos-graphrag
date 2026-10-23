@@ -10,6 +10,7 @@ import dev.fos.workbench.history.FieldChange
 import dev.fos.workbench.history.TargetKind
 import dev.fos.workbench.history.diff
 import dev.fos.workbench.ontology.Ontology
+import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.ontology.OntologyValidator
 import dev.fos.workbench.web.DuplicateException
 import dev.fos.workbench.web.NotArchivedException
@@ -22,7 +23,7 @@ import java.util.UUID
 @Service
 class NodeService(
     private val client: Neo4jClient,
-    private val ontology: Ontology,
+    private val holder: OntologyHolder,
     private val validator: OntologyValidator,
     private val guard: RevisionGuard,
     private val recorder: ChangeEventRecorder,
@@ -31,6 +32,7 @@ class NodeService(
 
     @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun create(request: CreateNodeRequest, actorId: String): NodeView {
+        val ontology = holder.current()
         val def = ontology.requireNodeType(request.type)
         if (def.managedBy == CLAIMS) {
             throw OntologyViolationException("claim-via-claims-api", "Claim 은 /api/claims 로 만듭니다.")
@@ -42,7 +44,7 @@ class NodeService(
         val props = properties + mapOf(
             "id" to id, "type" to request.type, "revision" to 1L, "archived" to false,
             "createdAt" to now, "createdBy" to actorId, "updatedAt" to now, "updatedBy" to actorId,
-            "searchText" to searchText(request.type, properties),
+            "searchText" to searchText(ontology, request.type, properties),
         )
         // label 은 requireNodeType 으로 허용 목록과 대조한 값만 넣는다
         client.query("CREATE (n:Knowledge:`${request.type}`) SET n = \$props").bind(props).to("props").run()
@@ -57,6 +59,7 @@ class NodeService(
 
     @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun patch(id: String, request: PatchNodeRequest, actorId: String): NodeView {
+        val ontology = holder.current()
         val before = guard.lockNode(id)
         val type = before["type"] as String
         if (ontology.requireNodeType(type).managedBy == CLAIMS) {
@@ -72,7 +75,7 @@ class NodeService(
         }
         val merged = (before + changes).filterValues { it != null }
         if (type == SECURITY) requireUniqueListing(merged, exceptId = id)
-        val after = guard.updateNode(id, changes + ("searchText" to searchText(type, merged)), actorId)
+        val after = guard.updateNode(id, changes + ("searchText" to searchText(ontology, type, merged)), actorId)
         recorder.record(
             ChangeEventDraft(
                 actorId, ChangeAction.UPDATE, id, TargetKind.NODE, type, ontology.labelOf(type, after),
@@ -127,7 +130,7 @@ class NodeService(
         if (exists) throw DuplicateException("같은 시장에 같은 종목 코드가 이미 있습니다. 보관된 종목이면 복원하세요.")
     }
 
-    private fun searchText(type: String, props: Map<String, Any?>): String =
+    private fun searchText(ontology: Ontology, type: String, props: Map<String, Any?>): String =
         (listOfNotNull(ontology.labelOf(type, props), props["ticker"]) +
             ontology.requireNodeType(type).searchProperties.mapNotNull { props[it] }).joinToString(" ").lowercase()
 

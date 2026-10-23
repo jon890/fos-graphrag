@@ -152,6 +152,67 @@ class OntologyLabelsTest {
         }
     }
 
+    @Test
+    fun `YAML 로 쓰고 다시 읽으면 같다`() {
+        assertThat(OntologyLoader.parse(OntologyLoader.toYaml(OntologyLoader.loadDefault()))).isEqualTo(OntologyLoader.loadDefault())
+    }
+
+    @Test
+    fun `주장 종류를 더하면 Claim 의 predicate 선택지도 생긴다`() {
+        val added = ontology.copy(
+            claimPredicates = ontology.claimPredicates +
+                ("TEST_PREDICATE" to ClaimPredicateDef(label = "테스트 관계", description = "x", subjectTypes = listOf("Company"), objectTypes = listOf("Company"))),
+        )
+        val predicate = OntologyLoader.parse(OntologyLoader.toYaml(added)).nodeTypes.getValue("Claim").properties.getValue("predicate")
+        assertThat(predicate.values).contains("TEST_PREDICATE")
+        assertThat(predicate.valueLabels).containsEntry("TEST_PREDICATE", "테스트 관계")
+    }
+
+    @Test
+    fun `주장 종류를 빼도 읽힌다`() {
+        val edited = ontology.copy(claimPredicates = ontology.claimPredicates - "ADVOCATES")
+        val merged = CodeOwned.merge(edited, OntologyLoader.loadDefault())
+        assertThat(OntologyLoader.consistencyErrors(merged)).isEmpty()
+        val predicate = merged.nodeTypes.getValue("Claim").properties.getValue("predicate")
+        assertThat(predicate.values).doesNotContain("ADVOCATES").contains("CRITICIZES")
+        assertThat(predicate.valueLabels).doesNotContainKey("ADVOCATES")
+    }
+
+    @Test
+    fun `주장 종류 이름을 바꾸면 Claim 선택지 이름도 바뀐다`() {
+        val supplies = ontology.claimPredicates.getValue("SUPPLIES_TO")
+        val edited = ontology.copy(claimPredicates = ontology.claimPredicates + ("SUPPLIES_TO" to supplies.copy(label = "납품한다")))
+        val merged = CodeOwned.merge(edited, OntologyLoader.loadDefault())
+        assertThat(merged.nodeTypes.getValue("Claim").properties.getValue("predicate").valueLabels).containsEntry("SUPPLIES_TO", "납품한다")
+    }
+
+    @Test
+    fun `오류를 모두 모은다`() {
+        val company = ontology.nodeTypes.getValue("Company")
+        val broken = ontology.copy(
+            nodeTypes = ontology.nodeTypes + ("Company" to company.copy(hintProperties = listOf("nope"), searchProperties = listOf("nope2"))),
+        )
+        val errors = OntologyLoader.consistencyErrors(broken)
+        assertThat(errors).hasSize(2)
+        assertThat(errors[0]).contains("hintProperties").contains("nope")
+        assertThat(errors[1]).contains("searchProperties").contains("nope2")
+    }
+
+    @Test
+    fun `알 수 없는 키는 줄 번호와 함께 알린다`() {
+        // 다섯째 줄에 Company 타입의 알 수 없는 키를 둔다
+        val yaml = minimal("{ type: string }").replace("    description: x\n", "    description: x\n    oddKey: 1\n")
+        assertThat(yaml.lines()[4]).isEqualTo("    oddKey: 1")
+
+        val read = OntologyLoader.readEdited(yaml, OntologyLoader.loadDefault())
+
+        assertThat(read).isInstanceOf(EditRead.Invalid::class.java)
+        val errors = (read as EditRead.Invalid).errors
+        assertThat(errors).hasSize(1)
+        assertThat(errors.single()).contains("oddKey").contains("줄 5").doesNotContain("dev.fos")
+        assertThat(read.ontology).isNull()
+    }
+
     private fun minimal(nameProperty: String) = """
         schemaVersion: "9"
         nodeTypes:

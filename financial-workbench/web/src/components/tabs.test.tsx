@@ -4,7 +4,7 @@ import type { ClaimView, CurrentUser, Page } from '../api/types'
 import { ListTab } from './ListTab'
 import { LoginView } from './LoginView'
 import { ChangesTab } from './ChangesTab'
-import { OntologyTab } from './OntologyTab'
+import { OntologyTab } from './ontology/OntologyTab'
 import { Pager } from './Pager'
 import { ReviewRow, ReviewTab } from './ReviewTab'
 import { UsersTab } from './UsersTab'
@@ -57,7 +57,7 @@ describe('머리글 밖 탭의 첫 렌더', () => {
   })
 
   it('OntologyTab 은 버전 표시를 그리고 옛 타입 구역 class 를 쓰지 않는다', () => {
-    const html = renderToStaticMarkup(withApp(<OntologyTab />))
+    const html = renderToStaticMarkup(withApp(<OntologyTab draft={null} onDraftChange={() => {}} reloadOntology={async () => {}} />))
     expect(html).toContain('data-testid="ontology-version"')
     expect(html).not.toContain('ontology-type')
   })

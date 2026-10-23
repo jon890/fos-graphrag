@@ -38,10 +38,11 @@ sequenceDiagram
 | `/list` | 목록 | `type`, `q`, `archived=1`, `page`(0이면 뺀다) |
 | `/review` | 검토 대기 | `page`, `minePage`(0이면 뺀다) |
 | `/changes` | 변경 이력 | `target`(대상 노드 id), `actor`(사용자 이메일), `page` |
-| `/ontology` | 온톨로지 | 없음 |
+| `/ontology` | 온톨로지 | `view`(ADMIN 의 `form`, `yaml`, `history`. 없으면 지금 버전 보기), `version`(`view=history` 에서 연 버전) |
 | `/users` | 사용자(ADMIN) | 없음 |
 
 - `/` 는 `/workspace` 로 바꿔 연다. 기본값과 같은 query 는 주소에 쓰지 않는다. 그래서 처음 열면 주소가 `/workspace` 다.
+- ADMIN 이 아닌 사람이 `/ontology?view=…` 를 열면 `/ontology` 로 바꿔 연다(기록을 쌓지 않는다).
 - `/` 와 권한 없는 화면 경로(`/users` 를 ADMIN 이 아닌 사람이 연 경우)는 `/workspace` 로 바꿔 연다. 바꿀 때는 기록을 쌓지 않는다. 표에 없는 경로는 서버가 `404` 로 답해 화면이 뜨지 않는다.
 - 이미 보낸 `/?node=<id>` 링크는 `/workspace?node=<id>&pane=detail` 로 바꿔 연다. 「링크 복사」 는 이제 `/workspace?node=<id>` 를 넣는다.
 - 서버는 위 여섯 경로의 GET 을 `index.html` 로 돌려준다. 그 밖의 경로는 지금처럼 `404` 다. 정적 파일과 `/api/**` 는 그대로다.
@@ -55,6 +56,7 @@ sequenceDiagram
 | 상단 탭 누르기 | 경로. 그 탭에 처음 들어가면 query 없이, 그 탭에서 마지막으로 보던 주소가 있으면 그 주소로 간다 |
 | 항목 열기(검색 결과, 그래프 노드, 「그래프에 나온 항목」, 목록, 검토 대기, 변경 이력, 관계와 주장 카드의 이름, 상세의 「그래프 중심으로」) | `/workspace?node=…`. 좁은 화면에서는 `pane` 도 함께 바뀐다. 상세만 바꾸는 열기(그래프와 상세 안에서 누른 것)는 그때의 그래프 중심을 `center` 로 남긴다 |
 | 좁은 화면의 검색, 그래프, 상세 탭 누르기, 그래프 아래 「상세 보기」 | `pane` |
+| 온톨로지 탭의 「폼으로 편집」, 「YAML 로 편집」, 「버전 기록」, 버전 기록에서 버전 열기 | `view`, `version` |
 
 나머지는 주소만 바꾸고 기록을 쌓지 않는다(replace). 검색어와 필터, 홉 수, 「주장을 따로 보기」, 그래프의 「선택한 항목을 중심으로」, 쪽 넘기기, 이력의 대상과 사용자 고르기가 여기 해당한다. 새로고침과 링크에는 남는다.
 
@@ -407,3 +409,91 @@ flowchart LR
 ```
 
 두 전이 모두 revision 을 올리고 ChangeEvent(`ARCHIVE`, `RESTORE`)를 남긴다. 이전 이력은 지우지 않는다.
+
+## 온톨로지 편집
+
+온톨로지 탭은 모든 역할에게 지금 버전을 보여 준다. 머리에 버전 번호와 저장한 사람, 시각이 있다.
+ADMIN 에게만 「폼으로 편집」, 「YAML 로 편집」, 「버전 기록」, 「YAML 내려받기」 단추가 보인다. 결정과 근거는 [ADR-008](adr/008-ontology-versions-in-db.md), 저장 규칙은 [데이터 스키마](data-schema.md) 의 「온톨로지 버전」 이다.
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"'Noto Sans KR', sans-serif","fontSize":"14px","lineColor":"#7A8594","primaryTextColor":"#1D1F23","edgeLabelBackground":"#FFFFFF","clusterBkg":"#FAFAFA"},"flowchart":{"curve":"basis","nodeSpacing":40,"rankSpacing":60,"padding":14}}}%%
+flowchart TD
+  subgraph 관리자
+    U1[폼이나 YAML 로 초안을 고친다]
+    U2[「저장 전에 확인」 을 누른다]
+    U3[바뀐 점과 영향을 읽고 메모를 적는다]
+    U4[「저장」 을 누른다]
+  end
+  subgraph 화면
+    D[초안. 탭을 옮겨도 남는다]
+    P[바뀐 점, 영향, 무시한 코드 소유 항목]
+    N[저장 완료 안내, 새 버전으로 다시 그린다]
+    X[오류 목록을 초안 옆에 보인다]
+    C[다른 관리자가 먼저 저장했다는 안내]
+  end
+  subgraph API
+    PV[POST /api/ontology/preview]
+    SV[POST /api/ontology/versions]
+  end
+  U1 --> D --> U2 --> PV
+  PV -- valid 거짓 --> X --> U1
+  PV -- valid 참 --> P --> U3 --> U4 --> SV
+  SV -- 201 --> N
+  SV -- 409 REVISION_CONFLICT --> C
+  classDef c1 fill:#E8F1FB,stroke:#3B7DD8,stroke-width:1.5px,color:#0B2545
+  classDef c2 fill:#E9F7EF,stroke:#2E9E5B,stroke-width:1.5px,color:#0E3B22
+  classDef c3 fill:#FDF2E3,stroke:#D9822B,stroke-width:1.5px,color:#4A2A05
+  class U1,U2,U3,U4 c1
+  class D,P,N,X,C c2
+  class PV,SV c3
+  style 관리자 fill:#F6FAFE,stroke:#3B7DD8,stroke-dasharray:4 3
+  style 화면 fill:#F5FBF7,stroke:#2E9E5B,stroke-dasharray:4 3
+  style API fill:#FFFAF3,stroke:#D9822B,stroke-dasharray:4 3
+```
+
+### 초안
+
+- 폼 편집기와 YAML 편집기는 초안 하나를 함께 쓴다. 처음 열면 지금 버전에서 시작하고, 시작한 버전이 `baseVersion` 이다.
+- 폼에서 YAML 로 옮기거나 YAML 에서 폼으로 옮길 때는 미리보기 API 가 정규화한 `yaml` 과 `definition` 으로 바꾼다. 웹은 YAML 을 직접 읽거나 쓰지 않는다. YAML 이 틀려 바꿀 수 없으면 옮기지 않고 오류를 보인다.
+- 초안은 화면 메모리에 있다. 다른 탭에 다녀와도 남고, 저장하거나 「초안 버리기」 를 누르면 사라진다. 새로고침과 창 닫기 전에는 브라우저가 떠날지 묻는다(`beforeunload`). 새로고침하면 초안은 사라진다.
+- 미리보기와 저장은 초안 전체를 보낸다. 고친 부분만 보내지 않는다.
+- 서버가 정규화한 YAML 에는 주석이 남지 않는다. YAML 편집기 위에 키 설명(`label`, `valueLabels`, `description`, `hintProperties`, `display`, `searchProperties`, `createPicker`, `valueAliases` 의 뜻과 흐름 표기의 따옴표 규칙)을 접힌 도움말로 둔다.
+
+### 미리보기와 저장
+
+- 「저장 전에 확인」 은 미리보기 API 를 부른다. 결과에 바뀐 점(더함, 뺌, 바뀜)과 영향 목록, 무시한 코드 소유 항목이 나온다. 바뀐 점이 없으면 「바뀐 점이 없습니다」 를 보이고 「저장」 을 두지 않는다.
+- 영향이 있으면 항목마다 「노드 3개가 이 속성 값을 가지고 있습니다」 처럼 보이고, 「기존 데이터와 어긋나는 것을 알고 저장합니다」 확인란을 켜야 「저장」 이 눌린다. 확인란을 켜면 저장 요청에 `confirm: true` 를 담는다.
+- 저장에 성공하면 화면이 새 버전으로 온톨로지를 다시 읽고 보기 화면(`/ontology`)으로 간다(push). 안내는 「버전 N 을 저장했습니다.」 다.
+- 미리보기와 저장 사이에 데이터가 바뀌어 영향이 새로 생기면 저장이 `409 ONTOLOGY_IMPACT_UNCONFIRMED` 로 거절될 수 있다. 화면은 그 응답의 영향 목록으로 미리보기를 다시 그린다.
+- 다른 관리자가 먼저 저장하면 저장이 `409 REVISION_CONFLICT` 다. 초안은 남는다. 화면은 「다른 관리자가 버전 N 을 저장했습니다.」 와 두 단추를 보인다.
+  - 「최신 버전에서 다시 시작」: 초안을 버리고 최신 버전으로 새 초안을 연다.
+  - 「내 초안을 최신 버전 위에 저장」: `baseVersion` 을 최신 번호로 바꾸고 미리보기를 다시 부른다. 바뀐 점은 최신 버전과 비교한 것이라, 다른 관리자의 변경을 덮어쓰면 그것이 「뺌」 이나 「바뀜」 으로 보인다.
+
+### 폼 편집기
+
+폼은 자주 하는 변경만 다룬다. 그 밖의 항목(`hintProperties`, `searchProperties`, `valueAliases`, `createPicker`, `labelProperty`)은 YAML 편집기에서 고친다. 폼은 이 항목을 읽기만 하고 그대로 둔다.
+
+| 대상 | 더하기 | 고치기 | 빼기 |
+| --- | --- | --- | --- |
+| 노드 타입 | 키, 표시 이름, 설명, 라벨 속성(새 타입의 첫 속성), 색과 모양 | 표시 이름, 설명, 색과 모양 | 된다. 영향은 미리보기에서 본다 |
+| 속성 | 키, 값 타입, 필수, 표시 이름, 설명, 길이와 범위, enum 값과 그 표시 이름 | 표시 이름, 설명, 필수, 길이와 범위, enum 값 더하기와 빼기, enum 표시 이름 | 된다. 라벨 속성은 뺄 수 없다 |
+| 관계 종류 | 키, 표시 이름, 설명, 시작 타입, 끝 타입 | 표시 이름, 설명, 시작과 끝 타입 | 된다 |
+| 주장 종류 | 키, 표시 이름, 문장 틀, 설명, 주체 타입, 대상 타입 | 표시 이름, 문장 틀, 설명, 주체와 대상 타입 | 된다 |
+
+- 키는 더할 때만 적는다. 이미 있는 키는 입력칸이 아니라 글자로 보인다. 키 형식은 타입이 `PascalCase`, 관계 종류와 주장 종류가 `UPPER_SNAKE_CASE`, 속성이 `camelCase` 다. 형식이 틀리면 입력칸 아래에 바로 알린다.
+- Claim 타입과 코드 소유 항목(검토 상태, 이력 이름, 주장 관계)은 폼에 나오지 않는다. 코드가 이름으로 읽는 키는 「빼기」 와 값 타입, 필수 칸이 꺼져 있다.
+- 빼기는 그 자리에서 지우지 않고 줄에 「뺄 예정」 표시를 남긴다. 「되살리기」 로 되돌린다. 미리보기에 들어가야 영향이 보이기 때문이다.
+
+### 버전 기록과 되돌리기
+
+- 「버전 기록」(`view=history`)은 최근 버전부터 번호, 시각, 저장한 사람, 메모를 보인다. 되돌린 버전은 「버전 N 으로 되돌림」 이 함께 보인다.
+- 버전을 누르면(`version=N`) 그 버전의 YAML 을 읽기 전용으로 보이고, 「이 버전 내려받기」 와 「이 버전으로 되돌리기」 가 있다.
+- 「이 버전으로 되돌리기」 는 그 버전의 YAML 로 미리보기를 부른다. 바뀐 점과 영향은 최신 버전과 비교한 것이다. 확인하고 저장하면 `POST /api/ontology/versions/{N}/restore` 로 새 버전이 생긴다. 예전 버전은 그대로 남는다.
+- 「YAML 내려받기」 는 `GET /api/ontology/export` 로 최신 버전 파일을 받는다. Git 에 백업하거나 저장소 YAML 과 비교할 때 쓴다.
+
+### 다른 화면이 버전 바뀜을 아는 방법
+
+- 요청 크기 검사가 거절한 `413`, `411` 응답을 뺀 모든 API 응답에 `X-Ontology-Version` 헤더가 있다. 화면은 들고 있는 온톨로지의 `version` 과 다르면 머리글 아래에 「온톨로지가 바뀌었습니다(버전 N). 다시 읽으면 바뀐 타입과 칸이 보입니다.」 와 「다시 읽기」 를 보인다.
+- 저절로 다시 읽지 않는다. 쓰던 폼의 칸이 바뀌어 입력이 사라질 수 있기 때문이다. 「다시 읽기」 는 온톨로지만 다시 받고 주소와 쓰던 입력은 그대로 둔다.
+- 다시 읽기 전에 저장한 쓰기도 서버는 최신 버전으로 검증한다. 빠진 속성이나 타입을 보내면 지금처럼 `400 ONTOLOGY_VIOLATION` 이다.
+- 자기가 저장한 관리자의 화면은 저장 응답을 받은 뒤 바로 다시 읽으므로 이 안내가 나오지 않는다.

@@ -1,7 +1,7 @@
 package dev.fos.workbench.knowledge
 
 import dev.fos.workbench.config.Timestamps
-import dev.fos.workbench.ontology.Ontology
+import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.web.ArchivedException
 import dev.fos.workbench.web.LastEvidenceException
 import dev.fos.workbench.web.NoActiveEvidenceException
@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component
  * 예외로 끝나면 트랜잭션 롤백이 지운다.
  */
 @Component
-class RevisionGuard(private val client: Neo4jClient, private val ontology: Ontology) {
+class RevisionGuard(private val client: Neo4jClient, private val holder: OntologyHolder) {
 
     @Suppress("UNCHECKED_CAST")
     fun lockNode(id: String): Map<String, Any?> =
@@ -30,6 +30,7 @@ class RevisionGuard(private val client: Neo4jClient, private val ontology: Ontol
     /** 관계 타입을 넣어야 타입별 id 인덱스를 쓴다. 허용 목록의 타입을 차례로 찾는다. */
     @Suppress("UNCHECKED_CAST")
     fun lockRelationship(id: String): LockedRelationship {
+        val ontology = holder.current()
         for (type in ontology.allRelationshipTypes.sorted()) {
             val found = client.query(
                 "MATCH (a:Knowledge)-[r:`$type` {id: \$id}]->(b:Knowledge) SET r._lock = true " +

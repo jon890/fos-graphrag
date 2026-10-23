@@ -2,19 +2,87 @@
 
 ## 온톨로지와 지식 데이터
 
-온톨로지는 타입, 속성, 관계의 정의다. `ontology/financial-ontology.yaml` 에 있고 Git 으로 관리한다.
+온톨로지는 타입, 속성, 관계의 정의다. Neo4j 의 `:OntologyVersion` 에 버전으로 쌓이고, API 는 최신 버전으로 검증한다(「온톨로지 버전」, [ADR-008](adr/008-ontology-versions-in-db.md)). 저장소의 `ontology/financial-ontology.yaml` 은 첫 버전과 서버 코드가 소유하는 부분의 원본이다.
 지식 데이터는 그 정의를 따르는 개별 기업, 종목, 인물, 개념, 주장이다. Neo4j 에 있다.
 
-API 는 시작할 때 온톨로지 파일을 읽고, 모든 쓰기를 그 정의로 검증한다.
+API 는 저장된 최신 버전으로 모든 쓰기를 검증한다. 저장하면 다음 요청부터 새 버전으로 검증한다.
 Neo4j 는 온톨로지 규칙을 집행하지 않는다. 아래 제약 조건은 유일성과 조회 속도만 맡는다.
 
-온톨로지 파일을 바꾸는 절차는 이렇다.
+온톨로지를 바꾸는 절차는 이렇다.
 
-1. YAML 을 고치고 `schemaVersion` 을 올린다.
-2. 기존 데이터가 새 정의를 어기는지 확인한다. 서버와 편집 폼은 바뀐 칸만 검사하므로, 새 정의를 어기는 값이 남아도 다른 칸은 고칠 수 있다. 어긴 칸을 고칠 때는 새 정의에 맞는 값을 넣어야 한다. 문자열 칸을 enum 으로 바꾸거나 enum 값을 뺄 때는 예전 표기를 `valueAliases` 에 적는다. API 가 시작할 때 고친다(「예전 값 정리」).
-3. API 를 다시 빌드한다. 파일은 빌드할 때 jar 안에 복사된다.
+1. ADMIN 이 온톨로지 탭의 폼 편집기나 YAML 편집기로 고친다(「온톨로지 편집」, [흐름](flow.md)).
+2. 저장하기 전에 기존 데이터가 새 정의를 어기는지 영향 목록으로 본다. 서버와 편집 폼은 바뀐 칸만 검사하므로, 새 정의를 어기는 값이 남아도 다른 칸은 고칠 수 있다. 어긴 칸을 고칠 때는 새 정의에 맞는 값을 넣어야 한다. 문자열 칸을 enum 으로 바꾸거나 enum 값을 뺄 때는 예전 표기를 `valueAliases` 에 적는다. API 가 시작할 때 고친다(「예전 값 정리」).
+3. 확인하고 저장하면 새 버전이 생기고 바로 쓰인다. 재배포는 없다.
 
-웹에서 타입과 관계 정의를 바꾸는 기능은 아직 없다.
+### 온톨로지 버전
+
+`(:OntologyVersion {version, yaml, createdAt, createdBy, note, restoredFrom})` 가 버전 하나다.
+
+| 속성 | 타입 | 뜻 |
+| --- | --- | --- |
+| `version` | Integer | 1 부터 오르는 번호. 유일하다(`ontology_version_unique`) |
+| `yaml` | String | 그 버전의 온톨로지 전체. 저장할 때 서버가 정규화한 YAML 이다 |
+| `createdAt`, `createdBy` | String | 저장 시각과 `:User` 의 `id`. 서버가 만든 버전은 `system` 이다 |
+| `note` | String | 저장할 때 적은 메모. 선택 |
+| `restoredFrom` | Integer | 예전 버전으로 되돌린 버전이면 그 번호 |
+
+- 최신 버전은 `version` 이 가장 큰 것이다. 버전은 지우거나 고치지 않는다. 되돌리기도 예전 내용을 담은 새 버전을 만든다.
+- 응답과 YAML 의 `schemaVersion` 은 그 버전의 `version` 을 문자열로 쓴 값이다. 저장할 때 서버가 채운다.
+- 저장은 `(:OntologyHead {key: 'ontology'})` 노드 하나(유일 제약 `ontology_head_key_unique`)를 잠근 뒤 최신 번호를 확인하고 새 번호로 만든다. 요청의 `baseVersion` 이 최신이 아니면 `409 REVISION_CONFLICT` 다. 동시 수정 처리(ADR-003)와 같은 방식이다.
+- 저장하면 같은 트랜잭션에서 `ChangeEvent`(`targetKind = ONTOLOGY`, `targetId` 는 버전 번호, `action` 은 `UPDATE` 나 되돌리기면 `RESTORE`)를 남긴다. `changes` 의 `added`, `removed`, `changed` 에 미리보기와 같은 경로 목록을 담는다. 빈 목록은 담지 않는다.
+- 새 관계 종류가 생기면 저장 직후 그 관계의 id 인덱스(`rel_<타입>_id`)를 만든다.
+
+**코드가 소유하는 부분**: 아래는 저장소 YAML 의 값만 쓴다. 웹에서 보내도 저장할 때 저장소 값으로 바꾼다.
+
+- `reviewStatuses`, `changeActions`, `changeFields`, `claimRelationships`
+- `managedBy` 가 있는 노드 타입(Claim). 이 타입의 `predicate` 선택지는 `claimPredicates` 에서 만든다
+
+**코드가 이름으로 읽는 키**: 아래 타입과 속성은 서버 코드가 이름으로 읽는다. 빼거나, 속성 타입이나 필수 여부를 바꾸면 미리보기가 `valid: false` 와 오류로 답한다. 표시 이름, 설명, enum 값 더하기는 된다. 목록은 서버 코드의 상수 한 곳(`CodeReadKeys`)이 소유한다.
+
+- `Document` 와 그 속성 `title`, `url`, `publisher`, `documentType`, `publishedAt`, `collectedAt`(주장의 근거 목록이 읽는다)
+- `Security` 와 그 속성 `market`, `ticker`(같은 종목 검사와 검색어가 읽는다)
+
+**시작할 때**: 스키마 초기화 뒤, 예전 값 정리 앞에서 아래를 한다.
+
+1. `:OntologyVersion` 이 없으면 저장소 YAML 로 버전 1 을 만든다(작업자 `system`, 메모 「저장소 YAML 로 만든 첫 버전」).
+2. 최신 버전의 코드 소유 부분이 저장소 YAML 과 다르면, 그 부분만 바꾼 새 버전을 만든다(메모 「코드가 소유하는 항목을 갱신」). 편집할 수 있는 부분은 그대로다. 바꾼 정의가 일관성 검사를 통과하지 못하면 새 버전을 만들지 않고 `error` 로그에 오류를 남긴 채 최신 버전으로 시작한다.
+   - 최신 버전을 지금 코드의 로더로 읽지 못하면(모델이나 검사 규칙이 바뀐 경우) `error` 로그를 남기고 저장소 YAML 로 새 버전을 만든다(메모 「저장된 최신 버전을 읽지 못해 저장소 YAML 로 만든 버전」). 읽지 못한 버전은 지우지 않는다. 그래서 온톨로지 모델이나 검사 규칙을 바꾸는 코드 변경은, 저장된 YAML 을 새 형식으로 옮기는 시작 작업을 함께 둔다.
+3. 저장소 YAML 의 편집할 수 있는 부분에만 있는 타입, 관계 종류, 주장 종류가 있으면 `warn` 로그에 키를 남긴다. 자동으로 더하지 않는다. 배포 뒤 ADMIN 이 웹에서 더한다.
+
+**어긋나는 변경**: 저장 전에 서버가 지금 데이터와 비교해 영향 목록을 만든다. 저장하려면 요청에 `confirm: true` 가 있어야 한다(영향이 없으면 없어도 된다). 데이터는 바꾸지 않는다.
+영향은 `OntologyHead` 를 잠그기 전에 세므로, 센 뒤 저장이 끝나기 전에 노드를 쓰면 그 영향은 확인 없이 저장될 수 있다. 어긋나는 데이터를 허용하는 결정에 따라 받아들인 한계다.
+
+| 변경 | `kind` | 영향으로 세는 것(보관된 것 포함) |
+| --- | --- | --- |
+| 노드 타입 빼기 | `REMOVED_NODE_TYPE` | 그 타입의 노드 수 |
+| 속성 빼기 | `REMOVED_PROPERTY` | 그 속성 값이 있는 노드 수 |
+| 속성을 필수로 바꾸기, 기존 타입에 필수 속성 더하기 | `NOW_REQUIRED` | 그 속성 값이 없는 노드 수 |
+| enum 값 빼기 | `REMOVED_ENUM_VALUE` | 그 값을 쓰는 노드 수 |
+| 속성 타입 바꾸기 | `CHANGED_PROPERTY_TYPE` | 그 속성 값이 있는 노드 수 |
+| `maxLength` 줄이기, `min`/`max` 좁히기(없던 제한을 새로 두는 것 포함) | `NARROWED_RANGE` | 새 범위를 넘는 노드 수 |
+| 관계 종류 빼기 | `REMOVED_RELATIONSHIP_TYPE` | 그 관계 수 |
+| 관계의 시작이나 끝 타입 줄이기 | `NARROWED_RELATIONSHIP_ENDS` | 빠진 타입에 걸린 그 관계 수 |
+| 주장 종류 빼기 | `REMOVED_CLAIM_PREDICATE` | 그 종류의 주장 수 |
+| 주장의 주체나 대상 타입 줄이기 | `NARROWED_CLAIM_TYPES` | 빠진 타입을 주체나 대상으로 둔 그 종류의 주장 수 |
+
+- 영향 항목은 `{path, kind, count}` 다. `path` 는 바뀐 정의의 경로(`nodeTypes.Person.properties.nickname` 등)다. `count` 가 0 인 항목은 담지 않는다.
+
+**정의에서 빠진 데이터**: 빼도 데이터는 지우지 않는다. 남은 데이터는 아래처럼 다룬다. 그 정의를 같은 키로 다시 더하면 처음처럼 쓴다.
+
+| 남은 것 | 읽기(검색, 목록, 그래프, 상세) | 쓰기 |
+| --- | --- | --- |
+| 빠진 타입의 노드 | 그대로 나온다. 이름은 `name` 속성, 없으면 타입 키다. 속성은 시스템 속성을 뺀 저장된 값을 모두 담는다 | 고치기는 `400 ONTOLOGY_VIOLATION`(`unknown-node-type`). 보관과 복원은 된다 |
+| 빠진 속성의 값 | 응답에 담지 않는다(지금처럼 정의된 속성만 담는다). 노드에는 남는다 | 고칠 때 보내면 `400 ONTOLOGY_VIOLATION` |
+| 빠진 관계 종류의 관계 | 그래프와 상세의 관계 목록에 나온다. 이름은 관계 키다 | 새로 만들 수 없다. 보관과 복원도 할 수 없고(`404 NOT_FOUND`), 화면은 그 단추를 숨긴다 |
+| 빠진 주장 종류의 주장 | 그대로 나온다. 이름의 관계 부분은 주장 종류 키다 | 내용 고치기는 `400 ONTOLOGY_VIOLATION`. 검토, 보관, 복원은 된다 |
+
+- 검색, 목록, 그래프의 타입 필터는 지금 정의에 없는 타입 키도 받는다. 키 형식(영문자로 시작하는 영문자, 숫자, 밑줄)만 검사하고 Cypher 에는 parameter 로 넘긴다.
+- 저장소에 없는 노드 타입에는 `managedBy` 를 둘 수 없다. 미리보기가 오류로 답한다.
+
+**초기 데이터와의 관계**: 초기 데이터 파일이 최신 버전에 없는 타입, 관계 종류, 주장 종류를 쓰면 그 파일을 적용하지 않고 `warn` 로그를 남긴다. `:SeedRun` 을 만들지 않으므로, ADMIN 이 그 정의를 더한 뒤 다음 시작 때 적용된다. 시작은 멈추지 않는다.
+
+- 키(타입, 속성, 관계 종류, 주장 종류, enum 값의 이름)는 바꾸지 않는다. 바꾸려면 빼고 더해야 하고, 위 표의 영향으로 보인다. 표시 이름(`label`, `valueLabels`, `description`, `sentence`, `display`)은 언제나 바꿀 수 있다.
+- 저장된 정의는 로더의 일관성 검사(알 수 없는 키, `labelProperty`, `hintProperties`, `searchProperties`, `display`, `valueAliases`, 타입과 관계 이름 형식)를 지금처럼 통과해야 한다. 통과하지 못하면 `400 ONTOLOGY_INVALID` 와 오류 목록이다.
 
 ### 표시 이름
 
@@ -26,7 +94,7 @@ Neo4j 는 온톨로지 규칙을 집행하지 않는다. 아래 제약 조건은
 | `nodeTypes.<타입>`, `nodeTypes.<타입>.properties.<속성>`, `relationshipTypes.<관계>`, `claimRelationships.<관계>`, `claimPredicates.<predicate>` | `label` | 화면에 보일 이름. 없으면 화면이 키를 그대로 보인다 |
 | enum 속성 | `valueLabels` | 선택지 표시 이름. 키는 `values` 안에 있어야 한다 |
 | `reviewStatuses.<상태>`, `changeActions.<작업>` | `label`, `description` | Claim 검토 상태와 변경 이력 작업의 표시 이름. 키는 서버가 정한 값이다 |
-| `changeFields.<키>` | `label` | 변경 이력의 `changes` 에 나오는 키 가운데 온톨로지 속성이 아닌 것(`subjectId`, `objectId`, `documentIds`, `fromId`, `toId`, `reviewStatus`, `reviewedBy`, `reviewedAt`, `reviewNote`, `archived`, `email`, `displayName`, `role`, `enabled`)의 표시 이름. 속성인 키는 그 속성의 `label` 을 쓴다. 서버가 이 목록을 상수로 두고 테스트가 YAML 과 대조한다 |
+| `changeFields.<키>` | `label` | 변경 이력의 `changes` 에 나오는 키 가운데 온톨로지 속성이 아닌 것(`subjectId`, `objectId`, `documentIds`, `fromId`, `toId`, `reviewStatus`, `reviewedBy`, `reviewedAt`, `reviewNote`, `archived`, `email`, `displayName`, `role`, `enabled`, 온톨로지 이력의 `added`, `removed`, `changed`)의 표시 이름. 속성인 키는 그 속성의 `label` 을 쓴다. 서버가 이 목록을 상수로 두고 테스트가 YAML 과 대조한다 |
 | 속성 | `description` | 입력칸 바로 아래에 보이는 도움말. 개발 용어 없이 쓴다 |
 | `claimPredicates.<predicate>` | `sentence` | 주장 만들기 폼의 문장 틀. `{subject}` 와 `{object}` 자리에 고르기 칸이 들어간다. 조사는 `이(가)`, `은(는)`, `을(를)`, `와(과)` 로 적으면 화면이 고른 이름의 끝소리에 맞춰 하나로 바꾼다. 없으면 「{subject} {object} 관계 이름」 순서로 보인다 |
 
@@ -199,6 +267,8 @@ API 가 시작할 때, 웹 서버가 요청을 받기 전에 `IF NOT EXISTS` 로
 | `change_event_id_unique` | `(:ChangeEvent).id` 유일 | 이력 ID |
 | `change_event_target` | `(:ChangeEvent).targetId` 인덱스 | 대상별 이력 조회 |
 | `change_event_at` | `(:ChangeEvent).at` 인덱스 | 최근 이력 조회 |
+| `ontology_version_unique` | `(:OntologyVersion).version` 유일 | 온톨로지 버전 번호 |
+| `ontology_head_key_unique` | `(:OntologyHead).key` 유일 | 온톨로지 저장 잠금 노드가 하나만 생기게 한다 |
 | `seed_run_key_unique` | `(:SeedRun).key` 유일 | 초기 데이터 파일을 한 번만 적용한다. `:SeedRun` 은 `:Knowledge` 가 아니라 검색과 그래프에 나오지 않는다 |
 | `knowledge_search_text` | `(:Knowledge).searchText` TEXT 인덱스 | 검색어 `CONTAINS`. 첫 버전의 RANGE 인덱스가 있으면 시작할 때 지우고 TEXT 로 다시 만든다 |
 | `rel_<타입>_id` | 관계 타입마다 `()-[r:<타입>]-()` 의 `r.id` 인덱스 | 관계 보관, 복원, 조회. 타입은 온톨로지의 관계와 Claim 관계 전부다 |

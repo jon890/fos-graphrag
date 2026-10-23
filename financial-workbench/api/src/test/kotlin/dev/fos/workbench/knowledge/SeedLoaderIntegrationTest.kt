@@ -1,10 +1,11 @@
 package dev.fos.workbench.knowledge
 
 import dev.fos.workbench.config.WorkbenchProperties
-import dev.fos.workbench.ontology.Ontology
+import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.support.Fixtures
 import dev.fos.workbench.support.IntegrationTest
 import dev.fos.workbench.support.id
+import dev.fos.workbench.web.OntologyViolationException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -18,7 +19,7 @@ class SeedLoaderIntegrationTest : IntegrationTest() {
     @Autowired lateinit var seeds: SeedLoader
     @Autowired lateinit var nodes: NodeService
     @Autowired lateinit var relationships: RelationshipService
-    @Autowired lateinit var ontology: Ontology
+    @Autowired lateinit var holder: OntologyHolder
     @Autowired lateinit var transactionManager: PlatformTransactionManager
 
     @Test
@@ -93,6 +94,16 @@ class SeedLoaderIntegrationTest : IntegrationTest() {
     }
 
     @Test
+    fun `최신 버전에 없는 타입을 쓰는 파일은 적용하지 않고 기록도 남기지 않는다`() {
+        val key = "test-unknown-${UUID.randomUUID().toString().take(8)}"
+        val file = SeedFile(key = key, nodes = listOf(SeedNode("a", "NoSuchType", mapOf("name" to "x"))))
+
+        assertThrows<OntologyViolationException> { seeds.applyInTransaction(file) }
+
+        assertThat(count("MATCH (s:SeedRun {key: '$key'}) RETURN count(s) AS c")).isZero()
+    }
+
+    @Test
     fun `같은 이름이 이미 있으면 그 노드를 쓴다`() {
         val alice = loggedIn(ALICE)
         val suffix = Fixtures(alice).suffix
@@ -111,7 +122,7 @@ class SeedLoaderIntegrationTest : IntegrationTest() {
 
     @Test
     fun `seeds enabled 가 false 이면 아무것도 하지 않는다`() {
-        val disabled = SeedLoader(neo4j, nodes, relationships, ontology, WorkbenchProperties(seeds = WorkbenchProperties.Seeds(enabled = false)), transactionManager)
+        val disabled = SeedLoader(neo4j, nodes, relationships, holder, WorkbenchProperties(seeds = WorkbenchProperties.Seeds(enabled = false)), transactionManager)
 
         assertThat(disabled.run()).isZero()
     }

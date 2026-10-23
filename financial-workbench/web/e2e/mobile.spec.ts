@@ -138,3 +138,12 @@ test('휴대폰 폭에서 노드를 만들고 그래프에서 골라 상세를 �
   await expect(page.getByTestId('detail-label')).toHaveText(exact(company))
   await expect(page).toHaveURL(new RegExp('/workspace\\?node=' + companyId))
 })
+
+test('휴대폰 폭에서 온톨로지 폼 편집기가 가로 스크롤 없이 열린다', async ({ page }) => {
+  await loginAs(page, admin)
+  await page.getByTestId('tab-ontology').click()
+  await page.getByTestId('ontology-edit-form').click()
+  await expect(page.getByTestId('ontology-form')).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await shot(page, 'm-ontology-form')
+})

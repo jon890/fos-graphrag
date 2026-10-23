@@ -25,8 +25,9 @@ class RequestSizeFilter(private val mapper: JsonMapper) : OncePerRequestFilter()
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {
         val length = request.contentLengthLong
         val chunked = request.getHeader("Transfer-Encoding")?.contains("chunked", ignoreCase = true) == true
+        val max = if (request.method == "POST" && request.requestURI.startsWith("/api/ontology/")) Limits.MAX_ONTOLOGY_BODY_BYTES else Limits.MAX_BODY_BYTES
         when {
-            length > Limits.MAX_BODY_BYTES -> reject(response, 413, ApiError("PAYLOAD_TOO_LARGE", "요청 본문이 ${Limits.MAX_BODY_BYTES / 1024}KiB 를 넘습니다."))
+            length > max -> reject(response, 413, ApiError("PAYLOAD_TOO_LARGE", "요청 본문이 ${max / 1024}KiB 를 넘습니다."))
             length < 0 && chunked -> reject(response, 411, ApiError("LENGTH_REQUIRED", "요청 본문에 Content-Length 가 필요합니다."))
             else -> chain.doFilter(request, response)
         }

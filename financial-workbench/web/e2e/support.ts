@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test'
+import { expect, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
 
 // 브라우저 테스트 파일들이 함께 쓰는 사용자와 로그인, 스크린샷 도우미다.
 
@@ -20,6 +20,12 @@ export const screenshotDir = process.env.E2E_SCREENSHOT_DIR ?? 'test-results/scr
 
 export async function shot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: path.join(screenshotDir, `${name}.png`), fullPage: true })
+}
+
+/** 스크롤 영역 안의 한 요소만 찍는다. 전체 화면 스크린샷이 스크롤 아래쪽만 담는 화면에 쓴다. */
+export async function shotElement(locator: Locator, name: string): Promise<void> {
+  await locator.scrollIntoViewIfNeeded()
+  await locator.screenshot({ path: path.join(screenshotDir, `${name}.png`) })
 }
 
 export function escapeRegExp(text: string): string {

@@ -18,6 +18,7 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `current-user-role` | 역할 배지. `data-role` 이 VIEWER, EDITOR, ADMIN |
 | `logout-button` | 로그아웃 |
 | `ontology-error` | 온톨로지를 받지 못했을 때 |
+| `ontology-stale`, `ontology-reload` | 다른 곳에서 온톨로지 버전이 바뀌었다는 안내와 「다시 읽기」 단추. 응답 헤더의 버전이 들고 있는 버전보다 클 때만 나온다 |
 
 ## 작업 공간: 좁은 화면
 
@@ -94,12 +95,14 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 | `node-restore-button` | 복원 버튼(보관된 노드) |
 | `node-meta`, `node-revision`, `node-updated-by` | 메타 정보 |
 | `node-edit-form`, `node-save`, `node-edit-local-message` | 속성 수정 폼(Claim 이 아닌 노드) |
+| `node-undefined-type` | 온톨로지에서 빠진 타입의 노드일 때 폼 대신 나오는 안내. 속성은 읽기 전용으로 보이고 주장 추가 단추는 없다 |
 | `edit-conflict`, `edit-conflict-field` *(`data-field`, `data-kind` 가 `theirs`, `mine`, `both`)*, `edit-conflict-choice-<속성>-mine`, `edit-conflict-choice-<속성>-latest`, `edit-conflict-apply`, `edit-conflict-discard` | 409 뒤 내 입력과 최신 값의 칸별 비교. 다시 읽은 뒤 되살릴 입력이 있을 때만 나온다 |
 | `edit-prop-<속성>` | 수정 폼의 속성 입력. 예: `edit-prop-description` |
 | `edit-prop-<속성>-unlisted` | 저장된 값이 목록 밖일 때만 나오는 선택지 |
 | `relationship-section` | 관계 영역 |
 | `relationship-row` * | 관계 한 줄. `data-rel-type` |
-| `relationship-archive-toggle` * | 관계 보관 또는 복원 |
+| `relationship-archive-toggle` * | 관계 보관 또는 복원. 정의에서 빠진 관계 종류에는 없다 |
+| `relationship-undefined` * | 「정의에서 빠진 관계」 배지. 온톨로지에 없는 관계 종류의 행에만 나온다 |
 | `relationship-add-toggle`, `relationship-add-form` | 「관계 추가」 |
 | `relationship-type-select` | 값은 `<타입>:out`(이 노드가 시작점) 또는 `<타입>:in`(이 노드가 끝점). 예: Security 에서는 `ISSUES:in` |
 | `relationship-target-picker-*` | 대상 노드 고르기(아래 「노드 고르기」) |
@@ -194,9 +197,37 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 
 | testid | 요소 |
 | --- | --- |
-| `ontology-tab`, `ontology-version` | 탭, schemaVersion |
+| `ontology-tab`, `ontology-version` | 탭, 버전 번호(「버전 N」) |
 | `ontology-node-type` * | 노드 타입 한 개. `data-type` |
 | `ontology-relationships`, `ontology-predicates` | 관계 타입 표, Claim predicate 표 |
+| `ontology-message` | 저장이나 되돌리기 결과. `data-kind` 가 `success` |
+
+ADMIN 에게만 나오는 요소다.
+
+| testid | 요소 |
+| --- | --- |
+| `ontology-edit-form`, `ontology-edit-yaml`, `ontology-history-open` | 「폼으로 편집」, 「YAML 로 편집」, 「버전 기록」 |
+| `ontology-export` | 「YAML 내려받기」 링크 |
+| `ontology-yaml-editor`, `ontology-yaml-help`, `ontology-yaml-input`, `ontology-yaml-error` | YAML 편집기, 접힌 도움말, YAML 입력칸, 초안을 읽지 못한 오류 |
+| `ontology-preview`, `ontology-preview-failed`, `ontology-draft-discard` | 「저장 전에 확인」, 미리보기 요청 오류, 「초안 버리기」. 폼과 YAML 편집기가 같은 id 를 쓴다 |
+| `ontology-yaml-to-form`, `ontology-yaml-back-to-form` | YAML 편집기의 「폼으로 보기」, 폼 초안을 YAML 로 옮기지 못했을 때의 「폼으로 돌아가기」 |
+| `ontology-form`, `ontology-form-convert-error`, `ontology-form-back-to-yaml` | 폼 편집기, YAML 을 폼으로 옮기지 못한 오류, 「YAML 로 돌아가기」 |
+| `ontology-form-type` *(`data-type`)*, `ontology-form-type-label` | 노드 타입 카드, 그 표시 이름 입력칸 |
+| `ontology-form-prop` *(`data-prop`)*, `ontology-form-required`, `ontology-form-enum-value` *(`data-value`)* | 속성 한 줄, 필수 확인란, enum 값 한 줄 |
+| `ontology-form-rel` *(`data-rel`)*, `ontology-form-predicate` *(`data-predicate`)* | 관계 종류 행, 주장 종류 행 |
+| `ontology-form-remove`, `ontology-form-restore` | 「빼기」, 「되살리기」(뺄 예정인 행에만 나온다) |
+| `ontology-form-type-add`, `ontology-form-prop-add`, `ontology-form-rel-add`, `ontology-form-predicate-add` | 「노드 타입 더하기」, 「속성 더하기」(타입 카드 안), 「관계 종류 더하기」, 「주장 종류 더하기」 |
+| `ontology-form-new` | 더하기 입력 영역. 안에 `ontology-form-new-key`, `-new-type`(속성 값 타입), `-new-label`, `-new-values`(enum 값), `-new-sentence`(문장 틀), `-new-submit`(「더하기」) |
+| `ontology-form-error`, `ontology-form-emptied` | 키나 문장 틀 오류, 「이 종류도 함께 빼야 합니다」 |
+| `ontology-form-to-yaml` | 폼의 「YAML 로 보기」 |
+| `ontology-preview-panel` | 미리보기 결과 |
+| `ontology-preview-error` * | 틀린 YAML 이나 저장 거절의 오류 한 줄 |
+| `ontology-diff-added`, `ontology-diff-removed`, `ontology-diff-changed`, `ontology-diff-empty` | 더함, 뺌, 바뀜 경로 목록과 「바뀐 점이 없습니다」 |
+| `ontology-impact` * | 영향 한 줄. `data-kind` 가 영향 종류 |
+| `ontology-save-note`, `ontology-save-confirm`, `ontology-save`, `ontology-save-error` | 메모, 영향 확인란, 「저장」, 그 밖의 저장 오류 |
+| `ontology-conflict`, `ontology-conflict-restart`, `ontology-conflict-rebase` | 다른 관리자가 먼저 저장했다는 안내와 두 단추 |
+| `ontology-history`, `ontology-history-row` *(`data-version`)*, `ontology-history-pager-prev`, `ontology-history-pager-next`, `ontology-history-pager-info` | 버전 기록과 행, 쪽 넘기기 |
+| `ontology-history-detail`, `ontology-history-yaml`, `ontology-history-download`, `ontology-restore` | 연 버전, 읽기 전용 YAML, 「이 버전 내려받기」, 「이 버전으로 되돌리기」(최신 버전에는 없다) |
 
 ## 사용자 탭 (ADMIN)
 
