@@ -255,7 +255,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   test('0e) 첫 화면 안내와 만들기 폼이 한국어 표시 이름으로 보인다', async () => {
     await openScreen(pageAdmin, 'map')
     await expect(pageAdmin.getByTestId('map-intro')).toBeVisible()
-    await expect(pageAdmin.getByTestId('map-intro')).toContainText('투자 지식 지도')
+    await expect(pageAdmin.getByTestId('map-intro')).toContainText('투자 온톨로지')
     await expect(pageAdmin.getByTestId('map-intro')).toContainText('상자를 누르면 그 종류의 항목을 보고 바로 추가할 수 있습니다.')
     await shot(pageAdmin, '00e-first-screen')
 

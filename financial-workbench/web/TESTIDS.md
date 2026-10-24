@@ -75,7 +75,7 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | testid | 요소 |
 | --- | --- |
 | `concept-map` | 개념 지도 화면 전체 |
-| `map-intro` | 지도 위 소개(「투자 지식 지도」) |
+| `map-intro` | 지도 위 소개(「투자 온톨로지」) |
 | `map-counts-error` | 항목 수(`GET /api/nodes/counts`)를 받지 못했을 때의 안내와 이유 |
 | `map-empty` | 모든 타입의 항목 수가 0 일 때의 안내 |
 | `concept-map-canvas` | Cytoscape 컨테이너. `data-node-count` 는 그린 타입 노드 수, `data-layout-done` 은 배치가 끝나면 `"true"` |

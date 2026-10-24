@@ -25,7 +25,7 @@ export const BROWSE_STEPS: GuideStep[] = [
     pane: null,
     route: 'workspace',
     title: '워크벤치 둘러보기',
-    body: '투자 지식을 근거와 함께 쌓는 곳입니다. 화면을 차례로 둘러봅니다.',
+    body: '투자 판단을 근거와 함께 쌓는 온톨로지입니다. 화면을 차례로 둘러봅니다.',
   },
   {
     id: 'map',
@@ -95,7 +95,7 @@ export function practiceSteps(labels: GuideLabels, plan: PracticePlan): GuideSte
       pane: null,
       route: 'workspace',
       title: '워크벤치 따라하기',
-      body: '투자 지식을 근거와 함께 쌓는 곳입니다. 연습 항목 세 개를 직접 만들어 봅니다. 끝나면 연습 항목은 보관되어 검색에 나오지 않습니다.',
+      body: '투자 판단을 근거와 함께 쌓는 온톨로지입니다. 연습 항목 세 개를 직접 만들어 봅니다. 끝나면 연습 항목은 보관되어 검색에 나오지 않습니다.',
     },
     // 기업과 근거 문서는 어느 화면에서나 「＋ 추가」 로 만든다. 창이 열려 있으면 창의 만들기 단추를 가리킨다.
     {

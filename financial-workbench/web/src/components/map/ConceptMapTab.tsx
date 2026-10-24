@@ -193,9 +193,9 @@ export function ConceptMapTab({ onOpenNode }: { onOpenNode: (id: string) => void
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
         <div className="min-w-0">
           <section className="mb-3" data-testid="map-intro">
-            <h2 className="text-lg font-bold">투자 지식 지도</h2>
+            <h2 className="text-lg font-bold">투자 온톨로지</h2>
             <p className="text-sm text-muted-foreground">
-              투자 지식을 근거와 함께 쌓는 곳입니다. 상자를 누르면 그 종류의 항목을 보고 바로 추가할 수 있습니다.
+              투자 판단을 근거와 함께 쌓는 온톨로지입니다. 상자를 누르면 그 종류의 항목을 보고 바로 추가할 수 있습니다.
             </p>
           </section>
           {countsError && (
