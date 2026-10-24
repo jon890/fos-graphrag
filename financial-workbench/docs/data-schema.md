@@ -96,6 +96,8 @@ Neo4j 는 온톨로지 규칙을 집행하지 않는다. 아래 제약 조건은
 | `reviewStatuses.<상태>`, `changeActions.<작업>` | `label`, `description` | Claim 검토 상태와 변경 이력 작업의 표시 이름. 키는 서버가 정한 값이다 |
 | `changeFields.<키>` | `label` | 변경 이력의 `changes` 에 나오는 키 가운데 온톨로지 속성이 아닌 것(`subjectId`, `objectId`, `documentIds`, `fromId`, `toId`, `reviewStatus`, `reviewedBy`, `reviewedAt`, `reviewNote`, `archived`, `email`, `displayName`, `role`, `enabled`, 온톨로지 이력의 `added`, `removed`, `changed`)의 표시 이름. 속성인 키는 그 속성의 `label` 을 쓴다. 서버가 이 목록을 상수로 두고 테스트가 YAML 과 대조한다 |
 | 속성 | `description` | 입력칸 바로 아래에 보이는 도움말. 개발 용어 없이 쓴다 |
+| `nodeTypes.<타입>` | `description` | 타입 설명. 첫 문장은 「＋ 추가」 메뉴의 짧은 설명으로 쓰이므로 그 문장만 읽어도 무엇인지 알게 쓴다 |
+| `relationshipTypes.<관계>` | `label` | 관계 문장의 동사로도 쓴다. 끝 타입을 목적어로 받는 동사구(「만든다」, 「겪는다」, 「이롭게 한다」)로 쓴다. 화면은 「{끝}을(를) 만듭니다」, 「{시작}이(가) 만듭니다」 처럼 읽는다. 규칙은 [흐름](flow.md) 의 「관계 문장」 이다 |
 | `claimPredicates.<predicate>` | `sentence` | 주장 만들기 폼의 문장 틀. `{subject}` 와 `{object}` 자리에 고르기 칸이 들어간다. 조사는 `이(가)`, `은(는)`, `을(를)`, `와(과)` 로 적으면 화면이 고른 이름의 끝소리에 맞춰 하나로 바꾼다. 없으면 「{subject} {object} 관계 이름」 순서로 보인다 |
 
 - Claim 의 `predicate` 선택지 이름은 `claimPredicates.<predicate>.label` 에서 온다. 로더가 응답의 `valueLabels` 에 채워 주므로 따로 적지 않는다.
@@ -203,7 +205,7 @@ Claim 의 `validFrom`, `validTo` 가 비어 있으면 관계의 유효 기간을
 `extractionConfidence` 는 AI 추출의 확신도다. 투자 성공 확률과 다르고 첫 버전에서는 AI 추출을 하지 않아 비어 있다.
 자료 공개 시점은 Document 의 `publishedAt`, 수집 시점은 `collectedAt` 이다.
 Document 의 `documentType` 에 책(`BOOK`), 서한(`LETTER`), 강연과 인터뷰(`SPEECH`)가 있다. 책과 서한은 출판사나 원문 페이지 주소를 `url` 에 넣는다.
-Change, Bottleneck, Valuation, Scenario, Decision 은 투자 논리 사슬의 타입이다. 뜻과 선택지는 아래 「투자 논리 사슬」 이 소유한다.
+Change, Bottleneck, Valuation, Scenario, Decision 은 투자 온톨로지의 타입이다. 뜻과 선택지는 아래 「투자 온톨로지」 가 소유한다.
 Person 은 투자자, 경영자, 학자 같은 인물이다. `role` 은 목록에서 고르고 `birthYear`, `deathYear` 는 정수다. Concept 는 안전마진, 경제적 해자 같은 투자 개념과 원칙이다. `summary` 는 한 줄 정의(300자 이하), `category` 는 목록에서 고른다.
 
 ## 관계
@@ -233,10 +235,10 @@ Claim 노드 하나와 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 관계로 저장한�
 주장 종류는 `BELONGS_TO_SECTOR`(기업이나 종목이 산업에 속한다), `ADVOCATES`, `CRITICIZES` 셋이다. 기업 사이의 관계(공급, 경쟁, 노출)는 담지 않는다([ADR-009](adr/009-investment-logic-chain.md)).
 거장의 생각도 같은 방식이다. 「버핏 → 안전마진 강조한다」 처럼 인물(주체)과 개념(대상)을 잇는 Claim(`ADVOCATES`, `CRITICIZES`)을 만들고, 짧은 인용은 `evidenceText`, 출처인 책이나 서한은 근거 문서다. 저작과 저자는 `AUTHORED` 로 잇는다. `RELATED_TO` 는 개념 사이의 식별 관계라 근거가 필요 없다.
 
-### 투자 논리 사슬
+### 투자 온톨로지
 
-내 투자 논리는 아래 사슬로 남긴다. 결정 하나에서 밸류에이션, 기업, 병목, 변화까지 거슬러 갈 수 있게 하는 것이 목적이다([ADR-009](adr/009-investment-logic-chain.md)).
-사슬의 관계는 일반 관계다. 근거 검토와 근거 문장이 없고, 근거 자료는 `EVIDENCED_BY` 로 붙인다.
+내 투자 논리는 세상의 변화에서 투자 결정까지 아래처럼 이어진 노드로 남긴다. 결정 하나에서 밸류에이션, 기업, 병목, 변화까지 거슬러 갈 수 있게 하는 것이 목적이다([ADR-009](adr/009-investment-logic-chain.md)).
+이 노드를 잇는 관계는 일반 관계다. 근거 검토와 근거 문장이 없고, 근거 자료는 `EVIDENCED_BY` 로 붙인다.
 
 ```text
 Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
@@ -261,7 +263,7 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 - `asOf`, `decidedAt`, `since`, `expectedResolution` 이 비어 있으면 모른다는 뜻이다. 미상을 특정 날짜로 바꾸지 않는다.
 - 범위로 받은 가치는 중간값을 `valuePerShare` 에 넣고 범위는 `description` 에 적는다.
 - 하방률, 상방률 같은 계산값은 아직 저장하지도 보이지도 않는다.
-- 사슬의 노드도 다른 노드처럼 로그인한 모든 사용자가 본다. 개인 기록의 열람 제한은 아직 없다.
+- 이 노드도 다른 노드처럼 로그인한 모든 사용자가 본다. 개인 기록의 열람 제한은 아직 없다.
 
 ### 초기 데이터
 
@@ -273,7 +275,7 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 - 파일을 읽지 못하면(문법 오류, 알 수 없는 키) 그 파일만 건너뛰고 파일 이름으로 `warn` 로그를 남긴다. 같은 `key` 가 여러 파일에 있으면 파일 이름 순서로 처음 것만 적용하고 나머지는 `warn` 로그로 남긴다.
 - 한 파일은 트랜잭션 하나로 적용한다. 실패하면 그 파일 전체가 롤백되고 `SeedRun` 도 남지 않아 다음 시작 때 다시 시도한다. 실패해도 API 는 시작한다. 초기 데이터는 없어도 쓸 수 있기 때문이다.
 - 끄려면 `workbench.seeds.enabled=false` 다. 기본은 켜짐이다.
-- 지금 파일은 `investment-logic-2026-10` 하나다. 친구가 Obsidian 에 정리한 투자 기록에서 옮긴 사슬이다. 메모리(HBM, 범용 DRAM), 데이터센터 전력과 에너지 저장, 칩 사이 광 연결의 변화와 병목, 그 산업과 기업과 종목, 공개 근거 자료, FLNC 의 밸류에이션 둘과 시나리오, 세 종목(SK하이닉스, FLNC, POET)의 결정 넷을 담는다. 원문과 대조하지 못한 값은 노드의 `description` 이나 `reason` 에 「원문 대조 대기」 라고 적었다. 친구의 실제 매매 날짜와 밸류에이션이 들어 있고 이 저장소는 공개다(사용자 결정 2026-10-24).
+- 지금 파일은 `investment-logic-2026-10` 하나다. 친구가 Obsidian 에 정리한 투자 기록에서 옮긴 투자 온톨로지 항목이다. 메모리(HBM, 범용 DRAM), 데이터센터 전력과 에너지 저장, 칩 사이 광 연결의 변화와 병목, 그 산업과 기업과 종목, 공개 근거 자료, FLNC 의 밸류에이션 둘과 시나리오, 세 종목(SK하이닉스, FLNC, POET)의 결정 넷을 담는다. 원문과 대조하지 못한 값은 노드의 `description` 이나 `reason` 에 「원문 대조 대기」 라고 적었다. 친구의 실제 매매 날짜와 밸류에이션이 들어 있고 이 저장소는 공개다(사용자 결정 2026-10-24).
 - 시드는 주장(Claim)을 만들지 못한다. 기업이나 종목의 산업 소속 주장은 사람이 근거를 붙여 만든다.
 
 ## 사용자

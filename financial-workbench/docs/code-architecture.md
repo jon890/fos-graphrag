@@ -148,10 +148,13 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | --- | --- |
 | `web/src/api/` | fetch 래퍼, CSRF 처리, 계약 타입 |
 | `web/src/components/` | 화면 조각. 그래프, 상세 패널, 표, 폼. `ErrorBoundary` 가 탭 단위로 렌더링 오류를 붙잡아 머리글과 탭을 지키고, 앱 최상위(`main.tsx`)에도 하나 있다 |
-| `web/src/lib/` | 그래프 병합과 주장 접기(`graph.ts` 의 `collapseClaims`), 입력값 변환(`formValues.ts`), 충돌 때 세 값 비교(`conflict.ts`), 표시 이름과 구분 정보 조회, 문장 틀 채우기(`labels.ts`)처럼 화면과 무관한 함수와 단위 테스트. 첫 접속 가이드의 단계 정의와 진행 상태 저장, 자동 시작 판정(`guide.ts`), `utils.ts` 의 `cn` 은 Tailwind class 를 합친다. shadcn 부품도 이것을 import 한다. registry 가 내려주는 `import { cn } from "cn"` 은 `@/lib/utils` 로 바꾸고 `cn` 패키지는 들이지 않는다 |
-| `web/src/components/ui/` | shadcn 으로 복사한 화면 부품(Button, Input, Textarea, NativeSelect, Tabs, Card, Badge, Table, Alert, Label). 저장소가 소스를 소유한다. 고칠 때는 이 폴더를 직접 고친다 |
+| `web/src/lib/` | 타입 순서(`typeOrder.ts`: 관계 방향의 깊이로 정한 순서와 깊이, 뿌리), 관계 문장(`relationSentence.ts`: 합니다체 바꾸기와 방향별 문장), 그래프 병합과 주장 접기(`graph.ts` 의 `collapseClaims`), 입력값 변환(`formValues.ts`), 충돌 때 세 값 비교(`conflict.ts`), 표시 이름과 구분 정보 조회, 문장 틀 채우기(`labels.ts`)처럼 화면과 무관한 함수와 단위 테스트. 첫 접속 가이드의 단계 정의와 진행 상태 저장, 자동 시작 판정(`guide.ts`), `utils.ts` 의 `cn` 은 Tailwind class 를 합친다. shadcn 부품도 이것을 import 한다. registry 가 내려주는 `import { cn } from "cn"` 은 `@/lib/utils` 로 바꾸고 `cn` 패키지는 들이지 않는다 |
+| `web/src/components/ui/` | shadcn 으로 복사한 화면 부품(Button, Input, Textarea, NativeSelect, Tabs, Card, Badge, Table, Alert, Label, Dialog, DropdownMenu). 저장소가 소스를 소유한다. 고칠 때는 이 폴더를 직접 고친다 |
 | `web/components.json` | shadcn CLI 설정. 부품을 더할 때 CLI 가 읽는다 |
 | `web/src/hooks/` | 화면 상태 훅. `useMediaQuery` 가 배치 경계를 판정한다 |
+| `web/src/components/header/` | 머리글. 상단 탭 셋(`TopTabs`), 「더보기」 메뉴(`MoreMenu`, 역할별 항목은 `routes.ts` 의 `moreItems`) |
+| `web/src/components/map/` | 개념 지도(`ConceptMapTab`: 지도 그림과 타입 목록, `TypePanel`: 고른 타입의 설명, 최근 항목, 관계 문장, 단추). 개수는 `GET /api/nodes/counts` 로 받는다 |
+| `web/src/components/add/` | 「＋ 추가」. `AddProvider` 가 만들기 창의 열림과 고른 타입을 들고 `useAdd().open(type?)` 를 내준다. `AddMenu` 는 타입 메뉴(머리글과 그래프의 ＋ 단추가 같은 것을 쓴다), `AddDialog` 는 창과 단계 표시이고 안에서 `NodeCreateForm` 이나 `ClaimCreateForm` 을 그린다. 만든 뒤에는 `App` 이 넘긴 콜백으로 작업 공간의 새 항목을 연다 |
 | `web/src/components/ontology/` | 온톨로지 탭의 보기, 폼 편집기, YAML 편집기, 미리보기, 버전 기록. 초안은 `App` 이 들고 있어 탭을 옮겨도 남는다. YAML 은 서버의 미리보기 응답으로 바꾸고 웹에 YAML 라이브러리를 들이지 않는다. `form/` 은 폼 편집기의 부품(공용 입력, 노드 타입, 관계 종류, 주장 종류 구역)이다 |
 | `web/src/components/guide/` | 첫 접속 가이드. 단계 정의, 진행 상태(`localStorage` 의 `workbench.guide`), 말풍선. 만들기 폼과 주장 폼은 가이드가 넘긴 미리 채울 값을 props 로 받고, 만들기에 성공하면 가이드에 알린다 |
 | `web/src/routes.ts` | 화면 경로 목록과 query 를 읽고 쓰는 순수 함수(기본값 생략, 옛 `/?node=` 넘기기, 로그인 뒤 돌아갈 주소 검사). 경로와 query 의 뜻은 [흐름](flow.md) 의 「주소와 뒤로가기」 가 소유한다 |
@@ -161,6 +164,10 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 화면 부품은 shadcn 으로 만든다. 소스를 복사해 저장소가 소유하므로 버전 올림에 끌려가지 않고, 접근성(키보드, 포커스)은 Radix 가 맡는다.
 선택 칸은 HTML 기본 `<select>` 를 감싼 `NativeSelect` 를 쓴다. 휴대폰에서 시스템 선택기가 뜨고, Radix Select 가 여는 스크롤 잠금이 없어 CSP 와 부딪히지 않는다.
 경로 별칭 `@/` 는 `web/src/` 를 가리킨다. `tsconfig.json`, `tsconfig.app.json`, `vite.config.ts` 에 함께 둔다. shadcn CLI 는 루트 `tsconfig.json` 의 별칭을 읽어 부품을 놓을 폴더를 정한다. TypeScript 6 에서 `baseUrl` 은 폐기 경고로 빌드를 멈추므로 `paths` 만 쓴다.
+
+`App` 은 화면을 경로로 고른다. `/map` 은 `ConceptMapTab`, `/workspace` 는 `Workspace` 다. `AddProvider` 와 첫 접속 가이드(`GuideProvider`)는 탭 단위 `ErrorBoundary` 바깥에 있어 화면을 옮겨도 남는다. 만들기 성공 안내(`flash`)는 `App` 이 들고 `Workspace` 에 넘긴다. 만든 곳이 작업 공간 밖일 수 있기 때문이다.
+창(Dialog)과 메뉴(DropdownMenu)는 shadcn 부품으로 만든다. 메뉴는 `modal={false}` 로 연다. 모달 메뉴가 여는 스크롤 잠금은 실행 중에 `<style>` 을 넣어 CSP 에 막히기 때문이다. 만들기 창은 모달이고, 같은 이유로 뒤 화면 스크롤은 막히지 않는다.
+작업 공간 상세(`DetailPanel`)는 읽기 카드(`NodeReadCard`)가 기본이고 편집 여부를 상태로 들고 있다. 동시 수정 비교용 입력(`EditDraft`)도 지금처럼 `DetailPanel` 이 들고 있어 편집 폼이 다시 그려져도 남는다.
 
 배치는 폭 1024px 를 경계로 두 가지다. 이상이면 `Workspace` 가 세 칸(왼쪽 260px, 그래프, 오른쪽 380px)으로 놓고, 미만이면 `Workspace` 가 `Tabs` 로 검색, 그래프, 상세를 나눈다.
 탭 배치에서도 세 칸을 모두 그려 두고 고르지 않은 칸만 숨긴다(`Tabs` 의 `forceMount` 와 `hidden`). 상세에서 쓰던 입력이 탭을 옮겨도 남아야 하기 때문이다.
@@ -195,10 +202,14 @@ mock 으로 Neo4j 를 대신한 테스트는 없다. 트랜잭션 일관성 테�
 | [006](adr/006-google-oidc-allowlist-roles.md) | Google OpenID Connect 로 로그인하고 허용 사용자와 역할로 권한을 나눈다. ADR 004 의 비밀번호 로그인을 대체한다 |
 | [007](adr/007-routes-in-url.md) | 화면 상태를 경로와 query 로 주소에 두고 React Router 로 다룬다. 서버는 화면 경로를 `index.html` 로 돌려준다 |
 | [008](adr/008-ontology-versions-in-db.md) | 온톨로지를 DB 에 버전으로 쌓고 ADMIN 이 웹에서 편집한다. 서버 코드와 맞물린 부분은 저장소 YAML 이 소유한다 |
-| [009](adr/009-investment-logic-chain.md) | 온톨로지를 투자 논리 사슬(변화, 병목, 산업, 기업, 밸류에이션, 결정) 중심으로 바꾸고 기업 사이의 관계를 뺀다 |
+| [009](adr/009-investment-logic-chain.md) | 온톨로지를 변화, 병목, 산업, 기업, 밸류에이션, 결정을 잇는 투자 온톨로지로 바꾸고 기업 사이의 관계를 뺀다 |
+| [010](adr/010-concept-map-first-screen.md) | 첫 화면을 개념 지도로 두고, 상단 탭 셋과 더보기 메뉴, 읽기 우선 상세, 전역 「＋ 추가」 로 화면 구조를 바꾼다 |
 
 ADR 로 남기지 않은 작은 결정은 다음과 같다.
 
+- 개념 지도와 작업 공간 그래프는 Cytoscape.js 내장 `breadthfirst` 배치(directed)를 쓴다(2026-10-24). 관계 방향대로 위에서 아래로 놓여 변화에서 결정까지 읽힌다. dagre 같은 계층 배치 확장은 새 의존이라 넣지 않았다.
+- 타입 순서는 온톨로지 필드가 아니라 관계 방향으로 계산한다([ADR-010](adr/010-concept-map-first-screen.md)). 깊이는 뿌리에서의 너비 우선 거리라 개념 지도의 `breadthfirst` 층과 같다.
+- 개념 지도의 최근 항목은 검색 API 에 `sort=recent` 를 더해 받는다(2026-10-24). 화면이 여러 쪽을 받아 정렬하는 안은 항목이 늘면 요청이 커져 버렸다.
 - 첫 접속 가이드는 라이브러리 없이 만든다(2026-10-23). 말풍선 라이브러리는 실행 중에 `<style>` 을 넣는 것이 많아 `style-src 'self'` 와 부딪히고, 가이드가 만들기 폼을 미리 채우고 만들기 성공을 받아야 해서 단계마다 화면 코드와 맞물린다. 말풍선 위치는 대상 요소의 `getBoundingClientRect` 로 계산해 React 의 `style` 속성(CSSOM)으로 둔다. 끝낸 기록은 서버의 `:User.guideDoneAt` 이다(사용자 결정 2026-10-23). 기기를 바꿔도 다시 열리지 않게 하려는 것이다.
 - 브라우저 테스트는 `prod` 를 켜지 않고 `e2e` 프로필(= `container` + `mockoidc`)로 돈다. `prod` 와 `mockoidc` 를 함께 켜면 시작을 막는다.
   e2e 스택은 운영 Compose 위에 override 만 겹치므로 이미지, 보안 헤더, cap_drop, 메모리 상한, 포트 규칙이 운영과 같다. Secure 쿠키와 forward headers 만 끈다.
