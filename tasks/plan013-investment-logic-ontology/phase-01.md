@@ -94,8 +94,11 @@
 
 ### 3. 타입 수와 목록을 고정한 API 테스트를 고친다
 
+- `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyValidatorTest.kt:70` 의 `schemaVersion` 단언을 `2.0.0` 으로 바꾼다.
 - `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyValidatorTest.kt:71` 의 `containsExactlyInAnyOrder(...)` 에 새 타입 다섯을 더한다.
 - `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyLabelsTest.kt:141` 의 `hasSize(7)` 을 `hasSize(12)` 로 바꾼다. 같은 파일에 새 타입의 enum 이 모두 `valueLabels` 를 갖는지 확인하는 테스트가 이미 있으면 그대로 통과하는지 본다.
+
+- 같은 파일에서 새 관계 여덟의 `from`, `to`, `createPicker.label` 이 작업 항목 2의 표와 같은지 단언한다. `HAS_BOTTLENECK` 과 `EVIDENCED_BY` 도 포함한다.
 
 ### 4. 사슬 관계를 확인하는 API 테스트를 더한다
 

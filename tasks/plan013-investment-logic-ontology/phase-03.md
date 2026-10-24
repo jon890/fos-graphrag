@@ -215,6 +215,7 @@ relationships:
 
 - 「시작할 때 초기 데이터가 들어가고 이력은 system 이다」: 워런 버핏 대신 `GET /api/nodes?q=FLNC&types=Security` 로 `Fluence Energy Class A` 를 찾고, 첫 이력이 `CREATE` 이며 작업자가 사용자로 보이지 않는지 본다. `SeedRun` key 를 `investment-logic-2026-10` 으로. `RELATED_TO` 단언은 `GET /api/nodes/{FLNC 첫 매수 id}` 의 `relationships` 에 `HAS_DECISION` 이 있고 그 시작이 `Fluence Energy Class A` 인지로 바꾼다. Decision 은 `GET /api/nodes?q=FLNC 첫 매수&types=Decision` 으로 찾는다.
 - 「다시 돌려도 새로 만들지 않는다」: `Person {name: '워런 버핏'}` 대신 `Company {name: 'Fluence Energy'}` 가 1개, `SeedRun {key: 'investment-logic-2026-10'}` 이 1개인지 본다.
+- 「이미 있는 관계를 다시 적은 파일도 적용된다」 는 새 시드의 `Fluence Energy` 와 `FLNC 간이 DCF (Valley AI 화면)` 노드와 그 사이 `HAS_VALUATION` 관계를 다시 적는 파일로 옮긴다. 적용 전후 같은 끝의 관계가 1개이고 새 `SeedRun` 이 남는지 단언해 기존 관계를 다시 만들지 않는 동작을 유지한다.
 - 새 테스트 「초기 데이터의 사슬이 모두 들어간다」: Cypher 로 `investment-logic-2026-10` 의 노드 수를 타입별로 세지 않는다(시드가 바뀌면 같이 낡는다). 대신 `(:Decision {title: 'FLNC 첫 매수'})<-[:HAS_DECISION]-(:Security)<-[:ISSUES]-(:Company)<-[:BENEFITS]-(:Bottleneck)<-[:CREATES]-(:Change)` 경로가 1개 있는지, 그리고 `(:Company {name: 'Fluence Energy'})-[:HAS_VALUATION]->(:Valuation)-[:HAS_SCENARIO]->(:Scenario)` 의 `kind` 가 `BEAR`, `BASE`, `BULL` 을 모두 담는지 본다. 이 테스트가 실패하면 시드 파일이 롤백된 것이다(로그에 `warn`).
 - 실패 경로는 기존 「이미 있는 관계를 다시 적은 파일도 적용된다」 아래의 `SeedFile` 직접 생성 방식을 따라, 정의에 없는 타입을 쓴 파일이 `SeedRun` 을 남기지 않는지 확인하는 테스트가 이미 있으면 그대로 두고, 없으면 하나 더한다.
 
