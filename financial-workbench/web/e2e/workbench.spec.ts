@@ -155,15 +155,25 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   })
 
   test('0c) 변경 이력 탭을 필터 없이 열어도 작성자가 없는 이력(첫 관리자 생성)이 「시스템」 으로 보이고 화면이 유지된다', async () => {
+    const waitForChangesPage = (page: number) =>
+      pageAdmin.waitForResponse((response) => {
+        const url = new URL(response.url())
+        return response.request().method() === 'GET' && url.pathname === '/api/changes' && url.searchParams.get('page') === String(page) && url.searchParams.get('size') === '20'
+      })
+    const initialPage = waitForChangesPage(0)
     await pageAdmin.getByTestId('tab-changes').click()
+    await initialPage
     await expect(pageAdmin.getByTestId('changes-table')).toBeVisible()
     // 첫 관리자를 만든 이력은 가장 오래돼서 뒤쪽 쪽에 있을 수 있다.
     const systemRow = pageAdmin.getByTestId('change-row').filter({ hasText: '시작 설정으로 만든 첫 관리자' })
     for (let i = 0; i < 50 && (await systemRow.count()) === 0; i += 1) {
       const next = pageAdmin.getByTestId('changes-pager-next')
       if (await next.isDisabled()) break
+      const nextPage = i + 1
+      const pageLoaded = waitForChangesPage(nextPage)
       await next.click()
-      await pageAdmin.waitForTimeout(300)
+      await pageLoaded
+      await expect(pageAdmin.getByTestId('changes-pager-info')).toContainText(`${nextPage + 1} /`)
     }
     await expect(systemRow).toHaveCount(1)
     await expect(systemRow).toContainText('시스템')
