@@ -161,6 +161,7 @@ cd financial-workbench/web && npx playwright test --list e2e/workbench.spec.ts e
 | `financial-workbench/web/src/lib/guide.ts` | 수정 |
 | `financial-workbench/web/src/lib/guide.test.ts` | 수정 |
 | `financial-workbench/web/src/components/guide/GuideProvider.tsx` | 수정 |
+| `financial-workbench/web/src/components/guide/guide.test.tsx` | 수정 |
 | `financial-workbench/web/src/components/map/map.test.tsx` | 신규 |
 | `financial-workbench/web/src/components/screens.test.tsx` | 수정 |
 | `financial-workbench/web/e2e/support.ts` | 수정 |
