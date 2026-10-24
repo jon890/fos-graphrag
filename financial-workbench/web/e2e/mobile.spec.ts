@@ -79,6 +79,9 @@ test('휴대폰 폭에서 노드를 만들고 그래프에서 골라 상세를 �
   expect(dialogBox!.x, '창의 왼쪽 끝').toBeGreaterThanOrEqual(0)
   expect(dialogBox!.x + dialogBox!.width, '창의 오른쪽 끝').toBeLessThanOrEqual(page.viewportSize()!.width)
   await expectNoHorizontalOverflow(page)
+  // 창은 나타나고 「＋ 추가」 메뉴는 사라지는 애니메이션이 끝난 뒤에 찍는다
+  await expect(page.getByTestId('add-type-Company')).toHaveCount(0)
+  await expect(page.getByTestId('add-dialog')).toHaveCSS('opacity', '1')
   await shot(page, 'add-dialog-mobile')
 
   // 3. 노드를 만들면 상세 탭으로 넘어간다. 그래프에 두 노드가 함께 오르도록 종목을 만들고 기업과 ISSUES 로 잇는다.

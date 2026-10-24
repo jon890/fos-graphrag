@@ -109,20 +109,26 @@ describe('연결 절의 관계 문장', () => {
     return rest.slice(rest.indexOf('>') + 1, cut).replace(/<[^>]+>/g, '')
   }
 
-  it('이 항목이 시작이면 이름은 굵게, 상대 이름은 여는 단추로 보이고 방향은 out 이다', () => {
+  it('이 항목이 시작이면 이름은 굵게, 상대 이름은 여는 링크로 보이고 방향은 out 이다', () => {
     const html = render(node({ id: 'c1', label: '가나전자' }))
     expect(html).toContain('data-direction="out"')
     expect(html).toMatch(/<strong data-testid="relationship-self">가나전자<\/strong>/)
-    expect(html).toMatch(/<button[^>]*data-testid="relationship-open"[^>]*data-node-id="s1"[^>]*>가나 보통주<\/button>/)
+    expect(html).toMatch(/<a[^>]*data-testid="relationship-open"[^>]*data-node-id="s1"[^>]*>가나 보통주<\/a>/)
     expect(sentenceText(html)).toBe(relationSentence(testOntology, 'ISSUES', '가나전자', '가나 보통주'))
     expect(sentenceText(html)).toBe('가나전자가 가나 보통주를 발행합니다')
+  })
+
+  it('상대 이름 링크는 그 항목의 작업 공간 상세 주소를 갖고, 조사는 이름 바로 뒤에 공백 없이 붙는다', () => {
+    const html = render(node({ id: 'c1', label: '가나전자' }))
+    expect(html).toMatch(/<a href="\/workspace\?node=s1&amp;pane=detail"[^>]*data-testid="relationship-open"/)
+    expect(html).toMatch(/가나전자<\/strong><span>가 <\/span><a[^>]*>가나 보통주<\/a><span>를 발행합니다<\/span>/)
   })
 
   it('이 항목이 끝이어도 같은 문장이고 방향은 in 이다', () => {
     const html = render(node({ id: 's1', type: 'Security', label: '가나 보통주' }))
     expect(html).toContain('data-direction="in"')
     expect(html).toMatch(/<strong data-testid="relationship-self">가나 보통주<\/strong>/)
-    expect(html).toMatch(/<button[^>]*data-testid="relationship-open"[^>]*data-node-id="c1"[^>]*>가나전자<\/button>/)
+    expect(html).toMatch(/<a[^>]*data-testid="relationship-open"[^>]*data-node-id="c1"[^>]*>가나전자<\/a>/)
     expect(sentenceText(html)).toBe(relationSentence(testOntology, 'ISSUES', '가나전자', '가나 보통주'))
   })
 

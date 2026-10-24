@@ -349,6 +349,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     const dialog = pageAdmin.getByTestId('add-dialog')
     await expect(dialog).toHaveAttribute('data-type', 'Sector')
     await expect(dialog.getByTestId('add-steps')).toBeVisible()
+    // 창은 투명에서 나타나는 애니메이션으로 열린다. 다 열린 뒤에 찍는다
+    await expect(dialog).toHaveCSS('opacity', '1')
     await shot(pageAdmin, 'add-dialog')
 
     // 필수 칸만 채워 저장한다.

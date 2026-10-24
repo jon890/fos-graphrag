@@ -3,6 +3,7 @@ import { api, errorMessage } from '../api/client'
 import type { NodeView, RelationshipView } from '../api/types'
 import { useApp, useLabels } from '../context'
 import { relationSentence, relationSentenceParts } from '../lib/relationSentence'
+import { DEFAULT_WORKSPACE_QUERY, TAB_PATHS, workspaceSearch } from '../routes'
 import { NodePicker } from './NodePicker'
 import { TypeBadge } from './TypeBadge'
 
@@ -90,7 +91,7 @@ export function RelationshipSection({ node, relationships, onChanged, onError, o
       {relationships.length === 0 && <div className="muted small">아직 연결된 항목이 없습니다.</div>}
       <ul className="rel-list">
         {relationships.map((r) => {
-          // 양쪽 상세에서 같은 문장이다. 이 항목 자리는 굵게, 상대 자리는 그 항목을 여는 단추로 그린다.
+          // 양쪽 상세에서 같은 문장이다. 이 항목 자리는 굵게, 상대 자리는 그 항목을 여는 링크로 그린다.
           const direction = r.from.id === node.id ? 'out' : 'in'
           const other = direction === 'out' ? r.to : r.from
           return (
@@ -111,9 +112,21 @@ export function RelationshipSection({ node, relationships, onChanged, onError, o
                       {part.text}
                     </strong>
                   ) : (
-                    <button key={i} className="link-button" data-testid="relationship-open" data-node-id={end.id} onClick={() => onOpenNode(end.id)}>
+                    // 단추는 줄 안에서 쪼개지지 않는 상자라 긴 이름이 통째로 다음 줄로 밀린다. 링크로 그려 문장 흐름 안에서 줄을 바꾼다
+                    <a
+                      key={i}
+                      href={`${TAB_PATHS.workspace}${workspaceSearch({ ...DEFAULT_WORKSPACE_QUERY, node: end.id, pane: 'detail' })}`}
+                      data-testid="relationship-open"
+                      data-node-id={end.id}
+                      onClick={(e) => {
+                        // 보조 키를 누른 클릭은 브라우저에 맡겨 새 탭으로 열게 한다
+                        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+                        e.preventDefault()
+                        onOpenNode(end.id)
+                      }}
+                    >
                       {part.text}
-                    </button>
+                    </a>
                   )
                 })}
               </span>

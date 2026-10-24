@@ -47,6 +47,8 @@ const STYLE: cytoscape.StylesheetJson = [
       'text-background-padding': '1px',
     },
   },
+  // 좁은 화면에서는 선 글자가 서로 겹친다. 관계는 타입 칸의 문장으로 읽는다
+  { selector: 'edge.no-label', style: { label: '' } },
 ]
 
 /** 타입 노드의 글자. 개수를 모르면 타입 이름만 */
@@ -164,6 +166,14 @@ export function ConceptMapTab({ onOpenNode }: { onOpenNode: (id: string) => void
     cy.nodes().removeClass('selected')
     if (selected) cy.getElementById(selected).addClass('selected')
   }, [selected, types])
+
+  // 좁은 화면(1024px 미만)에서는 선 글자를 숨긴다. 요소를 새로 놓으면 클래스도 사라지므로 온톨로지가 바뀔 때도 다시 붙인다
+  useEffect(() => {
+    const cy = cyRef.current
+    if (!cy) return
+    if (wide) cy.edges().removeClass('no-label')
+    else cy.edges().addClass('no-label')
+  }, [wide, ontology, types])
 
   // 넓은 화면과 좁은 화면을 오가면 그림 칸의 크기가 바뀐다. 크기를 다시 재고 화면에 맞춘다.
   useEffect(() => {
