@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.transaction.PlatformTransactionManager
-import java.net.URLEncoder
 import java.util.UUID
 
 class SeedLoaderIntegrationTest : IntegrationTest() {
@@ -25,54 +24,66 @@ class SeedLoaderIntegrationTest : IntegrationTest() {
     @Test
     fun `시작할 때 초기 데이터가 들어가고 이력은 system 이다`() {
         val alice = loggedIn(ALICE)
-        val found = alice.get("/api/nodes?q=${URLEncoder.encode("warren buffett", Charsets.UTF_8)}&types=Person").body["items"]
-            .filter { it["label"].asString() == "워런 버핏" }
-        assertThat(found).describedAs("초기 데이터의 워런 버핏").hasSize(1)
+        val found = alice.get("/api/nodes?q=FLNC&types=Security").body["items"]
+            .filter { it["label"].asString() == "Fluence Energy Class A" }
+        assertThat(found).describedAs("초기 데이터의 FLNC 종목").hasSize(1)
 
-        val buffett = found.single()
-        assertThat(buffett["properties"]["role"].asString()).isEqualTo("INVESTOR")
-        val first = alice.get("/api/changes?targetId=${buffett.id}").body["items"].last()
+        val flnc = found.single()
+        val first = alice.get("/api/changes?targetId=${flnc.id}").body["items"].last()
         assertThat(first["action"].asString()).isEqualTo("CREATE")
         assertThat(first["actor"] == null || first["actor"].isNull).describedAs("system 작업자는 사용자로 보이지 않는다: ${first["actor"]}").isTrue()
 
-        assertThat(count("MATCH (s:SeedRun {key: 'investing-basics-2026-10'}) RETURN count(s) AS c")).isEqualTo(1)
+        assertThat(count("MATCH (s:SeedRun {key: 'investment-logic-2026-10'}) RETURN count(s) AS c")).isEqualTo(1)
 
-        val marginId = conceptId("안전마진")
-        val related = alice.get("/api/nodes/$marginId").body["relationships"].toList()
-            .filter { it["type"].asString() == "RELATED_TO" }
-            .map { it["to"]["label"].asString() }
-        assertThat(related).contains("내재가치")
+        val decision = alice.get("/api/nodes?q=FLNC+첫+매수&types=Decision").body["items"]
+            .single { it["label"].asString() == "FLNC 첫 매수" }
+        val related = alice.get("/api/nodes/${decision.id}").body["relationships"].toList()
+            .filter { it["type"].asString() == "HAS_DECISION" }
+            .map { it["from"]["label"].asString() }
+        assertThat(related).contains("Fluence Energy Class A")
     }
 
     @Test
     fun `다시 돌려도 새로 만들지 않는다`() {
         assertThat(seeds.run()).describedAs("이미 적용한 파일은 건너뛴다").isZero()
 
-        assertThat(count("MATCH (n:Knowledge:Person {name: '워런 버핏', archived: false}) RETURN count(n) AS c")).isEqualTo(1)
-        assertThat(count("MATCH (s:SeedRun {key: 'investing-basics-2026-10'}) RETURN count(s) AS c")).isEqualTo(1)
+        assertThat(count("MATCH (n:Knowledge:Company {name: 'Fluence Energy', archived: false}) RETURN count(n) AS c")).isEqualTo(1)
+        assertThat(count("MATCH (s:SeedRun {key: 'investment-logic-2026-10'}) RETURN count(s) AS c")).isEqualTo(1)
     }
 
     @Test
     fun `이미 있는 관계를 다시 적은 파일도 적용된다`() {
         val key = "test-dup-${UUID.randomUUID().toString().take(8)}"
+        val relationshipCount =
+            "MATCH (:Knowledge:Company {name: 'Fluence Energy', archived: false})-[r:HAS_VALUATION]->(:Knowledge:Valuation {title: 'FLNC 간이 DCF (Valley AI 화면)', archived: false}) " +
+                "WHERE r.archived = false RETURN count(r) AS c"
         val file = SeedFile(
             key = key,
             nodes = listOf(
-                SeedNode("a", "Concept", mapOf("name" to "안전마진", "summary" to "내재가치보다 충분히 낮은 값에 사서 판단 착오에 대비하는 여유")),
-                SeedNode("b", "Concept", mapOf("name" to "내재가치", "summary" to "기업이 앞으로 벌어들일 현금을 지금 가치로 할인한 값")),
+                SeedNode("a", "Company", mapOf("name" to "Fluence Energy", "country" to "US")),
+                SeedNode("b", "Valuation", mapOf("title" to "FLNC 간이 DCF (Valley AI 화면)", "currentPrice" to 22.10, "currency" to "USD", "method" to "DCF")),
             ),
-            relationships = listOf(SeedRelationship("RELATED_TO", "a", "b")),
+            relationships = listOf(SeedRelationship("HAS_VALUATION", "a", "b")),
         )
 
+        assertThat(count(relationshipCount)).describedAs("적용 전 Fluence Energy 와 FLNC 간이 DCF 사이의 HAS_VALUATION").isEqualTo(1)
         seeds.applyInTransaction(file)
 
         assertThat(count("MATCH (s:SeedRun {key: '$key'}) RETURN count(s) AS c")).isEqualTo(1)
+        assertThat(count(relationshipCount)).describedAs("적용 후 Fluence Energy 와 FLNC 간이 DCF 사이의 HAS_VALUATION").isEqualTo(1)
+    }
+
+    @Test
+    fun `초기 데이터의 사슬이 모두 들어간다`() {
         assertThat(
             count(
-                "MATCH (:Knowledge:Concept {name: '안전마진', archived: false})-[r:RELATED_TO]->(:Knowledge:Concept {name: '내재가치', archived: false}) " +
-                    "WHERE r.archived = false RETURN count(r) AS c",
+                "MATCH (:Knowledge:Decision {title: 'FLNC 첫 매수', archived: false})<-[:HAS_DECISION]-(:Knowledge:Security)<-[:ISSUES]-(:Knowledge:Company)<-[:BENEFITS]-(:Knowledge:Bottleneck)<-[:CREATES]-(:Knowledge:Change) RETURN count(*) AS c",
             ),
-        ).describedAs("두 개념 사이의 RELATED_TO").isEqualTo(1)
+        ).isEqualTo(1)
+        val kinds = neo4j.query(
+            "MATCH (:Knowledge:Company {name: 'Fluence Energy', archived: false})-[:HAS_VALUATION]->(:Knowledge:Valuation)-[:HAS_SCENARIO]->(s:Knowledge:Scenario) RETURN s.kind AS kind",
+        ).fetch().all().map { it["kind"] as String }
+        assertThat(kinds).contains("BEAR", "BASE", "BULL")
     }
 
     @Test
@@ -129,7 +140,4 @@ class SeedLoaderIntegrationTest : IntegrationTest() {
 
     private fun count(cypher: String): Long = neo4j.query(cypher).fetch().one().map { (it["c"] as Number).toLong() }.orElse(0L)
 
-    private fun conceptId(name: String): String =
-        neo4j.query("MATCH (n:Knowledge:Concept {name: \$name, archived: false}) RETURN n.id AS id").bind(name).to("name")
-            .fetch().one().map { it["id"] as String }.orElseThrow()
 }

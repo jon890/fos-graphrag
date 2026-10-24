@@ -239,12 +239,12 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await shot(pageAdmin, '00e-security-form')
     await pageAdmin.getByTestId('create-cancel').click()
 
-    // 시작할 때 들어간 인물은 영문 이름으로도 찾고, 타입 배지는 온톨로지의 표시 이름이다.
-    await pageAdmin.getByTestId('search-input').fill('Warren Buffett')
+    // 시작할 때 들어간 종목은 종목 코드로도 찾고, 타입 배지는 온톨로지의 표시 이름이다.
+    await pageAdmin.getByTestId('search-input').fill('FLNC')
     await pageAdmin.getByTestId('search-submit').click()
-    const buffett = searchResult(pageAdmin, '워런 버핏')
-    await expect(buffett).toBeVisible()
-    await expect(buffett.locator('.type-badge')).toHaveText('인물')
+    const flnc = searchResult(pageAdmin, 'Fluence Energy Class A')
+    await expect(flnc).toBeVisible()
+    await expect(flnc.locator('.type-badge')).toHaveText('종목')
   })
 
   test('0f) 상단 탭은 경로를 바꾸고 뒤로가기로 앞 탭에 돌아온다', async () => {
@@ -473,25 +473,42 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
 
   test('2d) A 가 책을 근거로 거장의 생각을 주장으로 만든다', async () => {
     const bookTitle = `안전마진 해설서-${suffix}`
+    const personName = `워런 버핏-${suffix}`
+    const englishName = `Warren Buffett ${suffix}`
+    const conceptName = `안전마진-${suffix}`
     await pageA.getByTestId('tab-workspace').click()
+    await pageA.getByTestId('new-node-type').selectOption('Person')
+    await pageA.getByTestId('new-node-button').click()
+    await pageA.getByTestId('create-prop-name').fill(personName)
+    await pageA.getByTestId('create-prop-englishName').fill(englishName)
+    await pageA.getByTestId('create-submit').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(personName)
+
+    await pageA.getByTestId('new-node-type').selectOption('Concept')
+    await pageA.getByTestId('new-node-button').click()
+    await pageA.getByTestId('create-prop-name').fill(conceptName)
+    await pageA.getByTestId('create-prop-summary').fill('투자 판단에서 손실 가능성을 줄이는 여유다.')
+    await pageA.getByTestId('create-submit').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(conceptName)
+
     await pageA.getByTestId('new-node-type').selectOption('Document')
     await pageA.getByTestId('new-node-button').click()
     await pageA.getByTestId('create-prop-title').fill(bookTitle)
     await pageA.getByTestId('create-prop-url').fill(`https://example.com/book-${suffix}`)
     await pageA.getByTestId('create-prop-documentType').selectOption('BOOK')
     await pageA.getByTestId('create-prop-collectedAt').fill('2026-10-20T12:00')
-    await pick(pageA, 'create-link-AUTHORED-picker', '워런 버핏')
+    await pick(pageA, 'create-link-AUTHORED-picker', personName)
     await pageA.getByTestId('create-submit').click()
     await expect(pageA.getByTestId('detail-label')).toHaveText(bookTitle)
     await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
-    await expect(pageA.getByTestId('relationship-row').filter({ hasText: '워런 버핏' })).toHaveAttribute('data-rel-type', 'AUTHORED')
+    await expect(pageA.getByTestId('relationship-row').filter({ hasText: personName })).toHaveAttribute('data-rel-type', 'AUTHORED')
 
-    await searchAndOpen(pageA, '워런 버핏')
+    await searchAndOpen(pageA, personName)
     await pageA.getByTestId('claim-add-toggle').click()
     await pageA.getByTestId('claim-predicate-select').selectOption('ADVOCATES')
     await expect(pageA.getByTestId('claim-sentence')).toContainText('강조한다')
-    await pick(pageA, 'claim-object-picker', '안전마진')
-    await expect(pageA.getByTestId('claim-object-selected')).toContainText('안전마진')
+    await pick(pageA, 'claim-object-picker', conceptName)
+    await expect(pageA.getByTestId('claim-object-selected')).toContainText(conceptName)
     await pick(pageA, 'claim-doc-picker', bookTitle)
     await pageA.getByTestId('claim-description').fill('버핏은 안전마진을 투자의 핵심으로 본다.')
     await pageA.getByTestId('claim-evidence').fill(`안전마진은 투자의 핵심이다(테스트 문장 ${suffix})`)
@@ -503,8 +520,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     const claimId = (await card.getAttribute('data-claim-id')) ?? ''
     expect(claimId).not.toBe('')
     const list = pageA.getByTestId('graph-node-list')
-    await expect(list).toContainText('안전마진')
-    await expect(list.locator(`[data-node-id="${claimId}"]`)).toContainText('워런 버핏 → 안전마진 강조한다')
+    await expect(list).toContainText(conceptName)
+    await expect(list.locator(`[data-node-id="${claimId}"]`)).toContainText(`${personName} → ${conceptName} 강조한다`)
     await shot(pageA, '02d-master-claim')
   })
 
@@ -1181,12 +1198,12 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
 
       // 3. 편집자 A 가 API 를 부르는 동작을 하면 안내가 나오고, 다시 읽으면 인물의 고치기 폼에 「별명」 칸이 있다.
       await pageA.getByTestId('tab-workspace').click()
-      await pageA.getByTestId('search-input').fill('Warren Buffett')
+      await pageA.getByTestId('search-input').fill(`Warren Buffett ${suffix}`)
       await pageA.getByTestId('search-submit').click()
       await expect(pageA.getByTestId('ontology-stale')).toBeVisible()
       await pageA.getByTestId('ontology-reload').click()
       await expect(pageA.getByTestId('ontology-stale')).toHaveCount(0)
-      await searchResult(pageA, '워런 버핏').click()
+      await searchResult(pageA, `워런 버핏-${suffix}`).click()
       await expect(pageA.getByTestId(`edit-prop-${propKey}`)).toBeVisible()
       await expect(pageA.getByTestId('node-edit-form')).toContainText('별명')
     } finally {
@@ -1215,7 +1232,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     const before = Number(/\d+/.exec(await pageAdmin.getByTestId('ontology-version').innerText())?.[0])
     expect(before, '시작 전 온톨로지 버전').toBeGreaterThan(0)
 
-    // 2. YAML 의 Concept 타입 properties 아래에 필수 속성을 더한다. 시작 때 들어간 개념에는 이 값이 없다.
+    // 2. YAML 의 Concept 타입 properties 아래에 필수 속성을 더한다. 2d 에서 만든 개념에는 이 값이 없다.
     await pageAdmin.getByTestId('ontology-edit-yaml').click()
     const input = pageAdmin.getByTestId('ontology-yaml-input')
     await expect(input).not.toHaveValue('')
