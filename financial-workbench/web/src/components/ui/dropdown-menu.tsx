@@ -32,13 +32,36 @@ function DropdownMenuTrigger({
 function DropdownMenuContent({
   className,
   sideOffset = 4,
+  ref,
+  onPointerDownOutside,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+  const contentRef = React.useRef<HTMLDivElement | null>(null)
+  const setRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      contentRef.current = node
+      if (typeof ref === "function") ref(node)
+      else if (ref) ref.current = node
+    },
+    [ref]
+  )
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
+        ref={setRef}
         sideOffset={sideOffset}
+        onPointerDownOutside={(event) => {
+          onPointerDownOutside?.(event)
+          // 닫히는 애니메이션이 도는 동안에도 Radix 는 메뉴 바깥 누름을 듣는다.
+          // 그때 메뉴 단추를 누르면 단추가 연 메뉴를 이 바깥 누름이 곧바로 다시 닫는다.
+          // 단추 누름은 단추가 스스로 열고 닫으므로 바깥 누름으로 치지 않는다.
+          const triggerId = contentRef.current?.getAttribute("aria-labelledby")
+          const target = event.target
+          if (triggerId && target instanceof Element && target.closest(`[id="${CSS.escape(triggerId)}"]`)) {
+            event.preventDefault()
+          }
+        }}
         className={cn(
           "z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           className
