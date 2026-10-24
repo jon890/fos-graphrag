@@ -43,8 +43,9 @@ const STYLE: cytoscape.StylesheetJson = [
       color: '#475569',
       'text-rotation': 'autorotate',
       'text-background-color': '#ffffff',
-      'text-background-opacity': 0.85,
-      'text-background-padding': '1px',
+      'text-background-opacity': 1,
+      'text-background-padding': '3px',
+      'text-background-shape': 'roundrectangle',
     },
   },
   // 좁은 화면에서는 선 글자가 서로 겹친다. 관계는 타입 칸의 문장으로 읽는다
@@ -143,7 +144,7 @@ export function ConceptMapTab({ onOpenNode }: { onOpenNode: (id: string) => void
     // 뿌리가 없으면(모두 고리) 타입 순서의 첫 타입을 뿌리로 쓴다. roots 는 노드 id 목록이다.
     const rootIds = rootTypes(ontology).filter((t) => types.includes(t))
     const roots = rootIds.length > 0 ? rootIds : types.slice(0, 1)
-    const layout = cy.elements().not(cy.edges('[?self]')).layout({ name: 'breadthfirst', directed: true, roots, spacingFactor: 1.1, padding: 24 })
+    const layout = cy.elements().not(cy.edges('[?self]')).layout({ name: 'breadthfirst', directed: true, roots, spacingFactor: 1.6, padding: 24 })
     layout.one('layoutstop', () => {
       limitZoom(cy)
       setLayoutDone(true)
