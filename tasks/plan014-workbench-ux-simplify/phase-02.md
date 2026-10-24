@@ -28,7 +28,7 @@
 
 ### 1. 서버: `Ontology.kt`, `OntologyLoader.kt`
 
-- `RelationshipTypeDef` 에 `/** 관계 문장 틀. {from}, {to} 를 한 번씩 담는다 */ val sentence: String? = null` 을 `createPicker` 앞에 더한다. YAML 내보내기에서 `null` 이 빠지도록 `ClaimPredicateDef` 와 같은 직렬화 규칙을 따른다(`toYaml` 결과에 `sentence: null` 이 생기지 않는지 테스트로 본다).
+- `RelationshipTypeDef` 에 `/** 관계 문장 틀. {from}, {to} 를 한 번씩 담는다 */ val sentence: String? = null` 을 `createPicker` 앞에 더한다. 필드에만 `@field:JsonInclude(JsonInclude.Include.NON_NULL)` 을 붙여 YAML 내보내기에서 `null` 이 빠지게 한다. 클래스 전체에 붙이지 않는다(DB 에 저장하는 YAML 의 `label`, `createPicker` 직렬화가 바뀐다). `ClaimPredicateDef` 에는 이 설정이 없으므로 본보기로 삼지 않는다. `toYaml` 결과에 `sentence: null` 이 생기지 않는지 테스트로 본다.
 - `consistencyErrors` 에 관계마다 `sentence` 가 있으면 `{from}` 과 `{to}` 가 정확히 한 번씩 있는지 본다. 어기면 `"$name 의 sentence 는 {from} 과 {to} 를 한 번씩 담아야 한다"`.
 
 ### 2. 서버 테스트: `OntologyLabelsTest.kt`, `OntologyEditIntegrationTest.kt`
@@ -38,7 +38,7 @@
 
 ### 3. 웹 조사: `src/lib/labels.ts`, `src/lib/labels.test.ts`
 
-- `JOSA` 에 `'으로(로)': ['으로', '로']` 를 더한다.
+- `JOSA` 에 `'으로(로)': ['으로', '로']` 를 더하고, `LEADING_JOSA` 정규식에도 `으로\(로\)` 를 더한다(빠지면 문장 틀의 `으로(로)` 자리가 바뀌지 않는다). 긴 표기(`으로(로)`)가 짧은 표기보다 먼저 맞도록 순서를 둔다.
 - `export function finalSound(word: string): 'none' | 'rieul' | 'other' | null` 를 더한다. 끝의 공백, 괄호(`()[]{}「」『』`), 따옴표, 마침표, 쉼표를 건너뛴 마지막 글자로 정한다. 한글은 종성 없음이 `none`, ㄹ(종성 번호 8)이 `rieul`, 나머지 `other`. 영문자는 L, R 이 `rieul`, M, N 이 `other`, 나머지 `none`(대소문자 무시). 숫자는 1, 7, 8 이 `rieul`, 0, 3, 6 이 `other`, 나머지 `none`. 그 밖의 글자나 빈 문자열은 `null`.
 - `withJosa` 는 `finalSound` 로 고른다. `으로(로)` 는 `none` 과 `rieul` 이 「로」, `other` 가 「으로」. 나머지 조사는 `none` 이 받침 없는 꼴, 그 밖이 받침 있는 꼴. `null` 이면 지금처럼 표기를 그대로 붙인다.
 - 테스트 기대값:
@@ -46,7 +46,8 @@
   - 영문: 「FLNC가」, 「HBM을」, 「DRAM이」, 「POET가」, 「SK하이닉스 (KR)을」.
   - 숫자: 「A1로」, 「버전 3을」, 「버전 2를」, 「버전 0으로」.
   - 끝의 괄호와 따옴표는 건너뛴다. 빈 문자열과 기호로 끝나는 이름은 표기를 그대로 붙인다.
-- 주장 문장 틀(`claimSentenceParts`)은 이 `withJosa` 를 그대로 쓰므로 따로 고치지 않는다. 기존 `labels.test.ts` 의 주장 문장 단언이 영문 이름을 쓰면 새 규칙에 맞게 기대값을 고친다.
+- 주장 문장 틀(`claimSentenceParts`)은 이 `withJosa` 를 그대로 쓰므로 따로 고치지 않는다.
+- 기존 `labels.test.ts` 의 기대값을 새 규칙으로 고친다: `withEulReul('ETF')` 는 `ETF를`(F 는 받침 없음), `withJosa('ABC', '이(가)')` 는 `ABC가`. 「한글이 아니면 적힌 그대로」 라는 테스트 이름도 「기호로 끝나면 적힌 그대로」 로 바꾸고 기호 끝 예(`'A-'`)를 넣는다. 주장 문장 단언이 영문 이름을 쓰면 같이 고친다.
 
 ### 4. 웹 관계 문장: `src/lib/relationSentence.ts`, `src/lib/relationSentence.test.ts` (신규)
 
@@ -78,7 +79,7 @@ export function typeRelationSentences(o: Ontology, type: string): { key: string;
 
 ### 6. e2e: `e2e/workbench.spec.ts`
 
-온톨로지 폼 편집기 테스트(ADMIN 이 새 노드 타입을 더하는 테스트)에 이어, 관계 종류 하나의 문장 틀 칸에 `{from} 테스트` 처럼 `{to}` 가 빠진 값을 넣으면 오류가 보이고 「저장 전에 확인」 이 막히거나 미리보기가 오류를 보이는지 단언을 더한다. 틀을 비우면 오류가 사라진다. 저장은 하지 않는다(다른 테스트가 쓰는 온톨로지를 바꾸지 않는다).
+테스트 9b(폼으로 인물에 속성을 더하는 테스트, 지금 1184행 부근)에 단계를 더한다. 관계 종류 하나의 문장 틀 입력에 `{from} 테스트` 처럼 `{to}` 가 빠진 값을 넣으면 입력 아래 오류가 보이는지, 「저장 전에 확인」(`ontology-preview`)을 누르면 미리보기가 `valid: false` 의 오류 목록을 보이는지 단언한다. 「저장 전에 확인」 단추는 칸 오류로 꺼지지 않으므로 꺼짐을 단언하지 않는다. 저장하지 않고, 9c 처럼 「초안 버리기」 로 초안을 지워 끝낸다(남은 초안의 `beforeunload` 경고가 뒤 테스트의 이동을 막는다).
 
 ## 검증
 

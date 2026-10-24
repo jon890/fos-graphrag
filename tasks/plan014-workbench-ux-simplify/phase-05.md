@@ -39,7 +39,7 @@
 
 - `Workspace` 는 `hops`, `claimsAsNodes` 와 그 바꾸기를 `SearchPanel` 에 넘기고 `GraphPanel` 에는 넘기지 않는다.
 - `GraphPanel` 도구 줄에서 `graph-hops` 와 `graph-claims-as-nodes` 를 지운다. 「이웃 확장」, 「선택한 항목을 중심으로」, 「화면 맞춤」, 상태 글자는 그대로다. props 에서 `hops`, `onHopsChange`, `claimsAsNodes` 바꾸기를 뺀다. 접기 계산에 쓰는 `claimsAsNodes` 값은 그대로 받는다.
-- `runLayout(cy, centerId)` 를 `breadthfirst` 로 바꾼다: `{ name: 'breadthfirst', directed: true, roots, spacingFactor: 1.2, padding: 48, animate: false, fit: true }`. `roots` 는 `cy.nodes().filter(n => n.incomers('edge').filter(e => e.source().id() !== n.id()).empty())` 이고 비어 있으면 중심 노드다. `layoutstop` 뒤의 `fit` 과 `limitZoom` 은 그대로다.
+- `runLayout(cy, centerId)` 를 `breadthfirst` 로 바꾼다: `{ name: 'breadthfirst', directed: true, roots, spacingFactor: 1.2, padding: 48, animate: false, fit: true }`. `roots` 는 아래 `layoutRoots(display, centerId)` 의 결과다. `runLayout` 은 이 함수의 결과를 그대로 쓰고 cy 에서 따로 계산하지 않는다(테스트한 계산과 배치가 같은 값을 쓰게 한다). `layoutstop` 뒤의 `fit` 과 `limitZoom` 은 그대로다.
 - 중심 노드(`centerId`)가 바뀌면 새 요소가 없어도 다시 배치한다(숨겨져 있으면 지금처럼 미룬다).
 - 뿌리를 고르는 계산은 `src/lib/graph.ts` 에 `export function layoutRoots(display: GraphDisplay, centerId: string | null): string[]` 로 두고 테스트한다. 접힌 주장 선(`claimEdges`)도 주체에서 대상으로 가는 선으로 센다.
 

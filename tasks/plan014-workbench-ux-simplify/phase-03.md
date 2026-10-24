@@ -84,7 +84,7 @@ shadcn 의 Dialog, DropdownMenu 소스를 `radix-ui` 패키지(`import { Dialog 
 
 `docs/flow.md` 「개념 지도」 를 그대로 구현한다.
 
-- `ConceptMapTab`: `api.nodes.counts()` 를 한 번 읽는다(실패하면 `map-counts-error` 에 「항목 수를 불러오지 못했습니다.」 와 이유). 주소의 `type` 은 `parseMapQuery` 로 읽고, 고르면 `navigate(TAB_PATHS.map + mapSearch({type}))`(push)다.
+- `ConceptMapTab`: 루트 요소의 testid 는 `concept-map` 이다. `api.nodes.counts()` 를 한 번 읽는다(실패하면 `map-counts-error` 에 「항목 수를 불러오지 못했습니다.」 와 이유). 주소의 `type` 은 `parseMapQuery` 로 읽고, 고르면 `navigate(TAB_PATHS.map + mapSearch({type}))`(push)다.
   - 소개 `map-intro`: 제목 「투자 지식 지도」, 문장 「투자 지식을 근거와 함께 쌓는 곳입니다. 상자를 누르면 그 종류의 항목을 보고 바로 추가할 수 있습니다.」
   - 그림 `concept-map-canvas`: Cytoscape. 노드는 `orderedTypes` 의 타입, `data.label` 은 `${typeLabel} ${n}개`(개수가 없으면 타입 이름만), 색과 모양은 `typeColor`, `typeShape`. 간선은 `relationshipTypes` 의 from×to 조합마다 하나(`id` 는 `${key}:${from}:${to}`), 글자는 `relationshipLabel`. 배치는 `{ name: 'breadthfirst', directed: true, roots: rootTypes 의 노드(없으면 orderedTypes[0]), spacingFactor: 1.1, padding: 24 }` 이고, 자기 자신을 잇는 간선은 배치를 돌리는 컬렉션에서 뺀다(`cy.elements().not(selfLoops).layout(...)`). 노드를 누르면 그 타입을 고른다. 속성 `data-node-count`(타입 노드 수)와 `data-layout-done`(배치가 끝나면 `true`)을 둔다. 고른 타입 노드에는 굵은 테두리를 준다.
   - 타입 목록 `map-type-list`: `orderedTypes` 순서의 단추(testid `map-type`, `data-type`, `aria-pressed`). 안에 타입 배지와 개수(`map-type-count`).
@@ -101,20 +101,22 @@ shadcn 의 Dialog, DropdownMenu 소스를 `radix-ui` 패키지(`import { Dialog 
 
 ### 8. `WelcomeGuide` 를 지운다: `src/components/WelcomeGuide.tsx`(삭제), `src/components/GraphPanel.tsx`, `src/legacy.css`
 
-`GraphPanel` 의 `graph-empty` 자리에 `<p>` 한 줄 「항목을 검색해 고르면 이어진 항목이 그래프로 보입니다.」 만 둔다. `legacy.css` 의 `.welcome` 규칙이 남으면 지운다. `git grep -n "WelcomeGuide\|welcome-guide" financial-workbench/web` 결과가 이 phase 의 e2e 수정 뒤 없어야 한다.
+`src/components/screens.test.tsx` 의 `WelcomeGuide` import 와 렌더 단언(지금 12행, 97~107행)을 지우고, 같은 자리에 `ConceptMapTab` 의 `map-intro` 렌더 단언을 둔다. `GraphPanel` 의 `graph-empty` 자리에 `<p>` 한 줄 「항목을 검색해 고르면 이어진 항목이 그래프로 보입니다.」 만 둔다. `legacy.css` 의 `.welcome` 규칙이 남으면 지운다. `git grep -n "WelcomeGuide\|welcome-guide" financial-workbench/web` 결과가 이 phase 의 e2e 수정 뒤 없어야 한다.
 
 ### 9. 첫 접속 가이드의 첫 화면: `src/lib/guide.ts`, `src/lib/guide.test.ts`, `src/components/guide/GuideProvider.tsx`
 
 - `GuideStep` 에 `route: 'map' | 'workspace'` 를 더한다. 따라하기 단계와 지금 둘러보기 단계는 `'workspace'` 다.
 - `BROWSE_STEPS` 를 `docs/flow.md` 「열람자의 둘러보기」 표대로 바꾼다. 소개 다음에 `{ id: 'map', target: 'concept-map-canvas', pane: null, route: 'map', title: '개념 지도', body: '워크벤치가 담는 지식의 종류와 서로의 관계입니다. 상자를 누르면 그 종류의 항목을 봅니다.' }` 를 넣고, 소개 문장과 상세 단계 문장을 표와 같게 고친다.
 - 자동 시작은 `tab` 이 `'map'` 이나 `'workspace'` 일 때 한다. `open()` 은 지금 화면이 `/map` 이나 `/workspace` 면 옮기지 않고, 아니면 `LANDING_PATH` 로 옮긴다.
-- 단계 진입 effect: 단계의 `route` 가 `'map'` 이면 `/map` 으로, `'workspace'` 면 지금처럼 작업 공간 주소로 바꿔 연다(replace). 지금 경로가 작업 공간이 아니어도 바꾼다.
+- 단계 진입 effect: 단계마다 목적지를 정한다. 소개(`intro`)와 `resume` 은 옮기지 않는다. `route` 가 `'map'` 이면 `/map`(replace). `'workspace'` 인 둘러보기 단계는 지금 경로가 작업 공간이 아니면 `/workspace`(좁은 화면이면 `pane` 을 붙인다)로, 이미 작업 공간이면 지금처럼 좁은 화면의 `pane` 만 맞춘다. 따라하기 단계의 목적지는 지금 코드 그대로다(Phase 04 가 기업과 근거 문서 단계를 바꾼다).
 - `guide.test.ts`: 둘러보기 단계 id 가 `intro, map, search, graph, detail` 이고 `map` 단계의 `route` 가 `'map'` 인지.
 
 ### 10. e2e 와 testid 계약: `e2e/support.ts`, `e2e/workbench.spec.ts`, `e2e/mobile.spec.ts`, `TESTIDS.md`
 
 - `support.ts`: `loginAs` 는 `search-input` 대신 `tab-map` 과 `concept-map` 이 보일 때까지 기다린다(시작 경로가 `/` 일 때). 시작 경로가 다른 화면이면 그 화면의 탭이 보이는 것을 기다린다. `export async function openScreen(page, key: 'map' | 'workspace' | 'list' | 'changes' | 'ontology' | 'review' | 'users')` 를 더한다. 상단 탭이면 `tab-${key}` 를, 아니면 `more-open` 다음 `more-item-${key}` 를 누른다.
-- `workbench.spec.ts`, `mobile.spec.ts`: `tab-review`, `tab-changes`, `tab-ontology`, `tab-users` 를 누르던 곳을 `openScreen` 으로 바꾼다. 「`aria-selected` 가 참」 을 보던 단언은 더보기 화면이면 `more-open` 의 `data-active="true"` 로 바꾼다. 로그인 직후 작업 공간을 전제한 테스트는 `openScreen(page, 'workspace')` 를 먼저 부른다. `welcome-guide` 를 보던 단언(지금 215~218행)은 `map-intro` 로 옮긴다.
+- `workbench.spec.ts`, `mobile.spec.ts`: `tab-review`, `tab-changes`, `tab-ontology`, `tab-users` 를 누르던 곳을 `openScreen` 으로 바꾼다. 단, 열람자 테스트 7(지금 928행 `tab-review`)은 열람자 메뉴에 검토 대기가 없으므로 `page.goto('/review')` 로 연다.
+- 0f(지금 271~273행)의 `goto('/')` 뒤 `/workspace$` 와 `tab-workspace` 선택 단언을 `/map$` 과 `tab-map` 선택으로 바꾼다.
+- 둘러보기 테스트 10(지금 970~1007행)의 단계 단언에 `map` 단계를 더한다. `intro` 다음 `map` 에서 주소가 `/map` 이고 말풍선이 `concept-map-canvas` 를 가리키며, 다음 `search` 에서 주소가 `/workspace` 로 바뀌는지 본다. 「`aria-selected` 가 참」 을 보던 단언은 더보기 화면이면 `more-open` 의 `data-active="true"` 로 바꾼다. 로그인 직후 작업 공간을 전제한 테스트는 `openScreen(page, 'workspace')` 를 먼저 부른다. `welcome-guide` 를 보던 단언(지금 215~218행)은 `map-intro` 로 옮긴다.
 - 새 테스트(workbench.spec.ts, 넓은 화면): 「개념 지도가 첫 화면이고 타입을 고르면 칸이 열린다」. `/` 로 들어가 주소가 `/map` 인지, `concept-map-canvas` 의 `data-layout-done` 이 `true` 인지, `map-type` 이 하나 이상인지, 초기 데이터에 있는 타입 하나(`map-type[data-type=Bottleneck]`)를 누르면 `map-type-panel` 이 열리고 주소에 `type=Bottleneck` 이 붙고 `map-relation` 이 하나 이상, `map-recent-item` 이 하나 이상인지, `map-open-list` 가 `/list?type=Bottleneck` 으로 가는지. 스크린샷 `shot(page, 'map-wide')`.
 - 새 테스트: 「더보기 메뉴는 역할별 항목을 보이고 열린 화면을 표시한다」. ADMIN 은 네 항목, EDITOR 는 `more-item-users` 가 없음, VIEWER 는 `more-item-review` 와 `more-item-users` 가 없음. `more-item-changes` 를 누르면 `/changes` 이고 `more-open` 의 `data-active` 가 `true`.
 - 새 테스트(mobile.spec.ts, 390px): 「개념 지도와 머리글이 한 줄에 들어간다」. `/map` 에서 `tab-map`, `tab-workspace`, `tab-list`, `more-open` 의 `boundingBox().y` 가 같고, `document.documentElement.scrollWidth <= innerWidth` 다. `map-type` 을 눌러 `map-type-panel` 이 보이는지. 스크린샷 `shot(page, 'map-mobile')`.
@@ -124,7 +126,7 @@ shadcn 의 Dialog, DropdownMenu 소스를 `radix-ui` 패키지(`import { Dialog 
 
 ```bash
 cd financial-workbench/web && npm run typecheck
-cd financial-workbench/web && npx vitest run src/lib/typeOrder.test.ts src/lib/labels.test.ts src/routes.test.ts src/lib/guide.test.ts src/components/ui/ui.test.tsx src/components/map/map.test.tsx
+cd financial-workbench/web && npx vitest run src/lib/typeOrder.test.ts src/lib/labels.test.ts src/routes.test.ts src/lib/guide.test.ts src/components/ui/ui.test.tsx src/components/map/map.test.tsx src/components/screens.test.tsx
 cd financial-workbench/web && npm test && npm run build
 cd financial-workbench/web && npx playwright test --list e2e/workbench.spec.ts e2e/mobile.spec.ts
 ! git grep -n "WelcomeGuide\|welcome-guide\|tab-review\|tab-changes\|tab-ontology\|tab-users" -- financial-workbench/web
@@ -159,6 +161,7 @@ cd financial-workbench/web && npx playwright test --list e2e/workbench.spec.ts e
 | `financial-workbench/web/src/lib/guide.test.ts` | 수정 |
 | `financial-workbench/web/src/components/guide/GuideProvider.tsx` | 수정 |
 | `financial-workbench/web/src/components/map/map.test.tsx` | 신규 |
+| `financial-workbench/web/src/components/screens.test.tsx` | 수정 |
 | `financial-workbench/web/e2e/support.ts` | 수정 |
 | `financial-workbench/web/e2e/workbench.spec.ts` | 수정 |
 | `financial-workbench/web/e2e/mobile.spec.ts` | 수정 |

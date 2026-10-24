@@ -67,12 +67,12 @@ export function useAdd(): AddContextValue
 
 ### 5. 입구: `src/App.tsx`, `src/components/SearchPanel.tsx`, `src/components/Workspace.tsx`, `src/components/GraphPanel.tsx`, `src/components/map/TypePanel.tsx`
 
-- `App.tsx`: `AppContext.Provider` 안쪽, 탭 `ErrorBoundary` 바깥에 `AddProvider` 를 둔다. 머리글 둘째 줄(Phase 03 가 비워 둔 자리, 더보기 왼쪽)에 `canEdit` 일 때 `<AddMenu trigger={<Button data-testid="add-open">＋ 추가</Button>} align="end" />`. 좁은 화면에서는 글자 「추가」 를 숨기고 `aria-label="추가"` 를 둔다. 머리글이 온톨로지를 받기 전에는 단추를 그리지 않는다. `flash` 상태(`{ id, text, kind }`)를 App 으로 옮겨 `Workspace` 에 prop 으로 넘긴다.
+- `App.tsx`: 지금 머리글(`<header>`)은 `AppContext.Provider` 바깥에 있고 Provider 는 `<main>` 안에서 온톨로지를 받은 뒤에만 그려진다. 온톨로지가 있을 때 `AppContext.Provider` 와 그 안의 `AddProvider` 가 머리글과 `<main>` 을 함께 감싸도록 트리를 바꾼다. 온톨로지가 없을 때(불러오는 중, 오류)는 지금처럼 Provider 없이 머리글과 안내만 그린다. 탭 `ErrorBoundary` 는 `AddProvider` 안쪽에 둔다. 머리글 둘째 줄(Phase 03 가 비워 둔 자리, 더보기 왼쪽)에 `canEdit` 일 때 `<AddMenu trigger={<Button data-testid="add-open">＋ 추가</Button>} align="end" />`. 좁은 화면에서는 글자 「추가」 를 숨기고 `aria-label="추가"` 를 둔다. 머리글이 온톨로지를 받기 전에는 단추를 그리지 않는다. `flash` 상태(`{ id, text, kind }`)를 App 으로 옮겨 `Workspace` 에 prop 으로 넘긴다.
 - `ClaimCreateForm.tsx`: `initialSubject` 주석의 「왼쪽 「무엇을 만들까요?」 는 넘기지 않는다」 를 「「＋ 추가」 의 주장 줄은 넘기지 않는다」 로 고친다.
 - `SearchPanel.tsx`: `create-box` 전체와 가이드 프리필 effect, `NodeCreateForm`, `ClaimCreateForm` import, `onCreated` prop 을 지운다. 결과가 비었을 때의 문장을 「아직 등록한 항목이 없습니다.」 와 편집자에게 「오른쪽 위 「＋ 추가」 로 첫 항목을 만드세요.」 로 바꾼다. `viewer-create-hint` 는 지운다.
-- `Workspace.tsx`: `flash` 와 `setFlash` 를 지우고 prop 으로 받는다. `SearchPanel` 의 `onCreated` 를 넘기지 않는다. `useAdd` 의 성공 뒤 그래프와 검색을 다시 읽도록 App 이 `focusNode` 로 `focusSeq` 를 올리는 지금 흐름을 그대로 쓴다.
+- `Workspace.tsx`: `flash` 와 `setFlash` 를 지우고 prop 으로 받는다. 다른 항목을 고르면 안내를 지우던 effect(지금 83~85행)는 App 으로 옮긴다. App 은 `flash.id` 가 주소의 `node` 와 다르면 `flash` 를 지운다. `SearchPanel` 의 `onCreated` 를 넘기지 않는다. `useAdd` 의 성공 뒤 그래프와 검색을 다시 읽도록 App 이 `focusNode` 로 `focusSeq` 를 올리는 지금 흐름을 그대로 쓴다.
 - `GraphPanel.tsx`: 캔버스 오른쪽 아래에 편집 권한이 있을 때 둥근 단추(testid `graph-add`, `aria-label="추가"`, 글자 ＋)를 `AddMenu` 트리거로 둔다. 캔버스 위에 떠 있고 그래프 조작을 가리지 않는 크기(40px)다.
-- `TypePanel.tsx`: 편집 권한이 있으면 「＋ {타입 이름} 추가」(testid `map-add-type`)를 단추 줄 맨 앞에 두고 `useAdd().open(type)` 를 부른다.
+- `TypePanel.tsx`: 편집 권한이 있으면 「＋ {타입 이름} 추가」(testid `map-add-type`)를 단추 줄 맨 앞에 두고 `useAdd().open(type)` 를 부른다. `useAdd` 는 Provider 가 없으면 아무것도 하지 않는 기본값(`open` 과 `close` 가 빈 함수, `openType` 이 `null`)을 돌려준다. Provider 없이 그리는 기존 단위 테스트(`map.test.tsx`)가 그대로 돈다.
 
 ### 6. 따라하기: `src/lib/guide.ts`, `src/lib/guide.test.ts`, `src/components/guide/GuideProvider.tsx`, `src/components/guide/GuideBubble.tsx`
 
@@ -84,14 +84,20 @@ export function useAdd(): AddContextValue
 
 ### 7. 단위 테스트: `src/components/add/add.test.tsx` (신규)
 
-`testSupport.tsx` 로 `AddMenu` 를 연 상태(`defaultOpen` 으로 렌더할 수 있게 `AddMenu` 에 `defaultOpen?: boolean` prop 을 둔다)로 그려 `add-type-*` 의 순서가 `orderedTypes` 뒤에 주장인지, 줄마다 설명 첫 문장이 있는지 본다. `NodeCreateForm` 을 그려 필수 칸만 보이고 `create-optional-toggle` 이 있는지, 선택 칸이 없는 타입에는 토글이 없는지 본다.
+Radix Portal 은 서버 렌더에서 아무것도 그리지 않으므로 메뉴를 열어 그리는 테스트는 하지 않는다. 메뉴 줄 목록을 순수 함수 `export function addMenuEntries(ontology: Ontology): { type: string; label: string; summary: string; separatorBefore: boolean }[]` 로 `AddMenu.tsx` 에서 빼고, 그 결과의 순서가 `orderedTypes` 뒤에 주장인지, `summary` 가 설명 첫 문장인지, 주장 종류가 없으면 주장 줄이 없는지 본다. `NodeCreateForm` 을 그려 필수 칸만 보이고 `create-optional-toggle` 이 있는지, 선택 칸이 없는 타입에는 토글이 없는지 본다.
 
-### 8. e2e 와 testid 계약: `e2e/workbench.spec.ts`, `e2e/mobile.spec.ts`, `TESTIDS.md`
+### 8. 기존 단위 테스트: `src/components/screens.test.tsx`
+
+- 61~81행: `SearchPanel` 에 `onCreated` 를 넘기고 만들기 선택지(`<option value="Person">`)를 단언하던 것을 지운다. 대신 만들기 칸(`create-box`)이 그려지지 않는지 본다.
+- 18~27행: 만들기 폼에서 선택 속성 「투자 스타일」 이 바로 보인다는 단언을, 처음에는 보이지 않고 `create-optional-toggle` 이 있다는 단언으로 바꾼다.
+- 189~202행: `Workspace` 를 그릴 때 `flash={null}` 을 넘긴다.
+
+### 9. e2e 와 testid 계약: `e2e/workbench.spec.ts`, `e2e/mobile.spec.ts`, `TESTIDS.md`
 
 - 도우미 `createNode(page, type, label, props)` 를 `add-open` → `add-type-${type}` → `add-dialog` 안의 `create-prop-*` 채우기로 바꾼다. 선택 속성을 채울 때는 먼저 `create-optional-toggle` 을 누른다. 만든 뒤 `add-dialog` 가 사라지고 `detail-label` 이 그 이름인지 기다린다.
 - `new-node-type`, `new-node-button`, `viewer-create-hint` 를 쓰던 곳을 모두 바꾼다. 타입 목록을 단언하던 곳(지금 222행 `typeSelect.locator('option')`)은 `add-type-*` 의 마지막 줄이 주장이고 첫 줄이 `add-type-*` 가운데 하나인지만 단언하는 형태로 바꾼다(타입 목록을 테스트에 한 벌 더 적지 않는다).
 - 2c 처럼 「무엇을 만들까요?」 에서 주장을 만들던 테스트는 「＋ 추가」 의 주장 줄에서 시작하게 고치고 이름을 「＋ 추가」 기준으로 바꾼다.
-- 따라하기 테스트(0e, 0f 계열)는 말풍선이 `add-open` 을 가리킨 뒤(`add-open` 에 class `guide-target`), 메뉴에서 기업을 고르면 이름 칸이 연습 이름으로 채워지고 말풍선이 `create-submit` 을 가리키는지 확인하게 바꾼다.
+- 따라하기 테스트(11, 11b, 지금 1010행과 1084행)는 말풍선이 `add-open` 을 가리킨 뒤(`add-open` 에 class `guide-target`), 메뉴에서 기업을 고르면 이름 칸이 연습 이름으로 채워지고 말풍선이 `create-submit` 을 가리키는지 확인하게 바꾼다.
 - 열람자 테스트는 `add-open` 과 `graph-add` 가 없는지 본다.
 - 새 테스트: 「개념 지도의 ＋ 타입 추가로 만든 항목이 작업 공간 상세로 열린다」. 지도에서 타입 하나를 고르고 `map-add-type` 을 눌러 `add-dialog` 의 `data-type` 이 그 타입이고 `add-steps` 가 보이는지, 필수 칸만 채워 저장하면 주소가 `/workspace?node=…&pane=detail` 이고 `detail-notice` 가 성공인지. 스크린샷 `shot(page, 'add-dialog')` 는 창이 열린 상태에서 찍는다.
 - `mobile.spec.ts`: 390px 에서 `add-open` 이 탭 줄과 같은 줄이고, 창이 화면 폭 안에 들어가며 가로 스크롤이 없는지. 스크린샷 `shot(page, 'add-dialog-mobile')`.
@@ -101,7 +107,7 @@ export function useAdd(): AddContextValue
 
 ```bash
 cd financial-workbench/web && npm run typecheck
-cd financial-workbench/web && npx vitest run src/components/add/add.test.tsx src/lib/guide.test.ts src/components/guide/guide.test.tsx
+cd financial-workbench/web && npx vitest run src/components/add/add.test.tsx src/lib/guide.test.ts src/components/guide/guide.test.tsx src/components/screens.test.tsx
 cd financial-workbench/web && npm test && npm run build
 cd financial-workbench/web && npx playwright test --list e2e/workbench.spec.ts e2e/mobile.spec.ts
 ! git grep -n "new-node-type\|new-node-button\|viewer-create-hint\|create-box\|무엇을 만들까요" -- financial-workbench/web
@@ -117,6 +123,7 @@ cd financial-workbench/web && npx playwright test --list e2e/workbench.spec.ts e
 | `financial-workbench/web/src/components/add/AddMenu.tsx` | 신규 |
 | `financial-workbench/web/src/components/add/AddDialog.tsx` | 신규 |
 | `financial-workbench/web/src/components/add/add.test.tsx` | 신규 |
+| `financial-workbench/web/src/components/screens.test.tsx` | 수정 |
 | `financial-workbench/web/src/components/NodeCreateForm.tsx` | 수정 |
 | `financial-workbench/web/src/components/PropertyFields.tsx` | 수정 |
 | `financial-workbench/web/src/components/ClaimCreateForm.tsx` | 수정 |

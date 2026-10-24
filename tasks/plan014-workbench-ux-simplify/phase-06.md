@@ -66,7 +66,9 @@
 
 - 편집 폼의 입력(`edit-prop-*`)과 저장 단추(`node-save`)를 쓰기 전에 `node-edit` 를 누른다. 동시 수정 테스트(B 의 409 와 `edit-conflict-*`)는 409 뒤에도 편집 폼이 열려 있는지 단언을 하나 더한다.
 - 보관은 `node-more` → `node-archive-button` → `node-archive-dialog` 의 `node-archive-reason` 채우기 → `node-archive-confirm`. 복원은 `node-more` → `node-restore-button`. 링크 복사와 변경 이력도 `node-more` 를 먼저 연다.
-- `node-meta` 를 보던 단언은 `node-meta-details` 를 열어 보게 바꾼다. 열람자 테스트의 「버튼이 없다」 목록(`node-save`, `node-archive-button` 등)에 `node-edit` 를 더하고, `node-archive-button` 은 `node-more` 를 연 뒤 없음을 본다.
+- `node-meta` 를 보던 단언은 `node-meta-details` 를 열어 보게 바꾼다.
+- 열람자 테스트(지금 926행)의 `edit-prop-name` 이 꺼져 있다는 단언은, 열람자에게 편집 폼이 그려지지 않으므로 `node-edit` 와 `edit-prop-name` 이 없다는 단언으로 바꾼다.
+- 6b(지금 906행)의 `claim-edit-form` 단언 앞에 `node-edit` 를 누르는 단계를 넣는다. 열람자 테스트의 「버튼이 없다」 목록(`node-save`, `node-archive-button` 등)에 `node-edit` 를 더하고, `node-archive-button` 은 `node-more` 를 연 뒤 없음을 본다.
 - `relationship-row` 의 글자를 보던 단언(「—표시 이름→」 꼴)을 바꾼다. 문장 규칙을 다시 적지 말고 `relationship-self`, `relationship-open` 의 이름과 `data-direction` 을 본다.
 - 새 테스트: 「상세는 읽기 카드로 열리고 편집을 눌러야 폼이 열린다」. 항목을 열면 `node-props` 가 보이고 `edit-prop-*` 가 없으며, `node-edit` 를 누르면 폼이 열리고 `node-edit-cancel` 로 닫히는지. 스크린샷 `shot(page, 'detail-read-card')`.
 - `mobile.spec.ts`: 상세 탭에서 `node-actions` 가 가로 스크롤 없이 보이는지 기존 390px 단언에 더한다.

@@ -65,7 +65,19 @@ YAML 흐름 표기(`{ ... }`) 안에 넣지 않고 블록 표기의 따옴표 �
 
 ### 3. 화면 문구 점검: `financial-workbench/web/src/**/*.tsx`, `financial-workbench/web/src/lib/guide.ts`
 
-- 사용자에게 보이는 문자열을 모아(`git grep -n "[가-힣]" -- 'financial-workbench/web/src/**/*.tsx' financial-workbench/web/src/lib/guide.ts` 에서 주석을 뺀 것) `korean-check` 의 검사기로 점검한다. 걸린 표현과 어색한 표현(조사 생략, 명사만 이은 문장, 한 화면 안의 높임 섞임)을 고친다.
+- 사용자에게 보이는 문자열을 Markdown 한 파일로 모아 검사기에 넣는다. 저장소 밖 임시 경로에 두고 커밋하지 않는다.
+
+  ```bash
+  # cwd: 저장소 루트
+  git grep -h -o -E "[\"'\`>][^\"'\`<{}]*[가-힣][^\"'\`<{}]*" -- 'financial-workbench/web/src/**/*.tsx' financial-workbench/web/src/lib/guide.ts | grep -v "^\s*//" | sed -E 's/^[\"'\`>]//' | sort -u > "$TMPDIR/ui-strings.md"
+  bash /Users/nhn/personal/fos-skills/korean-check/scripts/check.sh "$TMPDIR/ui-strings.md"
+  ```
+
+  통과 기준은 종료 코드 0(매핑 표 금지어 0건)이다. 경고 줄은 문맥을 보고 고칠지 정한다.
+- 검사기 밖의 점검 대상은 아래 세 가지이고, 고친 것만 문구 변경 표에 적는다.
+  - 조사가 빠진 문장, 명사만 이은 문장.
+  - 한 화면 안에서 합니다체와 한다체가 섞인 곳. 화면 문구는 합니다체로 맞춘다.
+  - 「사슬」 이 단독으로 쓰인 곳.
 - 「사슬」 이 단독으로 쓰인 화면 문구가 있으면 문맥에 맞게 고친다(「투자 온톨로지」, 「연결」 등).
 - 고친 문구가 단위 테스트나 e2e 에 그대로 적혀 있으면 함께 고친다. e2e 는 문구 대신 testid 와 속성으로 단언하는 쪽으로 바꿀 수 있으면 바꾼다.
 
@@ -89,6 +101,8 @@ cd financial-workbench/web && npx playwright test --list e2e/workbench.spec.ts e
 ! git grep -n "투자 논리 사슬\|무엇을 만들까요" -- financial-workbench
 cd financial-workbench && bash scripts/tests/test_scripts.sh
 ```
+
+- 화면 문구 검사기(작업 항목 3 의 두 명령)도 커밋 전에 돌리고 종료 코드 0 을 확인한다.
 
 - 서버 테스트는 백그라운드로 돌린다.
 - `playwright test --list` 는 서버 없이 spec 파일을 읽어 문법과 import 오류만 잡는다. 브라우저 실행은 모든 phase 를 마친 뒤 한 번 한다.
