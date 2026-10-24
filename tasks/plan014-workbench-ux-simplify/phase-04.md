@@ -88,7 +88,7 @@ Radix Portal 은 서버 렌더에서 아무것도 그리지 않으므로 메뉴�
 
 ### 8. 기존 단위 테스트: `src/components/screens.test.tsx`
 
-- 61~81행: `SearchPanel` 에 `onCreated` 를 넘기고 만들기 선택지(`<option value="Person">`)를 단언하던 것을 지운다. 대신 만들기 칸(`create-box`)이 그려지지 않는지 본다.
+- 61~81행: `SearchPanel` 에 `onCreated` 를 넘기고 만들기 선택지(`<option value="Person">`)를 단언하던 것을 지운다. 대신 `create-form` 과 `create-submit` testid 가 그려지지 않는지 본다.
 - 18~27행: 만들기 폼에서 선택 속성 「투자 스타일」 이 바로 보인다는 단언을, 처음에는 보이지 않고 `create-optional-toggle` 이 있다는 단언으로 바꾼다.
 - 189~202행: `Workspace` 를 그릴 때 `flash={null}` 을 넘긴다.
 
