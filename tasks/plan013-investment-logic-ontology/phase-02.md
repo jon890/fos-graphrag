@@ -6,7 +6,7 @@
 
 주장 종류 `SUPPLIES_TO`, `COMPETES_WITH`, `HAS_EXPOSURE_TO` 를 저장소 YAML 에서 빼고, 이 셋을 쓰던 테스트를 남는 주장 종류(`BELONGS_TO_SECTOR`, `ADVOCATES`, `CRITICIZES`)로 옮긴다.
 
-**범위 외**: 새 타입과 관계(phase 01), 초기 데이터 교체(phase 03). 웹 단위 테스트(`web/src/**/*.test.ts*`)는 자기 안의 가짜 온톨로지(`web/src/components/testSupport.tsx`)를 써서 YAML 과 무관하므로 고치지 않는다.
+**범위 외**: 새 타입과 관계(phase 01), 초기 데이터 교체(phase 03). 기존 웹 단위 테스트는 가짜 온톨로지를 쓰므로 YAML 변경만을 이유로 고치지 않는다. 대상 전용 타입에서 주장 만들기를 여는 회귀 테스트는 아래 작업 항목에 따라 더한다.
 
 ## 컨텍스트
 
@@ -52,6 +52,12 @@
 - 첫 접속 가이드 테스트(902행부터 935행)는 `BELONGS_TO_SECTOR` 를 그대로 쓰므로 바꾸지 않는다. 통과하는지만 본다.
 - `financial-workbench/web/e2e/mobile.spec.ts` 는 빼는 종류를 쓰지 않는다. 통과하는지만 본다.
 
+### 4. 대상 전용 타입에서도 주장 추가를 보인다
+
+- `financial-workbench/web/src/components/DetailPanel.tsx` 의 `hasClaimPredicates` 는 노드 타입이 주장 종류의 `subjectTypes` 또는 `objectTypes` 에 있으면 참으로 판정한다. `Sector` 상세에서도 주장 추가가 보이고, 주체와 대상을 바꾸면 산업이 대상 칸으로 옮겨져야 한다. 기존 편집 권한, 보관 상태, 정의 존재 조건은 유지한다.
+- `financial-workbench/web/src/components/DetailPanel.test.tsx` 에 대상 전용 타입에서도 주장 추가가 가능하며 어느 끝에도 없는 타입에는 불가능함을 확인하는 회귀 테스트를 더한다.
+- 흐름 문서의 주장 만들기 화면 절과 대조한다. 기존 산업 상세 출발 설명과 같으므로 문구 변경은 필요하지 않다.
+
 ## 검증
 
 ```bash
@@ -80,3 +86,6 @@ cd financial-workbench && COMPOSE_PROJECT_NAME=plan013-p2-verify COMPOSE_FILE=co
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/RoleAndUserAdminIntegrationTest.kt` | 수정 |
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/knowledge/NodeWriteIntegrationTest.kt` | 수정 |
 | `financial-workbench/web/e2e/workbench.spec.ts` | 수정 |
+
+| `financial-workbench/web/src/components/DetailPanel.tsx` | 수정 |
+| `financial-workbench/web/src/components/DetailPanel.test.tsx` | 신규 |
