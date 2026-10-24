@@ -11,15 +11,15 @@ import org.junit.jupiter.api.Test
 class ClaimIntegrationTest : IntegrationTest() {
 
     @Test
-    fun `공급 관계 Claim 을 만들고 다른 사용자가 검토한다`() {
+    fun `산업 소속 Claim 을 만들고 다른 사용자가 검토한다`() {
         val alice = loggedIn(ALICE)
         val bob = loggedIn(BOB)
         val fx = Fixtures(alice)
         val supplier = fx.company("가상부품")
-        val customer = fx.company("가상전자")
+        val customer = fx.sector("반도체")
         val document = fx.document("2026 사업보고서")
 
-        val created = fx.claim("SUPPLIES_TO", supplier.id, customer.id, listOf(document.id))
+        val created = fx.claim("BELONGS_TO_SECTOR", supplier.id, customer.id, listOf(document.id))
         assertThat(created.status).isEqualTo(201)
         val claim = created.body
         assertThat(claim["reviewStatus"].asString()).isEqualTo("DRAFT")
@@ -56,10 +56,10 @@ class ClaimIntegrationTest : IntegrationTest() {
         val bob = loggedIn(BOB)
         val fx = Fixtures(alice)
         val supplier = fx.company("가상부품")
-        val customer = fx.company("가상전자")
-        val first = "가상부품-${fx.suffix} → 가상전자-${fx.suffix} 공급한다"
+        val customer = fx.sector("반도체")
+        val first = "가상부품-${fx.suffix} → 반도체-${fx.suffix} 속한다"
 
-        val claim = fx.claim("SUPPLIES_TO", supplier.id, customer.id, listOf(fx.document("보고서").id)).body
+        val claim = fx.claim("BELONGS_TO_SECTOR", supplier.id, customer.id, listOf(fx.document("보고서").id)).body
         assertThat(claim["label"].asString()).isEqualTo(first)
         fun history(action: String) = alice.get("/api/changes?targetId=${claim.id}").body["items"].toList()
             .single { it["action"].asString() == action }["targetLabel"].asString()
@@ -78,7 +78,7 @@ class ClaimIntegrationTest : IntegrationTest() {
         assertThat(history("CREATE")).isEqualTo(first)
 
         alice.post("/api/nodes/${claim.id}/archive", mapOf("expectedRevision" to reviewed.body.revision))
-        assertThat(history("ARCHIVE")).isEqualTo("$renamed → 가상전자-${fx.suffix} 공급한다")
+        assertThat(history("ARCHIVE")).isEqualTo("$renamed → 반도체-${fx.suffix} 속한다")
     }
 
     @Test
@@ -86,7 +86,7 @@ class ClaimIntegrationTest : IntegrationTest() {
         val alice = loggedIn(ALICE)
         val bob = loggedIn(BOB)
         val fx = Fixtures(alice)
-        val claim = fx.claim("SUPPLIES_TO", fx.company("a").id, fx.company("b").id, listOf(fx.document("d").id)).body
+        val claim = fx.claim("BELONGS_TO_SECTOR", fx.company("a").id, fx.sector("b").id, listOf(fx.document("d").id)).body
         bob.post("/api/claims/${claim.id}/review", mapOf("expectedRevision" to 1, "status" to "REVIEWED"))
 
         val edited = alice.patch("/api/claims/${claim.id}", mapOf("expectedRevision" to 2, "validFrom" to "2025-01-01", "description" to "수정한 설명"))
@@ -98,7 +98,7 @@ class ClaimIntegrationTest : IntegrationTest() {
         val unknown = alice.patch("/api/claims/${claim.id}", mapOf("expectedRevision" to edited.body.revision, "validFrom" to null))
         assertThat(unknown.body["properties"].has("validFrom")).isFalse()
 
-        val immutable = alice.patch("/api/claims/${claim.id}", mapOf("expectedRevision" to unknown.body.revision, "predicate" to "COMPETES_WITH"))
+        val immutable = alice.patch("/api/claims/${claim.id}", mapOf("expectedRevision" to unknown.body.revision, "predicate" to "CRITICIZES"))
         assertThat(immutable.code).isEqualTo("ONTOLOGY_VIOLATION")
 
         val badPeriod = alice.patch("/api/claims/${claim.id}", mapOf("expectedRevision" to unknown.body.revision, "validFrom" to "2026-01-01", "validTo" to "2025-01-01"))
@@ -113,7 +113,7 @@ class ClaimIntegrationTest : IntegrationTest() {
         val sector = fx.sector("s")
         val document = fx.document("d")
 
-        val wrongSubject = fx.claim("SUPPLIES_TO", sector.id, company.id, listOf(document.id))
+        val wrongSubject = fx.claim("BELONGS_TO_SECTOR", sector.id, company.id, listOf(document.id))
         assertThat(wrongSubject.status).isEqualTo(400)
         assertThat(wrongSubject.body["details"]["rule"].asString()).isEqualTo("claim-subject-type")
 
@@ -137,7 +137,7 @@ class ClaimIntegrationTest : IntegrationTest() {
         val alice = loggedIn(ALICE)
         val bob = loggedIn(BOB)
         val fx = Fixtures(alice)
-        val claim = fx.claim("SUPPLIES_TO", fx.company("a").id, fx.company("b").id, listOf(fx.document("d").id)).body
+        val claim = fx.claim("BELONGS_TO_SECTOR", fx.company("a").id, fx.sector("b").id, listOf(fx.document("d").id)).body
 
         val edited = bob.patch("/api/claims/${claim.id}", mapOf("expectedRevision" to 1, "evidenceText" to "B 가 바꾼 근거 문장"))
         assertThat(edited.status).isEqualTo(200)
@@ -156,10 +156,10 @@ class ClaimIntegrationTest : IntegrationTest() {
         val bob = loggedIn(BOB)
         val admin = loggedIn(ADMIN)
         val fx = Fixtures(alice)
-        val (x, y, d) = Triple(fx.company("x").id, fx.company("y").id, fx.document("d").id)
-        val a = fx.claim("SUPPLIES_TO", x, y, listOf(d)).body.id
-        val b = Fixtures(bob).claim("COMPETES_WITH", x, y, listOf(d)).body.id
-        val c = fx.claim("HAS_EXPOSURE_TO", x, y, listOf(d)).body.id
+        val (x, y, d) = Triple(fx.node("Person", mapOf("name" to "x-${fx.suffix}")).id, fx.node("Concept", mapOf("name" to "y-${fx.suffix}", "summary" to "개념")).id, fx.document("d").id)
+        val a = fx.claim("ADVOCATES", x, y, listOf(d)).body.id
+        val b = Fixtures(bob).claim("CRITICIZES", x, y, listOf(d)).body.id
+        val c = fx.claim("ADVOCATES", x, y, listOf(d)).body.id
         assertThat(bob.patch("/api/claims/$c", mapOf("expectedRevision" to 1, "evidenceText" to "B 가 바꾼 근거 문장")).status).isEqualTo(200)
 
         // 같은 컨테이너를 다른 테스트와 함께 쓰므로 개수는 세지 않고 이 테스트가 만든 id 가 있는지만 본다.

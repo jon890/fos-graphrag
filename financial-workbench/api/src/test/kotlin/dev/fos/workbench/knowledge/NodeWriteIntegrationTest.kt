@@ -54,7 +54,7 @@ class NodeWriteIntegrationTest : IntegrationTest() {
         assertThat(unknownProperty.status).isEqualTo(400)
         assertThat(unknownProperty.code).isEqualTo("ONTOLOGY_VIOLATION")
 
-        val claimViaNodes = alice.post("/api/nodes", mapOf("type" to "Claim", "properties" to mapOf("predicate" to "SUPPLIES_TO")))
+        val claimViaNodes = alice.post("/api/nodes", mapOf("type" to "Claim", "properties" to mapOf("predicate" to "BELONGS_TO_SECTOR")))
         assertThat(claimViaNodes.code).isEqualTo("ONTOLOGY_VIOLATION")
 
         val company = fx.company("가상전자")
@@ -63,7 +63,7 @@ class NodeWriteIntegrationTest : IntegrationTest() {
         assertThat(badEndpoint.status).isEqualTo(400)
         assertThat(badEndpoint.body["details"]["rule"].asString()).isEqualTo("relationship-endpoint")
 
-        val unknownRelationship = alice.post("/api/relationships", mapOf("type" to "SUPPLIES_TO", "fromId" to company.id, "toId" to company.id))
+        val unknownRelationship = alice.post("/api/relationships", mapOf("type" to "BELONGS_TO_SECTOR", "fromId" to company.id, "toId" to company.id))
         assertThat(unknownRelationship.code).isEqualTo("ONTOLOGY_VIOLATION")
 
         val claimLink = alice.post("/api/relationships", mapOf("type" to "SUBJECT", "fromId" to company.id, "toId" to company.id))

@@ -7,8 +7,10 @@ import { admin, exact, loginAs, newPage, shot, shotElement, type TestUser } from
 
 const suffix = String(Date.now())
 const data = {
-  supplier: `가상부품-${suffix}`,
-  customer: `가상전자-${suffix}`,
+  company: `가상전자-${suffix}`,
+  sector: `가상산업-${suffix}`,
+  supplier: `가상전자-${suffix}`,
+  customer: `가상산업-${suffix}`,
   security: `가상전자 보통주-${suffix}`,
   ticker: `T${suffix.slice(-10)}`,
   issuerSecurity: `가상발행 우선주-${suffix}`,
@@ -17,13 +19,14 @@ const data = {
   failedTicker: `F${suffix.slice(-10)}`,
   docTitle: `가상부품 사업보고서-${suffix}`,
   docUrl: `https://example.com/financial-workbench/${suffix}`,
-  description: `가상부품-${suffix} 이 가상전자-${suffix} 에 메모리 기판을 공급한다.`,
-  evidence: `당사의 주요 매출처는 가상전자-${suffix} 이다.`,
+  description: `가상전자-${suffix} 는 가상산업-${suffix} 에 속한다.`,
+  evidence: `가상전자-${suffix} 는 가상산업-${suffix} 분류에 속한다.`,
+  company2: `가상소재-${suffix}`,
   supplier2: `가상소재-${suffix}`,
   docTitle2: `가상소재 감사보고서-${suffix}`,
   docUrl2: `https://example.com/financial-workbench/${suffix}/2`,
-  description2: `가상소재-${suffix} 이 가상전자-${suffix} 에 소재를 공급한다.`,
-  evidence2: `가상소재-${suffix} 의 주요 매출처는 가상전자-${suffix} 이다.`,
+  description2: `가상소재-${suffix} 는 가상산업-${suffix} 에 속한다.`,
+  evidence2: `가상소재-${suffix} 는 가상산업-${suffix} 분류에 속한다.`,
   reviewNote: '공시 원문과 대조함',
   editByA: `A 가 고친 메모 ${suffix}`,
   editByB: `B 가 고친 메모 ${suffix}`,
@@ -114,7 +117,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   let pageB: Page
   let pageViewer: Page
   let contextViewer: BrowserContext
-  // 2) 에서 만든 공급 주장의 id. 링크와 이력 단계가 쓴다.
+  // 2) 에서 만든 산업 소속 주장의 id. 링크와 이력 단계가 쓴다.
   let supplyClaimId = ''
 
   async function open(browser: Browser): Promise<Page> {
@@ -260,7 +263,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageAdmin.getByTestId('tab-workspace')).toHaveAttribute('aria-selected', 'true')
   })
 
-  test('1) A 가 기업 두 개와 종목을 만들고 ISSUES 관계를 잇는다', async ({ browser }) => {
+  test('1) A 가 기업과 산업, 종목을 만들고 ISSUES 관계를 잇는다', async ({ browser }) => {
     pageA = await open(browser)
     await loginAs(pageA, editorA)
     await expect(pageA.getByTestId('current-user-role')).toHaveAttribute('data-role', 'EDITOR')
@@ -270,8 +273,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA).toHaveURL(/\/workspace$/)
     await expect(pageA.getByTestId('search-input')).toBeVisible()
 
-    await createNode(pageA, 'Company', data.supplier, { name: data.supplier, country: 'KR' })
-    await createNode(pageA, 'Company', data.customer, { name: data.customer, country: 'KR' })
+    await createNode(pageA, 'Company', data.company, { name: data.company, country: 'KR' })
+    await createNode(pageA, 'Sector', data.sector, { name: data.sector, scheme: 'GICS' })
     await createNode(pageA, 'Security', data.security, {
       market: 'KRX_KOSPI',
       ticker: data.ticker,
@@ -283,14 +286,14 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     // 종목 쪽에서 (Company) —ISSUES→ 이 종목 관계를 추가한다.
     await pageA.getByTestId('relationship-add-toggle').click()
     await pageA.getByTestId('relationship-type-select').selectOption('ISSUES:in')
-    await pick(pageA, 'relationship-target-picker', data.customer)
-    await expect(pageA.getByTestId('relationship-target-selected')).toContainText(data.customer)
+    await pick(pageA, 'relationship-target-picker', data.company)
+    await expect(pageA.getByTestId('relationship-target-selected')).toContainText(data.company)
     await pageA.getByTestId('relationship-add-submit').click()
 
-    const row = pageA.getByTestId('relationship-row').filter({ hasText: data.customer })
+    const row = pageA.getByTestId('relationship-row').filter({ hasText: data.company })
     await expect(row).toBeVisible()
     await expect(row).toHaveAttribute('data-rel-type', 'ISSUES')
-    await expect(pageA.locator('[data-testid="graph-node"]').filter({ hasText: data.customer })).toHaveCount(1)
+    await expect(pageA.locator('[data-testid="graph-node"]').filter({ hasText: data.company })).toHaveCount(1)
     await shot(pageA, '01-issues')
   })
 
@@ -335,12 +338,12 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageA.getByTestId('create-prop-name').fill(data.issuerSecurity)
     await pageA.getByTestId('create-prop-securityType').selectOption('COMMON')
     await pageA.getByTestId('create-prop-currency').selectOption('USD')
-    await pick(pageA, 'create-link-ISSUES-picker', data.customer)
-    await expect(pageA.getByTestId('create-link-ISSUES-selected')).toContainText(data.customer)
+    await pick(pageA, 'create-link-ISSUES-picker', data.company)
+    await expect(pageA.getByTestId('create-link-ISSUES-selected')).toContainText(data.company)
     await pageA.getByTestId('create-submit').click()
     await expect(pageA.getByTestId('detail-label')).toHaveText(data.issuerSecurity)
     await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
-    const row = pageA.getByTestId('relationship-row').filter({ hasText: data.customer })
+    const row = pageA.getByTestId('relationship-row').filter({ hasText: data.company })
     await expect(row).toBeVisible()
     await expect(row).toHaveAttribute('data-rel-type', 'ISSUES')
     await shot(pageA, '01b-issuer-linked')
@@ -360,7 +363,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageA.getByTestId('create-prop-name').fill(data.failedSecurity)
     await pageA.getByTestId('create-prop-securityType').selectOption('COMMON')
     await pageA.getByTestId('create-prop-currency').selectOption('USD')
-    await pick(pageA, 'create-link-ISSUES-picker', data.customer)
+    await pick(pageA, 'create-link-ISSUES-picker', data.company)
     await pageA.getByTestId('create-submit').click()
     await expect(pageA.getByTestId('detail-label')).toHaveText(data.failedSecurity)
     await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'error')
@@ -437,7 +440,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageA.getByTestId('graph-hops').selectOption('1')
   })
 
-  test('2) A 가 문서를 등록하고 SUPPLIES_TO Claim 을 만든다', async () => {
+  test('2) A 가 문서를 등록하고 BELONGS_TO_SECTOR Claim 을 만든다', async () => {
     await createNode(pageA, 'Document', data.docTitle, {
       title: data.docTitle,
       url: data.docUrl,
@@ -447,11 +450,11 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       collectedAt: '2026-10-20T12:00',
     })
 
-    await searchAndOpen(pageA, data.supplier)
+    await searchAndOpen(pageA, data.company)
     await pageA.getByTestId('claim-add-toggle').click()
-    await pageA.getByTestId('claim-predicate-select').selectOption('SUPPLIES_TO')
-    await pick(pageA, 'claim-object-picker', data.customer)
-    await expect(pageA.getByTestId('claim-object-selected')).toContainText(data.customer)
+    await expect(pageA.getByTestId('claim-predicate-select')).toHaveValue('BELONGS_TO_SECTOR')
+    await pick(pageA, 'claim-object-picker', data.sector)
+    await expect(pageA.getByTestId('claim-object-selected')).toContainText(data.sector)
     await pick(pageA, 'claim-doc-picker', data.docTitle)
     await expect(pageA.getByTestId('claim-doc-selected')).toContainText(data.docTitle)
     await pageA.getByTestId('claim-description').fill(data.description)
@@ -505,8 +508,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await shot(pageA, '02d-master-claim')
   })
 
-  test('2b) A 가 고객사 상세에서 「주체와 대상 바꾸기」 로 공급 주장을 만든다', async () => {
-    await createNode(pageA, 'Company', data.supplier2, { name: data.supplier2, country: 'KR' })
+  test('2b) A 가 산업 상세에서 「주체와 대상 바꾸기」 로 산업 소속 주장을 만든다', async () => {
+    await createNode(pageA, 'Company', data.company2, { name: data.company2, country: 'KR' })
     await createNode(pageA, 'Document', data.docTitle2, {
       title: data.docTitle2,
       url: data.docUrl2,
@@ -516,16 +519,16 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       collectedAt: '2026-10-20T12:00',
     })
 
-    await searchAndOpen(pageA, data.customer)
+    await searchAndOpen(pageA, data.sector)
     await pageA.getByTestId('claim-add-toggle').click()
-    await expect(pageA.getByTestId('claim-subject-selected')).toContainText(data.customer)
-    await pageA.getByTestId('claim-predicate-select').selectOption('SUPPLIES_TO')
+    await expect(pageA.getByTestId('claim-subject-selected')).toContainText(data.sector)
+    await expect(pageA.getByTestId('claim-predicate-select')).toHaveValue('BELONGS_TO_SECTOR')
     await pageA.getByTestId('claim-swap').click()
-    await expect(pageA.getByTestId('claim-object-selected')).toContainText(data.customer)
+    await expect(pageA.getByTestId('claim-object-selected')).toContainText(data.sector)
     await expect(pageA.getByTestId('claim-subject-selected')).toHaveCount(0)
-    await pick(pageA, 'claim-subject-picker', data.supplier2)
-    await expect(pageA.getByTestId('claim-subject-selected')).toContainText(data.supplier2)
-    await expect(pageA.getByTestId('claim-sentence')).toContainText('에 공급한다')
+    await pick(pageA, 'claim-subject-picker', data.company2)
+    await expect(pageA.getByTestId('claim-subject-selected')).toContainText(data.company2)
+    await expect(pageA.getByTestId('claim-sentence')).toContainText('에 속한다')
     await pick(pageA, 'claim-doc-picker', data.docTitle2)
     await pageA.getByTestId('claim-description').fill(data.description2)
     await pageA.getByTestId('claim-evidence').fill(data.evidence2)
@@ -533,8 +536,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
 
     await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
     const card = pageA.getByTestId('node-claims-section').getByTestId('claim-card').filter({ hasText: data.evidence2 })
-    await expect(card.getByTestId('claim-subject')).toContainText(data.supplier2)
-    await expect(card.getByTestId('claim-object')).toContainText(data.customer)
+    await expect(card.getByTestId('claim-subject')).toContainText(data.company2)
+    await expect(card.getByTestId('claim-object')).toContainText(data.sector)
     await shot(pageA, '02b-claim-from-object')
   })
 
@@ -542,17 +545,17 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageA.getByTestId('tab-workspace').click()
     await pageA.getByTestId('new-node-type').selectOption('Claim')
     await pageA.getByTestId('new-node-button').click()
-    await pageA.getByTestId('claim-predicate-select').selectOption('COMPETES_WITH')
-    await pick(pageA, 'claim-subject-picker', data.supplier2)
-    await pick(pageA, 'claim-object-picker', data.customer)
+    await pageA.getByTestId('claim-predicate-select').selectOption('BELONGS_TO_SECTOR')
+    await pick(pageA, 'claim-subject-picker', data.company2)
+    await pick(pageA, 'claim-object-picker', data.sector)
     await pick(pageA, 'claim-doc-picker', data.docTitle2)
-    await pageA.getByTestId('claim-description').fill(`${data.supplier2} 와 ${data.customer} 가 같은 시장에서 경쟁한다.`)
+    await pageA.getByTestId('claim-description').fill(`${data.company2} 는 ${data.sector} 에 속한다.`)
     await pageA.getByTestId('claim-evidence').fill(data.evidence2)
     await pageA.getByTestId('claim-add-submit').click()
 
     await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
     await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-type', 'Claim')
-    await expect(pageA.getByTestId('detail-label')).toHaveText(`${data.supplier2} → ${data.customer} 경쟁한다`)
+    await expect(pageA.getByTestId('detail-label')).toHaveText(`${data.company2} → ${data.sector} 속한다`)
   })
 
   test('3) B 가 검토 대기 탭에서 Claim 을 검토 완료한다', async ({ browser }) => {
@@ -577,7 +580,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageB.getByTestId('tab-review').click()
     const reviewable = pageB.getByTestId('review-section-reviewable')
     await expect(reviewable.getByTestId('review-table')).toBeVisible()
-    const row = reviewable.getByTestId('review-row').filter({ hasText: data.supplier })
+    const row = reviewable.getByTestId('review-row').filter({ hasText: data.company })
     const pagerInfo = reviewable.getByTestId('review-pager-info')
     await expect(pagerInfo).toBeVisible()
     // 검토 대기 목록은 오래된 것부터라 새 Claim 이 뒤쪽 페이지에 있을 수 있다.
@@ -589,11 +592,11 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       await expect(pagerInfo).not.toHaveText(before ?? '')
     }
     await expect(row).toHaveCount(1)
-    await expect(row).toContainText(data.customer)
+    await expect(row).toContainText(data.sector)
     await row.getByTestId('review-row-note').fill(data.reviewNote)
     await row.getByTestId('review-row-approve').click()
 
-    await expect(pageB.getByTestId('review-message')).toContainText(`${data.supplier} → ${data.customer} 공급한다`)
+    await expect(pageB.getByTestId('review-message')).toContainText(`${data.company} → ${data.sector} 속한다`)
     await expect(row).toHaveCount(0)
     await shot(pageB, '03-reviewed-by-b')
   })
@@ -604,7 +607,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       // 이미 보낸 /?node= 링크도 열리고, 새 주소로 바뀐다.
       await loginAs(page, editorB, 'success', `/?node=${encodeURIComponent(supplyClaimId)}`)
       await expect(page.getByTestId('detail-panel')).toHaveAttribute('data-node-id', supplyClaimId)
-      await expect(page.getByTestId('detail-label')).toHaveText(`${data.supplier} → ${data.customer} 공급한다`)
+      await expect(page.getByTestId('detail-label')).toHaveText(`${data.company} → ${data.sector} 속한다`)
       await expect(page.getByTestId('node-copy-link')).toBeVisible()
       await expect(page).toHaveURL(new RegExp(`/workspace\\?node=${supplyClaimId}&pane=detail$`))
     } finally {
@@ -615,14 +618,14 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     try {
       await loginAs(fresh.page, editorB, 'success', `/workspace?node=${encodeURIComponent(supplyClaimId)}`)
       await expect(fresh.page.getByTestId('detail-panel')).toHaveAttribute('data-node-id', supplyClaimId)
-      await expect(fresh.page.getByTestId('detail-label')).toHaveText(`${data.supplier} → ${data.customer} 공급한다`)
+      await expect(fresh.page.getByTestId('detail-label')).toHaveText(`${data.company} → ${data.sector} 속한다`)
     } finally {
       await fresh.context.close()
     }
   })
 
-  test('4) A 가 공급사 주변 그래프와 근거, 검토자를 확인한다', async () => {
-    await searchAndOpen(pageA, data.supplier)
+  test('4) A 가 기업 주변 그래프와 근거, 검토자를 확인한다', async () => {
+    await searchAndOpen(pageA, data.company)
 
     const canvas = pageA.getByTestId('graph-canvas')
     await expect(canvas).toHaveAttribute('data-collapsed-claims', '1')
@@ -631,12 +634,13 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     const claimId = (await card.getAttribute('data-claim-id'))!
     const claimItem = pageA.locator(`[data-testid="graph-node"][data-node-id="${claimId}"]`)
     const companies = (name: string) => pageA.locator('[data-testid="graph-node"][data-node-type="Company"]').filter({ hasText: name })
+    const sectors = (name: string) => pageA.locator('[data-testid="graph-node"][data-node-type="Sector"]').filter({ hasText: name })
     const documents = pageA.locator('[data-testid="graph-node"][data-node-type="Document"]').filter({ hasText: data.docTitle })
-    // 주장은 공급사에서 고객사로 가는 선 하나로 접혀 있고, 목록에는 접힌 주장으로 남는다
+    // 주장은 기업에서 산업으로 가는 선 하나로 접혀 있고, 목록에는 접힌 주장으로 남는다
     await expect(claimItem).toHaveAttribute('data-collapsed', 'true')
     await expect(claimItem).toHaveAttribute('data-review-status', 'REVIEWED')
-    await expect(claimItem).toContainText(`${data.supplier} → ${data.customer} 공급한다`)
-    await expect(companies(data.customer)).toHaveCount(1)
+    await expect(claimItem).toContainText(`${data.company} → ${data.sector} 속한다`)
+    await expect(sectors(data.sector)).toHaveCount(1)
 
     await expect(card).toHaveAttribute('data-review-status', 'REVIEWED')
     await expect(card.getByTestId('claim-evidence-text')).toHaveText(data.evidence)
@@ -650,8 +654,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-id', claimId)
     await pageA.getByTestId('graph-expand').click()
     await expect(pageA.getByTestId('graph-loading')).toHaveCount(0)
-    await expect(companies(data.supplier)).toHaveCount(1)
-    await expect(companies(data.customer)).toHaveCount(1)
+    await expect(companies(data.company)).toHaveCount(1)
+    await expect(sectors(data.sector)).toHaveCount(1)
     await expect(documents).toHaveCount(0)
     await expect(canvas).toHaveAttribute('data-collapsed-claims', '1')
 
@@ -676,9 +680,9 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA).toHaveURL(/q=/)
 
     // 「그래프에 나온 항목」 에서 고객사를 열면 상세만 바뀐다.
-    const customerItem = pageA.locator('[data-testid="graph-node"][data-node-type="Company"]').filter({ hasText: data.customer })
+    const customerItem = pageA.locator('[data-testid="graph-node"][data-node-type="Sector"]').filter({ hasText: data.sector })
     await customerItem.getByRole('button').click()
-    await expect(pageA.getByTestId('detail-label')).toHaveText(data.customer)
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.sector)
     await pageA.goBack()
     await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
     await expect(pageA.getByTestId('search-input')).toHaveValue(data.supplier)
@@ -693,7 +697,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
 
     // 홉 수는 주소만 바꾸고 기록을 쌓지 않는다. 고객사를 연 뒤 홉을 바꿔도 뒤로가기 한 번이면 공급사다.
     await customerItem.getByRole('button').click()
-    await expect(pageA.getByTestId('detail-label')).toHaveText(data.customer)
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.sector)
     await pageA.getByTestId('graph-hops').selectOption('2')
     await expect(pageA).toHaveURL(/hops=2/)
     await pageA.goBack()
@@ -703,8 +707,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   })
 
   test('5) 같은 노드를 동시에 고치면 나중 저장은 409 안내 뒤 최신 값을 보이고, 내 입력을 골라 다시 적용해 저장한다', async () => {
-    await searchAndOpen(pageA, data.customer)
-    await searchAndOpen(pageB, data.customer)
+    await searchAndOpen(pageA, data.company)
+    await searchAndOpen(pageB, data.company)
     const revisionBefore = Number(await pageB.getByTestId('node-revision').textContent())
 
     await pageA.getByTestId('edit-prop-description').fill(data.editByA)

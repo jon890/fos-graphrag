@@ -54,7 +54,7 @@ class OntologyVersionIntegrationTest : IntegrationTest() {
 
         assertThat(versions.latestNumber()).describedAs("코드 소유 부분은 그대로라 새 버전이 없다").isEqualTo(edited)
         val predicate = versions.latest()!!.ontology.nodeTypes.getValue("Claim").properties.getValue("predicate")
-        assertThat(predicate.values).doesNotContain("CRITICIZES").contains("SUPPLIES_TO")
+        assertThat(predicate.values).doesNotContain("CRITICIZES").contains("BELONGS_TO_SECTOR")
         assertThat(holder.current().claimPredicates).doesNotContainKey("CRITICIZES")
     }
 

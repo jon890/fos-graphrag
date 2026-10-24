@@ -45,7 +45,7 @@ class OntologyLabelsTest {
         val market = ontology.nodeTypes.getValue("Security").properties.getValue("market")
         assertThat(market.values).containsExactly("KRX_KOSPI", "KRX_KOSDAQ", "NASDAQ", "NYSE", "OTHER")
         assertThat(market.valueLabels).containsEntry("KRX_KOSPI", "코스피").containsEntry("KRX_KOSDAQ", "코스닥")
-        assertThat(ontology.claimPredicates.keys).containsExactly("SUPPLIES_TO", "BELONGS_TO_SECTOR", "COMPETES_WITH", "HAS_EXPOSURE_TO", "ADVOCATES", "CRITICIZES")
+        assertThat(ontology.claimPredicates.keys).containsExactly("BELONGS_TO_SECTOR", "ADVOCATES", "CRITICIZES")
         val country = ontology.nodeTypes.getValue("Company").properties.getValue("country")
         assertThat(country.type).isEqualTo(PropertyType.ENUM)
         assertThat(country.values).containsExactly("KR", "US", "JP", "CN", "TW", "HK", "NL", "DE", "GB", "FR", "OTHER")
@@ -114,7 +114,7 @@ class OntologyLabelsTest {
     fun `Claim predicate 선택지 이름은 claimPredicates 의 label 에서 온다`() {
         val predicate = ontology.nodeTypes.getValue("Claim").properties.getValue("predicate")
         assertThat(predicate.valueLabels).isEqualTo(ontology.claimPredicates.mapValues { it.value.label })
-        assertThat(predicate.valueLabels).containsEntry("SUPPLIES_TO", "공급한다")
+        assertThat(predicate.valueLabels).containsEntry("BELONGS_TO_SECTOR", "속한다")
     }
 
     @Test
@@ -124,7 +124,7 @@ class OntologyLabelsTest {
             sentence.split("{subject}").size != 2 || sentence.split("{object}").size != 2
         }.keys
         assertThat(invalid).describedAs("문장 틀이 없거나 자리가 어긋난 predicate").isEmpty()
-        assertThat(ontology.claimPredicates.getValue("SUPPLIES_TO").sentence).isEqualTo("{subject}이(가) {object}에 공급한다")
+        assertThat(ontology.claimPredicates.getValue("BELONGS_TO_SECTOR").sentence).isEqualTo("{subject}이(가) {object}에 속한다")
     }
 
     @Test
@@ -201,10 +201,10 @@ class OntologyLabelsTest {
 
     @Test
     fun `주장 종류 이름을 바꾸면 Claim 선택지 이름도 바뀐다`() {
-        val supplies = ontology.claimPredicates.getValue("SUPPLIES_TO")
-        val edited = ontology.copy(claimPredicates = ontology.claimPredicates + ("SUPPLIES_TO" to supplies.copy(label = "납품한다")))
+        val belongsToSector = ontology.claimPredicates.getValue("BELONGS_TO_SECTOR")
+        val edited = ontology.copy(claimPredicates = ontology.claimPredicates + ("BELONGS_TO_SECTOR" to belongsToSector.copy(label = "분류된다")))
         val merged = CodeOwned.merge(edited, OntologyLoader.loadDefault())
-        assertThat(merged.nodeTypes.getValue("Claim").properties.getValue("predicate").valueLabels).containsEntry("SUPPLIES_TO", "납품한다")
+        assertThat(merged.nodeTypes.getValue("Claim").properties.getValue("predicate").valueLabels).containsEntry("BELONGS_TO_SECTOR", "분류된다")
     }
 
     @Test

@@ -109,12 +109,12 @@ class TransactionConsistencyIntegrationTest : IntegrationTest() {
         val alice = loggedIn(ALICE)
         val fx = Fixtures(alice)
         val supplier = fx.company("공급사")
-        val customer = fx.company("고객사")
+        val customer = fx.sector("반도체")
         val document = fx.document("사업보고서")
 
         recorder.fail = true
         try {
-            assertThat(fx.claim("SUPPLIES_TO", supplier.id, customer.id, listOf(document.id)).status).isEqualTo(500)
+            assertThat(fx.claim("BELONGS_TO_SECTOR", supplier.id, customer.id, listOf(document.id)).status).isEqualTo(500)
         } finally {
             recorder.fail = false
         }

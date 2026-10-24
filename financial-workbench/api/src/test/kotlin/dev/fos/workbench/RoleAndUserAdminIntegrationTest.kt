@@ -25,7 +25,7 @@ class RoleAndUserAdminIntegrationTest : IntegrationTest() {
         assertThat(create.code).isEqualTo("FORBIDDEN")
         assertThat(viewer.patch("/api/nodes/${company.id}", mapOf("expectedRevision" to 1, "properties" to mapOf("country" to "US"))).status).isEqualTo(403)
         assertThat(viewer.post("/api/nodes/${company.id}/archive", mapOf("expectedRevision" to 1)).status).isEqualTo(403)
-        assertThat(viewer.post("/api/claims", mapOf("predicate" to "SUPPLIES_TO")).status).isEqualTo(403)
+        assertThat(viewer.post("/api/claims", mapOf("predicate" to "BELONGS_TO_SECTOR")).status).isEqualTo(403)
         assertThat(viewer.post("/api/relationships", mapOf("type" to "ISSUES", "fromId" to "a", "toId" to "b")).status).isEqualTo(403)
         assertThat(alice.get("/api/nodes/${company.id}").body["node"]["revision"].asLong()).isEqualTo(1)
     }

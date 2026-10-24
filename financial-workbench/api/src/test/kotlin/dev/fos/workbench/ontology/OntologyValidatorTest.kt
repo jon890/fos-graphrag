@@ -71,7 +71,7 @@ class OntologyValidatorTest {
         assertThat(ontology.nodeTypes.keys).containsExactlyInAnyOrder(
             "Company", "Security", "Sector", "Document", "Person", "Concept", "Change", "Bottleneck", "Valuation", "Scenario", "Decision", "Claim",
         )
-        assertThat(ontology.requirePredicate("SUPPLIES_TO").subjectTypes).containsExactly("Company")
+        assertThat(ontology.requirePredicate("BELONGS_TO_SECTOR").subjectTypes).containsExactly("Company", "Security")
         assertThatThrownBy { ontology.requireRelationshipType("OWNS_ACCOUNT") }.isInstanceOf(OntologyViolationException::class.java)
     }
 

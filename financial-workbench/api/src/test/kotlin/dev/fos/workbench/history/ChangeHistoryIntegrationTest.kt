@@ -16,16 +16,16 @@ class ChangeHistoryIntegrationTest : IntegrationTest() {
         val alice = loggedIn(ALICE)
         val fx = Fixtures(alice)
         val subject = fx.company("주체")
-        val target = fx.company("대상")
+        val target = fx.sector("대상")
         val document = fx.document("근거")
-        val claim = fx.claim("SUPPLIES_TO", subject.id, target.id, listOf(document.id)).body
+        val claim = fx.claim("BELONGS_TO_SECTOR", subject.id, target.id, listOf(document.id)).body
 
         fun created(): JsonNode = alice.get("/api/changes?targetId=${claim.id}").body["items"]
             .single { it["action"].asString() == "CREATE" }
         val event = created()
         assertThat(event["changes"]["subjectId"]["after"].asString()).isEqualTo(subject.id)
         assertThat(event["refs"][subject.id]["label"].asString()).isEqualTo(subject["label"].asString())
-        assertThat(event["refs"][target.id]["type"].asString()).isEqualTo("Company")
+        assertThat(event["refs"][target.id]["type"].asString()).isEqualTo("Sector")
         assertThat(event["refs"][document.id]["type"].asString()).isEqualTo("Document")
 
         val renamed = "새이름-${fx.suffix}"
@@ -40,7 +40,7 @@ class ChangeHistoryIntegrationTest : IntegrationTest() {
         val alice = loggedIn(ALICE)
         val bob = loggedIn(BOB)
         val fx = Fixtures(alice)
-        val claim = fx.claim("SUPPLIES_TO", fx.company("a").id, fx.company("b").id, listOf(fx.document("d").id)).body
+        val claim = fx.claim("BELONGS_TO_SECTOR", fx.company("a").id, fx.sector("b").id, listOf(fx.document("d").id)).body
         assertThat(bob.post("/api/claims/${claim.id}/review", mapOf("expectedRevision" to 1, "status" to "REVIEWED")).status).isEqualTo(200)
         val edited = alice.patch("/api/claims/${claim.id}", mapOf("expectedRevision" to 2, "evidenceText" to "고친 근거 문장"))
         assertThat(edited.status).describedAs(edited.body.toString()).isEqualTo(200)
