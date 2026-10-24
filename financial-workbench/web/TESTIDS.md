@@ -170,7 +170,7 @@ VIEWER 에게는 `node-edit`, `node-edit-form`, `edit-prop-*`, `node-save`, `nod
 | `relationship-section` | 「연결」 절 |
 | `relationship-row` * | 관계 한 줄(관계 문장). `data-rel-type`, `data-direction` 이 `out`(이 노드가 시작점) 또는 `in`(이 노드가 끝점) |
 | `relationship-self` * | 문장 안의 이 노드 이름(굵게) |
-| `relationship-open` * | 문장 안의 상대 이름 단추. `data-node-id`. 누르면 그 항목의 상세를 연다 |
+| `relationship-open` * | 문장 안의 상대 이름 링크(`<a>`, `href` 는 `/workspace?node=<id>&pane=detail`). `data-node-id`. 누르면 그 항목의 상세를 열고, 보조 키를 누르고 클릭하면 브라우저가 새 탭으로 연다 |
 | `relationship-archive-toggle` * | 「연결 보관」 또는 「연결 복원」. 정의에서 빠진 관계 종류에는 없다 |
 | `relationship-undefined` * | 「정의에서 빠진 관계」 배지. 온톨로지에 없는 관계 종류의 행에만 나온다 |
 | `relationship-add-toggle`, `relationship-add-form` | 절 머리의 「＋ 연결 추가」 와 그 추가 칸 |

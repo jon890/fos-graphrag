@@ -56,6 +56,7 @@ function DropdownMenuContent({
           // 닫히는 애니메이션이 도는 동안에도 Radix 는 메뉴 바깥 누름을 듣는다.
           // 그때 메뉴 단추를 누르면 단추가 연 메뉴를 이 바깥 누름이 곧바로 다시 닫는다.
           // 단추 누름은 단추가 스스로 열고 닫으므로 바깥 누름으로 치지 않는다.
+          // shadcn 원본과 다른 곳이다. Radix 가 붙이는 aria-labelledby 에 기대므로 radix-ui 를 올리면 e2e 0d 로 확인한다.
           const triggerId = contentRef.current?.getAttribute("aria-labelledby")
           const target = event.target
           if (triggerId && target instanceof Element && target.closest(`[id="${CSS.escape(triggerId)}"]`)) {
