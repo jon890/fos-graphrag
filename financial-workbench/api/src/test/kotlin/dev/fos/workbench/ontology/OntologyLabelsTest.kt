@@ -236,6 +236,13 @@ class OntologyLabelsTest {
     }
 
     @Test
+    fun `저장소 온톨로지의 모든 관계 종류는 문장 틀이 있다`() {
+        val missing = ontology.relationshipTypes.filterValues { it.sentence.isNullOrBlank() }.keys
+        assertThat(missing).describedAs("문장 틀이 없는 관계 종류").isEmpty()
+        assertThat(OntologyLoader.consistencyErrors(ontology)).isEmpty()
+    }
+
+    @Test
     fun `관계 문장 틀이 없으면 YAML 에 sentence 키를 쓰지 않는다`() {
         val withoutSentence = ontology.copy(relationshipTypes = ontology.relationshipTypes.mapValues { it.value.copy(sentence = null) })
         assertThat(OntologyLoader.toYaml(withoutSentence)).doesNotContain("sentence: null")

@@ -60,6 +60,20 @@ describe('relationSentenceParts', () => {
     ])
   })
 
+  it('저장소 온톨로지의 결정, 근거 자료 문장 틀은 끝 자리를 앞에 두고 합니다체로 보인다', () => {
+    // financial-ontology.yaml 의 HAS_DECISION, EVIDENCED_BY 문장 틀을 그대로 옮긴 조각이다
+    const repo: Ontology = {
+      ...ontology,
+      nodeTypes: { ...ontology.nodeTypes, Document: node('근거 문서') },
+      relationshipTypes: {
+        HAS_DECISION: { label: '결정', description: '', from: ['Security'], to: ['Decision'], sentence: '{to}은(는) {from}에 대한 결정이다' },
+        EVIDENCED_BY: { label: '근거 자료', description: '', from: ['Bottleneck'], to: ['Document'], sentence: '{to}이(가) {from}을(를) 뒷받침한다' },
+      },
+    }
+    expect(relationSentence(repo, 'HAS_DECISION', 'FLNC', 'FLNC 첫 매수')).toBe('FLNC 첫 매수는 FLNC에 대한 결정입니다')
+    expect(relationSentence(repo, 'EVIDENCED_BY', 'HBM 병목', '공개 자료')).toBe('공개 자료가 HBM 병목을 뒷받침합니다')
+  })
+
   it('영문 이름도 읽는 소리로 조사를 고른다', () => {
     expect(relationSentence(ontology, 'ISSUES', 'POET', 'FLNC')).toBe('POET가 FLNC를 발행합니다')
     expect(relationSentence(ontology, 'CREATES', 'AI 수요', 'HBM')).toBe('AI 수요가 HBM을 만듭니다')

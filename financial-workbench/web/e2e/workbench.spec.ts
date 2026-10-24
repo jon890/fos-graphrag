@@ -475,7 +475,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageA.unroute('**/api/relationships')
   })
 
-  test('1c) 투자 논리 사슬을 만들고 결정에서 변화까지 따라간다', async () => {
+  test('1c) 투자 온톨로지 항목을 이어 만들고 결정에서 변화까지 따라간다', async () => {
     await createNode(pageA, 'Change', data.change, { title: data.change, category: 'TECHNOLOGY' })
 
     await openAdd(pageA, 'Bottleneck')

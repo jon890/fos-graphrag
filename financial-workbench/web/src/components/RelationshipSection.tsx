@@ -59,7 +59,7 @@ export function RelationshipSection({ node, relationships, onChanged, onError, o
       await api.relationships.create(option.type, fromId, toId)
       setAdding(false)
       setTarget(null)
-      onChanged(`「${labels.relationship(option.type)}」 관계를 추가했습니다.`)
+      onChanged(`「${labels.relationship(option.type)}」 연결을 추가했습니다.`)
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -71,7 +71,7 @@ export function RelationshipSection({ node, relationships, onChanged, onError, o
     try {
       if (rel.archived) await api.relationships.restore(rel.id, rel.revision)
       else await api.relationships.archive(rel.id, rel.revision)
-      onChanged(rel.archived ? '관계를 복원했습니다.' : '관계를 보관했습니다.')
+      onChanged(rel.archived ? '연결을 복원했습니다.' : '연결을 보관했습니다.')
     } catch (e) {
       onError(e)
     }
@@ -136,7 +136,7 @@ export function RelationshipSection({ node, relationships, onChanged, onError, o
       {canEdit && adding && option && (
         <div className="sub-form" data-testid="relationship-add-form">
           <div className="field">
-            <label>관계 종류</label>
+            <label>연결 종류</label>
             <select
               data-testid="relationship-type-select"
               value={option.key}
