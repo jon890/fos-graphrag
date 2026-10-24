@@ -1,100 +1,104 @@
-# Phase 06. 온톨로지 표시 이름과 화면 문구 다듬기, 투자 온톨로지 명칭
+# Phase 05. 상세 읽기 카드, 편집 전환, ⋯ 메뉴와 보관 창, 연결 문장
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
-관계 표시 이름을 관계 문장으로 읽히는 동사구로 바꾸고, 타입 설명의 첫 문장을 「＋ 추가」 메뉴에 맞게 다듬는다. 화면 문구(TSX, `src/lib/guide.ts`)를 `korean-check` 기준으로 점검해 어색한 표현을 고치고, 「투자 논리 사슬」 이 남은 곳을 「투자 온톨로지」 로 바꾼다.
+작업 공간의 상세 칸을 읽기 카드로 바꾼다. 편집 폼은 「편집」 을 누를 때 열고, 링크 복사와 변경 이력, 보관과 복원은 「⋯」 메뉴로 옮긴다. 관계는 문장으로 보이고, 「＋ 연결 추가」 와 「＋ 주장 추가」 를 절 머리에 둔다.
 
-**범위 외**: 운영 온톨로지에 같은 문구를 저장하는 일(배포 뒤 ADMIN 이 한다. `docs/deployment.md` 「저장소 온톨로지의 문구를 운영에 반영할 때」). 화면 구조 변경(앞 phase 에서 끝남).
+**범위 외**: 검색 칸과 그래프(Phase 04). 화면 문구 전체 점검과 온톨로지 표시 이름(Phase 06).
 
 ## 컨텍스트
 
-- 온톨로지는 `financial-workbench/ontology/financial-ontology.yaml` 이다. 관계 종류는 `relationshipTypes`, 타입 설명은 `nodeTypes.<타입>.description` 이다. 이 파일의 편집할 수 있는 부분은 DB 가 비어 있을 때만 첫 버전이 된다([ADR-008](../../financial-workbench/docs/adr/008-ontology-versions-in-db.md)). 테스트와 e2e 는 빈 DB 에서 시작하므로 이 파일의 값을 쓴다.
-- 관계 문장 규칙은 `financial-workbench/docs/flow.md` 「관계 문장」, 표시 이름 규칙은 `financial-workbench/docs/data-schema.md` 「표시 이름」 이다. 표시 이름은 끝 타입을 목적어로 받는 동사구여야 「{끝}을(를) …합니다」, 「{시작}이(가) …합니다」 가 자연스럽다.
-- 표시 이름이 있는지는 `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyLabelsTest.kt` 가 확인한다. 값 자체를 단언하는 테스트가 있는지 `git grep -n "이익을 준다\|결정의 근거\|병목이 있다\|관련된다" -- financial-workbench` 로 확인하고 함께 고친다.
-- 화면 문구는 TSX 안에 인라인으로 있고, 첫 접속 가이드 문구는 `src/lib/guide.ts` 다. 문구 규칙은 `korean-check` 스킬의 `references/korean-style.md` 이고 검사기는 같은 스킬의 `scripts/korean-style-check.py` 다.
+- 상세는 `financial-workbench/web/src/components/DetailPanel.tsx` 다. 지금은 머리(배지, 이름, 검토 상태, 보관됨), 알림(`detail-notice`), 동작 줄(`node-history-link`, `node-center-graph`, `node-copy-link`, `node-archive-reason`, `node-archive-button` 또는 `node-restore-button`), 열람자 안내(`viewer-hint`), 생성과 수정(`node-meta`, `node-updated-by`), 「자세히」(`node-meta-details`, `node-revision`), 그리고 주장 노드면 `ClaimCard` 와 `ReviewControls`, `ClaimEditForm`, 아니면 늘 열린 `NodeEditForm` 을 그린다. 그 아래 `RelationshipSection` 과 주장 절(`node-claims-section`, `claim-add-toggle`, `ClaimCreateForm`)이 있다.
+- 동시 수정 때 입력을 지키는 `draft`(`EditDraft`)와 `onConflict`, `onDraftDone` 은 `DetailPanel` 이 들고 `NodeEditForm` 에 넘긴다(`docs/flow.md` 「화면에서 입력 지키기」). `fail(e)` 은 `REVISION_CONFLICT` 면 상세를 다시 읽는다.
+- 관계는 `src/components/RelationshipSection.tsx` 가 그린다. 줄(`relationship-row`, `data-rel-type`)은 「시작 —표시 이름→ 끝」 이고, 편집자는 `relationship-archive-toggle`, 추가는 `relationship-add-toggle` → `relationship-add-form`(`relationship-type-select`, `relationship-target-picker-*`, `relationship-add-submit`)이다. `RelationshipView` 는 `from`, `to`(각 `id`, `type`, `label`)와 `archived` 를 가진다.
+- 링크 복사는 `src/components/CopyLinkButton.tsx` 다. 사용자 이름은 `src/lib/format.ts` 의 `userName(ref)`(없으면 「시스템」), 날짜는 `formatDate`, 시각은 `formatDateTime` 이다. 값 표시는 `useLabels().value(type, prop, value)`, 속성 이름은 `useLabels().property(type, prop)` 이다.
+- Phase 02 가 만든 `src/lib/relationSentence.ts` 의 `relationSentence(label, direction, other)`, `src/components/ui/dialog.tsx`, `src/components/ui/dropdown-menu.tsx` 를 쓴다.
+- 가이드의 주장 단계는 `DetailPanel` 이 `prefill.subjectId` 를 보고 주장 폼을 저절로 연다. 대상 testid 는 `claim-add-submit` 이다.
 
-**근거 문서**: `financial-workbench/docs/flow.md` 의 「관계 문장」, 「노드 만들기」, 「첫 접속 가이드」, `financial-workbench/docs/data-schema.md` 의 「표시 이름」, 「투자 온톨로지」, `financial-workbench/docs/deployment.md` 의 「저장소 온톨로지의 문구를 운영에 반영할 때」
+**근거 문서**: `financial-workbench/docs/flow.md` 의 「작업 공간」 의 「상세 칸: 읽기 카드」, 「관계 문장」, 「화면에서 입력 지키기」, 「보관과 복원」, 「주장 만들기 화면」, `financial-workbench/docs/code-architecture.md` 의 「웹 구조」
 
 ## 의도 메모
 
-- 키(`ISSUES`, `CREATES` 등)와 속성 정의, `createPicker` 의 관계는 바꾸지 않는다. 표시 문구만 바꾼다.
-- 바꾼 문구는 PR 본문의 「문구 변경 표」 로 옮긴다. 커밋 메시지 본문에 전과 후를 줄마다 적어 두면 PR 을 쓸 때 그대로 옮길 수 있다.
-- 새 번역어를 만들지 않는다. 저장소 문서와 코드가 이미 쓰는 표기를 따른다.
+- testid 는 되도록 유지한다. `node-copy-link`, `node-history-link`, `node-archive-button`, `node-restore-button` 은 「⋯」 메뉴 항목이 되고, `node-archive-reason` 은 보관 창 안의 입력이 된다. e2e 는 메뉴를 먼저 여는 한 단계만 더한다.
+- 편집 폼을 여는 상태(`editing`)는 `DetailPanel` 이 든다. 409 를 받으면 `editing` 을 그대로 두어 비교가 보이게 한다. 다른 항목을 고르면(`selectedId` 가 바뀌면) `editing` 과 `draft` 를 함께 지운다.
+- 보관 창의 「보관」 이 실패하면 창을 닫고 지금의 `fail(e)` 로 상세 위에 알린다. `LAST_EVIDENCE` 의 「주장 열기」 단추도 그대로 나온다.
+- 메뉴는 `modal={false}` 다(CSP 와 스크롤 잠금).
 
 ## 작업 항목
 
-### 1. `financial-workbench/ontology/financial-ontology.yaml` 의 관계 표시 이름
+### 1. `src/components/NodeReadCard.tsx` (신규)
 
-| 관계 | 지금 `label` | 바꿀 `label` | 바꿀 `description` |
-| --- | --- | --- | --- |
-| `RELATED_TO` | 관련된다 | 함께 본다 | 두 개념을 함께 본다. 근거가 필요 없는 식별 관계다. |
-| `HAS_BOTTLENECK` | 병목이 있다 | 겪는다 | 산업이 병목을 겪는다. |
-| `BENEFITS` | 이익을 준다 | 이롭게 한다 | 병목이 기업을 이롭게 한다. 기업이 병목의 이익을 가져간다. |
-| `HAS_VALUATION` | 밸류에이션 | 가진다 | 기업이 밸류에이션을 가진다. |
-| `HAS_SCENARIO` | 시나리오 | 포함한다 | 밸류에이션이 시나리오를 포함한다. |
-| `HAS_DECISION` | 결정 | 받는다 | 종목이 투자 결정을 받는다. |
-| `BASED_ON` | 결정의 근거 | 뒷받침한다 | 밸류에이션이 투자 결정을 뒷받침한다. |
-| `EVIDENCED_BY` | 근거 자료 | 근거로 삼는다 | 변화, 병목, 밸류에이션이 자료를 근거로 삼는다. |
+일반 노드의 속성 목록을 그린다(testid `node-props`). 온톨로지 속성 순서대로, 값이 `null`, `undefined`, 빈 문자열인 속성은 뺀다. 줄은 `<dt>` 속성 이름, `<dd>` 표시 값(`labels.value`)이고 testid `node-prop`, `data-prop`. 값이 하나도 없으면 「적은 내용이 없습니다.」. 정의에서 빠진 타입은 지금처럼 `UndefinedTypeProperties` 를 쓴다(이 컴포넌트를 부르지 않는다).
 
-`ISSUES`(발행한다), `AUTHORED`(썼다), `CREATES`(만든다)는 이미 규칙에 맞아 그대로 둔다. `createPicker.label` 은 고르기 칸의 이름이라 동사구로 바꾸지 않는다. 다만 「병목이 있는 산업」 은 「이 병목을 겪는 산업」 으로 바꿔 관계 이름과 맞춘다.
+### 2. `src/components/DetailPanel.tsx`
 
-### 2. 같은 파일의 타입 설명
+`docs/flow.md` 「상세 칸: 읽기 카드」 표의 순서로 다시 짠다.
 
-첫 문장만 읽어도 무엇인지 알게 고친다. 둘째 문장부터는 지금 내용을 남긴다.
+- 머리: 타입 배지, 이름(`detail-label`), 검토 상태, 보관됨(`detail-archived`). 그 아래 한 줄 `node-created-line`: `${withJosa(userName(node.createdBy), '이(가)')} ${formatDate(node.createdAt)}에 등록`.
+- 버튼 줄(testid `node-actions`):
+  - 「편집」(testid `node-edit`): `canEdit && !node.archived && typeDefined` 일 때. 누르면 `editing = true`.
+  - 「그래프 중심으로」(testid `node-center-graph`).
+  - 「⋯」(testid `node-more`, `aria-label="더 보기"`) 메뉴: 「링크 복사」(`node-copy-link`, 지금 `CopyLinkButton` 동작), 「변경 이력」(`node-history-link`), 편집 권한이 있으면 「보관」(`node-archive-button`) 또는 「복원」(`node-restore-button`). 클립보드를 쓸 수 없을 때 주소를 보이는 입력칸은 메뉴가 닫혀도 남도록 버튼 줄 아래에 그린다(`CopyLinkButton` 이 메뉴 밖에 결과를 그릴 수 있게 props 를 나눈다).
+- 보관 창(testid `node-archive-dialog`): 제목 「이 항목을 보관할까요?」, 설명 「보관하면 기본 검색과 주변 그래프에서 빠집니다. 복원할 수 있습니다.」, 사유 입력 `node-archive-reason`(placeholder 「보관 사유(선택)」), 단추 「보관」(`node-archive-confirm`)과 「취소」. 복원은 묻지 않고 바로 한다.
+- 열람자 안내 `viewer-hint` 는 그대로.
+- 일반 노드: `editing` 이면 지금의 `NodeEditForm` 을 그리고 「취소」(testid `node-edit-cancel`)를 폼 옆에 둔다. 저장에 성공하면 `editing = false`. 아니면 `NodeReadCard` 를 그린다. 타입 설명(`hint`)은 편집할 때만 보인다.
+- 주장 노드: `ClaimCard` 와 `ReviewControls` 는 늘 보이고, `ClaimEditForm` 은 `editing` 일 때만 그린다(「편집」 단추 규칙이 같다).
+- 「연결」 절은 `RelationshipSection`, 「주장」 절은 머리 「주장 (N)」 과 편집 권한이 있을 때 머리 오른쪽 「＋ 주장 추가」(`claim-add-toggle`, 보관된 항목이면 끔).
+- 「자세히」(`node-meta-details`) 안에 생성(작성자, 시각), 수정(`node-updated-by`), 보관 시각, revision(`node-revision`), ID 를 둔다. 기본은 접힘. 머리 아래의 `node-meta` 는 지운다.
+- `selectedId` 가 바뀌면 `editing` 을 `false` 로 되돌린다. 409 면 `editing` 을 유지한다.
 
-| 타입 | 바꿀 `description` |
-| --- | --- |
-| `Company` | 사업을 하는 법인이다. 상장 여부와 관계없이 담는다. |
-| `Security` | 시장에서 거래되는 종목이다. 같은 기업의 여러 상장과 이름이 같은 종목을 시장과 종목 코드로 구분한다. |
-| `Sector` | 기업이 속하고 병목이 생기는 산업이다. |
-| `Document` | 판단과 주장의 근거가 되는 자료다. 서버가 주소를 읽어 오지 않으므로 사람이 자료 정보를 직접 등록한다. |
-| `Change` | 투자 판단에 영향을 주는 세상의 변화다. |
-| `Valuation` | 한 기업의 가치를 한 기준일에 평가한 기록이다. |
-| `Scenario` | 비관, 기준, 낙관 가운데 한 가정으로 계산한 주당 가치다. |
-| `Claim` | 근거 문서와 함께 등록하고 다른 편집자가 검토하는 주장이다. |
+### 3. `src/components/RelationshipSection.tsx`
 
-`Person`, `Concept`, `Bottleneck`, `Decision` 은 그대로 둔다.
+- 절 제목을 「연결」 로, 머리 오른쪽에 「＋ 연결 추가」(`relationship-add-toggle`)를 둔다. 추가 칸은 지금 그대로다(관계 종류 선택지 글자도 문장 규칙으로: 나가는 것은 「이 항목이 (끝 타입)을(를) {합니다체}」, 들어오는 것은 「(시작 타입)이(가) 이 항목을 {합니다체}」).
+- 줄(`relationship-row`, `data-rel-type`, `data-direction`)은 이 항목이 시작이면 `relationSentence(label, 'out', to.label)`, 끝이면 `relationSentence(label, 'in', from.label)` 이다. 문장 안의 상대 이름은 단추(testid `relationship-open`, `data-node-id`)로 누르면 `onOpenNode(id)`. 문장을 조각으로 그리기 위해 `relationSentence` 와 같은 규칙으로 `{ other, rest }` 를 돌려주는 `relationSentenceParts(label, direction, other)` 를 `relationSentence.ts` 에 더하고 `relationSentence` 는 그것을 이어 붙이게 바꾼다.
+- 상대 타입 배지는 문장 앞에 둔다. 보관된 관계는 흐리게 「보관됨」 을 붙이고, 편집자는 「연결 보관」 또는 「연결 복원」(`relationship-archive-toggle`). 「정의에서 빠진 관계」 표시(`relationship-undefined`)는 그대로.
+- 연결이 없으면 「아직 연결된 항목이 없습니다.」.
 
-### 3. 화면 문구 점검: `financial-workbench/web/src/**/*.tsx`, `financial-workbench/web/src/lib/guide.ts`
+### 4. 단위 테스트: `src/components/DetailPanel.test.tsx`, `src/lib/relationSentence.test.ts`, `src/components/screens.test.tsx`
 
-- 사용자에게 보이는 문자열을 모아(`git grep -n "[가-힣]" -- 'financial-workbench/web/src/**/*.tsx' financial-workbench/web/src/lib/guide.ts` 에서 주석을 뺀 것) `korean-check` 의 검사기로 점검한다. 걸린 표현과 어색한 표현(조사 생략, 명사만 이은 문장, 한 화면 안의 높임 섞임)을 고친다.
-- 「사슬」 이 단독으로 쓰인 화면 문구가 있으면 문맥에 맞게 고친다(「투자 온톨로지」, 「연결」 등).
-- 고친 문구가 단위 테스트나 e2e 에 그대로 적혀 있으면 함께 고친다. e2e 는 문구 대신 testid 와 속성으로 단언하는 쪽으로 바꿀 수 있으면 바꾼다.
+- `relationSentenceParts` 가 두 방향에서 상대 이름과 나머지를 나누고, 이어 붙이면 `relationSentence` 와 같은지.
+- `NodeReadCard` 를 그려 빈 값 속성이 빠지고 enum 이 표시 이름으로 나오는지.
+- `RelationshipSection` 을 그려 이 항목이 끝인 관계가 「{시작 이름}이(가) …」 문장으로, 시작인 관계가 「{끝 이름}을(를) …」 로 나오는지.
+- `screens.test.tsx` 에 상세를 그리는 기존 단언(`node-meta`, `NodeEditForm` 의 입력 등)이 있으면 읽기 카드 기준으로 고친다.
 
-### 4. 이름 바꾸기: `financial-workbench/web/e2e/workbench.spec.ts`
+### 5. e2e 와 testid 계약: `e2e/workbench.spec.ts`, `e2e/mobile.spec.ts`, `TESTIDS.md`
 
-`test('1c) 투자 논리 사슬을 만들고 결정에서 변화까지 따라간다'` 를 `test('1c) 투자 온톨로지 항목을 이어 만들고 결정에서 변화까지 따라간다'` 로 바꾼다. 다른 테스트 이름의 「무엇을 만들까요?」 가 Phase 03 뒤에도 남아 있으면 「＋ 추가」 로 바꾼다.
-
-### 5. 이 phase 를 검증하는 테스트: `financial-workbench/web/src/lib/relationSentence.test.ts`
-
-저장소 YAML 을 읽어(`node:fs` 로 `../../ontology/financial-ontology.yaml` 을 읽고 `relationshipTypes` 아래 `label:` 줄을 정규식으로 뽑는다) 모든 관계 표시 이름이 「다」 로 끝나는지 확인하는 테스트를 더한다. YAML 라이브러리를 들이지 않는다(`docs/code-architecture.md` 「웹 구조」). 관계 수나 이름 목록을 테스트에 적지 않는다.
+- 편집 폼의 입력(`edit-prop-*`)과 저장 단추(`node-save`)를 쓰기 전에 `node-edit` 를 누른다. 동시 수정 테스트(B 의 409 와 `edit-conflict-*`)는 409 뒤에도 편집 폼이 열려 있는지 단언을 하나 더한다.
+- 보관은 `node-more` → `node-archive-button` → `node-archive-dialog` 의 `node-archive-reason` 채우기 → `node-archive-confirm`. 복원은 `node-more` → `node-restore-button`. 링크 복사와 변경 이력도 `node-more` 를 먼저 연다.
+- `node-meta` 를 보던 단언은 `node-meta-details` 를 열어 보게 바꾼다. 열람자 테스트의 「버튼이 없다」 목록(`node-save`, `node-archive-button` 등)에 `node-edit` 를 더하고, `node-archive-button` 은 `node-more` 를 연 뒤 없음을 본다.
+- `relationship-row` 의 글자를 보던 단언(「—표시 이름→」 꼴)을 문장 꼴로 바꾼다. 문장 단언은 화면이 쓰는 함수의 규칙을 다시 적지 말고 `relationship-open` 의 이름과 `data-direction` 을 본다.
+- 새 테스트: 「상세는 읽기 카드로 열리고 편집을 눌러야 폼이 열린다」. 항목을 열면 `node-props` 가 보이고 `edit-prop-*` 가 없으며, `node-edit` 를 누르면 폼이 열리고 `node-edit-cancel` 로 닫히는지. 스크린샷 `shot(page, 'detail-read-card')`.
+- `mobile.spec.ts`: 상세 탭에서 `node-actions` 가 가로 스크롤 없이 보이는지 기존 390px 단언에 더한다.
+- `TESTIDS.md`: 「작업 공간: 오른쪽(상세)」 절을 읽기 카드 기준으로 고친다. 새 testid(`node-created-line`, `node-actions`, `node-edit`, `node-edit-cancel`, `node-more`, `node-archive-dialog`, `node-archive-confirm`, `node-props`, `node-prop`, `relationship-open`)를 적고 `node-meta` 줄을 지운다.
 
 ## 검증
 
 ```bash
-cd financial-workbench/api && ./gradlew test --rerun --tests 'dev.fos.workbench.ontology.*'
 cd financial-workbench/web && npm run typecheck
-cd financial-workbench/web && npx vitest run src/lib/relationSentence.test.ts
+cd financial-workbench/web && npx vitest run src/components/DetailPanel.test.tsx src/lib/relationSentence.test.ts src/components/screens.test.tsx
 cd financial-workbench/web && npm test && npm run build
 cd financial-workbench/web && npx playwright test --list e2e/workbench.spec.ts e2e/mobile.spec.ts
-! git grep -n "투자 논리 사슬\|무엇을 만들까요" -- financial-workbench
-cd financial-workbench && bash scripts/tests/test_scripts.sh
+! git grep -n "data-testid=\"node-meta\"" -- financial-workbench/web/src
 ```
 
-- `./gradlew test --rerun --tests 'dev.fos.workbench.ontology.*'` 백그라운드
-- `playwright test --list` 는 서버 없이 spec 파일을 읽어 문법과 import 오류만 잡는다. 브라우저 실행은 모든 phase 를 마친 뒤 한 번 한다.
+- e2e 는 이 phase 에서 브라우저로 돌리지 않는다. `playwright test --list` 는 서버 없이 spec 파일을 읽어 문법과 import 오류만 잡는다. 브라우저 실행은 모든 phase 를 마친 뒤 한 번 한다.
 
 ## 변경 파일
 
 | 파일 | 변경 |
 |---|---|
-| `financial-workbench/ontology/financial-ontology.yaml` | 수정 |
-| `financial-workbench/web/src/lib/guide.ts` | 수정 |
-| `financial-workbench/web/src/lib/guide.test.ts` | 수정 |
-| `financial-workbench/web/src/components/**/*.tsx` | 수정 |
-| `financial-workbench/web/src/App.tsx` | 수정 |
+| `financial-workbench/web/src/components/NodeReadCard.tsx` | 신규 |
+| `financial-workbench/web/src/components/DetailPanel.tsx` | 수정 |
+| `financial-workbench/web/src/components/DetailPanel.test.tsx` | 수정 |
+| `financial-workbench/web/src/components/RelationshipSection.tsx` | 수정 |
+| `financial-workbench/web/src/components/CopyLinkButton.tsx` | 수정 |
+| `financial-workbench/web/src/components/NodeEditForm.tsx` | 수정 |
+| `financial-workbench/web/src/components/screens.test.tsx` | 수정 |
+| `financial-workbench/web/src/lib/relationSentence.ts` | 수정 |
 | `financial-workbench/web/src/lib/relationSentence.test.ts` | 수정 |
+| `financial-workbench/web/src/legacy.css` | 수정 |
 | `financial-workbench/web/e2e/workbench.spec.ts` | 수정 |
 | `financial-workbench/web/e2e/mobile.spec.ts` | 수정 |
+| `financial-workbench/web/TESTIDS.md` | 수정 |

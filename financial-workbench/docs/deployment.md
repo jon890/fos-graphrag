@@ -169,12 +169,12 @@ PR 을 머지 큐(`merge-with-finish.py`)로 머지하면 `.claude/orch-finish.j
 
 ## 저장소 온톨로지의 문구를 운영에 반영할 때
 
-저장소 YAML 의 편집할 수 있는 부분(타입, 관계 종류, 주장 종류의 `label`, `description`, `createPicker`)은 DB 가 비어 있을 때의 첫 버전에만 쓰인다([ADR-008](adr/008-ontology-versions-in-db.md)). 이미지를 바꿔도 운영 온톨로지의 문구는 그대로다.
+저장소 YAML 의 편집할 수 있는 부분(타입, 관계 종류, 주장 종류의 `label`, `description`, `createPicker`, `sentence`)은 DB 가 비어 있을 때의 첫 버전에만 쓰인다([ADR-008](adr/008-ontology-versions-in-db.md)). 이미지를 바꿔도 운영 온톨로지의 문구는 그대로다.
 
 1. ADMIN 이 운영 화면의 더보기 「온톨로지 상세」 에서 「YAML 로 편집」 을 연다.
-2. 저장소 YAML 과 다른 `label`, `description`, `createPicker` 값만 고친다. 키와 속성 정의는 건드리지 않는다. 운영에서 따로 더한 타입이 있으면 그대로 둔다.
+2. 저장소 YAML 과 다른 `label`, `description`, `createPicker`, `sentence` 값만 고친다. 운영에 없는 관계 종류의 `sentence` 는 새로 더한다. 키와 속성 정의는 건드리지 않는다. 운영에서 따로 더한 타입이 있으면 그대로 둔다.
 3. 「저장 전에 확인」 의 바뀐 점이 문구뿐이고 영향 목록이 비어 있는지 본 뒤 메모(「저장소 문구 반영」)를 적고 저장한다.
-4. 개념 지도의 선 글자와 상세의 연결 문장이 새 문구로 보이는지 확인한다.
+4. 개념 지도의 선 글자, 타입 칸의 관계 문장, 상세의 연결 문장이 새 문구로 보이는지 확인한다.
 
 폼 편집기로 같은 값을 하나씩 고쳐도 된다. 어느 쪽이든 새 버전이 쌓이므로 되돌릴 수 있다.
 

@@ -97,8 +97,8 @@ Neo4j 는 온톨로지 규칙을 집행하지 않는다. 아래 제약 조건은
 | `changeFields.<키>` | `label` | 변경 이력의 `changes` 에 나오는 키 가운데 온톨로지 속성이 아닌 것(`subjectId`, `objectId`, `documentIds`, `fromId`, `toId`, `reviewStatus`, `reviewedBy`, `reviewedAt`, `reviewNote`, `archived`, `email`, `displayName`, `role`, `enabled`, 온톨로지 이력의 `added`, `removed`, `changed`)의 표시 이름. 속성인 키는 그 속성의 `label` 을 쓴다. 서버가 이 목록을 상수로 두고 테스트가 YAML 과 대조한다 |
 | 속성 | `description` | 입력칸 바로 아래에 보이는 도움말. 개발 용어 없이 쓴다 |
 | `nodeTypes.<타입>` | `description` | 타입 설명. 첫 문장은 「＋ 추가」 메뉴의 짧은 설명으로 쓰이므로 그 문장만 읽어도 무엇인지 알게 쓴다 |
-| `relationshipTypes.<관계>` | `label` | 관계 문장의 동사로도 쓴다. 끝 타입을 목적어로 받는 동사구(「만든다」, 「겪는다」, 「이롭게 한다」)로 쓴다. 화면은 「{끝}을(를) 만듭니다」, 「{시작}이(가) 만듭니다」 처럼 읽는다. 규칙은 [흐름](flow.md) 의 「관계 문장」 이다 |
-| `claimPredicates.<predicate>` | `sentence` | 주장 만들기 폼의 문장 틀. `{subject}` 와 `{object}` 자리에 고르기 칸이 들어간다. 조사는 `이(가)`, `은(는)`, `을(를)`, `와(과)` 로 적으면 화면이 고른 이름의 끝소리에 맞춰 하나로 바꾼다. 없으면 「{subject} {object} 관계 이름」 순서로 보인다 |
+| `relationshipTypes.<관계>` | `sentence` | 관계 문장 틀. `{from}` 과 `{to}` 를 한 번씩 담는 한다체 문장이다(예: `{to}은(는) {from}에 대한 결정이다`). 조사 표기는 `claimPredicates` 의 `sentence` 와 같다. 없으면 「{from}이(가) {to}을(를) {label}」 로 보인다. 서버가 두 자리표시를 검사한다. 화면 규칙은 [흐름](flow.md) 의 「관계 문장」 이다 |
+| `claimPredicates.<predicate>` | `sentence` | 주장 만들기 폼의 문장 틀. `{subject}` 와 `{object}` 자리에 고르기 칸이 들어간다. 조사는 `이(가)`, `은(는)`, `을(를)`, `와(과)`, `으로(로)` 로 적으면 화면이 고른 이름의 끝소리에 맞춰 하나로 바꾼다. 영문과 숫자로 끝나는 이름은 읽는 소리로 고른다([흐름](flow.md) 의 「조사 고르기」). 없으면 「{subject} {object} 관계 이름」 순서로 보인다 |
 
 - Claim 의 `predicate` 선택지 이름은 `claimPredicates.<predicate>.label` 에서 온다. 로더가 응답의 `valueLabels` 에 채워 주므로 따로 적지 않는다.
 - 로더는 알 수 없는 키가 있으면 시작을 멈춘다. YAML 흐름 표기(`{ ... }`) 안에서 쉼표나 콜론이 든 문장을 따옴표로 감싸지 않으면 뒷부분이 값 없는 키가 되기 때문이다.

@@ -373,7 +373,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 
 | 메서드 | 경로 | 인증 | 응답 |
 | --- | --- | --- | --- |
-| GET | `/api/ontology` | 필요 | 최신 온톨로지 버전을 옮긴 JSON. `version`(정수), `versionCreatedAt`, `versionCreatedBy`(UserRef, 서버가 만든 버전이면 `null`)가 더 있다. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`), 주장 문장 틀(`claimPredicates.<predicate>.sentence`), 만들기 폼 정보(`nodeTypes.<타입>.hintProperties`, `relationshipTypes.<관계>.createPicker`), 타입의 색과 모양(`nodeTypes.<타입>.display`), 검색에 넣을 속성(`nodeTypes.<타입>.searchProperties`), 변경 이력의 항목 이름(`changeFields`), 예전 값 별칭(`valueAliases`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다. 뜻은 [데이터 스키마](data-schema.md) 의 「표시 이름」 과 그 아래 절이다 |
+| GET | `/api/ontology` | 필요 | 최신 온톨로지 버전을 옮긴 JSON. `version`(정수), `versionCreatedAt`, `versionCreatedBy`(UserRef, 서버가 만든 버전이면 `null`)가 더 있다. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`), 주장 문장 틀(`claimPredicates.<predicate>.sentence`), 관계 문장 틀(`relationshipTypes.<관계>.sentence`), 만들기 폼 정보(`nodeTypes.<타입>.hintProperties`, `relationshipTypes.<관계>.createPicker`), 타입의 색과 모양(`nodeTypes.<타입>.display`), 검색에 넣을 속성(`nodeTypes.<타입>.searchProperties`), 변경 이력의 항목 이름(`changeFields`), 예전 값 별칭(`valueAliases`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다. 뜻은 [데이터 스키마](data-schema.md) 의 「표시 이름」 과 그 아래 절이다 |
 | GET | `/api/ontology/versions` | ADMIN | 버전 목록. 최근 것부터 `Page<{"version","createdAt","createdBy":UserRef?,"note","restoredFrom"}>`. 쪽 나누기는 `page`, `size` |
 | GET | `/api/ontology/versions/{version}` | ADMIN | 그 버전의 `{"version", "yaml", …목록의 필드}` |
 | GET | `/api/ontology/export` | ADMIN | 최신 버전의 YAML 파일. `Content-Type: application/yaml;charset=UTF-8`, `Content-Disposition: attachment; filename="financial-ontology-v<버전>.yaml"` |
