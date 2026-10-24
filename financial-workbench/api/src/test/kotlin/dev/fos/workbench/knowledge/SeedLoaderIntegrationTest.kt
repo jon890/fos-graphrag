@@ -74,7 +74,7 @@ class SeedLoaderIntegrationTest : IntegrationTest() {
     }
 
     @Test
-    fun `초기 데이터의 사슬이 모두 들어간다`() {
+    fun `초기 데이터의 투자 온톨로지 항목과 관계가 모두 들어간다`() {
         assertThat(
             count(
                 "MATCH (:Knowledge:Decision {title: 'FLNC 첫 매수', archived: false})<-[:HAS_DECISION]-(:Knowledge:Security)<-[:ISSUES]-(:Knowledge:Company)<-[:BENEFITS]-(:Knowledge:Bottleneck)<-[:CREATES]-(:Knowledge:Change) RETURN count(*) AS c",

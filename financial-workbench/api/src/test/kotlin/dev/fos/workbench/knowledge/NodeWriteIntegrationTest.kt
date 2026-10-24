@@ -94,7 +94,7 @@ class NodeWriteIntegrationTest : IntegrationTest() {
     }
 
     @Test
-    fun `투자 논리 사슬의 노드와 관계를 만들고 방향과 필수값을 검사한다`() {
+    fun `투자 온톨로지의 노드와 관계를 만들고 방향과 필수값을 검사한다`() {
         val alice = loggedIn(ALICE)
         val fx = Fixtures(alice)
         val change = fx.node("Change", mapOf("title" to "AI 서버 증가-${fx.suffix}", "category" to "TECHNOLOGY"))

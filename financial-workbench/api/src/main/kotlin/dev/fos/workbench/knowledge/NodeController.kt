@@ -25,9 +25,13 @@ class NodeController(private val nodes: NodeService, private val queries: NodeQu
         @RequestParam(required = false) types: List<String>?,
         @RequestParam(required = false) reviewStatus: String?,
         @RequestParam(required = false, defaultValue = "false") includeArchived: Boolean,
+        @RequestParam(required = false) sort: String?,
         @RequestParam(required = false) page: Int?,
         @RequestParam(required = false) size: Int?,
-    ): Page<NodeView> = queries.search(q, types, reviewStatus, includeArchived, PageQuery.of(page, size))
+    ): Page<NodeView> = queries.search(q, types, reviewStatus, includeArchived, sort, PageQuery.of(page, size))
+
+    @GetMapping("/counts")
+    fun counts(): NodeCounts = queries.counts()
 
     @GetMapping("/{id}")
     fun detail(@PathVariable id: String): NodeDetail = queries.detail(id)
