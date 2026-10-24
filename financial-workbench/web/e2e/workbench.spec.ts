@@ -28,6 +28,14 @@ const data = {
   editByA: `A 가 고친 메모 ${suffix}`,
   editByB: `B 가 고친 메모 ${suffix}`,
   registrationByB: `110111-${suffix.slice(-7)}`,
+  change: `AI 서버 증가-${suffix}`,
+  bottleneck: `HBM 공급-${suffix}`,
+  investmentCompany: `가상수혜기업-${suffix}`,
+  investmentSecurity: `가상수혜기업 보통주-${suffix}`,
+  investmentTicker: `V${suffix.slice(-10)}`,
+  valuation: `가상수혜기업 평가-${suffix}`,
+  scenario: `가상수혜기업 기준-${suffix}`,
+  decision: `가상수혜기업 매수-${suffix}`,
 }
 
 const editorA: TestUser = { sub: `editor-a-${suffix}`, email: `editor-a-${suffix}@example.com`, name: '편집자A' }
@@ -198,9 +206,9 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await shot(pageAdmin, '00e-first-screen')
 
     const typeSelect = pageAdmin.getByTestId('new-node-type')
-    await expect(typeSelect.locator('option')).toHaveText(['무엇을 만들까요?', '기업', '종목', '산업', '근거 문서', '인물', '개념', '주장'])
+    await expect(typeSelect.locator('option')).toHaveText(['무엇을 만들까요?', '기업', '종목', '산업', '근거 문서', '인물', '개념', '세상의 변화', '병목', '밸류에이션', '시나리오', '투자 결정', '주장'])
     // 저장되는 값은 그대로다.
-    await expect(typeSelect.locator('option')).toHaveCount(8)
+    await expect(typeSelect.locator('option')).toHaveCount(13)
     await typeSelect.selectOption('Claim')
     await pageAdmin.getByTestId('new-node-button').click()
     await expect(pageAdmin.getByTestId('claim-add-form')).toBeVisible()
@@ -358,6 +366,75 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'error')
     await expect(pageA.getByTestId('detail-notice')).toContainText('발행 기업을 잇지 못했습니다')
     await pageA.unroute('**/api/relationships')
+  })
+
+  test('1c) 투자 논리 사슬을 만들고 결정에서 변화까지 따라간다', async () => {
+    await createNode(pageA, 'Change', data.change, { title: data.change, category: 'TECHNOLOGY' })
+
+    await pageA.getByTestId('new-node-type').selectOption('Bottleneck')
+    await pageA.getByTestId('new-node-button').click()
+    await pageA.getByTestId('create-prop-title').fill(data.bottleneck)
+    await pageA.getByTestId('create-prop-status').selectOption('CONFIRMED')
+    await pick(pageA, 'create-link-CREATES-picker', data.change)
+    await pageA.getByTestId('create-submit').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.bottleneck)
+
+    await pageA.getByTestId('new-node-type').selectOption('Company')
+    await pageA.getByTestId('new-node-button').click()
+    await pageA.getByTestId('create-prop-name').fill(data.investmentCompany)
+    await pageA.getByTestId('create-prop-country').selectOption('US')
+    await pick(pageA, 'create-link-BENEFITS-picker', data.bottleneck)
+    await pageA.getByTestId('create-submit').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.investmentCompany)
+
+    await pageA.getByTestId('new-node-type').selectOption('Security')
+    await pageA.getByTestId('new-node-button').click()
+    await pageA.getByTestId('create-prop-market').selectOption('NASDAQ')
+    await pageA.getByTestId('create-prop-ticker').fill(data.investmentTicker)
+    await pageA.getByTestId('create-prop-name').fill(data.investmentSecurity)
+    await pick(pageA, 'create-link-ISSUES-picker', data.investmentCompany)
+    await pageA.getByTestId('create-submit').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.investmentSecurity)
+
+    await pageA.getByTestId('new-node-type').selectOption('Valuation')
+    await pageA.getByTestId('new-node-button').click()
+    await pageA.getByTestId('create-prop-title').fill(data.valuation)
+    await pageA.getByTestId('create-prop-currentPrice').fill('100')
+    await pick(pageA, 'create-link-HAS_VALUATION-picker', data.investmentCompany)
+    await pageA.getByTestId('create-submit').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.valuation)
+
+    await pageA.getByTestId('new-node-type').selectOption('Scenario')
+    await pageA.getByTestId('new-node-button').click()
+    await pageA.getByTestId('create-prop-title').fill(data.scenario)
+    await pageA.getByTestId('create-prop-kind').selectOption('BASE')
+    await pick(pageA, 'create-link-HAS_SCENARIO-picker', data.valuation)
+    await pageA.getByTestId('create-submit').click()
+    await expect(pageA.getByTestId('create-prop-valuePerShare-error')).toBeVisible()
+    await expect(pageA.getByTestId('detail-label')).not.toHaveText(data.scenario)
+    await pageA.getByTestId('create-prop-valuePerShare').fill('120')
+    await pageA.getByTestId('create-submit').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.scenario)
+
+    await pageA.getByTestId('new-node-type').selectOption('Decision')
+    await pageA.getByTestId('new-node-button').click()
+    await pageA.getByTestId('create-prop-title').fill(data.decision)
+    await pageA.getByTestId('create-prop-action').selectOption('BUY')
+    await pick(pageA, 'create-link-HAS_DECISION-picker', data.investmentSecurity)
+    await pick(pageA, 'create-link-BASED_ON-picker', data.valuation)
+    await pageA.getByTestId('create-submit').click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(data.decision)
+    await expect(pageA.getByTestId('relationship-row').filter({ hasText: data.investmentSecurity })).toHaveAttribute('data-rel-type', 'HAS_DECISION')
+    await expect(pageA.getByTestId('relationship-row').filter({ hasText: data.valuation })).toHaveAttribute('data-rel-type', 'BASED_ON')
+
+    await pageA.getByTestId('graph-hops').selectOption('2')
+    const companyNode = pageA.locator('[data-testid="graph-node"][data-node-type="Company"]').filter({ hasText: data.investmentCompany })
+    await expect(companyNode).toHaveCount(1)
+    await companyNode.getByRole('button').click()
+    await pageA.getByTestId('graph-expand').click()
+    await expect(pageA.locator('[data-testid="graph-node"][data-node-type="Change"]').filter({ hasText: data.change })).toHaveCount(1)
+    await shot(pageA, '13a-investment-chain')
+    await pageA.getByTestId('graph-hops').selectOption('1')
   })
 
   test('2) A 가 문서를 등록하고 SUPPLIES_TO Claim 을 만든다', async () => {

@@ -90,6 +90,27 @@ class OntologyLabelsTest {
     }
 
     @Test
+    fun `투자 논리 관계는 시작과 끝, 만들기 칸을 정한다`() {
+        val expected = mapOf(
+            "CREATES" to Triple(listOf("Change"), listOf("Bottleneck"), "이 병목을 만든 변화"),
+            "HAS_BOTTLENECK" to Triple(listOf("Sector"), listOf("Bottleneck"), "병목이 있는 산업"),
+            "BENEFITS" to Triple(listOf("Bottleneck"), listOf("Company"), "이익을 가져가는 병목"),
+            "HAS_VALUATION" to Triple(listOf("Company"), listOf("Valuation"), "평가한 기업"),
+            "HAS_SCENARIO" to Triple(listOf("Valuation"), listOf("Scenario"), "시나리오가 속한 밸류에이션"),
+            "HAS_DECISION" to Triple(listOf("Security"), listOf("Decision"), "결정한 종목"),
+            "BASED_ON" to Triple(listOf("Valuation"), listOf("Decision"), "결정에 쓴 밸류에이션"),
+            "EVIDENCED_BY" to Triple(listOf("Change", "Bottleneck", "Valuation"), listOf("Document"), "이 자료가 근거인 항목"),
+        )
+
+        expected.forEach { (type, values) ->
+            val relationship = ontology.relationshipTypes.getValue(type)
+            assertThat(relationship.from).isEqualTo(values.first)
+            assertThat(relationship.to).isEqualTo(values.second)
+            assertThat(relationship.createPicker?.label).isEqualTo(values.third)
+        }
+    }
+
+    @Test
     fun `Claim predicate 선택지 이름은 claimPredicates 의 label 에서 온다`() {
         val predicate = ontology.nodeTypes.getValue("Claim").properties.getValue("predicate")
         assertThat(predicate.valueLabels).isEqualTo(ontology.claimPredicates.mapValues { it.value.label })
@@ -138,7 +159,7 @@ class OntologyLabelsTest {
 
     @Test
     fun `모든 노드 타입에 색과 모양이 있다`() {
-        assertThat(ontology.nodeTypes.keys).hasSize(7)
+        assertThat(ontology.nodeTypes.keys).hasSize(12)
         val missing = ontology.nodeTypes.filterValues { it.display?.color.isNullOrBlank() || it.display?.shape.isNullOrBlank() }.keys
         assertThat(missing).describedAs("색이나 모양이 없는 노드 타입").isEmpty()
     }

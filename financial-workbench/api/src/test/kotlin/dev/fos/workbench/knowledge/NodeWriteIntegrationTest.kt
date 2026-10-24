@@ -94,6 +94,43 @@ class NodeWriteIntegrationTest : IntegrationTest() {
     }
 
     @Test
+    fun `투자 논리 사슬의 노드와 관계를 만들고 방향과 필수값을 검사한다`() {
+        val alice = loggedIn(ALICE)
+        val fx = Fixtures(alice)
+        val change = fx.node("Change", mapOf("title" to "AI 서버 증가-${fx.suffix}", "category" to "TECHNOLOGY"))
+        val bottleneck = fx.node("Bottleneck", mapOf("title" to "HBM 공급-${fx.suffix}", "status" to "CONFIRMED"))
+        val company = fx.company("수혜기업")
+        val security = fx.security("수혜기업 보통주")
+        val valuation = fx.node("Valuation", mapOf("title" to "수혜기업 평가-${fx.suffix}", "currentPrice" to 100.0))
+        val scenario = fx.node("Scenario", mapOf("title" to "수혜기업 기준-${fx.suffix}", "kind" to "BASE", "valuePerShare" to 120.0))
+        val decision = fx.node("Decision", mapOf("title" to "수혜기업 매수-${fx.suffix}", "action" to "BUY"))
+
+        listOf(
+            Triple("CREATES", change.id, bottleneck.id),
+            Triple("BENEFITS", bottleneck.id, company.id),
+            Triple("HAS_VALUATION", company.id, valuation.id),
+            Triple("HAS_SCENARIO", valuation.id, scenario.id),
+            Triple("HAS_DECISION", security.id, decision.id),
+            Triple("BASED_ON", valuation.id, decision.id),
+        ).forEach { (type, fromId, toId) ->
+            assertThat(alice.post("/api/relationships", mapOf("type" to type, "fromId" to fromId, "toId" to toId)).status).isEqualTo(201)
+        }
+
+        val relationshipTypes = alice.get("/api/nodes/${decision.id}").body["relationships"].toList().map { it["type"].asString() }
+        assertThat(relationshipTypes).contains("HAS_DECISION", "BASED_ON")
+
+        val reversed = alice.post("/api/relationships", mapOf("type" to "CREATES", "fromId" to bottleneck.id, "toId" to change.id))
+        assertThat(reversed.status).isEqualTo(400)
+        assertThat(reversed.code).isEqualTo("ONTOLOGY_VIOLATION")
+
+        val missingValue = alice.post("/api/nodes", mapOf("type" to "Scenario", "properties" to mapOf("title" to "빠진 가치-${fx.suffix}", "kind" to "BASE")))
+        assertThat(missingValue.status).isEqualTo(400)
+
+        val zeroValue = alice.post("/api/nodes", mapOf("type" to "Scenario", "properties" to mapOf("title" to "영 가치-${fx.suffix}", "kind" to "BEAR", "valuePerShare" to 0)))
+        assertThat(zeroValue.status).isEqualTo(201)
+    }
+
+    @Test
     fun `관계 복원은 만들기와 같은 규칙으로 중복과 보관된 끝 노드를 거절한다`() {
         val alice = loggedIn(ALICE)
         val fx = Fixtures(alice)

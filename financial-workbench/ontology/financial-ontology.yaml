@@ -15,7 +15,7 @@
 # YAML 흐름 표기({ ... }) 안에서는 쉼표와 콜론이 값을 끊는다. 쉼표나 콜론이 든 문장은 반드시 따옴표로 감싼다.
 # API 는 알 수 없는 키가 있으면 시작을 멈춘다. 쉼표로 잘린 값이나 오타를 시작할 때 잡기 위해서다.
 
-schemaVersion: "1.4.0"
+schemaVersion: "2.0.0"
 
 nodeTypes:
   Company:
@@ -196,6 +196,103 @@ nodeTypes:
       summary: { type: string, label: 한 줄 정의, required: true, maxLength: 300, description: 개념을 한 문장으로 정의한다 }
       description: { type: text, label: 설명, required: false, maxLength: 4000, description: 더 자세한 설명 }
 
+  Change:
+    label: 세상의 변화
+    description: 세상에서 일어나 투자 판단에 영향을 주는 변화다.
+    labelProperty: title
+    hintProperties: [category]
+    display: { color: "#0891b2", shape: round-pentagon }
+    properties:
+      title: { type: string, label: 변화, required: true, maxLength: 300, description: "변화를 한 문장으로 적는다. 예: AI 서버가 늘면서 고성능 메모리 수요가 커진다" }
+      category:
+        type: enum
+        label: 분류
+        required: true
+        values: [TECHNOLOGY, DEMOGRAPHIC, SOCIOCULTURAL, OTHER]
+        valueLabels: { TECHNOLOGY: 기술, DEMOGRAPHIC: 인구, SOCIOCULTURAL: 사회와 문화, OTHER: 기타 }
+      since: { type: string, label: 언제부터, required: false, maxLength: 64, description: "예: 2023년부터. 모르면 비워 둔다" }
+      durability: { type: text, label: 오래 가는 이유, required: false, maxLength: 4000 }
+      description: { type: text, label: 메모, required: false, maxLength: 4000 }
+
+  Bottleneck:
+    label: 병목
+    description: 수요를 공급이 따라가지 못하는 구간이다.
+    labelProperty: title
+    hintProperties: [status]
+    display: { color: "#dc2626", shape: hexagon }
+    properties:
+      title: { type: string, label: 병목, required: true, maxLength: 300, description: "수요를 공급이 따라가지 못하는 구간. 예: HBM 생산과 고적층 패키징" }
+      status:
+        type: enum
+        label: 상태
+        required: true
+        values: [HYPOTHESIS, CONFIRMED, RESOLVED]
+        valueLabels: { HYPOTHESIS: 가설, CONFIRMED: 확인, RESOLVED: 해소 }
+      demandEvidence: { type: text, label: 수요 근거, required: false, maxLength: 4000 }
+      supplyConstraint: { type: text, label: 공급 제약, required: false, maxLength: 4000 }
+      resolutionPath: { type: text, label: 해소 경로, required: false, maxLength: 4000, description: "증설, 대체 기술처럼 병목이 풀릴 길" }
+      expectedResolution: { type: string, label: 예상 해소 시점, required: false, maxLength: 64, description: "예: 2027년 하반기. 모르면 비워 둔다" }
+      description: { type: text, label: 메모, required: false, maxLength: 4000 }
+
+  Valuation:
+    label: 밸류에이션
+    description: 기업의 가치를 평가한 기록이다.
+    labelProperty: title
+    hintProperties: [asOf, method]
+    display: { color: "#16a34a", shape: round-rectangle }
+    properties:
+      title: { type: string, label: 이름, required: true, maxLength: 200, description: "예: FLNC 2026-09-14" }
+      asOf: { type: date, label: 기준일, required: false, description: "평가한 날. 모르면 비워 둔다" }
+      currentPrice: { type: number, label: 현재가, required: true, min: 0, description: 기준일의 주가 }
+      currency:
+        type: enum
+        label: 통화
+        required: false
+        values: [KRW, USD, JPY, CNY, TWD, HKD, EUR, GBP]
+        valueLabels: { KRW: 원 (KRW), USD: 미국 달러 (USD), JPY: 엔 (JPY), CNY: 위안 (CNY), TWD: 대만 달러 (TWD), HKD: 홍콩 달러 (HKD), EUR: 유로 (EUR), GBP: 파운드 (GBP) }
+      method:
+        type: enum
+        label: 방법
+        required: false
+        values: [PER, PBR, EV_SALES, EV_EBITDA, DCF, REVERSE_DCF, OTHER]
+        valueLabels: { PER: PER, PBR: PBR, EV_SALES: EV/매출, EV_EBITDA: EV/EBITDA, DCF: DCF, REVERSE_DCF: 역DCF, OTHER: 기타 }
+      description: { type: text, label: 메모, required: false, maxLength: 4000 }
+
+  Scenario:
+    label: 시나리오
+    description: 가정에 따라 계산한 주당 가치다.
+    labelProperty: title
+    hintProperties: [kind, valuePerShare]
+    display: { color: "#65a30d", shape: round-tag }
+    properties:
+      title: { type: string, label: 이름, required: true, maxLength: 200, description: "예: FLNC 비관" }
+      kind:
+        type: enum
+        label: 종류
+        required: true
+        values: [BEAR, BASE, BULL]
+        valueLabels: { BEAR: 비관, BASE: 기준, BULL: 낙관 }
+      valuePerShare: { type: number, label: 주당 가치, required: true, min: 0, description: "밸류에이션과 같은 통화. 범위로 받았으면 중간값을 넣고 범위는 메모에 적는다" }
+      assumptions: { type: text, label: 핵심 가정, required: false, maxLength: 4000 }
+      description: { type: text, label: 메모, required: false, maxLength: 4000 }
+
+  Decision:
+    label: 투자 결정
+    description: 종목에 대해 내린 투자 행동의 기록이다.
+    labelProperty: title
+    hintProperties: [action, decidedAt]
+    display: { color: "#7c3aed", shape: round-diamond }
+    properties:
+      title: { type: string, label: 이름, required: true, maxLength: 200, description: "예: FLNC 첫 매수" }
+      action:
+        type: enum
+        label: 행동
+        required: true
+        values: [WATCH, BUY, ADD, TRIM, EXIT, HOLD]
+        valueLabels: { WATCH: 관심 등록, BUY: 매수, ADD: 추가 매수, TRIM: 일부 매도, EXIT: 전량 매도, HOLD: 보류 }
+      decidedAt: { type: date, label: 결정일, required: false, description: "모르면 비워 둔다" }
+      reason: { type: text, label: 이유, required: false, maxLength: 4000 }
+
   Claim:
     label: 주장
     description: 자료나 사람이 내놓은 주장. 근거 문서와 함께 등록하고 다른 편집자가 검토한다.
@@ -235,6 +332,54 @@ relationshipTypes:
     description: 두 개념이 서로 관련된다. 근거가 필요 없는 식별 관계다.
     from: [Concept]
     to: [Concept]
+  CREATES:
+    label: 만든다
+    description: 변화가 병목을 만든다.
+    from: [Change]
+    to: [Bottleneck]
+    createPicker: { label: 이 병목을 만든 변화, description: "이 병목을 만든 변화를 고른다. 몰라도 비워 둘 수 있다" }
+  HAS_BOTTLENECK:
+    label: 병목이 있다
+    description: 산업에 병목이 있다.
+    from: [Sector]
+    to: [Bottleneck]
+    createPicker: { label: 병목이 있는 산업, description: "이 병목이 있는 산업을 고른다. 몰라도 비워 둘 수 있다" }
+  BENEFITS:
+    label: 이익을 준다
+    description: 병목이 기업에 이익을 준다.
+    from: [Bottleneck]
+    to: [Company]
+    createPicker: { label: 이익을 가져가는 병목, description: "이 기업이 이익을 가져가는 병목을 고른다. 몰라도 비워 둘 수 있다" }
+  HAS_VALUATION:
+    label: 밸류에이션
+    description: 기업에 밸류에이션이 있다.
+    from: [Company]
+    to: [Valuation]
+    createPicker: { label: 평가한 기업, description: "이 밸류에이션으로 평가한 기업을 고른다. 몰라도 비워 둘 수 있다" }
+  HAS_SCENARIO:
+    label: 시나리오
+    description: 밸류에이션에 시나리오가 있다.
+    from: [Valuation]
+    to: [Scenario]
+    createPicker: { label: 시나리오가 속한 밸류에이션, description: "이 시나리오가 속한 밸류에이션을 고른다. 몰라도 비워 둘 수 있다" }
+  HAS_DECISION:
+    label: 결정
+    description: 종목에 투자 결정이 있다.
+    from: [Security]
+    to: [Decision]
+    createPicker: { label: 결정한 종목, description: "이 투자 결정을 내린 종목을 고른다. 몰라도 비워 둘 수 있다" }
+  BASED_ON:
+    label: 결정의 근거
+    description: 밸류에이션이 투자 결정의 근거다.
+    from: [Valuation]
+    to: [Decision]
+    createPicker: { label: 결정에 쓴 밸류에이션, description: "이 투자 결정에 쓴 밸류에이션을 고른다. 몰라도 비워 둘 수 있다" }
+  EVIDENCED_BY:
+    label: 근거 자료
+    description: 변화와 병목과 밸류에이션이 자료로 뒷받침된다.
+    from: [Change, Bottleneck, Valuation]
+    to: [Document]
+    createPicker: { label: 이 자료가 근거인 항목, description: "이 자료가 근거인 변화, 병목, 밸류에이션을 고른다. 몰라도 비워 둘 수 있다" }
 
 # Claim 과 대상 노드를 잇는 관계다. Claim API 가 만들고 일반 관계 API 로는 만들 수 없다.
 claimRelationships:
