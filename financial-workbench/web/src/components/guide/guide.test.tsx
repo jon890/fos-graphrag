@@ -91,8 +91,12 @@ describe('따라하기 말풍선', () => {
     expect(html).not.toContain('data-testid="guide-reopen"')
   })
 
-  it('폼을 취소했으면 「폼 다시 열기」 가 나온다', () => {
-    expect(renderPractice(PRACTICE[1], 1, true)).toContain('data-testid="guide-reopen"')
+  it('주장 폼을 취소했으면 「폼 다시 열기」 가 나온다', () => {
+    expect(renderPractice(PRACTICE[3], 3, true)).toContain('data-testid="guide-reopen"')
+  })
+
+  it('말풍선은 만들기 창의 오버레이보다 위에 그리고 누르기를 받는다', () => {
+    expect(renderPractice()).toMatch(/data-testid="guide-bubble"[^>]*class="[^"]*pointer-events-auto[^"]*z-\[60\]/)
   })
 
   it('마침 단계는 「끝내기」 만 있다', () => {

@@ -15,7 +15,7 @@ import { fieldErrorsOf } from './PropertyFields'
 import { TypeBadge } from './TypeBadge'
 
 interface Props {
-  /** 처음 채울 주체. 상세의 「주장 추가」 는 그 항목을 넘기고, 왼쪽 「무엇을 만들까요?」 는 넘기지 않는다 */
+  /** 처음 채울 주체. 상세의 「주장 추가」 는 그 항목을 넘기고, 「＋ 추가」 의 주장 줄은 넘기지 않는다 */
   initialSubject?: NodeView | null
   onCreated: (claim: ClaimView) => void
   onCancel: () => void

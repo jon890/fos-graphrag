@@ -32,8 +32,14 @@ interface Props {
 
 type Placement = { mode: 'card' } | { mode: 'anchored'; top: number; left: number }
 
-function findTarget(testId: string): HTMLElement | null {
-  return document.querySelector<HTMLElement>(`[data-testid="${testId}"]`)
+/** 목록 앞에서부터 처음 보이는(그려진 상자가 있는) 대상 */
+function findTarget(testIds: string[]): HTMLElement | null {
+  for (const testId of testIds) {
+    for (const el of document.querySelectorAll<HTMLElement>(`[data-testid="${testId}"]`)) {
+      if (el.getClientRects().length > 0) return el
+    }
+  }
+  return null
 }
 
 function samePlacement(a: Placement, b: Placement): boolean {
@@ -53,12 +59,15 @@ export function GuideBubble({ kind, step, index, total, busy, wide, onNext, onFi
   const creating = practice && PRACTICE_CREATE_STEPS.includes(step.id)
 
   // 대상을 찾아 강조 class 를 붙이고 위치를 다시 계산한다. React 가 다시 그리며 class 를 지울 수 있어 같은 주기로 다시 붙인다.
+  // 창이 열리고 닫히면 가리킬 대상이 바뀌므로(창의 만들기 단추와 「＋ 추가」) 주기마다 목록을 다시 본다.
+  const targetKey = step.target.join(' ')
   useEffect(() => {
+    const targets = targetKey ? targetKey.split(' ') : []
     let marked: HTMLElement | null = null
     let found = false
     const startedAt = Date.now()
     const update = () => {
-      const el = step.target ? findTarget(step.target) : null
+      const el = findTarget(targets)
       if (marked && marked !== el) marked.classList.remove(TARGET_CLASS)
       if (el && !el.classList.contains(TARGET_CLASS)) el.classList.add(TARGET_CLASS)
       marked = el
@@ -73,7 +82,7 @@ export function GuideBubble({ kind, step, index, total, busy, wide, onNext, onFi
     update()
     const timer = window.setInterval(() => {
       // 대상을 한 번도 못 찾았으면 5초 뒤로는 아래쪽 카드로 둔다. 한 번 찾은 뒤에는 폼을 닫았다 다시 열어도 계속 찾는다.
-      if (step.target && !found && Date.now() - startedAt > WAIT_MS) return
+      if (targets.length > 0 && !found && Date.now() - startedAt > WAIT_MS) return
       update()
     }, RETRY_MS)
     window.addEventListener('resize', update)
@@ -84,7 +93,7 @@ export function GuideBubble({ kind, step, index, total, busy, wide, onNext, onFi
       window.removeEventListener('scroll', update, true)
       marked?.classList.remove(TARGET_CLASS)
     }
-  }, [step.target, wide])
+  }, [targetKey, wide])
 
   // 아래쪽 카드가 열린 동안 본문 아래에 카드 높이만큼 여백을 둬 마지막 단추까지 내려 볼 수 있게 한다.
   const card = placement.mode === 'card'
@@ -110,6 +119,7 @@ export function GuideBubble({ kind, step, index, total, busy, wide, onNext, onFi
     onSkip()
   }
 
+  // 만들기 창(모달)의 오버레이보다 위에 그리고, 창이 막은 누르기를 말풍선만 다시 받는다.
   return (
     <div
       ref={ref}
@@ -119,7 +129,7 @@ export function GuideBubble({ kind, step, index, total, busy, wide, onNext, onFi
       data-testid="guide-bubble"
       data-step={step.id}
       data-placement={placement.mode}
-      className={cn('guide-bubble', card && 'guide-bubble-card')}
+      className={cn('guide-bubble pointer-events-auto z-[60]', card && 'guide-bubble-card')}
       style={placement.mode === 'anchored' ? { top: placement.top, left: placement.left } : undefined}
       onKeyDown={onKeyDown}
     >

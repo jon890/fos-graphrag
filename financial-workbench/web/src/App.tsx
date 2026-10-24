@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { api, errorMessage, setOntologyVersionListener, setUnauthorizedHandler } from './api/client'
-import type { CurrentUser, Ontology } from './api/types'
+import type { CurrentUser, NodeView, Ontology } from './api/types'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,8 @@ import { ConceptMapTab } from './components/map/ConceptMapTab'
 import { MoreMenu } from './components/header/MoreMenu'
 import { TopTabs } from './components/header/TopTabs'
 import { GuideMessage, GuideOpenButton, GuideProvider } from './components/guide/GuideProvider'
+import { AddProvider } from './components/add/AddProvider'
+import { AddMenu } from './components/add/AddMenu'
 
 const ROLE_BADGE_CLASS: Record<string, string> = {
   ADMIN: 'bg-[#7c2d12] text-[#ffedd5]',
@@ -44,6 +46,9 @@ const ROLE_BADGE_CLASS: Record<string, string> = {
 function readLoginDenied(): boolean {
   return new URLSearchParams(window.location.search).get('login') === 'denied'
 }
+
+/** 만든 직후 상세 위에 보일 안내 */
+type Flash = { id: string; text: string; kind?: 'success' | 'error' }
 
 type AuthState = { status: 'checking' } | { status: 'anonymous'; notice?: string } | { status: 'signed-in'; user: CurrentUser }
 
@@ -58,6 +63,8 @@ export default function App() {
   const [ontologyDraft, setOntologyDraft] = useState<OntologyDraft | null>(null)
   // 같은 노드를 다시 골라도 그래프와 상세를 새로 읽게 한다.
   const [focusSeq, setFocusSeq] = useState(0)
+  // 항목을 만든 직후 상세 위에 보일 안내. 만든 곳이 작업 공간 밖일 수 있어 여기서 든다. 다른 항목을 고르면 사라진다.
+  const [flash, setFlash] = useState<Flash | null>(null)
   const location = useLocation()
   const navigate = useNavigate()
   // useNavigate 가 돌려주는 함수는 경로가 바뀔 때마다 새로 만들어진다. effect 와 콜백은 ref 로 최신 값을 쓴다.
@@ -72,6 +79,11 @@ export default function App() {
 
   const tab = tabOfPath(location.pathname)
   const role = auth.status === 'signed-in' ? auth.user.role : null
+  const openNodeId = tab === 'workspace' ? parseWorkspaceQuery(location.search).node : null
+
+  useEffect(() => {
+    if (flash && flash.id !== openNodeId) setFlash(null)
+  }, [flash, openNodeId])
 
   useEffect(() => {
     // 로그인 화면을 거쳐도 남도록 먼저 탭 저장소에 둔다.
@@ -175,6 +187,15 @@ export default function App() {
     [go, workspaceQueryNow],
   )
 
+  /** 「＋ 추가」 로 만들었을 때. 안내를 채우고 작업 공간에서 새 항목을 연다 */
+  const onCreated = useCallback(
+    (node: NodeView, text: string, kind?: 'success' | 'error') => {
+      setFlash({ id: node.id, text, kind })
+      focusNode(node.id)
+    },
+    [focusNode],
+  )
+
   const openHistory = useCallback(
     (id: string) => go(TAB_PATHS.changes + changesSearch({ target: id, actor: '', page: 0 })),
     [go],
@@ -217,84 +238,118 @@ export default function App() {
   const workspaceQuery = parseWorkspaceQuery(location.search)
   const changesQuery = parseChangesQuery(location.search)
 
+  const header = (
+    // 넓은 화면은 한 줄, 좁은 화면은 두 줄(제목과 사용자 상자 / 탭 셋과 더보기, 「＋ 추가」)이다
+    <header className="flex shrink-0 flex-wrap items-center gap-x-2 bg-slate-900 px-2 text-slate-200 lg:h-12 lg:flex-nowrap lg:gap-x-6 lg:px-4">
+      <div className="min-w-0 flex-1 truncate py-2 font-bold lg:flex-none lg:py-0">금융 온톨로지 워크벤치</div>
+      <nav className="order-3 flex min-w-0 basis-full flex-nowrap items-center lg:order-none lg:flex-1 lg:basis-auto">
+        <TopTabs activeTab={activeTab} onOpen={openTab} />
+        {/* 「＋ 추가」 는 오른쪽 끝, 「더보기」 왼쪽이다. 온톨로지를 받기 전에는 그리지 않는다 */}
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          {ontology && canEdit && (
+            <AddMenu
+              align="end"
+              trigger={
+                <Button size="sm" className="h-8 px-2.5" aria-label="추가" data-testid="add-open">
+                  ＋<span className="hidden sm:inline"> 추가</span>
+                </Button>
+              }
+            />
+          )}
+          <MoreMenu role={user.role} activeTab={activeTab} onOpen={openTab} />
+        </div>
+      </nav>
+      <div className="flex shrink-0 items-center gap-1 text-sm">
+        <GuideOpenButton />
+        <span data-testid="current-user-name">{user.displayName}</span>
+        <span className="hidden text-slate-400 lg:inline" data-testid="current-user-email">
+          {' '}
+          {user.email}
+        </span>
+        <Badge
+          className={cn('ml-1.5 rounded-[3px] px-1.5 py-px', ROLE_BADGE_CLASS[user.role] ?? 'bg-slate-700 text-slate-200')}
+          data-testid="current-user-role"
+          data-role={user.role}
+        >
+          {ROLE_LABEL[user.role] ?? user.role}
+        </Badge>
+        <Button variant="link" size="sm" className="ml-2 h-auto px-1 py-0 text-blue-300" data-testid="logout-button" onClick={logout}>
+          로그아웃
+        </Button>
+      </div>
+    </header>
+  )
+
+  const main = (
+    <main className="app-main min-h-0 flex-1 overflow-auto">
+      {ontologyError && (
+        <Alert role={undefined} variant="destructive" className="m-2 w-auto" data-testid="ontology-error">
+          <AlertDescription>{ontologyError}</AlertDescription>
+        </Alert>
+      )}
+      {ontology && latestVersion > ontology.version && (
+        <Alert role={undefined} className="m-2 w-auto" data-testid="ontology-stale">
+          <AlertDescription className="flex flex-wrap items-center gap-2">
+            <span>온톨로지가 바뀌었습니다(버전 {latestVersion}). 다시 읽으면 바뀐 타입과 칸이 보입니다.</span>
+            <Button type="button" size="sm" variant="outline" data-testid="ontology-reload" onClick={() => void reloadOntology().catch((e) => setOntologyError(errorMessage(e)))}>
+              다시 읽기
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      {!ontology && !ontologyError && <div className="p-12 text-center text-muted-foreground">온톨로지를 불러오는 중…</div>}
+      {ontology && (
+        <ErrorBoundary resetKey={activeTab ?? undefined}>
+          {activeTab === 'map' && <ConceptMapTab onOpenNode={focusNode} />}
+          {activeTab === 'workspace' && (
+            <Workspace
+              centerId={workspaceQuery.center ?? workspaceQuery.node}
+              focusSeq={focusSeq}
+              selectedId={workspaceQuery.node}
+              flash={flash}
+              onFocus={focusNode}
+              onSelect={selectNode}
+              onOpenHistory={openHistory}
+            />
+          )}
+          {activeTab === 'list' && <ListTab onOpen={focusNode} />}
+          {activeTab === 'review' && <ReviewTab onOpen={focusNode} />}
+          {activeTab === 'changes' && (
+            <ChangesTab
+              targetId={changesQuery.target}
+              onTargetIdChange={(id) => go(TAB_PATHS.changes + changesSearch({ ...changesQuery, target: id, page: 0 }), true)}
+              onOpen={focusNode}
+            />
+          )}
+          {activeTab === 'ontology' && <OntologyTab draft={ontologyDraft} onDraftChange={setOntologyDraft} reloadOntology={reloadOntology} />}
+          {activeTab === 'users' && user.role === 'ADMIN' && <UsersTab onOpenHistory={openHistory} />}
+        </ErrorBoundary>
+      )}
+    </main>
+  )
+
+  const body = (
+    <>
+      {header}
+      <GuideMessage />
+      {main}
+    </>
+  )
+
   return (
     <div className="flex h-screen flex-col">
       {/* 탭 단위 ErrorBoundary 바깥이라 탭을 옮겨도 가이드가 남는다. 로그인 화면이 되면 함께 사라진다 */}
       <GuideProvider user={user} onUserChange={(u) => setAuth({ status: 'signed-in', user: u })} ontology={ontology}>
-        {/* 넓은 화면은 한 줄, 좁은 화면은 두 줄(제목과 사용자 상자 / 탭 셋과 더보기)이다 */}
-        <header className="flex shrink-0 flex-wrap items-center gap-x-2 bg-slate-900 px-2 text-slate-200 lg:h-12 lg:flex-nowrap lg:gap-x-6 lg:px-4">
-          <div className="min-w-0 flex-1 truncate py-2 font-bold lg:flex-none lg:py-0">금융 온톨로지 워크벤치</div>
-          {/* 둘째 줄 오른쪽 끝은 「＋ 추가」 자리다 */}
-          <nav className="order-3 flex min-w-0 basis-full flex-nowrap items-center lg:order-none lg:flex-1 lg:basis-auto">
-            <TopTabs activeTab={activeTab} onOpen={openTab} />
-            <MoreMenu role={user.role} activeTab={activeTab} onOpen={openTab} />
-          </nav>
-          <div className="flex shrink-0 items-center gap-1 text-sm">
-            <GuideOpenButton />
-            <span data-testid="current-user-name">{user.displayName}</span>
-            <span className="hidden text-slate-400 lg:inline" data-testid="current-user-email">
-              {' '}
-              {user.email}
-            </span>
-            <Badge
-              className={cn('ml-1.5 rounded-[3px] px-1.5 py-px', ROLE_BADGE_CLASS[user.role] ?? 'bg-slate-700 text-slate-200')}
-              data-testid="current-user-role"
-              data-role={user.role}
-            >
-              {ROLE_LABEL[user.role] ?? user.role}
-            </Badge>
-            <Button variant="link" size="sm" className="ml-2 h-auto px-1 py-0 text-blue-300" data-testid="logout-button" onClick={logout}>
-              로그아웃
-            </Button>
-          </div>
-        </header>
-        <GuideMessage />
-        <main className="app-main min-h-0 flex-1 overflow-auto">
-          {ontologyError && (
-            <Alert role={undefined} variant="destructive" className="m-2 w-auto" data-testid="ontology-error">
-              <AlertDescription>{ontologyError}</AlertDescription>
-            </Alert>
-          )}
-          {ontology && latestVersion > ontology.version && (
-            <Alert role={undefined} className="m-2 w-auto" data-testid="ontology-stale">
-              <AlertDescription className="flex flex-wrap items-center gap-2">
-                <span>온톨로지가 바뀌었습니다(버전 {latestVersion}). 다시 읽으면 바뀐 타입과 칸이 보입니다.</span>
-                <Button type="button" size="sm" variant="outline" data-testid="ontology-reload" onClick={() => void reloadOntology().catch((e) => setOntologyError(errorMessage(e)))}>
-                  다시 읽기
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-          {!ontology && !ontologyError && <div className="p-12 text-center text-muted-foreground">온톨로지를 불러오는 중…</div>}
-          {ontology && (
-            <AppContext.Provider value={{ user, ontology, canEdit }}>
-              <ErrorBoundary resetKey={activeTab ?? undefined}>
-                {activeTab === 'map' && <ConceptMapTab onOpenNode={focusNode} />}
-                {activeTab === 'workspace' && (
-                  <Workspace
-                    centerId={workspaceQuery.center ?? workspaceQuery.node}
-                    focusSeq={focusSeq}
-                    selectedId={workspaceQuery.node}
-                    onFocus={focusNode}
-                    onSelect={selectNode}
-                    onOpenHistory={openHistory}
-                  />
-                )}
-                {activeTab === 'list' && <ListTab onOpen={focusNode} />}
-                {activeTab === 'review' && <ReviewTab onOpen={focusNode} />}
-                {activeTab === 'changes' && (
-                  <ChangesTab
-                    targetId={changesQuery.target}
-                    onTargetIdChange={(id) => go(TAB_PATHS.changes + changesSearch({ ...changesQuery, target: id, page: 0 }), true)}
-                    onOpen={focusNode}
-                  />
-                )}
-                {activeTab === 'ontology' && <OntologyTab draft={ontologyDraft} onDraftChange={setOntologyDraft} reloadOntology={reloadOntology} />}
-                {activeTab === 'users' && user.role === 'ADMIN' && <UsersTab onOpenHistory={openHistory} />}
-              </ErrorBoundary>
-            </AppContext.Provider>
-          )}
-        </main>
+        {/* 온톨로지를 받은 뒤에는 머리글의 「＋ 추가」 와 탭이 같은 만들기 창을 쓴다. 받기 전(불러오는 중, 오류)에는 Provider 없이 그린다 */}
+        {ontology ? (
+          <AppContext.Provider value={{ user, ontology, canEdit }}>
+            <AddProvider onCreated={onCreated} onOpenNode={focusNode}>
+              {body}
+            </AddProvider>
+          </AppContext.Provider>
+        ) : (
+          body
+        )}
       </GuideProvider>
     </div>
   )

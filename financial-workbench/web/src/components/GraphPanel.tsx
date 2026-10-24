@@ -4,6 +4,7 @@ import { useApp, useLabels } from '../context'
 import { collapseClaims, expandedDisplay, type GraphData, type GraphDisplay, typeColor, typeShape } from '../lib/graph'
 import type { Ontology } from '../api/types'
 import { nodeDisplayLabel, predicateLabel, relationshipLabel } from '../lib/labels'
+import { AddMenu } from './add/AddMenu'
 
 interface Props {
   data: GraphData
@@ -120,7 +121,7 @@ function runLayout(cy: Core): void {
 
 export function GraphPanel(props: Props) {
   const { data, centerId, selectedId, loading, error, hops, onHopsChange, claimsAsNodes, visible = true } = props
-  const { ontology } = useApp()
+  const { ontology, canEdit } = useApp()
   const labels = useLabels()
   const display = useMemo(() => (claimsAsNodes ? expandedDisplay(data) : collapseClaims(data, centerId)), [data, centerId, claimsAsNodes])
   const containerRef = useRef<HTMLDivElement>(null)
@@ -273,6 +274,22 @@ export function GraphPanel(props: Props) {
           <div className="graph-overlay subtle" data-testid="graph-no-neighbors">
             이 항목에 연결된 이웃이 없습니다.
           </div>
+        )}
+        {/* 캔버스 위에 떠 있는 「＋ 추가」 메뉴 단추. 그래프 조작을 가리지 않게 작게 둔다 */}
+        {canEdit && (
+          <AddMenu
+            align="end"
+            trigger={
+              <button
+                type="button"
+                className="absolute right-3 bottom-3 z-10 flex size-10 items-center justify-center rounded-full bg-primary text-xl text-primary-foreground shadow-md"
+                aria-label="추가"
+                data-testid="graph-add"
+              >
+                ＋
+              </button>
+            }
+          />
         )}
       </div>
 

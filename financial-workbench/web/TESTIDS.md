@@ -22,6 +22,32 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `ontology-error` | 온톨로지를 받지 못했을 때 |
 | `ontology-stale`, `ontology-reload` | 다른 곳에서 온톨로지 버전이 바뀌었다는 안내와 「다시 읽기」 단추. 응답 헤더의 버전이 들고 있는 버전보다 클 때만 나온다 |
 
+## ＋ 추가
+
+머리글의 「＋ 추가」 메뉴와 만들기 창이다. 메뉴와 창은 Portal 로 `body` 아래에 그려진다. 편집 권한이 없으면(VIEWER) 여는 단추가 없다.
+
+| testid | 요소 |
+| --- | --- |
+| `add-open` | 머리글의 「＋ 추가」 단추. 좁은 화면에서는 ＋ 만 보이고 `aria-label="추가"` 다. 온톨로지를 받기 전에는 없다 |
+| `add-type-<타입>` * | 메뉴의 타입 줄. 타입 순서대로이고 주장(`add-type-Claim`)은 맨 아래 구분선 밑에 있다. 주장 종류가 없으면 주장 줄이 없다 |
+| `add-dialog` | 만들기 창. `data-type` 이 고른 타입이다. 주장이면 안에 주장 만들기 폼(`claim-add-form`)이 있다 |
+| `add-steps` | 창 위쪽의 단계 표시(「1. 종류 고르기」, 「2. 내용 적기」, 「3. 연결하기」). 주장과 고르기 칸이 없는 타입은 3단계가 없다 |
+| `graph-add` | 작업 공간 그래프 오른쪽 아래의 둥근 ＋ 단추. `add-open` 과 같은 메뉴를 연다 |
+| `map-add-type` | 개념 지도 타입 칸의 「＋ {타입} 추가」. 메뉴 없이 그 타입의 창을 연다 |
+| `create-optional-toggle` | 「선택 항목 더 보기」. `aria-expanded`. 선택 속성이 없는 타입에는 없다. 선택 속성에 오류가 생기면 저절로 펼친다 |
+| `create-form`, `create-submit`, `create-cancel`, `create-error` | 만들기 창의 폼 |
+| `create-prop-<속성>` | 만들기 창 폼의 속성 입력. 선택 속성은 `create-optional-toggle` 을 눌러야 나온다. 예: `create-prop-name`, `create-prop-market` |
+| `create-prop-<속성>-error` | 그 속성의 오류 |
+| `create-duplicate` | 같은 이름 경고(`role=status`). 저장 전에 같은 이름이 있으면 나온다 |
+| `create-duplicate-item` * | 경고의 후보 한 줄. `data-node-id` |
+| `create-duplicate-open` | 후보의 「열기」 단추. `claim-doc-create-` 에서는 「이 문서 고르기」 |
+| `create-duplicate-confirm` | 「그래도 만들기」 단추 |
+| `create-link-<관계>-picker-*` | 만들기 창 폼의 시작 노드 고르기(NodePicker). 예: `create-link-ISSUES-picker-input` |
+| `create-link-<관계>-selected` | 고른 시작 노드 |
+| `create-link-<관계>-clear` | 「다시 고르기」 단추 |
+
+`create-duplicate*` 와 `create-link-*` 는 근거 문서 등록 폼에서 `claim-doc-create-` 접두사로도 생긴다.
+
 ## 첫 접속 가이드
 
 `guideDoneAt` 이 없는 사용자가 개념 지도나 작업 공간에 들어오거나 「사용법」(`guide-open`)을 누르면 열린다. `e2e/support.ts` 의 `loginAs` 는 기본으로 가이드를 건너뛴다. 가이드를 확인하는 테스트만 `{ guide: 'keep' }` 을 넘긴다.
@@ -35,11 +61,12 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `guide-skip` | 「건너뛰기」. 둘러보기의 모든 단계와 따라하기의 소개에 있다. 말풍선 안에 초점이 있을 때 `Escape` 도 같다 |
 | `guide-stop` | 따라하기의 기업, 근거 문서, 주장 단계와 `resume` 단계의 「그만두기」. 만든 연습 항목을 보관하고 끝낸다 |
 | `guide-resume` | `resume` 단계의 「이어서 하기」. 저장된 단계로 연다 |
-| `guide-reopen` | 「폼 다시 열기」. 따라하기의 만드는 단계에서 만들기 폼을 취소했을 때만 나온다 |
+| `guide-reopen` | 「폼 다시 열기」. 따라하기의 주장 단계에서 주장 폼을 취소했을 때만 나온다. 기업과 근거 문서 단계에서 창을 닫으면 말풍선은 다시 `add-open` 을 가리킨다 |
 | `guide-message` | 끝낸 기록을 남기지 못했거나 연습 항목을 보관하지 못했을 때 머리글 아래 안내 |
 | `guide-archive-failed` | `guide-message` 안의 보관하지 못한 연습 항목 이름 한 줄. 누르면 `/workspace?node=<id>` 로 연다 |
 
 가이드가 가리키는 요소에는 class `guide-target` 이 붙는다. 단계가 바뀌거나 가이드가 닫히면 떨어진다.
+따라하기의 기업과 근거 문서 단계는 만들기 창이 열려 있으면 `create-submit`, 아니면 `add-open` 을 가리킨다. 말풍선은 창 위에 보이고, 말풍선을 눌러도 창이 닫히지 않는다.
 
 ## 개념 지도
 
@@ -86,20 +113,6 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `search-result-hint` * | 결과 한 줄의 구분 정보(`hintProperties` 값과 만든 날) |
 | `search-empty` | 결과 없음 |
 | `search-pager-prev`, `search-pager-next`, `search-pager-info` | 결과가 2쪽 이상일 때 |
-| `new-node-type`, `new-node-button` | 새 노드 타입 select 와 만들기 버튼. VIEWER 에게는 없다. 값 `Claim` 을 고르면 주장 만들기 폼(`claim-add-form`)이 열린다 |
-| `viewer-create-hint` | VIEWER 에게 보이는 「노드를 만들 수 없습니다」 안내 |
-| `create-form`, `create-submit`, `create-cancel`, `create-error` | 새 노드 폼 |
-| `create-prop-<속성>` | 새 노드 폼의 속성 입력. 예: `create-prop-name`, `create-prop-market` |
-| `create-prop-<속성>-error` | 그 속성의 오류 |
-| `create-duplicate` | 같은 이름 경고(`role=status`). 저장 전에 같은 이름이 있으면 나온다 |
-| `create-duplicate-item` * | 경고의 후보 한 줄. `data-node-id` |
-| `create-duplicate-open` | 후보의 「열기」 단추. `claim-doc-create-` 에서는 「이 문서 고르기」 |
-| `create-duplicate-confirm` | 「그래도 만들기」 단추 |
-| `create-link-<관계>-picker-*` | 만들기 폼의 시작 노드 고르기(NodePicker). 예: `create-link-ISSUES-picker-input` |
-| `create-link-<관계>-selected` | 고른 시작 노드 |
-| `create-link-<관계>-clear` | 「다시 고르기」 단추 |
-
-`create-duplicate*` 와 `create-link-*` 는 근거 문서 등록 폼에서 `claim-doc-create-` 접두사로도 생긴다.
 
 ## 작업 공간: 가운데 그래프
 

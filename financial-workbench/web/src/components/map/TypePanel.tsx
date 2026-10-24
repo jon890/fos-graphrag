@@ -7,6 +7,7 @@ import { typeRelationSentences } from '../../lib/relationSentence'
 import { DEFAULT_WORKSPACE_QUERY, listSearch, TAB_PATHS, workspaceSearch } from '../../routes'
 import { Button } from '@/components/ui/button'
 import { TypeBadge } from '../TypeBadge'
+import { useAdd } from '../add/AddProvider'
 
 interface Props {
   type: string
@@ -15,11 +16,12 @@ interface Props {
   onOpenNode: (id: string) => void
 }
 
-/** 개념 지도에서 고른 타입의 칸. 설명, 최근 항목, 관계 문장, 다른 화면으로 가는 단추가 있다 */
+/** 개념 지도에서 고른 타입의 칸. 설명, 최근 항목, 관계 문장, 만들기 창과 다른 화면으로 가는 단추가 있다 */
 export function TypePanel({ type, count, onOpenNode }: Props) {
-  const { ontology } = useApp()
+  const { ontology, canEdit } = useApp()
   const labels = useLabels()
   const navigate = useNavigate()
+  const add = useAdd()
   const [recent, setRecent] = useState<NodeView[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -93,6 +95,11 @@ export function TypePanel({ type, count, onOpenNode }: Props) {
       )}
 
       <div className="mt-4 flex flex-wrap gap-2">
+        {canEdit && (
+          <Button type="button" size="sm" data-testid="map-add-type" onClick={() => add.open(type)}>
+            ＋ {labels.type(type)} 추가
+          </Button>
+        )}
         <Button
           type="button"
           size="sm"

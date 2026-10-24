@@ -68,7 +68,7 @@ export interface GuideContextValue {
   /** 항목을 만들었을 때. 지금 단계의 종류면 다음 단계로 간다 */
   report: (event: GuideReport) => void
   consumePrefill: () => void
-  /** 만들기 폼을 닫았을 때. 말풍선에 「폼 다시 열기」 가 나온다 */
+  /** 만들기 폼이나 창을 닫았을 때. 주장 단계는 말풍선에 「폼 다시 열기」 가 나오고, 기업과 근거 문서 단계는 다음에 그 타입의 창을 열 때 다시 채운다 */
   cancelForm: () => void
 }
 
@@ -285,11 +285,16 @@ export function GuideProvider({ user, onUserChange, ontology, children }: Props)
     setPrefillUsed(true)
     setFormClosed(false)
   }, [])
-  const cancelForm = useCallback(() => setFormClosed(true), [])
   const reopen = useCallback(() => {
     setPrefillUsed(false)
     setFormClosed(false)
   }, [])
+  const cancelForm = useCallback(() => {
+    const s = stateRef.current
+    const id = s.steps[s.step]?.id
+    if (id === 'company' || id === 'document') reopen()
+    else if (id === 'claim') setFormClosed(true)
+  }, [reopen])
 
   useEffect(() => {
     if (autoTriedRef.current || (tab !== 'map' && tab !== 'workspace') || ontology === null) return
@@ -320,8 +325,8 @@ export function GuideProvider({ user, onUserChange, ontology, children }: Props)
     let target: WorkspaceQuery | null = null
     if (s.kind === 'practice') {
       const company = s.created.company ?? null
-      if (current.id === 'company' || current.id === 'document') target = { ...DEFAULT_WORKSPACE_QUERY, pane: narrowPane }
-      else if (current.id === 'claim' && company) target = { ...DEFAULT_WORKSPACE_QUERY, node: company, pane: narrowPane }
+      // 기업과 근거 문서는 어느 화면에서나 「＋ 추가」 로 만들어 주소를 바꾸지 않는다.
+      if (current.id === 'claim' && company) target = { ...DEFAULT_WORKSPACE_QUERY, node: company, pane: narrowPane }
       else if (current.id === 'done' && company) target = { ...DEFAULT_WORKSPACE_QUERY, node: company, center: company, pane: narrowPane }
     } else if (here.pathname !== TAB_PATHS.workspace) {
       target = { ...DEFAULT_WORKSPACE_QUERY, pane: narrowPane }
@@ -331,7 +336,7 @@ export function GuideProvider({ user, onUserChange, ontology, children }: Props)
     }
     if (!target) return
     const url = TAB_PATHS.workspace + workspaceSearch(target)
-    // 만들기가 성공하면 작업 공간이 만든 항목을 여는 주소를 같은 이벤트에서 쌓는다. 아직 반영되지 않은 주소와 비교하면
+    // 만들기가 성공하면 App 이 만든 항목을 여는 주소를 같은 이벤트에서 쌓는다. 아직 반영되지 않은 주소와 비교하면
     // 바꾸지 않고 넘어갈 수 있어, 따라하기는 비교하지 않고 언제나 바꾼다. replace 라 기록은 쌓이지 않는다.
     if (s.kind === 'practice' || url !== here.pathname + here.search) navigateRef.current(url, { replace: true })
     // entry 가 바뀔 때만 돈다. 주소나 폭이 바뀌어도 다시 옮기지 않는다.

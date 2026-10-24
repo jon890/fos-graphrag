@@ -52,7 +52,7 @@ const progress: GuideProgress = { userId: 'u1', kind: 'browse', step: 2, started
 describe('첫 접속 가이드', () => {
   it('둘러보기는 소개, 개념 지도, 검색 입력칸, 그래프, 상세 칸 순서로 가리킨다', () => {
     expect(BROWSE_STEPS.map((s) => s.id)).toEqual(['intro', 'map', 'search', 'graph', 'detail'])
-    expect(BROWSE_STEPS.map((s) => s.target)).toEqual([null, 'concept-map-canvas', 'search-input', 'graph-canvas', 'workspace-pane-detail'])
+    expect(BROWSE_STEPS.map((s) => s.target)).toEqual([[], ['concept-map-canvas'], ['search-input'], ['graph-canvas'], ['workspace-pane-detail']])
     expect(BROWSE_STEPS.map((s) => s.pane)).toEqual([null, null, 'search', 'graph', 'detail'])
   })
 
@@ -150,10 +150,20 @@ describe('첫 접속 가이드', () => {
     const o = practiceOntology()
     const steps = practiceSteps({ type: (t) => typeLabel(o, t), predicate: (p) => predicateLabel(o, p) }, { predicate: 'BELONGS_TO_SECTOR', objectType: 'Sector' })
     expect(steps.map((s) => s.id)).toEqual(['intro', 'company', 'document', 'claim', 'done'])
-    expect(steps.map((s) => s.target)).toEqual([null, 'create-submit', 'create-submit', 'claim-add-submit', 'graph-canvas'])
-    expect(steps.map((s) => s.pane)).toEqual([null, 'search', 'search', 'detail', 'graph'])
+    expect(steps.map((s) => s.target)).toEqual([[], ['create-submit', 'add-open'], ['create-submit', 'add-open'], ['claim-add-submit'], ['graph-canvas']])
+    expect(steps.map((s) => s.pane)).toEqual([null, null, null, 'detail', 'graph'])
     expect(steps[3].body).toContain('대상에 산업 하나를 고르고')
     expect(steps[3].title).toContain('속한다')
+  })
+
+  it('기업 단계는 창이 열려 있으면 만들기 단추를, 아니면 「＋ 추가」 를 가리키고 작업 공간 탭을 옮기지 않는다', () => {
+    const o = practiceOntology()
+    const steps = practiceSteps({ type: (t) => typeLabel(o, t), predicate: (p) => predicateLabel(o, p) }, { predicate: 'BELONGS_TO_SECTOR', objectType: 'Sector' })
+    const company = steps.find((s) => s.id === 'company')
+    expect(company?.target).toEqual(['create-submit', 'add-open'])
+    expect(company?.pane).toBeNull()
+    expect(company?.body).toContain('「＋ 추가」 를 누르고 기업을 고르세요')
+    expect(steps.find((s) => s.id === 'document')?.body).toContain('「＋ 추가」 에서 근거 문서를 골라')
   })
 
   describe('anchorOf', () => {

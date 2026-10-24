@@ -11,12 +11,15 @@ interface Props {
   disabled?: boolean
   /** 서버가 관리해 사용자가 바꿀 수 없는 속성 */
   readOnlyNames?: string[]
+  /** 필수 칸이나 선택 칸만 그린다. 없으면 전부 그린다 */
+  only?: 'required' | 'optional'
 }
 
-export function PropertyFields({ defs, values, errors = {}, onChange, testIdPrefix, disabled, readOnlyNames = [] }: Props) {
+export function PropertyFields({ defs, values, errors = {}, onChange, testIdPrefix, disabled, readOnlyNames = [], only }: Props) {
+  const entries = Object.entries(defs).filter(([, def]) => !only || (only === 'required') === !!def.required)
   return (
     <div className="prop-fields">
-      {Object.entries(defs).map(([name, def]) => {
+      {entries.map(([name, def]) => {
         const id = `${testIdPrefix}-${name}`
         const value = values[name] ?? ''
         const readOnly = disabled || readOnlyNames.includes(name)

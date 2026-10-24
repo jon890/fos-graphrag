@@ -83,18 +83,35 @@ function searchResult(page: Page, label: string): Locator {
   return page.getByTestId('search-result').filter({ has: page.locator('.result-label', { hasText: exact(label) }) })
 }
 
-/** 왼쪽 「새 노드 만들기」 폼으로 노드를 만든다. 만든 노드가 선택된다. */
+/** 머리글 「＋ 추가」 에서 타입을 골라 만들기 창을 연다. */
+async function openAdd(page: Page, type: string): Promise<Locator> {
+  await page.getByTestId('add-open').click()
+  await page.getByTestId(`add-type-${type}`).click()
+  const dialog = page.getByTestId('add-dialog')
+  await expect(dialog).toHaveAttribute('data-type', type)
+  return dialog
+}
+
+/** 만들기 창의 선택 항목을 펼친다. 이미 펼쳤으면 그대로 둔다. */
+async function showOptional(page: Page): Promise<void> {
+  const toggle = page.getByTestId('create-optional-toggle')
+  if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+}
+
+/** 「＋ 추가」 창으로 노드를 만든다. 창이 닫히고 작업 공간에서 만든 노드의 상세가 열린다. */
 async function createNode(page: Page, type: string, label: string, props: Record<string, string>): Promise<void> {
-  await page.getByTestId('tab-workspace').click()
-  await page.getByTestId('new-node-type').selectOption(type)
-  await page.getByTestId('new-node-button').click()
+  const dialog = await openAdd(page, type)
   for (const [name, value] of Object.entries(props)) {
-    const input = page.getByTestId(`create-prop-${name}`)
+    const input = dialog.getByTestId(`create-prop-${name}`)
+    // 선택 속성은 펼쳐야 보인다.
+    if ((await input.count()) === 0) await showOptional(page)
     const tag = await input.evaluate((el) => el.tagName)
     if (tag === 'SELECT') await input.selectOption(value)
     else await input.fill(value)
   }
-  await page.getByTestId('create-submit').click()
+  await dialog.getByTestId('create-submit').click()
+  await expect(dialog).toHaveCount(0)
   await expect(page.getByTestId('detail-label')).toHaveText(label)
   // 만든 직후 상세 위에 성공 안내가 나온다.
   await expect(page.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
@@ -220,20 +237,23 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
 
     await openScreen(pageAdmin, 'workspace')
 
-    const typeSelect = pageAdmin.getByTestId('new-node-type')
-    await expect(typeSelect.locator('option')).toHaveText(['무엇을 만들까요?', '기업', '종목', '산업', '근거 문서', '인물', '개념', '세상의 변화', '병목', '밸류에이션', '시나리오', '투자 결정', '주장'])
-    // 저장되는 값은 그대로다.
-    await expect(typeSelect.locator('option')).toHaveCount(13)
-    await typeSelect.selectOption('Claim')
-    await pageAdmin.getByTestId('new-node-button').click()
+    // 메뉴의 줄은 타입 순서이고 주장은 맨 아래다. 타입 목록은 온톨로지가 정하므로 여기에 다시 적지 않는다.
+    await pageAdmin.getByTestId('add-open').click()
+    const addTypes = pageAdmin.locator('[data-testid^="add-type-"]')
+    await expect(addTypes.first()).toHaveAttribute('data-testid', /^add-type-/)
+    await expect(addTypes.last()).toHaveAttribute('data-testid', 'add-type-Claim')
+    await expect(addTypes.last()).toContainText('주장')
+    await pageAdmin.keyboard.press('Escape')
+    await openAdd(pageAdmin, 'Claim')
     await expect(pageAdmin.getByTestId('claim-add-form')).toBeVisible()
     await expect(pageAdmin.getByTestId('claim-subject-picker-input')).toBeVisible()
     await expect(pageAdmin.getByTestId('claim-object-picker-input')).toBeVisible()
     await pageAdmin.getByTestId('claim-add-cancel').click()
-    await typeSelect.selectOption('Company')
-    await pageAdmin.getByTestId('new-node-button').click()
+    await expect(pageAdmin.getByTestId('add-dialog')).toHaveCount(0)
+    await openAdd(pageAdmin, 'Company')
     const company = pageAdmin.getByTestId('create-form')
     await expect(company).toContainText('기업 이름')
+    await showOptional(pageAdmin)
     await expect(company).toContainText('국가')
     await expect(company).toContainText('기업이 등록된 나라')
     await expect(pageAdmin.getByTestId('create-prop-country').locator('option[value="KR"]')).toHaveText('대한민국 (KR)')
@@ -242,11 +262,11 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await shot(pageAdmin, '00e-company-form')
     await pageAdmin.getByTestId('create-cancel').click()
 
-    await typeSelect.selectOption('Security')
-    await pageAdmin.getByTestId('new-node-button').click()
+    await openAdd(pageAdmin, 'Security')
     const market = pageAdmin.getByTestId('create-prop-market')
     await expect(market.locator('option')).toHaveText(['선택하세요', '코스피', '코스닥', '나스닥', '뉴욕증권거래소', '기타'])
     await expect(market.locator('option[value="KRX_KOSPI"]')).toHaveText('코스피')
+    await showOptional(pageAdmin)
     await expect(pageAdmin.getByTestId('create-prop-securityType').locator('option')).toHaveText(['(없음)', '보통주', '우선주', 'ETF', '예탁증서(ADR)', '기타'])
     await shot(pageAdmin, '00e-security-form')
     await pageAdmin.getByTestId('create-cancel').click()
@@ -296,6 +316,26 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageAdmin.getByTestId('tab-list')).toHaveAttribute('aria-selected', 'true')
   })
 
+  test('0h) 개념 지도의 ＋ 타입 추가로 만든 항목이 작업 공간 상세로 열린다', async () => {
+    const name = `지도에서 만든 산업-${suffix}`
+    await openScreen(pageAdmin, 'map')
+    await pageAdmin.locator('[data-testid="map-type"][data-type="Sector"]').click()
+    await expect(pageAdmin.getByTestId('map-type-panel')).toHaveAttribute('data-type', 'Sector')
+    await pageAdmin.getByTestId('map-add-type').click()
+    const dialog = pageAdmin.getByTestId('add-dialog')
+    await expect(dialog).toHaveAttribute('data-type', 'Sector')
+    await expect(dialog.getByTestId('add-steps')).toBeVisible()
+    await shot(pageAdmin, 'add-dialog')
+
+    // 필수 칸만 채워 저장한다.
+    await dialog.getByTestId('create-prop-name').fill(name)
+    await dialog.getByTestId('create-submit').click()
+    await expect(dialog).toHaveCount(0)
+    await expect(pageAdmin).toHaveURL(/\/workspace\?node=[^&]+&pane=detail/)
+    await expect(pageAdmin.getByTestId('detail-label')).toHaveText(name)
+    await expect(pageAdmin.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
+  })
+
   test('1) A 가 기업과 산업, 종목을 만들고 ISSUES 관계를 잇는다', async ({ browser }) => {
     pageA = await open(browser)
     await loginAs(pageA, editorA)
@@ -335,8 +375,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
 
   test('1b) 같은 이름은 저장 전에 경고하고, 종목을 만들며 고른 발행 기업이 이어진다', async () => {
     await pageA.getByTestId('tab-workspace').click()
-    await pageA.getByTestId('new-node-type').selectOption('Company')
-    await pageA.getByTestId('new-node-button').click()
+    await openAdd(pageA, 'Company')
     await pageA.getByTestId('create-prop-name').fill(data.supplier)
     await pageA.getByTestId('create-submit').click()
     await expect(pageA.getByTestId('create-duplicate')).toBeVisible()
@@ -344,10 +383,11 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA.getByTestId('create-duplicate-item')).toContainText('대한민국 (KR)')
     await shot(pageA, '01b-duplicate')
     await pageA.getByTestId('create-duplicate-open').click()
+    await expect(pageA.getByTestId('add-dialog')).toHaveCount(0)
     await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
 
     // 그래도 만들면 같은 이름의 기업이 둘이 된다.
-    await pageA.getByTestId('new-node-button').click()
+    await openAdd(pageA, 'Company')
     await pageA.getByTestId('create-prop-name').fill(data.supplier)
     await pageA.getByTestId('create-submit').click()
     await expect(pageA.getByTestId('create-duplicate')).toBeVisible()
@@ -367,11 +407,11 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
 
     // 종목을 만들면서 발행 기업을 고르면 ISSUES 관계가 함께 이어진다.
-    await pageA.getByTestId('new-node-type').selectOption('Security')
-    await pageA.getByTestId('new-node-button').click()
+    await openAdd(pageA, 'Security')
     await pageA.getByTestId('create-prop-market').selectOption('KRX_KOSDAQ')
     await pageA.getByTestId('create-prop-ticker').fill(data.issuerTicker)
     await pageA.getByTestId('create-prop-name').fill(data.issuerSecurity)
+    await showOptional(pageA)
     await pageA.getByTestId('create-prop-securityType').selectOption('COMMON')
     await pageA.getByTestId('create-prop-currency').selectOption('USD')
     await pick(pageA, 'create-link-ISSUES-picker', data.company)
@@ -392,11 +432,11 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
         body: JSON.stringify({ code: 'INTERNAL_ERROR', message: '테스트로 만든 실패', details: null }),
       }),
     )
-    await pageA.getByTestId('new-node-type').selectOption('Security')
-    await pageA.getByTestId('new-node-button').click()
+    await openAdd(pageA, 'Security')
     await pageA.getByTestId('create-prop-market').selectOption('KRX_KOSDAQ')
     await pageA.getByTestId('create-prop-ticker').fill(data.failedTicker)
     await pageA.getByTestId('create-prop-name').fill(data.failedSecurity)
+    await showOptional(pageA)
     await pageA.getByTestId('create-prop-securityType').selectOption('COMMON')
     await pageA.getByTestId('create-prop-currency').selectOption('USD')
     await pick(pageA, 'create-link-ISSUES-picker', data.company)
@@ -410,24 +450,22 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   test('1c) 투자 논리 사슬을 만들고 결정에서 변화까지 따라간다', async () => {
     await createNode(pageA, 'Change', data.change, { title: data.change, category: 'TECHNOLOGY' })
 
-    await pageA.getByTestId('new-node-type').selectOption('Bottleneck')
-    await pageA.getByTestId('new-node-button').click()
+    await openAdd(pageA, 'Bottleneck')
     await pageA.getByTestId('create-prop-title').fill(data.bottleneck)
     await pageA.getByTestId('create-prop-status').selectOption('CONFIRMED')
     await pick(pageA, 'create-link-CREATES-picker', data.change)
     await pageA.getByTestId('create-submit').click()
     await expect(pageA.getByTestId('detail-label')).toHaveText(data.bottleneck)
 
-    await pageA.getByTestId('new-node-type').selectOption('Company')
-    await pageA.getByTestId('new-node-button').click()
+    await openAdd(pageA, 'Company')
     await pageA.getByTestId('create-prop-name').fill(data.investmentCompany)
+    await showOptional(pageA)
     await pageA.getByTestId('create-prop-country').selectOption('US')
     await pick(pageA, 'create-link-BENEFITS-picker', data.bottleneck)
     await pageA.getByTestId('create-submit').click()
     await expect(pageA.getByTestId('detail-label')).toHaveText(data.investmentCompany)
 
-    await pageA.getByTestId('new-node-type').selectOption('Security')
-    await pageA.getByTestId('new-node-button').click()
+    await openAdd(pageA, 'Security')
     await pageA.getByTestId('create-prop-market').selectOption('NASDAQ')
     await pageA.getByTestId('create-prop-ticker').fill(data.investmentTicker)
     await pageA.getByTestId('create-prop-name').fill(data.investmentSecurity)
@@ -435,16 +473,14 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageA.getByTestId('create-submit').click()
     await expect(pageA.getByTestId('detail-label')).toHaveText(data.investmentSecurity)
 
-    await pageA.getByTestId('new-node-type').selectOption('Valuation')
-    await pageA.getByTestId('new-node-button').click()
+    await openAdd(pageA, 'Valuation')
     await pageA.getByTestId('create-prop-title').fill(data.valuation)
     await pageA.getByTestId('create-prop-currentPrice').fill('100')
     await pick(pageA, 'create-link-HAS_VALUATION-picker', data.investmentCompany)
     await pageA.getByTestId('create-submit').click()
     await expect(pageA.getByTestId('detail-label')).toHaveText(data.valuation)
 
-    await pageA.getByTestId('new-node-type').selectOption('Scenario')
-    await pageA.getByTestId('new-node-button').click()
+    await openAdd(pageA, 'Scenario')
     await pageA.getByTestId('create-prop-title').fill(data.scenario)
     await pageA.getByTestId('create-prop-kind').selectOption('BASE')
     await pick(pageA, 'create-link-HAS_SCENARIO-picker', data.valuation)
@@ -455,8 +491,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageA.getByTestId('create-submit').click()
     await expect(pageA.getByTestId('detail-label')).toHaveText(data.scenario)
 
-    await pageA.getByTestId('new-node-type').selectOption('Decision')
-    await pageA.getByTestId('new-node-button').click()
+    await openAdd(pageA, 'Decision')
     await pageA.getByTestId('create-prop-title').fill(data.decision)
     await pageA.getByTestId('create-prop-action').selectOption('BUY')
     await pick(pageA, 'create-link-HAS_DECISION-picker', data.investmentSecurity)
@@ -513,24 +548,23 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     const englishName = `Warren Buffett ${suffix}`
     const conceptName = `안전마진-${suffix}`
     await pageA.getByTestId('tab-workspace').click()
-    await pageA.getByTestId('new-node-type').selectOption('Person')
-    await pageA.getByTestId('new-node-button').click()
+    await openAdd(pageA, 'Person')
     await pageA.getByTestId('create-prop-name').fill(personName)
+    await showOptional(pageA)
     await pageA.getByTestId('create-prop-englishName').fill(englishName)
     await pageA.getByTestId('create-submit').click()
     await expect(pageA.getByTestId('detail-label')).toHaveText(personName)
 
-    await pageA.getByTestId('new-node-type').selectOption('Concept')
-    await pageA.getByTestId('new-node-button').click()
+    await openAdd(pageA, 'Concept')
     await pageA.getByTestId('create-prop-name').fill(conceptName)
     await pageA.getByTestId('create-prop-summary').fill('투자 판단에서 손실 가능성을 줄이는 여유다.')
     await pageA.getByTestId('create-submit').click()
     await expect(pageA.getByTestId('detail-label')).toHaveText(conceptName)
 
-    await pageA.getByTestId('new-node-type').selectOption('Document')
-    await pageA.getByTestId('new-node-button').click()
+    await openAdd(pageA, 'Document')
     await pageA.getByTestId('create-prop-title').fill(bookTitle)
     await pageA.getByTestId('create-prop-url').fill(`https://example.com/book-${suffix}`)
+    await showOptional(pageA)
     await pageA.getByTestId('create-prop-documentType').selectOption('BOOK')
     await pageA.getByTestId('create-prop-collectedAt').fill('2026-10-20T12:00')
     await pick(pageA, 'create-link-AUTHORED-picker', personName)
@@ -594,10 +628,10 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await shot(pageA, '02b-claim-from-object')
   })
 
-  test('2c) A 가 왼쪽 「무엇을 만들까요?」 에서 주장을 만든다', async () => {
-    await pageA.getByTestId('tab-workspace').click()
-    await pageA.getByTestId('new-node-type').selectOption('Claim')
-    await pageA.getByTestId('new-node-button').click()
+  test('2c) A 가 「＋ 추가」 의 주장 줄에서 주장을 만든다', async () => {
+    await openScreen(pageA, 'map')
+    const dialog = await openAdd(pageA, 'Claim')
+    await expect(dialog.getByTestId('add-steps')).not.toContainText('3. 연결하기')
     await pageA.getByTestId('claim-predicate-select').selectOption('BELONGS_TO_SECTOR')
     await pick(pageA, 'claim-subject-picker', data.company2)
     await pick(pageA, 'claim-object-picker', data.sector)
@@ -606,7 +640,11 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageA.getByTestId('claim-evidence').fill(data.evidence2)
     await pageA.getByTestId('claim-add-submit').click()
 
+    // 개념 지도에서 만들어도 창이 닫히고 작업 공간에서 새 주장의 상세가 열린다.
+    await expect(dialog).toHaveCount(0)
+    await expect(pageA).toHaveURL(/\/workspace\?.*node=.*pane=detail/)
     await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
+    await expect(pageA.getByTestId('detail-notice')).toContainText('다른 편집자의 검토를 기다립니다')
     await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-type', 'Claim')
     await expect(pageA.getByTestId('detail-label')).toHaveText(`${data.company2} → ${data.sector} 속한다`)
   })
@@ -943,7 +981,10 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageViewer.getByTestId('current-user-role')).toHaveAttribute('data-role', 'VIEWER')
     await openScreen(pageViewer, 'workspace')
     await expect(pageViewer.getByTestId('search-input')).toBeVisible()
-    await expect(pageViewer.getByTestId('new-node-button')).toHaveCount(0)
+    // 열람자에게는 「＋ 추가」 와 그래프의 ＋ 단추가 없다.
+    await expect(pageViewer.getByTestId('graph-canvas')).toBeVisible()
+    await expect(pageViewer.getByTestId('add-open')).toHaveCount(0)
+    await expect(pageViewer.getByTestId('graph-add')).toHaveCount(0)
 
     await searchAndOpen(pageViewer, data.supplier)
     await expect(pageViewer.getByTestId('viewer-hint')).toBeVisible()
@@ -1076,18 +1117,24 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(bubble).toHaveAttribute('data-step', 'intro')
     await page.getByTestId('guide-start').click()
 
-    // 1. 기업: 「다음」 없이 연습 이름을 채운 폼이 열린다.
+    // 1. 기업: 「다음」 없이 말풍선이 「＋ 추가」 를 가리키고, 메뉴에서 기업을 고르면 연습 이름을 채운 창이 열린다.
     await expect(bubble).toHaveAttribute('data-step', 'company')
     await expect(page.getByTestId('guide-next')).toHaveCount(0)
+    await expect(page.getByTestId('add-open')).toHaveClass(/(^|\s)guide-target(\s|$)/)
+    await openAdd(page, 'Company')
     const companyInput = page.getByTestId('create-prop-name')
     await expect(companyInput).toHaveValue(/^\[연습\] /)
+    await expect(page.getByTestId('create-submit')).toHaveClass(/(^|\s)guide-target(\s|$)/)
     const practiceCompany = await companyInput.inputValue()
     await page.getByTestId('create-submit').click()
 
-    // 2. 근거 문서: 제목이 채워진 폼이 열린다.
+    // 2. 근거 문서: 같은 방법으로 제목이 채워진 창이 열린다.
     await expect(bubble).toHaveAttribute('data-step', 'document')
+    await expect(page.getByTestId('add-open')).toHaveClass(/(^|\s)guide-target(\s|$)/)
+    await openAdd(page, 'Document')
     const titleInput = page.getByTestId('create-prop-title')
     await expect(titleInput).not.toHaveValue('')
+    await expect(page.getByTestId('create-submit')).toHaveClass(/(^|\s)guide-target(\s|$)/)
     const practiceDocument = await titleInput.inputValue()
     await page.getByTestId('create-submit').click()
 
@@ -1146,6 +1193,10 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(bubble).toHaveAttribute('data-step', 'intro')
     await page.getByTestId('guide-start').click()
     await expect(bubble).toHaveAttribute('data-step', 'company')
+    await expect(page.getByTestId('add-open')).toHaveClass(/(^|\s)guide-target(\s|$)/)
+    await openAdd(page, 'Company')
+    await expect(page.getByTestId('create-prop-name')).toHaveValue(/^\[연습\] /)
+    await expect(page.getByTestId('create-submit')).toHaveClass(/(^|\s)guide-target(\s|$)/)
     await page.getByTestId('create-submit').click()
     await expect(bubble).toHaveAttribute('data-step', 'document')
     const companyId = await page.evaluate(
@@ -1212,7 +1263,9 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       await expect(pageA.getByTestId('ontology-stale')).toBeVisible()
       await pageA.getByTestId('ontology-reload').click()
       await expect(pageA.getByTestId('ontology-stale')).toHaveCount(0)
-      await expect(pageA.getByTestId('new-node-type').locator('option', { hasText: '펀드' })).toHaveCount(1)
+      await pageA.getByTestId('add-open').click()
+      await expect(pageA.getByTestId(`add-type-${typeKey}`)).toContainText('펀드')
+      await pageA.keyboard.press('Escape')
 
       // 4. 관리자가 버전 기록에서 저장 전 버전으로 되돌린다.
       await pageAdmin.getByTestId('ontology-history-open').click()

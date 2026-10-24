@@ -15,11 +15,11 @@ import { testOntology, withApp } from './testSupport'
 
 // 「Person」 은 화면 코드에 없는 타입이다. 온톨로지에만 있어도 화면이 따라오는지 본다.
 describe('온톨로지에 새로 더한 타입', () => {
-  it('만들기 폼이 한국어 칸 이름, 선택지, 도움말을 보이고 타입 표시를 보이지 않는다', () => {
+  it('만들기 폼이 한국어 칸 이름과 도움말을 보이고, 선택 속성은 접어 두며 타입 표시를 보이지 않는다', () => {
     const html = renderToStaticMarkup(withApp(<NodeCreateForm type="Person" testIdPrefix="create" onCreated={() => {}} onCancel={() => {}} />))
     expect(html).toContain('>이름')
-    expect(html).toContain('투자 스타일')
-    expect(html).toContain('>가치 투자</option>')
+    expect(html).not.toContain('투자 스타일')
+    expect(html).toMatch(/<button[^>]*aria-expanded="false"[^>]*data-testid="create-optional-toggle"[^>]*>선택 항목 더 보기</)
     expect(html).toContain('널리 알려진 이름')
     expect(html).toContain('인물 만들기')
     expect(html).not.toContain('문자열')
@@ -58,7 +58,7 @@ describe('온톨로지에 새로 더한 타입', () => {
     expect(html).not.toContain('type="url"')
   })
 
-  it('검색 패널의 종류 필터와 만들기 선택지에 새 타입이 나온다', () => {
+  it('검색 패널의 종류 필터에 새 타입이 나오고 만들기 폼은 없다', () => {
     const html = renderToStaticMarkup(
       withApp(
         <SearchPanel
@@ -66,17 +66,16 @@ describe('온톨로지에 새로 더한 타입', () => {
           onFiltersChange={() => {}}
           selectedId={null}
           onFocus={() => {}}
-          onCreated={() => {}}
           refreshTick={0}
           typesParam={() => undefined}
         />,
       ),
     )
     expect(html).toContain('data-testid="filter-type-Person"')
-    expect(html).toContain('<option value="Person">인물</option>')
     expect(html).toContain('<option value="DRAFT">초안</option>')
-    // Claim 은 전용 API 로 만들지만 주장 폼을 여는 선택지로 나온다.
-    expect(html).toContain('<option value="Claim">주장</option>')
+    // 만들기는 머리글의 「＋ 추가」 창에서만 한다.
+    expect(html).not.toContain('data-testid="create-form"')
+    expect(html).not.toContain('data-testid="create-submit"')
     expect(html).not.toContain('새 노드')
   })
 
@@ -186,7 +185,7 @@ describe('주소의 검색 조건', () => {
   it('작업 공간은 주소의 q 와 archived 로 검색 입력칸과 보관 포함을 채운다', () => {
     const html = renderToStaticMarkup(
       withApp(
-        <Workspace centerId={null} focusSeq={0} selectedId={null} onFocus={() => {}} onSelect={() => {}} onOpenHistory={() => {}} />,
+        <Workspace centerId={null} focusSeq={0} selectedId={null} flash={null} onFocus={() => {}} onSelect={() => {}} onOpenHistory={() => {}} />,
         testOntology,
         undefined,
         '/workspace?q=abc&archived=1',
