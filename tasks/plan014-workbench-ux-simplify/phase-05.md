@@ -75,11 +75,11 @@ cd financial-workbench/web && npx playwright test --list e2e/workbench.spec.ts e
 |---|---|
 | `financial-workbench/web/src/components/SearchPanel.tsx` | 수정 |
 | `financial-workbench/web/src/components/SearchPanel.test.tsx` | 신규 |
+| `financial-workbench/web/src/components/screens.test.tsx` | 수정 |
 | `financial-workbench/web/src/components/Workspace.tsx` | 수정 |
 | `financial-workbench/web/src/components/GraphPanel.tsx` | 수정 |
 | `financial-workbench/web/src/lib/graph.ts` | 수정 |
 | `financial-workbench/web/src/lib/graph.test.ts` | 수정 |
 | `financial-workbench/web/src/legacy.css` | 수정 |
 | `financial-workbench/web/e2e/workbench.spec.ts` | 수정 |
-| `financial-workbench/web/e2e/mobile.spec.ts` | 수정 |
 | `financial-workbench/web/TESTIDS.md` | 수정 |
