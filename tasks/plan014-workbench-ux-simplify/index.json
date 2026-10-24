@@ -1,0 +1,46 @@
+{
+  "name": "plan014-workbench-ux-simplify",
+  "description": "워크벤치를 일반 사용자 기준으로 단순화한다 — 첫 화면 개념 지도, 탭 셋과 더보기, 전역 ＋ 추가, 읽기 우선 상세, 투자 온톨로지 명칭과 문구",
+  "status": "pending",
+  "created_at": "2026-10-24",
+  "total_phases": 6,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "title": "개수 API, 최근 정렬, /map 화면 경로",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "title": "타입 순서와 관계 문장, 머리글 탭 셋과 더보기, 개념 지도",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "title": "전역 ＋ 추가 메뉴와 만들기 창, 따라하기 연결",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 4,
+      "file": "phase-04.md",
+      "title": "작업 공간 검색 칩, 고급 필터, 방향 배치 그래프",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 5,
+      "file": "phase-05.md",
+      "title": "상세 읽기 카드, 편집 전환, ⋯ 메뉴와 보관 창, 연결 문장",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 6,
+      "file": "phase-06.md",
+      "title": "온톨로지 표시 이름과 화면 문구 다듬기, 투자 온톨로지 명칭",
+      "execution_profile": "standard"
+    }
+  ]
+}
