@@ -413,6 +413,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageA.getByTestId('create-duplicate-open').click()
     await expect(pageA.getByTestId('add-dialog')).toHaveCount(0)
     await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
+    const firstId = (await pageA.getByTestId('detail-panel').getAttribute('data-node-id'))!
 
     // 그래도 만들면 같은 이름의 기업이 둘이 된다.
     await openAdd(pageA, 'Company')
@@ -421,6 +422,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA.getByTestId('create-duplicate')).toBeVisible()
     await pageA.getByTestId('create-duplicate-confirm').click()
     await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
+    // 이름이 같아 라벨로는 구분되지 않는다. 새 상세를 다 읽기 전에는 앞 기업이 보이므로 id 가 바뀔 때까지 기다린다.
+    await expect(pageA.getByTestId('detail-panel')).not.toHaveAttribute('data-node-id', firstId)
     await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
     const secondId = (await pageA.getByTestId('detail-panel').getAttribute('data-node-id'))!
     await pageA.getByTestId('search-input').fill(data.supplier)
@@ -831,7 +834,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   })
 
   test('4c) 고급 필터는 접혀 있고 바꾼 개수를 보인다', async () => {
-    await pageA.getByTestId('tab-workspace').click()
+    // 앞 테스트가 같은 화면에서 고급 필터를 열어 두었을 수 있어 새로 연다.
+    await pageA.goto('/workspace')
     await expect(pageA.getByTestId('advanced-filters')).not.toHaveAttribute('open', /.*/)
     await expect(pageA.getByTestId('advanced-filters-toggle')).toHaveText('고급 필터')
 
