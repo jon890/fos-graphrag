@@ -5,8 +5,8 @@
 ## 기준 브랜치와 지시서
 
 - PR 의 base 는 `main` 이다. 머지 방식은 merge commit 이다.
-- 공통 지시서는 `.omc/orch/specs/spec-common.md`, 개별 지시서와 지시서 폴더(`--specs-dir`)는 `.omc/orch/specs/` 다.
-- 머지 뒤 마무리와 머지 큐 기본값은 `.claude/orch-finish.json` 이다. Run id 가 바뀌면 그 파일의 `finish.run` 을 고친다.
+- 공통 지시서는 `.orch/specs/spec-common.md`, 개별 지시서와 지시서 폴더(`--specs-dir`)는 `.orch/specs/` 다.
+- 머지 뒤 마무리와 머지 큐 기본값은 `.orch/config.json` 이다. Run id 가 바뀌면 그 파일의 `finish.run` 을 고친다.
 
 ## 검증 명령
 
@@ -20,7 +20,7 @@
 ## 배포
 
 **머지한 뒤에는 묻지 않고 운영에 배포한다(사용자 지시 2026-10-23).**
-머지 큐(`merge-with-finish.py`)가 `.claude/orch-finish.json` 의 `queue.after_merged` 로 `financial-workbench/scripts/deploy-prod.sh` 를 부른다. 문서만 머지했으면(`docs_glob`) 배포하지 않는다.
+머지 큐(`merge-with-finish.py`)가 `.orch/config.json` 의 `queue.after_merged` 로 `financial-workbench/scripts/deploy-prod.sh` 를 부른다. 문서만 머지했으면(`docs_glob`) 배포하지 않는다.
 머지 큐를 쓰지 않고 머지했으면 그 스크립트를 직접 부른다. 배포 결과(이미지 실행 id, health)는 사용자에게 알린다.
 
 - API 를 다시 띄우면 로그인 세션이 사라져 사용자는 다시 로그인해야 한다. 배포한 뒤 알릴 때 함께 적는다.
