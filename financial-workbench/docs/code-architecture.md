@@ -195,6 +195,7 @@ mock 으로 Neo4j 를 대신한 테스트는 없다. 트랜잭션 일관성 테�
 | [006](adr/006-google-oidc-allowlist-roles.md) | Google OpenID Connect 로 로그인하고 허용 사용자와 역할로 권한을 나눈다. ADR 004 의 비밀번호 로그인을 대체한다 |
 | [007](adr/007-routes-in-url.md) | 화면 상태를 경로와 query 로 주소에 두고 React Router 로 다룬다. 서버는 화면 경로를 `index.html` 로 돌려준다 |
 | [008](adr/008-ontology-versions-in-db.md) | 온톨로지를 DB 에 버전으로 쌓고 ADMIN 이 웹에서 편집한다. 서버 코드와 맞물린 부분은 저장소 YAML 이 소유한다 |
+| [009](adr/009-investment-logic-chain.md) | 온톨로지를 투자 논리 사슬(변화, 병목, 산업, 기업, 밸류에이션, 결정) 중심으로 바꾸고 기업 사이의 관계를 뺀다 |
 
 ADR 로 남기지 않은 작은 결정은 다음과 같다.
 

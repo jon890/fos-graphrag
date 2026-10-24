@@ -179,11 +179,53 @@ flowchart TD
 - 주소 칸(`url` 타입)은 브라우저의 주소 형식 검사를 쓰지 않는다. `example.com/report` 처럼 `scheme://` 없이 적으면 저장할 때 `https://` 를 붙인다. 붙인 뒤에도 주소가 아니면 서버가 `400 VALIDATION_FAILED` 로 막는다.
 - 필수 시각 칸(`datetime` 이고 `required`, 지금은 근거 문서의 「수집 시각」)은 폼을 열 때 지금 시각으로 채운다. 편집 폼은 저장된 값을 그대로 보인다.
 - 국가와 통화처럼 목록이 있는 칸은 선택 칸이다. 편집 폼에서 저장된 값이 목록에 없으면 「목록에 없는 값: 그 값」 선택지를 더해 보이고, 그 칸을 바꾸지 않으면 다른 칸을 저장할 수 있다.
-- 시작 노드 고르기 칸은 `createPicker` 가 있는 관계마다 생긴다. 종목 폼의 「발행 기업」 이 그것이다. 고르지 않아도 된다.
+- 시작 노드 고르기 칸은 `createPicker` 가 있는 관계마다 생긴다. 종목 폼의 「발행 기업」, 병목 폼의 「이 병목을 만든 변화」 가 그것이다. 고르지 않아도 된다. 투자 논리 사슬은 이 칸으로 이어 간다(아래 「투자 논리 사슬 만들기」).
   - 고르면 노드를 만든 뒤 그 관계(`ISSUES`, 시작은 고른 기업, 끝은 새 종목)를 만든다. 두 요청은 따로라서 관계만 실패할 수 있다.
   - 관계만 실패하면 종목은 남는다. 새 종목을 열고 「종목을 만들었지만 발행 기업을 잇지 못했습니다. 상세의 관계 추가로 다시 이으세요.」 와 실패 이유를 보인다.
 
-## 공급 관계 Claim 등록과 검토
+## 투자 논리 사슬 만들기
+
+사슬은 앞에서 뒤로 만든다. 새 화면은 없고 지금의 만들기 폼을 쓴다. 각 폼의 시작 노드 고르기 칸이 앞 노드와의 관계를 함께 만든다. 저장 모델은 [데이터 스키마](data-schema.md) 의 「투자 논리 사슬」 이 소유한다.
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"'Noto Sans KR', sans-serif","fontSize":"14px","lineColor":"#7A8594","primaryTextColor":"#1D1F23","edgeLabelBackground":"#FFFFFF","clusterBkg":"#FAFAFA"},"flowchart":{"curve":"basis","nodeSpacing":40,"rankSpacing":60,"padding":14}}}%%
+flowchart TD
+  subgraph 사용자
+    C[세상의 변화 만들기]
+    B[병목 만들기<br/>이 병목을 만든 변화, 병목이 있는 산업 고르기]
+    K[기업 만들기<br/>이익을 가져가는 병목 고르기]
+    S[종목 만들기<br/>발행 기업 고르기]
+    V[밸류에이션 만들기<br/>평가한 기업 고르기]
+    SC[시나리오 셋 만들기<br/>시나리오가 속한 밸류에이션 고르기]
+    D[투자 결정 만들기<br/>결정한 종목, 결정에 쓴 밸류에이션 고르기]
+    G[결정 상세의 그래프에서 이웃 확장]
+  end
+  subgraph API
+    N[POST /api/nodes]
+    R[POST /api/relationships<br/>고른 칸마다 하나]
+  end
+  C --> B --> K --> S --> V --> SC --> D --> G
+  B & K & S & V & SC & D -. 만들기 .-> N
+  N -. 고른 칸이 있으면 .-> R
+  R -- 실패 --> PART[노드는 남고 「잇지 못했습니다」 안내. 상세의 관계 추가로 다시 잇는다]
+  G --> END[결정 ← 밸류에이션 ← 기업 ← 병목 ← 변화]
+  classDef c1 fill:#E8F1FB,stroke:#3B7DD8,stroke-width:1.5px,color:#0B2545
+  classDef c3 fill:#FFF4E5,stroke:#E08A1E,stroke-width:1.5px,color:#4A2A00
+  classDef c2 fill:#E9F7EF,stroke:#2E9E5B,stroke-width:1.5px,color:#0E3B22
+  class C,B,K,S,V,SC,D,G c1
+  class N,R c3
+  class PART,END c2
+  style 사용자 fill:#F6FAFE,stroke:#3B7DD8,stroke-dasharray:4 3
+  style API fill:#FFFAF2,stroke:#E08A1E,stroke-dasharray:4 3
+```
+
+- 고르기 칸에 고를 노드가 없으면 비워 두고 만든다. 나중에 상세의 관계 추가로 잇는다.
+- 결정 폼의 두 고르기 칸은 관계를 하나씩 따로 만든다. 하나만 실패하면 그 관계만 다시 잇는다.
+- 다시 평가할 때는 기존 밸류에이션을 고치지 않고 새 밸류에이션과 시나리오를 만든다. 결정은 그때 쓴 밸류에이션을 가리킨다.
+- 근거 자료는 근거 문서 폼의 「이 자료가 근거인 항목」 칸으로 변화, 병목, 밸류에이션에 잇는다.
+- 주변 그래프는 최대 2홉이라 결정 하나에서 변화(4홉)까지 한 번에 보이지 않는다. 「이웃 확장」 을 두 번 눌러 따라간다.
+
+## 산업 소속 Claim 등록과 검토
 
 ```mermaid
 sequenceDiagram
@@ -191,10 +233,10 @@ sequenceDiagram
   participant UB as 사용자 B
   participant A as API
   participant N as Neo4j
-  UA->>A: POST /api/nodes (Company 둘, Security 하나)
+  UA->>A: POST /api/nodes (Company, Security, Sector)
   UA->>A: POST /api/relationships (ISSUES)
   UA->>A: POST /api/nodes (Document)
-  UA->>A: POST /api/claims (SUPPLIES_TO, documentIds)
+  UA->>A: POST /api/claims (BELONGS_TO_SECTOR, documentIds)
   A->>A: 온톨로지 검증 (predicate, 주어와 목적어 타입, Document 여부)
   A->>N: 한 트랜잭션: Claim, SUBJECT, OBJECT, SUPPORTED_BY, ChangeEvent 생성
   A-->>UA: 201 ClaimView (DRAFT)
@@ -226,12 +268,12 @@ sequenceDiagram
 ### 주장 만들기 화면
 
 주장은 문장을 채우는 폼으로 만든다. 관계 종류를 고르면 그 종류의 문장 틀(`claimPredicates.<predicate>.sentence`)이 칸의 순서를 정한다.
-예를 들어 공급 관계는 「[주체 고르기]이(가) [대상 고르기]에 공급한다」 로 보인다. 조사는 고른 이름의 끝소리에 맞춰 바뀐다.
+예를 들어 산업 소속은 「[주체 고르기]이(가) [대상 고르기]에 속한다」 로 보인다. 조사는 고른 이름의 끝소리에 맞춰 바뀐다.
 
 - 입구는 둘이다.
   - 왼쪽 「무엇을 만들까요?」 에서 「주장」 을 고른다. 주체와 대상이 모두 비어 있다.
   - 항목 상세 맨 아래 「주장 추가」 를 누른다. 그 항목이 주체로 채워진다.
-- 「주체와 대상 바꾸기」 단추가 두 칸을 맞바꾼다. 공급받는 기업의 상세에서 시작해도 「이 기업에 공급하는 기업」 을 만들 수 있다.
+- 「주체와 대상 바꾸기」 단추가 두 칸을 맞바꾼다. 산업의 상세에서 시작해도 「이 산업에 속하는 기업」 을 만들 수 있다.
 - 관계 종류를 바꾸면 그 종류가 받지 않는 타입의 주체나 대상은 비운다.
 - 주체나 대상을 아직 고르지 않았거나 근거 문서가 없으면 저장 단추를 눌렀을 때 칸마다 무엇이 빠졌는지 보인다. 서버 검증 오류도 같은 칸 아래에 보인다.
 - 고를 기업이 하나도 없으면 고르기 칸이 「먼저 기업을 만드세요」 를 보인다.
@@ -246,7 +288,7 @@ sequenceDiagram
 
 ### 주장의 이름
 
-주장의 이름은 저장하지 않고 읽을 때 만든다. 「주체 → 대상 관계」 다(예: 「다라부품 → 가나전자 공급한다」).
+주장의 이름은 저장하지 않고 읽을 때 만든다. 「주체 → 대상 관계」 다(예: 「가나전자 → 메모리 반도체 속한다」).
 기업 이름을 바꾸면 그 기업이 걸린 주장의 이름도 바로 바뀐다. 변경 이력의 대상 이름은 그때의 이름을 남긴다.
 
 ## 동시 수정
@@ -337,7 +379,7 @@ flowchart TD
 
 ### 주장 접기
 
-화면은 기본으로 주장을 두 항목 사이의 선 하나로 접어 그린다. 주장 노드, 그 주장의 주체와 대상 관계, 근거 문서 관계를 지우고 「주체 → 대상」 선을 그린다. 선 이름은 관계 종류의 표시 이름(예: 「공급한다」)이다.
+화면은 기본으로 주장을 두 항목 사이의 선 하나로 접어 그린다. 주장 노드, 그 주장의 주체와 대상 관계, 근거 문서 관계를 지우고 「주체 → 대상」 선을 그린다. 선 이름은 관계 종류의 표시 이름(예: 「속한다」)이다.
 초안 주장의 선은 점선, 반려된 주장의 선은 흐리게 그린다. 선을 누르면 그 주장이 상세에 열린다.
 
 - 주체나 대상 가운데 하나라도 그래프에 없으면 그 주장은 접지 않고 노드로 둔다. 중심 노드가 주장이면 그 주장도 접지 않는다.
