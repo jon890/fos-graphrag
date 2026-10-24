@@ -231,6 +231,8 @@ export interface RelationshipTypeDef {
   description: string
   from: string[]
   to: string[]
+  /** 관계 문장 틀. {from}, {to} 자리에 두 항목 이름이 들어간다 */
+  sentence?: string | null
   /** 끝(to) 타입 만들기 폼에 시작(from) 노드를 고르는 칸 */
   createPicker?: CreatePickerDef | null
 }

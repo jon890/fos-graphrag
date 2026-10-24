@@ -141,6 +141,9 @@ data class RelationshipTypeDef(
     val description: String,
     val from: List<String>,
     val to: List<String>,
+    /** 관계 문장 틀. {from}, {to} 를 한 번씩 담는다 */
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
+    val sentence: String? = null,
     /** 끝(to) 타입 만들기 폼에 시작(from) 노드를 고르는 칸. 없으면 칸이 없다 */
     val createPicker: CreatePickerDef? = null,
 )

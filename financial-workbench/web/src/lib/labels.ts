@@ -68,17 +68,45 @@ const JOSA: Record<string, [withBatchim: string, withoutBatchim: string]> = {
   '은(는)': ['은', '는'],
   '을(를)': ['을', '를'],
   '와(과)': ['과', '와'],
+  '으로(로)': ['으로', '로'],
 }
 
-/** 낱말 끝소리에 맞춰 조사 이(가), 은(는), 을(를), 와(과) 가운데 하나를 고른다. 한글이 아니거나 모르는 조사면 적힌 그대로 붙인다 */
+/** 이름 끝에서 건너뛰는 글자. 공백, 괄호, 따옴표, 마침표, 쉼표다 */
+const TRAILING_SKIP = /[\s()[\]{}「」『』'"‘’“”.,]+$/
+
+/**
+ * 이름의 끝소리. 끝의 공백, 괄호, 따옴표, 마침표, 쉼표를 건너뛴 마지막 글자로 정한다.
+ * 영문자와 숫자는 읽는 소리로 본다(L, R, 1, 7, 8 은 ㄹ 받침, M, N, 0, 3, 6 은 다른 받침). 규칙은 docs/flow.md 「조사 고르기」.
+ * 받침이 없으면 none, ㄹ 받침이면 rieul, 다른 받침이면 other, 그 밖의 글자로 끝나거나 비면 null 이다.
+ */
+export function finalSound(word: string): 'none' | 'rieul' | 'other' | null {
+  const trimmed = word.replace(TRAILING_SKIP, '')
+  if (!trimmed) return null
+  const last = trimmed[trimmed.length - 1]
+  const code = last.charCodeAt(0)
+  if (code >= 0xac00 && code <= 0xd7a3) {
+    const jong = (code - 0xac00) % 28
+    return jong === 0 ? 'none' : jong === 8 ? 'rieul' : 'other'
+  }
+  const upper = last.toUpperCase()
+  if (upper >= 'A' && upper <= 'Z') return 'LR'.includes(upper) ? 'rieul' : 'MN'.includes(upper) ? 'other' : 'none'
+  if (last >= '0' && last <= '9') return '178'.includes(last) ? 'rieul' : '036'.includes(last) ? 'other' : 'none'
+  return null
+}
+
+/**
+ * 낱말 끝소리에 맞춰 조사 이(가), 은(는), 을(를), 와(과), 으로(로) 가운데 하나를 고른다.
+ * 으로(로) 는 받침이 없거나 ㄹ 받침이면 「로」 다. 끝소리를 정할 수 없거나 모르는 조사면 적힌 그대로 붙인다
+ */
 export function withJosa(word: string, josa: string): string {
   const pair = JOSA[josa]
-  const code = word.charCodeAt(word.length - 1)
-  if (!pair || code < 0xac00 || code > 0xd7a3) return `${word}${josa}`
-  return `${word}${pair[(code - 0xac00) % 28 === 0 ? 1 : 0]}`
+  const sound = finalSound(word)
+  if (!pair || sound === null) return `${word}${josa}`
+  const withoutBatchim = sound === 'none' || (josa === '으로(로)' && sound === 'rieul')
+  return `${word}${pair[withoutBatchim ? 1 : 0]}`
 }
 
-/** 한글 낱말 끝소리에 맞춰 을/를을 붙인다. 한글이 아니면 「을(를)」 로 둔다 */
+/** 낱말 끝소리에 맞춰 을/를을 붙인다. 끝소리를 정할 수 없으면 「을(를)」 로 둔다 */
 export function withEulReul(word: string): string {
   return withJosa(word, '을(를)')
 }
@@ -91,10 +119,11 @@ export function createFirstHint(typeLabels: string[]): string {
 export type SentencePart = { kind: 'slot'; slot: 'subject' | 'object' } | { kind: 'text'; text: string }
 
 const SLOT_PATTERN = /\{(subject|object)\}/g
-const LEADING_JOSA = /^(이\(가\)|은\(는\)|을\(를\)|와\(과\))/
+/** 자리 바로 뒤 글의 맨 앞 조사 표기. 관계 문장(relationSentence.ts)도 함께 쓴다 */
+export const LEADING_JOSA = /^(으로\(로\)|이\(가\)|은\(는\)|을\(를\)|와\(과\))/
 
 /**
- * predicate 의 문장 틀을 칸과 글로 나눈다. 칸 바로 뒤 글의 맨 앞 조사(이(가), 은(는), 을(를), 와(과))는
+ * predicate 의 문장 틀을 칸과 글로 나눈다. 칸 바로 뒤 글의 맨 앞 조사(이(가), 은(는), 을(를), 와(과), 으로(로))는
  * names 에 그 칸의 이름이 있으면 끝소리에 맞춰 하나로 바꾸고, 없으면 적힌 그대로 둔다.
  * 문장 틀이 없으면 subject 칸, object 칸, 관계 표시 이름 순서다.
  */

@@ -49,6 +49,23 @@ describe('온톨로지 탭의 편집 단추', () => {
     expect(html).not.toContain('ontology-export')
     expect(html).toContain('data-testid="ontology-node-type"')
   })
+
+  it('지금 버전 보기의 관계 표에 문장 틀 열이 있고 틀이 없으면 - 를 보인다', () => {
+    const html = renderTab(viewer)
+    const table = /<table[^>]*data-testid="ontology-relationships"[\s\S]*?<\/table>/.exec(html)?.[0] ?? ''
+    expect(table).toContain('<th')
+    expect(table).toMatch(/<th[^>]*>문장 틀<\/th>/)
+    expect(table).toMatch(/<td[^>]*>ISSUES<\/td><td[^>]*>Company → Security<\/td><td[^>]*>-<\/td>/)
+
+    const withSentence = {
+      ...testOntology,
+      relationshipTypes: { ISSUES: { ...testOntology.relationshipTypes.ISSUES, sentence: '{from}이(가) {to}을(를) 발행한다' } },
+    }
+    const sentenceHtml = renderToStaticMarkup(
+      withApp(<OntologyTab draft={null} onDraftChange={() => {}} reloadOntology={async () => {}} />, withSentence, viewer, '/ontology'),
+    )
+    expect(sentenceHtml).toContain('{from}이(가) {to}을(를) 발행한다')
+  })
 })
 
 describe('OntologyPreviewPanel', () => {
@@ -101,6 +118,12 @@ describe('OntologyFormEditor', () => {
     expect(html).toContain('data-testid="ontology-form"')
     expect(html).toContain('data-type="Company"')
     expect(html).not.toContain('data-type="Claim"')
+  })
+
+  it('관계 종류마다 문장 틀 입력이 있다', () => {
+    const row = /<div[^>]*data-testid="ontology-form-rel"[^>]*data-rel="ISSUES"[\s\S]*$/.exec(html)?.[0] ?? ''
+    expect(row).toContain('문장 틀(예: {from}이(가) {to}을(를) 발행한다)')
+    expect(row).toMatch(/<input[^>]*data-testid="ontology-form-rel-sentence"[^>]*value=""/)
   })
 
   it('코드가 읽는 속성은 빼기 단추가 꺼져 있다', () => {

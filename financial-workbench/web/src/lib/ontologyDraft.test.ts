@@ -4,6 +4,7 @@ import {
   addNodeType,
   applyRemoved,
   keyError,
+  relationSentenceError,
   RELOAD_FAILED_HINT,
   reloadSucceeded,
   restartError,
@@ -12,6 +13,7 @@ import {
   toDefinition,
   toggleRemoved,
   updateProperty,
+  updateRelationshipType,
 } from './ontologyDraft'
 
 const definition: OntologyDefinition = {
@@ -158,6 +160,29 @@ describe('sentenceError', () => {
 
   it('한 번씩 있으면 오류가 아니다', () => {
     expect(sentenceError('{subject}이(가) {object}을(를) 강조한다')).toBeNull()
+  })
+})
+
+describe('relationSentenceError', () => {
+  it('{from} 과 {to} 가 한 번씩 있으면 오류가 아니다', () => {
+    expect(relationSentenceError('{from}이(가) {to}을(를) 발행한다')).toBeNull()
+    expect(relationSentenceError('{to}은(는) {from}에 대한 결정이다')).toBeNull()
+  })
+
+  it('자리가 빠지거나 두 번 있으면 오류다', () => {
+    expect(relationSentenceError('{from}이(가) 발행한다')).toBe('문장 틀에 {from} 과 {to} 를 한 번씩 넣습니다')
+    expect(relationSentenceError('{from}이(가) {to} {to}')).toBe('문장 틀에 {from} 과 {to} 를 한 번씩 넣습니다')
+  })
+})
+
+describe('updateRelationshipType', () => {
+  it('문장 틀을 더하고 undefined 로 고치면 키를 지운다', () => {
+    const withSentence = updateRelationshipType(definition, 'ISSUES', { sentence: '{from}이(가) {to}을(를) 발행한다' })
+    expect(withSentence.relationshipTypes.ISSUES.sentence).toBe('{from}이(가) {to}을(를) 발행한다')
+
+    const cleared = updateRelationshipType(withSentence, 'ISSUES', { sentence: undefined })
+    expect('sentence' in cleared.relationshipTypes.ISSUES).toBe(false)
+    expect(cleared.relationshipTypes.ISSUES).toEqual(definition.relationshipTypes.ISSUES)
   })
 })
 

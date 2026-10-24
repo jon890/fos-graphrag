@@ -6,6 +6,7 @@ import {
   actionLabel,
   claimSentenceParts,
   createFirstHint,
+  finalSound,
   nodeDisplayLabel,
   nodeHint,
   predicateLabel,
@@ -124,17 +125,71 @@ describe('withEulReul', () => {
     expect(withEulReul('기업')).toBe('기업을')
     expect(withEulReul('근거 문서')).toBe('근거 문서를')
     expect(withEulReul('인물')).toBe('인물을')
-    expect(withEulReul('ETF')).toBe('ETF을(를)')
+    expect(withEulReul('ETF')).toBe('ETF를')
   })
 })
 
 describe('withJosa', () => {
-  it('끝소리에 맞춰 조사를 고르고 한글이 아니면 적힌 그대로 붙인다', () => {
+  it('한글 끝소리에 맞춰 조사를 고른다', () => {
     expect(withJosa('가나전자', '이(가)')).toBe('가나전자가')
     expect(withJosa('다라부품', '이(가)')).toBe('다라부품이')
     expect(withJosa('삼성', '와(과)')).toBe('삼성과')
     expect(withJosa('가나전자', '와(과)')).toBe('가나전자와')
-    expect(withJosa('ABC', '이(가)')).toBe('ABC이(가)')
+    expect(withJosa('병목', '이(가)')).toBe('병목이')
+    expect(withJosa('기업', '이(가)')).toBe('기업이')
+  })
+
+  it('으로(로) 는 받침이 없거나 ㄹ 받침이면 로다', () => {
+    expect(withJosa('서울', '으로(로)')).toBe('서울로')
+    expect(withJosa('산업', '으로(로)')).toBe('산업으로')
+    expect(withJosa('기업', '으로(로)')).toBe('기업으로')
+    expect(withJosa('가나전자', '으로(로)')).toBe('가나전자로')
+  })
+
+  it('영문자는 읽는 소리로 고른다', () => {
+    expect(withJosa('FLNC', '이(가)')).toBe('FLNC가')
+    expect(withJosa('HBM', '을(를)')).toBe('HBM을')
+    expect(withJosa('DRAM', '이(가)')).toBe('DRAM이')
+    expect(withJosa('POET', '이(가)')).toBe('POET가')
+    expect(withJosa('ABC', '이(가)')).toBe('ABC가')
+    expect(withJosa('SK하이닉스 (KR)', '을(를)')).toBe('SK하이닉스 (KR)을')
+    expect(withJosa('intel', '으로(로)')).toBe('intel로')
+  })
+
+  it('숫자는 읽는 소리로 고른다', () => {
+    expect(withJosa('A1', '으로(로)')).toBe('A1로')
+    expect(withJosa('버전 3', '을(를)')).toBe('버전 3을')
+    expect(withJosa('버전 2', '을(를)')).toBe('버전 2를')
+    expect(withJosa('버전 0', '으로(로)')).toBe('버전 0으로')
+  })
+
+  it('끝의 괄호와 따옴표, 마침표는 건너뛴다', () => {
+    expect(withJosa('「기업」', '이(가)')).toBe('「기업」이')
+    expect(withJosa('"가나전자"', '을(를)')).toBe('"가나전자"를')
+    expect(withJosa('병목 (가설).', '은(는)')).toBe('병목 (가설).은')
+  })
+
+  it('기호로 끝나거나 비면 적힌 그대로 붙인다', () => {
+    expect(withJosa('A-', '이(가)')).toBe('A-이(가)')
+    expect(withJosa('', '을(를)')).toBe('을(를)')
+    expect(withJosa('( )', '이(가)')).toBe('( )이(가)')
+    expect(withJosa('가나', '에서')).toBe('가나에서')
+  })
+})
+
+describe('finalSound', () => {
+  it('끝소리를 받침 없음, ㄹ 받침, 다른 받침, 모름으로 나눈다', () => {
+    expect(finalSound('가나')).toBe('none')
+    expect(finalSound('서울')).toBe('rieul')
+    expect(finalSound('기업')).toBe('other')
+    expect(finalSound('excel')).toBe('rieul')
+    expect(finalSound('ETF')).toBe('none')
+    expect(finalSound('HBM')).toBe('other')
+    expect(finalSound('7')).toBe('rieul')
+    expect(finalSound('6')).toBe('other')
+    expect(finalSound('9')).toBe('none')
+    expect(finalSound('A-')).toBeNull()
+    expect(finalSound('')).toBeNull()
   })
 })
 

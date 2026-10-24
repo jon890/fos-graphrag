@@ -64,6 +64,7 @@ export function OntologyView() {
           <TableRow className="bg-slate-50 hover:bg-slate-50">
             <TableHead>이름</TableHead>
             <TableHead>시작 → 끝</TableHead>
+            <TableHead>문장 틀</TableHead>
             <TableHead>설명</TableHead>
           </TableRow>
         </TableHeader>
@@ -74,6 +75,7 @@ export function OntologyView() {
               <TableCell>
                 {def.from.join(', ')} → {def.to.join(', ')}
               </TableCell>
+              <TableCell>{def.sentence || '-'}</TableCell>
               <TableCell>{def.description}</TableCell>
             </TableRow>
           ))}
@@ -83,6 +85,7 @@ export function OntologyView() {
               <TableCell>
                 {(def.from ?? []).join(', ')} → {(def.to ?? ['(주어/목적어 노드)']).join(', ')}
               </TableCell>
+              <TableCell>-</TableCell>
               <TableCell>{def.description} (Claim API 전용)</TableCell>
             </TableRow>
           ))}

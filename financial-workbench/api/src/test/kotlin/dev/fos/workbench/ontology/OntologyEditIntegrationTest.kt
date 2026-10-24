@@ -333,6 +333,37 @@ class OntologyEditIntegrationTest : IntegrationTest() {
     }
 
     @Test
+    fun `관계에 문장 틀을 더하면 바뀐 점에 나오고 저장하면 정의 응답에 있다`() {
+        val admin = loggedIn(ADMIN)
+        val o = current()
+        val (rel, def) = o.relationshipTypes.entries.first()
+        val sentence = "{from}이(가) {to}을(를) 잇는다 $sfx"
+        val edited = o.copy(relationshipTypes = o.relationshipTypes + (rel to def.copy(sentence = sentence)))
+
+        val preview = preview(admin, edited)
+
+        assertThat(preview.body["valid"].asBoolean()).describedAs(preview.body.toString()).isTrue()
+        assertThat(preview.body["changed"].toList().map { it.asString() }).contains("relationshipTypes.$rel.sentence")
+        assertThat(save(admin, edited).status).isEqualTo(201)
+        assertThat(admin.get("/api/ontology").body["relationshipTypes"][rel]["sentence"].asString()).isEqualTo(sentence)
+    }
+
+    @Test
+    fun `관계 문장 틀에 시작 자리가 빠지면 미리보기가 거짓이다`() {
+        val admin = loggedIn(ADMIN)
+        val o = current()
+        val (rel, def) = o.relationshipTypes.entries.first()
+        val edited = o.copy(relationshipTypes = o.relationshipTypes + (rel to def.copy(sentence = "{to}을(를) 잇는다")))
+
+        val preview = preview(admin, edited)
+
+        assertThat(preview.status).isEqualTo(200)
+        assertThat(preview.body["valid"].asBoolean()).isFalse()
+        assertThat(preview.body["errors"].toList().map { it.asString() }).contains("$rel 의 sentence 는 {from} 과 {to} 를 한 번씩 담아야 한다")
+        assertThat(versions.latestNumber()).isEqualTo(start)
+    }
+
+    @Test
     fun `온톨로지 본문은 512KiB 까지 받는다`() {
         val admin = loggedIn(ADMIN)
         val yaml = OntologyLoader.toYaml(current())

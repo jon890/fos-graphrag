@@ -1216,6 +1216,19 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       await searchResult(pageA, `워런 버핏-${suffix}`).click()
       await expect(pageA.getByTestId(`edit-prop-${propKey}`)).toBeVisible()
       await expect(pageA.getByTestId('node-edit-form')).toContainText('별명')
+
+      // 4. 관리자가 관계 종류의 문장 틀에서 {to} 를 빼면 입력 아래와 미리보기에 오류가 보인다. 저장하지 않고 초안을 버린다.
+      await pageAdmin.getByTestId('tab-ontology').click()
+      await pageAdmin.getByTestId('ontology-edit-form').click()
+      const issues = pageAdmin.locator('[data-testid="ontology-form-rel"][data-rel="ISSUES"]')
+      await expect(issues).toBeVisible()
+      await issues.getByTestId('ontology-form-rel-sentence').fill('{from} 테스트')
+      await expect(issues.getByTestId('ontology-form-error')).toHaveText('문장 틀에 {from} 과 {to} 를 한 번씩 넣습니다')
+      await pageAdmin.getByTestId('ontology-preview').click()
+      await expect(pageAdmin.getByTestId('ontology-preview-error')).toContainText(['ISSUES 의 sentence 는 {from} 과 {to} 를 한 번씩 담아야 한다'])
+      await expect(pageAdmin.getByTestId('ontology-save')).toHaveCount(0)
+      await pageAdmin.getByTestId('ontology-draft-discard').click()
+      await expect(pageAdmin.getByTestId('ontology-form')).toHaveCount(0)
     } finally {
       // 단계가 중간에 실패해도 속성이 남지 않게 저장 전 버전으로 되돌린다.
       const base = new URL(pageAdmin.url()).origin
