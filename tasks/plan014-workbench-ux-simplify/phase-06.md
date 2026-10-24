@@ -1,4 +1,4 @@
-# Phase 05. 상세 읽기 카드, 편집 전환, ⋯ 메뉴와 보관 창, 연결 문장
+# Phase 06. 상세 읽기 카드, 편집 전환, ⋯ 메뉴와 보관 창, 연결 문장
 
 **Execution profile**: deep
 
@@ -6,7 +6,7 @@
 
 작업 공간의 상세 칸을 읽기 카드로 바꾼다. 편집 폼은 「편집」 을 누를 때 열고, 링크 복사와 변경 이력, 보관과 복원은 「⋯」 메뉴로 옮긴다. 관계는 문장으로 보이고, 「＋ 연결 추가」 와 「＋ 주장 추가」 를 절 머리에 둔다.
 
-**범위 외**: 검색 칸과 그래프(Phase 04). 화면 문구 전체 점검과 온톨로지 표시 이름(Phase 06).
+**범위 외**: 검색 칸과 그래프(Phase 05). 화면 문구 전체 점검과 온톨로지 표시 이름(Phase 07).
 
 ## 컨텍스트
 
@@ -14,7 +14,7 @@
 - 동시 수정 때 입력을 지키는 `draft`(`EditDraft`)와 `onConflict`, `onDraftDone` 은 `DetailPanel` 이 들고 `NodeEditForm` 에 넘긴다(`docs/flow.md` 「화면에서 입력 지키기」). `fail(e)` 은 `REVISION_CONFLICT` 면 상세를 다시 읽는다.
 - 관계는 `src/components/RelationshipSection.tsx` 가 그린다. 줄(`relationship-row`, `data-rel-type`)은 「시작 —표시 이름→ 끝」 이고, 편집자는 `relationship-archive-toggle`, 추가는 `relationship-add-toggle` → `relationship-add-form`(`relationship-type-select`, `relationship-target-picker-*`, `relationship-add-submit`)이다. `RelationshipView` 는 `from`, `to`(각 `id`, `type`, `label`)와 `archived` 를 가진다.
 - 링크 복사는 `src/components/CopyLinkButton.tsx` 다. 사용자 이름은 `src/lib/format.ts` 의 `userName(ref)`(없으면 「시스템」), 날짜는 `formatDate`, 시각은 `formatDateTime` 이다. 값 표시는 `useLabels().value(type, prop, value)`, 속성 이름은 `useLabels().property(type, prop)` 이다.
-- Phase 02 가 만든 `src/lib/relationSentence.ts` 의 `relationSentence(label, direction, other)`, `src/components/ui/dialog.tsx`, `src/components/ui/dropdown-menu.tsx` 를 쓴다.
+- Phase 02 가 만든 `src/lib/relationSentence.ts` 의 `relationSentenceParts(o, relationship, from, to)`, Phase 03 이 만든 `src/components/ui/dialog.tsx`, `src/components/ui/dropdown-menu.tsx` 를 쓴다.
 - 가이드의 주장 단계는 `DetailPanel` 이 `prefill.subjectId` 를 보고 주장 폼을 저절로 연다. 대상 testid 는 `claim-add-submit` 이다.
 
 **근거 문서**: `financial-workbench/docs/flow.md` 의 「작업 공간」 의 「상세 칸: 읽기 카드」, 「관계 문장」, 「화면에서 입력 지키기」, 「보관과 복원」, 「주장 만들기 화면」, `financial-workbench/docs/code-architecture.md` 의 「웹 구조」
@@ -51,16 +51,15 @@
 
 ### 3. `src/components/RelationshipSection.tsx`
 
-- 절 제목을 「연결」 로, 머리 오른쪽에 「＋ 연결 추가」(`relationship-add-toggle`)를 둔다. 추가 칸은 지금 그대로다(관계 종류 선택지 글자도 문장 규칙으로: 나가는 것은 「이 항목이 (끝 타입)을(를) {합니다체}」, 들어오는 것은 「(시작 타입)이(가) 이 항목을 {합니다체}」).
-- 줄(`relationship-row`, `data-rel-type`, `data-direction`)은 이 항목이 시작이면 `relationSentence(label, 'out', to.label)`, 끝이면 `relationSentence(label, 'in', from.label)` 이다. 문장 안의 상대 이름은 단추(testid `relationship-open`, `data-node-id`)로 누르면 `onOpenNode(id)`. 문장을 조각으로 그리기 위해 `relationSentence` 와 같은 규칙으로 `{ other, rest }` 를 돌려주는 `relationSentenceParts(label, direction, other)` 를 `relationSentence.ts` 에 더하고 `relationSentence` 는 그것을 이어 붙이게 바꾼다.
+- 절 제목을 「연결」 로, 머리 오른쪽에 「＋ 연결 추가」(`relationship-add-toggle`)를 둔다. 추가 칸은 지금 그대로다. 관계 종류 선택지 글자는 `relationSentence(ontology, type, 시작 이름, 끝 이름)` 으로 만들고, 이 항목 쪽 자리에는 「이 항목」, 상대 쪽 자리에는 상대 타입 이름을 넣는다.
+- 줄(`relationship-row`, `data-rel-type`, `data-direction`)은 `relationSentenceParts(ontology, r.type, r.from.label, r.to.label)` 로 그린다. 이 항목이 시작이면 `data-direction="out"`, 끝이면 `"in"` 이다. 양쪽 상세에서 같은 문장이다. 자리 조각 가운데 이 항목의 것은 `<strong>`(testid `relationship-self`)으로, 상대의 것은 단추(testid `relationship-open`, `data-node-id`)로 그리고 누르면 `onOpenNode(id)`.
 - 상대 타입 배지는 문장 앞에 둔다. 보관된 관계는 흐리게 「보관됨」 을 붙이고, 편집자는 「연결 보관」 또는 「연결 복원」(`relationship-archive-toggle`). 「정의에서 빠진 관계」 표시(`relationship-undefined`)는 그대로.
 - 연결이 없으면 「아직 연결된 항목이 없습니다.」.
 
-### 4. 단위 테스트: `src/components/DetailPanel.test.tsx`, `src/lib/relationSentence.test.ts`, `src/components/screens.test.tsx`
+### 4. 단위 테스트: `src/components/DetailPanel.test.tsx`, `src/components/screens.test.tsx`
 
-- `relationSentenceParts` 가 두 방향에서 상대 이름과 나머지를 나누고, 이어 붙이면 `relationSentence` 와 같은지.
 - `NodeReadCard` 를 그려 빈 값 속성이 빠지고 enum 이 표시 이름으로 나오는지.
-- `RelationshipSection` 을 그려 이 항목이 끝인 관계가 「{시작 이름}이(가) …」 문장으로, 시작인 관계가 「{끝 이름}을(를) …」 로 나오는지.
+- `RelationshipSection` 을 그려 이 항목이 시작인 관계와 끝인 관계 모두에서 이 항목 이름이 `relationship-self` 로, 상대 이름이 `relationship-open` 으로 나오고, 문장 글자가 `relationSentence` 와 같은지.
 - `screens.test.tsx` 에 상세를 그리는 기존 단언(`node-meta`, `NodeEditForm` 의 입력 등)이 있으면 읽기 카드 기준으로 고친다.
 
 ### 5. e2e 와 testid 계약: `e2e/workbench.spec.ts`, `e2e/mobile.spec.ts`, `TESTIDS.md`
@@ -68,16 +67,16 @@
 - 편집 폼의 입력(`edit-prop-*`)과 저장 단추(`node-save`)를 쓰기 전에 `node-edit` 를 누른다. 동시 수정 테스트(B 의 409 와 `edit-conflict-*`)는 409 뒤에도 편집 폼이 열려 있는지 단언을 하나 더한다.
 - 보관은 `node-more` → `node-archive-button` → `node-archive-dialog` 의 `node-archive-reason` 채우기 → `node-archive-confirm`. 복원은 `node-more` → `node-restore-button`. 링크 복사와 변경 이력도 `node-more` 를 먼저 연다.
 - `node-meta` 를 보던 단언은 `node-meta-details` 를 열어 보게 바꾼다. 열람자 테스트의 「버튼이 없다」 목록(`node-save`, `node-archive-button` 등)에 `node-edit` 를 더하고, `node-archive-button` 은 `node-more` 를 연 뒤 없음을 본다.
-- `relationship-row` 의 글자를 보던 단언(「—표시 이름→」 꼴)을 문장 꼴로 바꾼다. 문장 단언은 화면이 쓰는 함수의 규칙을 다시 적지 말고 `relationship-open` 의 이름과 `data-direction` 을 본다.
+- `relationship-row` 의 글자를 보던 단언(「—표시 이름→」 꼴)을 바꾼다. 문장 규칙을 다시 적지 말고 `relationship-self`, `relationship-open` 의 이름과 `data-direction` 을 본다.
 - 새 테스트: 「상세는 읽기 카드로 열리고 편집을 눌러야 폼이 열린다」. 항목을 열면 `node-props` 가 보이고 `edit-prop-*` 가 없으며, `node-edit` 를 누르면 폼이 열리고 `node-edit-cancel` 로 닫히는지. 스크린샷 `shot(page, 'detail-read-card')`.
 - `mobile.spec.ts`: 상세 탭에서 `node-actions` 가 가로 스크롤 없이 보이는지 기존 390px 단언에 더한다.
-- `TESTIDS.md`: 「작업 공간: 오른쪽(상세)」 절을 읽기 카드 기준으로 고친다. 새 testid(`node-created-line`, `node-actions`, `node-edit`, `node-edit-cancel`, `node-more`, `node-archive-dialog`, `node-archive-confirm`, `node-props`, `node-prop`, `relationship-open`)를 적고 `node-meta` 줄을 지운다.
+- `TESTIDS.md`: 「작업 공간: 오른쪽(상세)」 절을 읽기 카드 기준으로 고친다. 새 testid(`node-created-line`, `node-actions`, `node-edit`, `node-edit-cancel`, `node-more`, `node-archive-dialog`, `node-archive-confirm`, `node-props`, `node-prop`, `relationship-self`, `relationship-open`)를 적고 `node-meta` 줄을 지운다.
 
 ## 검증
 
 ```bash
 cd financial-workbench/web && npm run typecheck
-cd financial-workbench/web && npx vitest run src/components/DetailPanel.test.tsx src/lib/relationSentence.test.ts src/components/screens.test.tsx
+cd financial-workbench/web && npx vitest run src/components/DetailPanel.test.tsx src/components/screens.test.tsx
 cd financial-workbench/web && npm test && npm run build
 cd financial-workbench/web && npx playwright test --list e2e/workbench.spec.ts e2e/mobile.spec.ts
 ! git grep -n "data-testid=\"node-meta\"" -- financial-workbench/web/src
@@ -96,8 +95,6 @@ cd financial-workbench/web && npx playwright test --list e2e/workbench.spec.ts e
 | `financial-workbench/web/src/components/CopyLinkButton.tsx` | 수정 |
 | `financial-workbench/web/src/components/NodeEditForm.tsx` | 수정 |
 | `financial-workbench/web/src/components/screens.test.tsx` | 수정 |
-| `financial-workbench/web/src/lib/relationSentence.ts` | 수정 |
-| `financial-workbench/web/src/lib/relationSentence.test.ts` | 수정 |
 | `financial-workbench/web/src/legacy.css` | 수정 |
 | `financial-workbench/web/e2e/workbench.spec.ts` | 수정 |
 | `financial-workbench/web/e2e/mobile.spec.ts` | 수정 |

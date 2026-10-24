@@ -1,4 +1,4 @@
-# Phase 04. 작업 공간 검색 칩, 고급 필터, 방향 배치 그래프
+# Phase 05. 작업 공간 검색 칩, 고급 필터, 방향 배치 그래프
 
 **Execution profile**: standard
 
@@ -6,14 +6,14 @@
 
 작업 공간 검색 칸을 검색창과 종류 칩만 보이게 줄이고, 나머지 조건(주장 검토 상태, 보관 포함, 이웃 단계, 주장을 따로 보기)을 「고급 필터」 한 곳에 접는다. 그래프를 관계 방향대로 위에서 아래로 놓는다.
 
-**범위 외**: 상세 칸(Phase 05). 만들기(Phase 03 에서 끝남).
+**범위 외**: 상세 칸(Phase 06). 만들기(Phase 04 에서 끝남).
 
 ## 컨텍스트
 
 - 검색 칸은 `financial-workbench/web/src/components/SearchPanel.tsx` 다. 지금 `<fieldset className="filters">` 안에 종류 체크박스(`filter-type-${t}`), 검토 상태 select(`filter-review-status`), 「보관 포함」 체크(`filter-include-archived`)와 안내 문장이 있다. 종류를 바꾸는 `toggleType(type, on)` 은 `labels.types`(YAML 순서)로 다시 정렬한다.
 - 이웃 단계(`graph-hops`, 「홉 수」 select)와 「주장을 따로 보기」(`graph-claims-as-nodes`)는 `src/components/GraphPanel.tsx` 의 도구 줄에 있고, 값과 바꾸기는 `Workspace.tsx` 가 `hops`, `onHopsChange`, `claimsAsNodes`, `onClaimsAsNodesChange` 로 넘긴다. 주소의 query 는 `hops`, `claims=nodes`, `status`, `archived=1` 이다(`src/routes.ts` 의 `WorkspaceQuery`).
 - 그래프 배치는 `GraphPanel.tsx` 의 `runLayout(cy)` 가 `cose` 로 한다. 새 요소가 생겼을 때만 배치하고, 숨겨진 동안이면 `pendingLayout` 으로 미룬다.
-- Phase 02 가 만든 `src/lib/typeOrder.ts` 의 `orderedTypes`, `managedTypes` 를 칩 순서에 쓴다.
+- Phase 03 가 만든 `src/lib/typeOrder.ts` 의 `orderedTypes`, `managedTypes` 를 칩 순서에 쓴다.
 
 **근거 문서**: `financial-workbench/docs/flow.md` 의 「작업 공간」 의 「검색 칸」, 「그래프 칸」, 「주장 접기」, 「주소와 뒤로가기」
 

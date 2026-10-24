@@ -6,7 +6,7 @@
 
 개념 지도가 쓸 서버 기능을 만든다. 타입별 항목 수 API(`GET /api/nodes/counts`), 검색 API 의 최근 정렬(`sort=recent`), 화면 경로 `/map` 의 `index.html` 전달이다.
 
-**범위 외**: 웹 화면(Phase 02 부터). 온톨로지 YAML 의 표시 이름(Phase 06).
+**범위 외**: 웹 화면(Phase 03 부터). 온톨로지 YAML 의 표시 이름(Phase 07).
 
 ## 컨텍스트
 

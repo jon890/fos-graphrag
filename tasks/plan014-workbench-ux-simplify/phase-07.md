@@ -1,18 +1,18 @@
-# Phase 06. 온톨로지 표시 이름과 화면 문구 다듬기, 투자 온톨로지 명칭
+# Phase 07. 온톨로지 관계 문장 틀과 화면 문구 다듬기, 투자 온톨로지 명칭
 
 **Execution profile**: standard
 
 ## 목표
 
-관계 표시 이름을 관계 문장으로 읽히는 동사구로 바꾸고, 타입 설명의 첫 문장을 「＋ 추가」 메뉴에 맞게 다듬는다. 화면 문구(TSX, `src/lib/guide.ts`)를 `korean-check` 기준으로 점검해 어색한 표현을 고치고, 「투자 논리 사슬」 이 남은 곳을 「투자 온톨로지」 로 바꾼다.
+저장소 온톨로지의 관계마다 문장 틀(`sentence`)을 적고, 타입 설명의 첫 문장을 「＋ 추가」 메뉴에 맞게 다듬는다. 화면 문구(TSX, `src/lib/guide.ts`)를 `korean-check` 기준으로 점검해 어색한 표현을 고치고, 「투자 논리 사슬」 이 남은 곳을 「투자 온톨로지」 로 바꾼다.
 
 **범위 외**: 운영 온톨로지에 같은 문구를 저장하는 일(배포 뒤 ADMIN 이 한다. `docs/deployment.md` 「저장소 온톨로지의 문구를 운영에 반영할 때」). 화면 구조 변경(앞 phase 에서 끝남).
 
 ## 컨텍스트
 
 - 온톨로지는 `financial-workbench/ontology/financial-ontology.yaml` 이다. 관계 종류는 `relationshipTypes`, 타입 설명은 `nodeTypes.<타입>.description` 이다. 이 파일의 편집할 수 있는 부분은 DB 가 비어 있을 때만 첫 버전이 된다([ADR-008](../../financial-workbench/docs/adr/008-ontology-versions-in-db.md)). 테스트와 e2e 는 빈 DB 에서 시작하므로 이 파일의 값을 쓴다.
-- 관계 문장 규칙은 `financial-workbench/docs/flow.md` 「관계 문장」, 표시 이름 규칙은 `financial-workbench/docs/data-schema.md` 「표시 이름」 이다. 표시 이름은 끝 타입을 목적어로 받는 동사구여야 「{끝}을(를) …합니다」, 「{시작}이(가) …합니다」 가 자연스럽다.
-- 표시 이름이 있는지는 `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyLabelsTest.kt` 가 확인한다. 값 자체를 단언하는 테스트가 있는지 `git grep -n "이익을 준다\|결정의 근거\|병목이 있다\|관련된다" -- financial-workbench` 로 확인하고 함께 고친다.
+- 관계 문장 규칙은 `financial-workbench/docs/flow.md` 「관계 문장」, 「조사 고르기」, 문장 틀 규칙은 `financial-workbench/docs/data-schema.md` 「표시 이름」 이다. 문장 틀 필드와 검사, 채우는 함수(`src/lib/relationSentence.ts`)는 Phase 02 가 만들었다.
+- 표시 이름과 주장 문장 틀이 있는지는 `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyLabelsTest.kt` 가 확인한다.
 - 화면 문구는 TSX 안에 인라인으로 있고, 첫 접속 가이드 문구는 `src/lib/guide.ts` 다. 문구 규칙은 `korean-check` 스킬의 `references/korean-style.md` 이고 검사기는 같은 스킬의 `scripts/korean-style-check.py` 다.
 
 **근거 문서**: `financial-workbench/docs/flow.md` 의 「관계 문장」, 「노드 만들기」, 「첫 접속 가이드」, `financial-workbench/docs/data-schema.md` 의 「표시 이름」, 「투자 온톨로지」, `financial-workbench/docs/deployment.md` 의 「저장소 온톨로지의 문구를 운영에 반영할 때」
@@ -25,20 +25,26 @@
 
 ## 작업 항목
 
-### 1. `financial-workbench/ontology/financial-ontology.yaml` 의 관계 표시 이름
+### 1. `financial-workbench/ontology/financial-ontology.yaml` 의 관계 문장 틀
 
-| 관계 | 지금 `label` | 바꿀 `label` | 바꿀 `description` |
-| --- | --- | --- | --- |
-| `RELATED_TO` | 관련된다 | 함께 본다 | 두 개념을 함께 본다. 근거가 필요 없는 식별 관계다. |
-| `HAS_BOTTLENECK` | 병목이 있다 | 겪는다 | 산업이 병목을 겪는다. |
-| `BENEFITS` | 이익을 준다 | 이롭게 한다 | 병목이 기업을 이롭게 한다. 기업이 병목의 이익을 가져간다. |
-| `HAS_VALUATION` | 밸류에이션 | 가진다 | 기업이 밸류에이션을 가진다. |
-| `HAS_SCENARIO` | 시나리오 | 포함한다 | 밸류에이션이 시나리오를 포함한다. |
-| `HAS_DECISION` | 결정 | 받는다 | 종목이 투자 결정을 받는다. |
-| `BASED_ON` | 결정의 근거 | 뒷받침한다 | 밸류에이션이 투자 결정을 뒷받침한다. |
-| `EVIDENCED_BY` | 근거 자료 | 근거로 삼는다 | 변화, 병목, 밸류에이션이 자료를 근거로 삼는다. |
+관계마다 `sentence` 를 더한다. 표시 이름(`label`)과 `createPicker` 는 바꾸지 않는다. 화면은 끝을 합니다체로 바꿔 보인다.
 
-`ISSUES`(발행한다), `AUTHORED`(썼다), `CREATES`(만든다)는 이미 규칙에 맞아 그대로 둔다. `createPicker.label` 은 고르기 칸의 이름이라 동사구로 바꾸지 않는다. 다만 「병목이 있는 산업」 은 「이 병목을 겪는 산업」 으로 바꿔 관계 이름과 맞춘다.
+| 관계 | `sentence` | 화면 예 |
+| --- | --- | --- |
+| `ISSUES` | `{from}이(가) {to}을(를) 발행한다` | SK하이닉스가 SK하이닉스 보통주를 발행합니다 |
+| `AUTHORED` | `{from}이(가) {to}을(를) 썼다` | 워런 버핏이 주주서한을 썼습니다 |
+| `RELATED_TO` | `{from}은(는) {to}와(과) 관련된다` | 안전마진은 경제적 해자와 관련됩니다 |
+| `CREATES` | `{from}이(가) {to}을(를) 만든다` | AI 서버 증가가 HBM 병목을 만듭니다 |
+| `HAS_BOTTLENECK` | `{to}은(는) {from}에 있는 병목이다` | HBM 병목은 메모리 반도체에 있는 병목입니다 |
+| `BENEFITS` | `{from}이(가) {to}에 이익을 준다` | HBM 병목이 SK하이닉스에 이익을 줍니다 |
+| `HAS_VALUATION` | `{to}은(는) {from}의 가치를 평가한다` | FLNC 간이 DCF는 Fluence Energy의 가치를 평가합니다 |
+| `HAS_SCENARIO` | `{to}은(는) {from}의 시나리오 가운데 하나다` | FLNC 비관은 FLNC 간이 DCF의 시나리오 가운데 하나입니다 |
+| `HAS_DECISION` | `{to}은(는) {from}에 대한 결정이다` | FLNC 첫 매수는 FLNC에 대한 결정입니다 |
+| `BASED_ON` | `{to}은(는) {from}을(를) 근거로 한다` | FLNC 첫 매수는 FLNC 간이 DCF를 근거로 합니다 |
+| `EVIDENCED_BY` | `{to}이(가) {from}을(를) 뒷받침한다` | 공개 자료가 HBM 병목을 뒷받침합니다 |
+
+YAML 흐름 표기(`{ ... }`) 안에 넣지 않고 블록 표기의 따옴표 문자열로 적는다(`{` 로 시작하는 값은 따옴표가 필요하다. `docs/data-schema.md` 「표시 이름」 아래의 로더 주의).
+화면 예의 문장이 실제로 그렇게 보이는지는 Phase 02 의 `relationSentence` 로 확인한다(아래 5).
 
 ### 2. 같은 파일의 타입 설명
 
@@ -65,11 +71,12 @@
 
 ### 4. 이름 바꾸기: `financial-workbench/web/e2e/workbench.spec.ts`
 
-`test('1c) 투자 논리 사슬을 만들고 결정에서 변화까지 따라간다'` 를 `test('1c) 투자 온톨로지 항목을 이어 만들고 결정에서 변화까지 따라간다'` 로 바꾼다. 다른 테스트 이름의 「무엇을 만들까요?」 가 Phase 03 뒤에도 남아 있으면 「＋ 추가」 로 바꾼다.
+`test('1c) 투자 논리 사슬을 만들고 결정에서 변화까지 따라간다'` 를 `test('1c) 투자 온톨로지 항목을 이어 만들고 결정에서 변화까지 따라간다'` 로 바꾼다. 다른 테스트 이름의 「무엇을 만들까요?」 가 Phase 04 뒤에도 남아 있으면 「＋ 추가」 로 바꾼다.
 
-### 5. 이 phase 를 검증하는 테스트: `financial-workbench/web/src/lib/relationSentence.test.ts`
+### 5. 이 phase 를 검증하는 테스트: `OntologyLabelsTest.kt`, `src/lib/relationSentence.test.ts`
 
-저장소 YAML 을 읽어(`node:fs` 로 `../../ontology/financial-ontology.yaml` 을 읽고 `relationshipTypes` 아래 `label:` 줄을 정규식으로 뽑는다) 모든 관계 표시 이름이 「다」 로 끝나는지 확인하는 테스트를 더한다. YAML 라이브러리를 들이지 않는다(`docs/code-architecture.md` 「웹 구조」). 관계 수나 이름 목록을 테스트에 적지 않는다.
+- `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyLabelsTest.kt` 에 「저장소 온톨로지의 모든 관계 종류는 문장 틀이 있다」 를 더한다. `OntologyLoader.loadDefault()` 의 모든 `relationshipTypes` 에 `sentence` 가 있고 `consistencyErrors` 가 비어 있는지 본다. 관계 수나 키 목록을 테스트에 적지 않는다.
+- `relationSentence.test.ts` 에 위 표의 `HAS_DECISION` 과 `EVIDENCED_BY` 두 줄을 테스트 온톨로지 조각으로 옮겨 화면 예와 같은 문장이 나오는지 더한다(조사, 자리 순서, 합니다체를 함께 확인한다).
 
 ## 검증
 
@@ -83,7 +90,7 @@ cd financial-workbench/web && npx playwright test --list e2e/workbench.spec.ts e
 cd financial-workbench && bash scripts/tests/test_scripts.sh
 ```
 
-- `./gradlew test --rerun --tests 'dev.fos.workbench.ontology.*'` 백그라운드
+- 서버 테스트는 백그라운드로 돌린다.
 - `playwright test --list` 는 서버 없이 spec 파일을 읽어 문법과 import 오류만 잡는다. 브라우저 실행은 모든 phase 를 마친 뒤 한 번 한다.
 
 ## 변경 파일
@@ -91,6 +98,7 @@ cd financial-workbench && bash scripts/tests/test_scripts.sh
 | 파일 | 변경 |
 |---|---|
 | `financial-workbench/ontology/financial-ontology.yaml` | 수정 |
+| `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyLabelsTest.kt` | 수정 |
 | `financial-workbench/web/src/lib/guide.ts` | 수정 |
 | `financial-workbench/web/src/lib/guide.test.ts` | 수정 |
 | `financial-workbench/web/src/components/**/*.tsx` | 수정 |

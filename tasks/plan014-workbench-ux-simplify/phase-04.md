@@ -1,4 +1,4 @@
-# Phase 03. 전역 ＋ 추가 메뉴와 만들기 창, 따라하기 연결
+# Phase 04. 전역 ＋ 추가 메뉴와 만들기 창, 따라하기 연결
 
 **Execution profile**: deep
 
@@ -6,14 +6,14 @@
 
 항목 만들기를 머리글의 「＋ 추가」 하나로 모은다. 타입 메뉴, 단계 표시가 있는 만들기 창, 그래프의 둥근 ＋ 단추, 개념 지도의 「＋ {타입} 추가」 를 만들고, 검색 칸 아래의 만들기 칸(`create-box`)을 없앤다. 첫 접속 가이드의 따라하기가 「＋ 추가」 에서 시작하게 맞춘다.
 
-**범위 외**: 검색 칩과 고급 필터(Phase 04). 상세 읽기 카드와 「＋ 연결 추가」, 「＋ 주장 추가」(Phase 05). 화면 문구 전체 점검(Phase 06).
+**범위 외**: 검색 칩과 고급 필터(Phase 05). 상세 읽기 카드와 「＋ 연결 추가」, 「＋ 주장 추가」(Phase 06). 화면 문구 전체 점검(Phase 07).
 
 ## 컨텍스트
 
 - 지금 만들기의 유일한 입구는 `financial-workbench/web/src/components/SearchPanel.tsx` 아래의 `create-box` 다. `new-node-type` select 와 `new-node-button` 으로 타입을 고르고, 같은 칸에 `NodeCreateForm`(`testIdPrefix="create"`) 이나 `ClaimCreateForm` 을 그린다. 만든 뒤 `onCreated(node, message, kind)` 로 `Workspace` 의 `flash` 를 채우고 `onFocus(node.id)` 를 부른다. 관계만 실패했을 때의 안내 문장(`createPicker.label` 을 쓴 「…을(를) 잇지 못했습니다」)도 여기 있다.
 - 첫 접속 가이드의 미리 채우기는 `useGuide()` 의 `prefill`, `consumePrefill()`, `cancelForm()`, `report()` 다. 기업과 근거 문서 단계는 `SearchPanel` 이 `prefill.type` 을 보고 폼을 저절로 연다. 주장 단계는 `DetailPanel` 이 연다(이 phase 에서 바꾸지 않는다). 가이드 단계 정의는 `src/lib/guide.ts` 의 `practiceSteps` 이고 말풍선은 `src/components/guide/GuideBubble.tsx` 가 `step.target` testid 로 대상을 찾는다.
 - `NodeCreateForm`(`src/components/NodeCreateForm.tsx`)은 속성 칸을 `PropertyFields`(`src/components/PropertyFields.tsx`)로 그리고, `createPicker` 가 있는 관계마다 `NodePicker` 고르기 칸(`${testIdPrefix}-link-${relType}-*`)을 그린다. 같은 이름 검사와 관계 실패 처리를 바꾸지 않는다.
-- Phase 02 가 만든 것: `src/components/ui/dialog.tsx`, `src/components/ui/dropdown-menu.tsx`, `src/lib/typeOrder.ts`(`orderedTypes`, `managedTypes`), `src/lib/labels.ts` 의 `firstSentence`, 머리글(`src/components/header/`), 개념 지도(`src/components/map/ConceptMapTab.tsx`, `TypePanel.tsx`).
+- Phase 03 가 만든 것: `src/components/ui/dialog.tsx`, `src/components/ui/dropdown-menu.tsx`, `src/lib/typeOrder.ts`(`orderedTypes`, `managedTypes`), `src/lib/labels.ts` 의 `firstSentence`, 머리글(`src/components/header/`), 개념 지도(`src/components/map/ConceptMapTab.tsx`, `TypePanel.tsx`).
 - `App.tsx` 의 `focusNode(id)` 는 `/workspace?node=<id>&pane=detail` 로 간다(push).
 
 **근거 문서**: `financial-workbench/docs/flow.md` 의 「노드 만들기」, 「개념 지도」, 「작업 공간」 의 「그래프 칸」, 「첫 접속 가이드」, `financial-workbench/docs/code-architecture.md` 의 「웹 구조」, `financial-workbench/docs/adr/010-concept-map-first-screen.md`
@@ -67,7 +67,7 @@ export function useAdd(): AddContextValue
 
 ### 5. 입구: `src/App.tsx`, `src/components/SearchPanel.tsx`, `src/components/Workspace.tsx`, `src/components/GraphPanel.tsx`, `src/components/map/TypePanel.tsx`
 
-- `App.tsx`: `AppContext.Provider` 안쪽, 탭 `ErrorBoundary` 바깥에 `AddProvider` 를 둔다. 머리글 둘째 줄(Phase 02 가 비워 둔 자리, 더보기 왼쪽)에 `canEdit` 일 때 `<AddMenu trigger={<Button data-testid="add-open">＋ 추가</Button>} align="end" />`. 좁은 화면에서는 글자 「추가」 를 숨기고 `aria-label="추가"` 를 둔다. 머리글이 온톨로지를 받기 전에는 단추를 그리지 않는다. `flash` 상태(`{ id, text, kind }`)를 App 으로 옮겨 `Workspace` 에 prop 으로 넘긴다.
+- `App.tsx`: `AppContext.Provider` 안쪽, 탭 `ErrorBoundary` 바깥에 `AddProvider` 를 둔다. 머리글 둘째 줄(Phase 03 가 비워 둔 자리, 더보기 왼쪽)에 `canEdit` 일 때 `<AddMenu trigger={<Button data-testid="add-open">＋ 추가</Button>} align="end" />`. 좁은 화면에서는 글자 「추가」 를 숨기고 `aria-label="추가"` 를 둔다. 머리글이 온톨로지를 받기 전에는 단추를 그리지 않는다. `flash` 상태(`{ id, text, kind }`)를 App 으로 옮겨 `Workspace` 에 prop 으로 넘긴다.
 - `ClaimCreateForm.tsx`: `initialSubject` 주석의 「왼쪽 「무엇을 만들까요?」 는 넘기지 않는다」 를 「「＋ 추가」 의 주장 줄은 넘기지 않는다」 로 고친다.
 - `SearchPanel.tsx`: `create-box` 전체와 가이드 프리필 effect, `NodeCreateForm`, `ClaimCreateForm` import, `onCreated` prop 을 지운다. 결과가 비었을 때의 문장을 「아직 등록한 항목이 없습니다.」 와 편집자에게 「오른쪽 위 「＋ 추가」 로 첫 항목을 만드세요.」 로 바꾼다. `viewer-create-hint` 는 지운다.
 - `Workspace.tsx`: `flash` 와 `setFlash` 를 지우고 prop 으로 받는다. `SearchPanel` 의 `onCreated` 를 넘기지 않는다. `useAdd` 의 성공 뒤 그래프와 검색을 다시 읽도록 App 이 `focusNode` 로 `focusSeq` 를 올리는 지금 흐름을 그대로 쓴다.
