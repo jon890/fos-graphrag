@@ -122,3 +122,16 @@ export function collapseClaims(data: GraphData, centerId: string | null): GraphD
 export function expandedDisplay(data: GraphData): GraphDisplay {
   return { nodes: data.nodes, edges: data.edges, claimEdges: [], listed: data.nodes }
 }
+
+/**
+ * 방향 배치의 뿌리. 그래프 안에서 들어오는 선이 없는 노드다.
+ * 접힌 주장 선도 주체에서 대상으로 가는 선으로 센다. 고리만 있어 뿌리가 없으면 중심 노드를 준다.
+ */
+export function layoutRoots(display: GraphDisplay, centerId: string | null): string[] {
+  const incoming = new Set<string>()
+  for (const e of display.edges) incoming.add(e.target)
+  for (const c of display.claimEdges) incoming.add(c.target)
+  const roots = display.nodes.filter((n) => !incoming.has(n.id)).map((n) => n.id)
+  if (roots.length > 0) return roots
+  return centerId !== null && display.nodes.some((n) => n.id === centerId) ? [centerId] : display.nodes.slice(0, 1).map((n) => n.id)
+}

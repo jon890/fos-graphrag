@@ -77,6 +77,10 @@ button:where(:not([data-slot])).link-button:disabled { color: var(--text); opaci
 .pane-center { background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
 
 .filters { border: 1px solid var(--border); border-radius: 4px; margin: 8px 0; padding: 6px 10px; display: flex; flex-direction: column; gap: 4px; }
+.type-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.type-chip { padding: 2px 6px; border-radius: 12px; opacity: 0.5; }
+.type-chip.on { opacity: 1; border-color: var(--primary); }
+.filters > summary { cursor: pointer; }
 .check { display: flex; align-items: center; gap: 6px; }
 .field-inline { display: inline-flex; align-items: center; gap: 6px; }
 .search-results ul { list-style: none; padding: 0; margin: 0; }

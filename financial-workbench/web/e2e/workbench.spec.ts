@@ -65,9 +65,17 @@ function usersRow(page: Page, email: string): Locator {
   return page.locator(`[data-testid="users-row"][data-email="${email}"]`)
 }
 
+/** 고급 필터를 연다. 이미 열려 있으면 누르지 않는다 */
+async function openAdvancedFilters(page: Page): Promise<void> {
+  const details = page.getByTestId('advanced-filters')
+  if ((await details.getAttribute('open')) === null) await page.getByTestId('advanced-filters-toggle').click()
+  await expect(details).toHaveAttribute('open', '')
+}
+
 /** 작업 공간 왼쪽 검색으로 노드를 찾아 중심 노드로 연다. */
 async function searchAndOpen(page: Page, label: string, options: { includeArchived?: boolean } = {}): Promise<void> {
   await page.getByTestId('tab-workspace').click()
+  await openAdvancedFilters(page)
   const archived = page.getByTestId('filter-include-archived')
   if ((await archived.isChecked()) !== !!options.includeArchived) await archived.setChecked(!!options.includeArchived)
   await page.getByTestId('search-input').fill(label)
@@ -501,6 +509,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA.getByTestId('relationship-row').filter({ hasText: data.investmentSecurity })).toHaveAttribute('data-rel-type', 'HAS_DECISION')
     await expect(pageA.getByTestId('relationship-row').filter({ hasText: data.valuation })).toHaveAttribute('data-rel-type', 'BASED_ON')
 
+    await openAdvancedFilters(pageA)
     await pageA.getByTestId('graph-hops').selectOption('2')
     const companyNode = pageA.locator('[data-testid="graph-node"][data-node-type="Company"]').filter({ hasText: data.investmentCompany })
     await expect(companyNode).toHaveCount(1)
@@ -508,6 +517,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageA.getByTestId('graph-expand').click()
     await expect(pageA.locator('[data-testid="graph-node"][data-node-type="Change"]').filter({ hasText: data.change })).toHaveCount(1)
     await shot(pageA, '13a-investment-chain')
+    await openAdvancedFilters(pageA)
     await pageA.getByTestId('graph-hops').selectOption('1')
   })
 
@@ -751,6 +761,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(canvas).toHaveAttribute('data-collapsed-claims', '1')
 
     // 주장을 따로 보면 마름모 노드와 근거 문서가 나온다
+    await openAdvancedFilters(pageA)
     await pageA.getByTestId('graph-claims-as-nodes').setChecked(true)
     await expect(canvas).toHaveAttribute('data-collapsed-claims', '0')
     await expect(documents).toHaveCount(1)
@@ -789,12 +800,33 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     // 홉 수는 주소만 바꾸고 기록을 쌓지 않는다. 고객사를 연 뒤 홉을 바꿔도 뒤로가기 한 번이면 공급사다.
     await customerItem.getByRole('button').click()
     await expect(pageA.getByTestId('detail-label')).toHaveText(data.sector)
+    await openAdvancedFilters(pageA)
     await pageA.getByTestId('graph-hops').selectOption('2')
     await expect(pageA).toHaveURL(/hops=2/)
     await pageA.goBack()
     await expect(pageA.getByTestId('detail-label')).toHaveText(data.supplier)
     await expect(pageA).not.toHaveURL(/hops=/)
     await shot(pageA, '04b-back-to-supplier')
+  })
+
+  test('4c) 고급 필터는 접혀 있고 바꾼 개수를 보인다', async () => {
+    await pageA.getByTestId('tab-workspace').click()
+    await expect(pageA.getByTestId('advanced-filters')).not.toHaveAttribute('open', /.*/)
+    await expect(pageA.getByTestId('advanced-filters-toggle')).toHaveText('고급 필터')
+
+    await openAdvancedFilters(pageA)
+    await pageA.getByTestId('graph-hops').selectOption('2')
+    await expect(pageA).toHaveURL(/hops=2/)
+    await expect(pageA.getByTestId('advanced-filters-toggle')).toHaveText('고급 필터 (1)')
+
+    // 열림은 주소에 두지 않아 새로고침하면 접히고, 조건이 걸린 개수는 남는다.
+    await pageA.reload()
+    await expect(pageA.getByTestId('advanced-filters')).not.toHaveAttribute('open', /.*/)
+    await expect(pageA.getByTestId('advanced-filters-toggle')).toHaveText('고급 필터 (1)')
+
+    await openAdvancedFilters(pageA)
+    await pageA.getByTestId('graph-hops').selectOption('1')
+    await expect(pageA.getByTestId('advanced-filters-toggle')).toHaveText('고급 필터')
   })
 
   test('5) 같은 노드를 동시에 고치면 나중 저장은 409 안내 뒤 최신 값을 보이고, 내 입력을 골라 다시 적용해 저장한다', async () => {

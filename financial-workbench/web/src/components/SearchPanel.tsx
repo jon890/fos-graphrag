@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { api, errorMessage } from '../api/client'
 import type { NodeView, Page, ReviewStatus } from '../api/types'
 import { useApp, useLabels } from '../context'
+import { managedTypes, orderedTypes } from '../lib/typeOrder'
 import { Pager } from './Pager'
 import { StatusBadge, TypeBadge } from './TypeBadge'
 
@@ -12,6 +13,11 @@ export interface SearchFilters {
   includeArchived: boolean
 }
 
+/** 고급 필터에서 기본값과 다른 조건의 개수. 접혀 있어도 조건이 걸린 것을 머리글자로 알린다 */
+export function advancedFilterCount(f: { reviewStatus: string; includeArchived: boolean; hops: number; claimsAsNodes: boolean }): number {
+  return [f.reviewStatus !== '', f.includeArchived, f.hops !== 1, f.claimsAsNodes].filter(Boolean).length
+}
+
 interface Props {
   filters: SearchFilters
   onFiltersChange: (f: SearchFilters) => void
@@ -19,11 +25,18 @@ interface Props {
   onFocus: (id: string) => void
   refreshTick: number
   typesParam: (types: string[]) => string[] | undefined
+  hops: number
+  onHopsChange: (hops: number) => void
+  claimsAsNodes: boolean
+  onClaimsAsNodesChange: (value: boolean) => void
 }
 
-export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, refreshTick, typesParam }: Props) {
+export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, refreshTick, typesParam, hops, onHopsChange, claimsAsNodes, onClaimsAsNodesChange }: Props) {
   const { canEdit } = useApp()
   const labels = useLabels()
+  const { ontology } = useApp()
+  // 칩 순서는 개념 지도와 같다. 관계 방향으로 얕은 타입이 앞이고 주장이 맨 뒤다.
+  const chipTypes = useMemo(() => [...orderedTypes(ontology), ...managedTypes(ontology)], [ontology])
   const [qInput, setQInput] = useState(filters.q)
   // 뒤로가기로 주소의 검색어가 바뀌면 입력칸도 따라간다.
   useEffect(() => setQInput(filters.q), [filters.q])
@@ -69,8 +82,10 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, ref
 
   const toggleType = (type: string, on: boolean) => {
     const next = on ? [...filters.types, type] : filters.types.filter((t) => t !== type)
-    update({ types: labels.types.filter((t) => next.includes(t)) })
+    update({ types: chipTypes.filter((t) => next.includes(t)) })
   }
+
+  const advancedCount = advancedFilterCount({ reviewStatus: filters.reviewStatus, includeArchived: filters.includeArchived, hops, claimsAsNodes })
 
   // 조건 없이 검색해도 결과가 없으면 아직 아무것도 등록하지 않은 것이다.
   const nothingRegistered =
@@ -81,7 +96,7 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, ref
       <form onSubmit={submit} className="row">
         <input
           data-testid="search-input"
-          placeholder="이름 또는 종목 코드"
+          placeholder="이름이나 종목 코드로 찾기"
           value={qInput}
           onChange={(e) => setQInput(e.target.value)}
         />
@@ -90,19 +105,28 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, ref
         </button>
       </form>
 
-      <fieldset className="filters">
-        <legend>종류</legend>
-        {labels.types.map((t) => (
-          <label key={t} className="check">
-            <input
-              type="checkbox"
+      <div className="type-chips">
+        {chipTypes.map((t) => {
+          const on = filters.types.includes(t)
+          return (
+            <button
+              key={t}
+              type="button"
+              className={on ? 'type-chip on' : 'type-chip'}
               data-testid={`filter-type-${t}`}
-              checked={filters.types.includes(t)}
-              onChange={(e) => toggleType(t, e.target.checked)}
-            />
-            <TypeBadge type={t} />
-          </label>
-        ))}
+              aria-pressed={on}
+              onClick={() => toggleType(t, !on)}
+            >
+              <TypeBadge type={t} />
+            </button>
+          )
+        })}
+      </div>
+
+      <details className="filters" data-testid="advanced-filters">
+        <summary data-testid="advanced-filters-toggle">
+          {advancedCount === 0 ? '고급 필터' : `고급 필터 (${advancedCount})`}
+        </summary>
         <label className="field-inline">
           주장 검토 상태
           <select
@@ -127,8 +151,24 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, ref
           />
           보관 포함
         </label>
-        <div className="hint">종류와 검토 상태 필터는 주변 그래프에도 적용됩니다.</div>
-      </fieldset>
+        <label className="field-inline">
+          이웃 단계
+          <select data-testid="graph-hops" value={hops} onChange={(e) => onHopsChange(Number(e.target.value))}>
+            <option value={1}>1</option>
+            <option value={2}>2</option>
+          </select>
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            data-testid="graph-claims-as-nodes"
+            checked={claimsAsNodes}
+            onChange={(e) => onClaimsAsNodesChange(e.target.checked)}
+          />
+          주장을 따로 보기
+        </label>
+        <div className="hint">종류와 검토 상태는 그래프에도 적용됩니다.</div>
+      </details>
 
       <div className="search-results" data-testid="search-results">
         {loading && <div className="muted">검색 중…</div>}

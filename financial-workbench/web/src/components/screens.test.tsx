@@ -68,6 +68,10 @@ describe('온톨로지에 새로 더한 타입', () => {
           onFocus={() => {}}
           refreshTick={0}
           typesParam={() => undefined}
+          hops={1}
+          onHopsChange={() => {}}
+          claimsAsNodes={false}
+          onClaimsAsNodesChange={() => {}}
         />,
       ),
     )

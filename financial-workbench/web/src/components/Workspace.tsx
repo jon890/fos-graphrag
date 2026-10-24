@@ -143,6 +143,10 @@ export function Workspace({ centerId, focusSeq, selectedId, flash, onFocus, onSe
       onFocus={onFocus}
       refreshTick={changeTick}
       typesParam={typesParam}
+      hops={hops}
+      onHopsChange={(n) => replace({ hops: n })}
+      claimsAsNodes={claimsAsNodes}
+      onClaimsAsNodesChange={(on) => replace({ claimsAsNodes: on })}
     />
   )
   const graphPanel = (
@@ -152,13 +156,10 @@ export function Workspace({ centerId, focusSeq, selectedId, flash, onFocus, onSe
       selectedId={selectedId}
       loading={graphLoading}
       error={graphError}
-      hops={hops}
-      onHopsChange={(n) => replace({ hops: n })}
       onSelect={onSelect}
       onExpand={(id) => void expand(id)}
       onRecenter={(id) => replace({ center: id })}
       claimsAsNodes={claimsAsNodes}
-      onClaimsAsNodesChange={(on) => replace({ claimsAsNodes: on })}
       visible={wide || mobileTab === 'graph'}
     />
   )

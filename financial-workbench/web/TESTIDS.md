@@ -105,9 +105,13 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | testid | 요소 |
 | --- | --- |
 | `search-input`, `search-submit` | 검색어(q)와 검색 버튼 |
-| `filter-type-Company` 등 `filter-type-<타입>` | 타입 필터 체크박스. 주변 그래프에도 적용된다 |
-| `filter-review-status` | Claim 검토 상태 select(`""`, DRAFT, REVIEWED, REJECTED) |
-| `filter-include-archived` | 「보관 포함」 체크 |
+| `filter-type-Company` 등 `filter-type-<타입>` | 종류 칩 단추. `aria-pressed` 로 눌림을 보인다. 주변 그래프에도 적용된다 |
+| `advanced-filters` | 「고급 필터」 `<details>`. 기본은 접힘이고 열림은 주소에 두지 않는다 |
+| `advanced-filters-toggle` | 고급 필터의 `<summary>`. 바뀐 조건이 있으면 「고급 필터 (N)」 |
+| `filter-review-status` | (고급 필터 안) Claim 검토 상태 select(`""`, DRAFT, REVIEWED, REJECTED) |
+| `filter-include-archived` | (고급 필터 안) 「보관 포함」 체크 |
+| `graph-hops` | (고급 필터 안) 이웃 단계 select(1, 2) |
+| `graph-claims-as-nodes` | (고급 필터 안) 「주장을 따로 보기」 체크 상자. 켜면 주장을 노드로 그린다. 작업 공간을 떠날 때까지 남는다 |
 | `search-results` | 결과 영역 |
 | `search-result` * | 결과 한 줄. `data-node-id`, `data-node-type`. 이름은 안쪽 `.result-label` |
 | `search-result-hint` * | 결과 한 줄의 구분 정보(`hintProperties` 값과 만든 날) |
@@ -118,12 +122,10 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 
 | testid | 요소 |
 | --- | --- |
-| `graph-hops` | 홉 수 select(1, 2) |
 | `graph-expand` | 선택 노드 이웃 확장(더블클릭과 같다) |
 | `graph-recenter` | 선택 노드를 새 중심으로 다시 불러온다 |
 | `graph-fit` | 화면 맞춤 |
 | `graph-status` | 「항목 N · 관계 M」. N 은 「그래프에 나온 항목」 수, M 은 그린 관계와 접은 주장 선을 합한 수 |
-| `graph-claims-as-nodes` | 「주장을 따로 보기」 체크 상자. 켜면 주장을 노드로 그린다. 작업 공간을 떠날 때까지 남는다 |
 | `graph-loading`, `graph-error` | 로딩, 오류(서버 `message`) |
 | `graph-truncated` | 「결과가 잘렸습니다(최대 노드 N, 관계 M)」 |
 | `graph-empty` | 선택한 노드가 없음 |
