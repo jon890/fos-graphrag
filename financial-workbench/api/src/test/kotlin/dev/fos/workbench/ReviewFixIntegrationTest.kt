@@ -20,7 +20,7 @@ class ReviewFixIntegrationTest : IntegrationTest() {
         val alice = loggedIn(ALICE)
         val fx = Fixtures(alice)
         val docs = (1..21).map { "00000000-0000-0000-0000-${it.toString().padStart(12, '0')}" }
-        val tooMany = fx.claim("SUPPLIES_TO", fx.company("a").id, fx.company("b").id, docs)
+        val tooMany = fx.claim("BELONGS_TO_SECTOR", fx.company("a").id, fx.sector("b").id, docs)
         assertThat(tooMany.code).isEqualTo("VALIDATION_FAILED")
         assertThat(tooMany.body["details"]["fieldErrors"]["documentIds"].asString()).contains("20")
 
@@ -72,7 +72,7 @@ class ReviewFixIntegrationTest : IntegrationTest() {
         assertThat(same.body.revision).isEqualTo(1)
         assertThat(alice.get("/api/changes?targetId=${company.id}").body["totalItems"].asLong()).isEqualTo(1)
 
-        val claim = fx.claim("SUPPLIES_TO", company.id, fx.company("상대").id, listOf(fx.document("d").id)).body
+        val claim = fx.claim("BELONGS_TO_SECTOR", company.id, fx.sector("상대").id, listOf(fx.document("d").id)).body
         val sameClaim = alice.patch("/api/claims/${claim.id}", mapOf("expectedRevision" to 1, "description" to claim["properties"]["description"].asString()))
         assertThat(sameClaim.body.revision).isEqualTo(1)
         bob.post("/api/claims/${claim.id}/review", mapOf("expectedRevision" to 1, "status" to "REVIEWED", "note" to "확인"))
@@ -109,7 +109,7 @@ class ReviewFixIntegrationTest : IntegrationTest() {
         val fx = Fixtures(alice)
         val doc1 = fx.document("근거1")
         val doc2 = fx.document("근거2")
-        val claim = fx.claim("SUPPLIES_TO", fx.company("a").id, fx.company("b").id, listOf(doc1.id, doc2.id)).body
+        val claim = fx.claim("BELONGS_TO_SECTOR", fx.company("a").id, fx.sector("b").id, listOf(doc1.id, doc2.id)).body
 
         assertThat(alice.post("/api/nodes/${doc1.id}/archive", mapOf("expectedRevision" to 1)).status).isEqualTo(200)
         val last = alice.post("/api/nodes/${doc2.id}/archive", mapOf("expectedRevision" to 1))

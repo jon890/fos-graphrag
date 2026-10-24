@@ -2,7 +2,7 @@
   "finish": {
     "run": "run_9b1b8772b620",
     "base_branch": "main",
-    "specs_dir": ".omc/orch/specs"
+    "specs_dir": ".orch/specs"
   },
   "queue": {
     "method": "merge",

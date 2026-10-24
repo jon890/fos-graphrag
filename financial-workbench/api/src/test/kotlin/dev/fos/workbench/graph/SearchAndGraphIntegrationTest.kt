@@ -90,7 +90,7 @@ class SearchAndGraphIntegrationTest : IntegrationTest() {
         val fx = Fixtures(alice)
         val subject = fx.company("Claim많음")
         val document = fx.document("근거")
-        val created = (1..3).map { fx.claim("SUPPLIES_TO", subject.id, fx.company("고객$it").id, listOf(document.id)).body.id }
+        val created = (1..3).map { fx.claim("BELONGS_TO_SECTOR", subject.id, fx.sector("산업$it").id, listOf(document.id)).body.id }
 
         val detail = alice.get("/api/nodes/${subject.id}").body
         assertThat(detail["claims"].size()).isEqualTo(2)
@@ -105,21 +105,21 @@ class SearchAndGraphIntegrationTest : IntegrationTest() {
         val alice = loggedIn(ALICE)
         val bob = loggedIn(BOB)
         val fx = Fixtures(alice)
-        val a = fx.company("A")
-        val b = fx.company("B")
-        val c = fx.company("C")
+        val a = fx.node("Person", mapOf("name" to "A-${fx.suffix}"))
+        val b = fx.node("Concept", mapOf("name" to "B-${fx.suffix}", "summary" to "개념 B"))
+        val c = fx.node("Concept", mapOf("name" to "C-${fx.suffix}", "summary" to "개념 C"))
         val d = fx.document("근거")
-        fx.claim("SUPPLIES_TO", a.id, b.id, listOf(d.id))
-        val reviewed = fx.claim("COMPETES_WITH", a.id, c.id, listOf(d.id)).body
+        fx.claim("ADVOCATES", a.id, b.id, listOf(d.id))
+        val reviewed = fx.claim("CRITICIZES", a.id, c.id, listOf(d.id)).body
         bob.post("/api/claims/${reviewed.id}/review", mapOf("expectedRevision" to 1, "status" to "REVIEWED"))
 
-        val onlyReviewed = alice.get("/api/graph/neighborhood?id=${a.id}&hops=2&reviewStatus=REVIEWED&types=Company,Claim").body
+        val onlyReviewed = alice.get("/api/graph/neighborhood?id=${a.id}&hops=2&reviewStatus=REVIEWED&types=Person,Concept,Claim").body
         assertThat(onlyReviewed["nodes"].toList().map { it["id"].asString() })
             .containsExactlyInAnyOrder(a.id, reviewed.id, c.id)
 
-        // 타입 필터도 경로 전체에 적용된다. Claim 을 빼면 Claim 을 거쳐야 닿는 기업도 보이지 않는다
-        val companiesOnly = alice.get("/api/graph/neighborhood?id=${a.id}&hops=2&types=Company").body
-        assertThat(companiesOnly["nodes"].toList().map { it["id"].asString() }).containsExactly(a.id)
+        // 타입 필터도 경로 전체에 적용된다. Claim 을 빼면 Claim 을 거쳐야 닿는 개념도 보이지 않는다
+        val peopleAndConcepts = alice.get("/api/graph/neighborhood?id=${a.id}&hops=2&types=Person,Concept").body
+        assertThat(peopleAndConcepts["nodes"].toList().map { it["id"].asString() }).containsExactly(a.id)
     }
 
     @Test
@@ -127,17 +127,17 @@ class SearchAndGraphIntegrationTest : IntegrationTest() {
         val alice = loggedIn(ALICE)
         val fx = Fixtures(alice)
         val supplier = fx.company("공급사")
-        val customer = fx.company("고객사")
+        val customer = fx.sector("반도체")
         val document = fx.document("보고서")
-        val claim = fx.claim("SUPPLIES_TO", supplier.id, customer.id, listOf(document.id)).body
+        val claim = fx.claim("BELONGS_TO_SECTOR", supplier.id, customer.id, listOf(document.id)).body
 
         val oneHop = alice.get("/api/graph/neighborhood?id=${supplier.id}").body
         assertThat(oneHop["truncated"].asBoolean()).isFalse()
         assertThat(oneHop["nodes"].toList().map { it["id"].asString() }).containsExactlyInAnyOrder(supplier.id, claim.id, customer.id)
         assertThat(oneHop["edges"].toList().map { it["type"].asString() }).containsExactlyInAnyOrder("SUBJECT", "OBJECT")
         val claimNode = oneHop["nodes"].toList().single { it.id == claim.id }
-        assertThat(claimNode["predicate"].asString()).isEqualTo("SUPPLIES_TO")
-        assertThat(claimNode["label"].asString()).isEqualTo("공급사-${fx.suffix} → 고객사-${fx.suffix} 공급한다")
+        assertThat(claimNode["predicate"].asString()).isEqualTo("BELONGS_TO_SECTOR")
+        assertThat(claimNode["label"].asString()).isEqualTo("공급사-${fx.suffix} → 반도체-${fx.suffix} 속한다")
         assertThat(oneHop["nodes"].toList().single { it.id == supplier.id }["predicate"].isNull).isTrue()
 
         val twoHops = alice.get("/api/graph/neighborhood?id=${supplier.id}&hops=2").body
@@ -161,9 +161,9 @@ class SearchAndGraphIntegrationTest : IntegrationTest() {
         val alice = loggedIn(ALICE)
         val fx = Fixtures(alice)
         val supplier = fx.company("공급")
-        val customer = fx.company("고객")
+        val customer = fx.sector("산업")
         val document = fx.document("근거")
-        val claim = fx.claim("SUPPLIES_TO", supplier.id, customer.id, listOf(document.id)).body
+        val claim = fx.claim("BELONGS_TO_SECTOR", supplier.id, customer.id, listOf(document.id)).body
 
         val fromCustomer = alice.get("/api/graph/neighborhood?id=${customer.id}").body
         assertThat(fromCustomer["nodes"].toList().map { it.id }).contains(supplier.id)
@@ -173,8 +173,8 @@ class SearchAndGraphIntegrationTest : IntegrationTest() {
 
         val hub = fx.company("중심")
         repeat(4) { i ->
-            val c = fx.company("거래처$i")
-            assertThat(fx.claim("SUPPLIES_TO", hub.id, c.id, listOf(document.id)).status).isEqualTo(201)
+            val c = fx.sector("산업$i")
+            assertThat(fx.claim("BELONGS_TO_SECTOR", hub.id, c.id, listOf(document.id)).status).isEqualTo(201)
         }
         val capped = alice.get("/api/graph/neighborhood?id=${hub.id}").body
         assertThat(capped["nodes"].size()).isEqualTo(5)
@@ -187,11 +187,11 @@ class SearchAndGraphIntegrationTest : IntegrationTest() {
         val bob = loggedIn(BOB)
         val fx = Fixtures(alice)
         val a = fx.company("a")
-        val b = fx.company("b")
+        val b = fx.sector("b")
         val d = fx.document("d")
-        val draft = fx.claim("SUPPLIES_TO", a.id, b.id, listOf(d.id)).body
-        val reviewed = fx.claim("COMPETES_WITH", a.id, b.id, listOf(d.id)).body
-        val archived = fx.claim("SUPPLIES_TO", b.id, a.id, listOf(d.id)).body
+        val draft = fx.claim("BELONGS_TO_SECTOR", a.id, b.id, listOf(d.id)).body
+        val reviewed = fx.claim("BELONGS_TO_SECTOR", a.id, fx.sector("c").id, listOf(d.id)).body
+        val archived = fx.claim("BELONGS_TO_SECTOR", a.id, fx.sector("d").id, listOf(d.id)).body
         bob.post("/api/claims/${reviewed.id}/review", mapOf("expectedRevision" to 1, "status" to "REVIEWED"))
         alice.post("/api/nodes/${archived.id}/archive", mapOf("expectedRevision" to 1))
 

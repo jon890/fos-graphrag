@@ -138,7 +138,7 @@ Neo4j 예외는 시간 초과(`QUERY_TIMEOUT`), 연결 불가(`DATABASE_UNAVAILA
 }
 ```
 
-`label` 은 온톨로지의 `labelProperty` 값이다. 단 Claim 의 `label` 은 읽을 때 만든 「주체 이름 → 대상 이름 관계 표시 이름」(예: `다라부품 → 가나전자 공급한다`)이다. 주체나 대상을 찾지 못하면 그 자리를 `?` 로 둔다. `reviewStatus` 는 Claim 일 때만 값이 있다.
+`label` 은 온톨로지의 `labelProperty` 값이다. 단 Claim 의 `label` 은 읽을 때 만든 「주체 이름 → 대상 이름 관계 표시 이름」(예: `가나전자 → 메모리 반도체 속한다`)이다. 주체나 대상을 찾지 못하면 그 자리를 `?` 로 둔다. `reviewStatus` 는 Claim 일 때만 값이 있다.
 
 `ClaimView`: `NodeView` 의 모든 필드에 아래를 더한다.
 
@@ -220,7 +220,7 @@ revision 은 그대로이고 ChangeEvent 도 만들지 않는다. `expectedRevis
 | POST | `/api/nodes/{id}/restore` | 복원. 본문 `{"expectedRevision"}`. 응답 `NodeView` |
 
 - `q` 는 `label`, Security 의 `ticker`, 그 타입의 `searchProperties` 값(예: 인물과 개념의 `englishName`)에서 대소문자를 무시하고 부분 일치로 찾는다. 100자까지다. 비우면 전체를 돌려준다.
-- `POST /api/nodes` 의 `type` 은 `Company`, `Security`, `Sector`, `Document` 가운데 하나다. `Claim` 은 `400 ONTOLOGY_VIOLATION` 이고 `/api/claims` 로 만든다.
+- `POST /api/nodes` 의 `type` 은 현재 온톨로지에서 `managedBy` 가 없는 노드 타입이다. `Claim` 처럼 별도 API 가 관리하는 타입은 `400 ONTOLOGY_VIOLATION` 이고, `Claim` 은 `/api/claims` 로 만든다.
 - `PATCH` 로 Claim 을 고치면 `400 ONTOLOGY_VIOLATION` 이다. `PATCH /api/claims/{id}` 를 쓴다.
 - `relationships` 는 만든 순서로 100개, `claims` 는 오래된 순서로 50개까지 담는다. 넘으면 잘라 내고 `...Truncated` 를 `true` 로 둔다.
 - Document 를 보관할 때 그 문서가 어떤 활성 Claim 의 유일한 활성 근거면 `409 LAST_EVIDENCE` 다. Claim 을 먼저 보관하거나 다른 근거를 더한 Claim 으로 새로 만든다.
@@ -244,7 +244,7 @@ revision 은 그대로이고 ChangeEvent 도 만들지 않는다. `expectedRevis
 
 ## 관계
 
-일반 관계는 온톨로지 `relationshipTypes` 에 있는 타입만 만들 수 있다. 현재는 `ISSUES` 하나다.
+일반 관계는 온톨로지 `relationshipTypes` 에 있는 타입만 만들 수 있다. 목록은 [데이터 스키마](data-schema.md) 의 「관계」 가 소유한다.
 Claim 에 딸린 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 는 이 API 로 만들 수 없다.
 
 | 메서드 | 경로 | 설명 |
@@ -270,12 +270,12 @@ Claim 에 딸린 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 는 이 API 로 만들 수 
 
 ```json
 {
-  "predicate": "SUPPLIES_TO",
+  "predicate": "BELONGS_TO_SECTOR",
   "subjectId": "uuid",
   "objectId": "uuid",
   "documentIds": ["uuid"],
-  "description": "가상부품이 가상전자에 메모리 기판을 공급한다.",
-  "evidenceText": "당사의 주요 매출처는 가상전자이다.",
+  "description": "가상전자는 메모리 반도체 산업에 속한다.",
+  "evidenceText": "당사는 D램과 낸드 플래시를 주력으로 생산한다.",
   "validFrom": null,
   "validTo": null,
   "authoringMethod": "MANUAL",
@@ -320,7 +320,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
   "hops": 1,
   "nodes": [
     { "id": "uuid", "type": "Company", "label": "가상전자", "reviewStatus": null, "predicate": null },
-    { "id": "uuid", "type": "Claim", "label": "가상부품 → 가상전자 공급한다", "reviewStatus": "DRAFT", "predicate": "SUPPLIES_TO" }
+    { "id": "uuid", "type": "Claim", "label": "가상전자 → 메모리 반도체 속한다", "reviewStatus": "DRAFT", "predicate": "BELONGS_TO_SECTOR" }
   ],
   "edges": [{ "id": "uuid", "type": "SUBJECT", "source": "uuid", "target": "uuid" }],
   "truncated": false,
@@ -349,7 +349,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
   "targetId": "uuid",
   "targetKind": "NODE",
   "targetType": "Claim",
-  "targetLabel": "SUPPLIES_TO",
+  "targetLabel": "BELONGS_TO_SECTOR",
   "revision": 2,
   "changes": { "reviewStatus": { "before": "DRAFT", "after": "REVIEWED" } },
   "refs": {},

@@ -67,9 +67,11 @@ class OntologyValidatorTest {
 
     @Test
     fun `온톨로지 파일이 스스로 일관되다`() {
-        assertThat(ontology.schemaVersion).isEqualTo("1.4.0")
-        assertThat(ontology.nodeTypes.keys).containsExactlyInAnyOrder("Company", "Security", "Sector", "Document", "Person", "Concept", "Claim")
-        assertThat(ontology.requirePredicate("SUPPLIES_TO").subjectTypes).containsExactly("Company")
+        assertThat(ontology.schemaVersion).isEqualTo("2.0.0")
+        assertThat(ontology.nodeTypes.keys).containsExactlyInAnyOrder(
+            "Company", "Security", "Sector", "Document", "Person", "Concept", "Change", "Bottleneck", "Valuation", "Scenario", "Decision", "Claim",
+        )
+        assertThat(ontology.requirePredicate("BELONGS_TO_SECTOR").subjectTypes).containsExactly("Company", "Security")
         assertThatThrownBy { ontology.requireRelationshipType("OWNS_ACCOUNT") }.isInstanceOf(OntologyViolationException::class.java)
     }
 

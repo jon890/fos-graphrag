@@ -31,6 +31,12 @@ type Notice = { kind: 'success' | 'conflict' | 'error'; text: string; actions?: 
 
 export const CONFLICT_TEXT = '다른 탭이나 다른 사용자가 먼저 저장했습니다. 최신 내용을 불러왔습니다.'
 
+export function hasClaimPredicateForNode(ontology: ReturnType<typeof useApp>['ontology'], nodeType: string) {
+  return Object.values(ontology.claimPredicates).some((predicate) =>
+    predicate.subjectTypes.includes(nodeType) || predicate.objectTypes.includes(nodeType),
+  )
+}
+
 export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus, onSelect, onOpenHistory }: Props) {
   const { ontology, canEdit } = useApp()
   const labels = useLabels()
@@ -153,7 +159,7 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
 
   const { node, claim } = detail
   const typeDefined = !!ontology.nodeTypes[node.type]
-  const hasClaimPredicates = Object.values(ontology.claimPredicates).some((p) => p.subjectTypes.includes(node.type))
+  const hasClaimPredicates = hasClaimPredicateForNode(ontology, node.type)
 
   const archiveOrRestore = async () => {
     try {

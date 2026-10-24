@@ -17,7 +17,7 @@ class ConcurrencyIntegrationTest : IntegrationTest() {
     fun `두 검토자가 같은 Claim 을 동시에 검토하면 하나는 409 다`() {
         val alice = loggedIn(ALICE)
         val fx = Fixtures(alice)
-        val claim = fx.claim("SUPPLIES_TO", fx.company("a").id, fx.company("b").id, listOf(fx.document("d").id)).body
+        val claim = fx.claim("BELONGS_TO_SECTOR", fx.company("a").id, fx.sector("b").id, listOf(fx.document("d").id)).body
         val bob = loggedIn(BOB)
         val admin = loggedIn(ADMIN)
         val results = race(
@@ -104,7 +104,7 @@ class ConcurrencyIntegrationTest : IntegrationTest() {
         val fx = Fixtures(alice)
         repeat(5) { round ->
             val doc = fx.document("경합근거$round")
-            val claim = fx.claim("SUPPLIES_TO", fx.company("a$round").id, fx.company("b$round").id, listOf(doc.id)).body
+            val claim = fx.claim("BELONGS_TO_SECTOR", fx.company("a$round").id, fx.sector("b$round").id, listOf(doc.id)).body
             assertThat(alice.post("/api/nodes/${claim.id}/archive", mapOf("expectedRevision" to 1)).status).isEqualTo(200)
 
             val results = race(
