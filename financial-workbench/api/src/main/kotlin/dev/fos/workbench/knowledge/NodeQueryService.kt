@@ -59,7 +59,7 @@ class NodeQueryService(
     @Transactional(readOnly = true)
     fun counts(): NodeCounts {
         val ontology = holder.current()
-        val found = client.query("MATCH (n:Knowledge) WHERE n.archived = false RETURN n.type AS type, count(n) AS count")
+        val found = client.query("MATCH (n:Knowledge) WHERE n.archived = false AND n.type IS NOT NULL RETURN n.type AS type, count(n) AS count")
             .fetch().all().associate { it["type"] as String to (it["count"] as Number).toLong() }
         return NodeCounts(ontology.nodeTypes.keys.associateWithTo(LinkedHashMap()) { found[it] ?: 0L })
     }

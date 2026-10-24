@@ -65,8 +65,12 @@ class SearchAndGraphIntegrationTest : IntegrationTest() {
         val counts = response.body["counts"]
         assertThat(counts["Company"].asLong() - before["Company"].asLong()).isEqualTo(1)
         assertThat(counts["Sector"].asLong() - before["Sector"].asLong()).isEqualTo(1)
-        for (type in listOf("Decision", "Claim")) {
-            assertThat(counts.has(type)).describedAs(type).isTrue()
+        // 키 집합은 온톨로지 노드 타입과 같고, 값은 타입 필터 조회의 총 개수와 같다(0 인 타입 포함)
+        val typeKeys = alice.get("/api/ontology").body["nodeTypes"].propertyNames().asSequence().toSet()
+        assertThat(counts.propertyNames().asSequence().toSet()).isEqualTo(typeKeys)
+        for (type in typeKeys) {
+            val total = alice.get("/api/nodes?types=$type&size=1").body["totalItems"].asLong()
+            assertThat(counts[type].asLong()).describedAs(type).isEqualTo(total)
         }
     }
 

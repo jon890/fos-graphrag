@@ -32,9 +32,8 @@ interface Props {
 }
 
 export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, refreshTick, typesParam, hops, onHopsChange, claimsAsNodes, onClaimsAsNodesChange }: Props) {
-  const { canEdit } = useApp()
+  const { canEdit, ontology } = useApp()
   const labels = useLabels()
-  const { ontology } = useApp()
   // 칩 순서는 개념 지도와 같다. 관계 방향으로 얕은 타입이 앞이고 주장이 맨 뒤다.
   const chipTypes = useMemo(() => [...orderedTypes(ontology), ...managedTypes(ontology)], [ontology])
   const [qInput, setQInput] = useState(filters.q)

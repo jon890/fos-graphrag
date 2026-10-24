@@ -149,6 +149,11 @@ describe('layoutRoots', () => {
     expect(layoutRoots(expandedDisplay(data), 'b')).toEqual(['b'])
   })
 
+  it('자기 자신을 잇는 선만 있는 노드도 뿌리다', () => {
+    const data: GraphData = { ...EMPTY_GRAPH, nodes: [node('a'), node('b')], edges: [edge('e1', 'a', 'a'), edge('e2', 'a', 'b')] }
+    expect(layoutRoots(expandedDisplay(data), null)).toEqual(['a'])
+  })
+
   it('접힌 주장 선이 대상 노드를 뿌리에서 뺀다', () => {
     const data: GraphData = {
       ...EMPTY_GRAPH,

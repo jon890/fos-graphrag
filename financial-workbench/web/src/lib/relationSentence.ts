@@ -70,13 +70,11 @@ export function typeRelationSentences(
   type: string,
 ): { key: string; relationship: string; fromType: string; toType: string; text: string }[] {
   const out: { key: string; relationship: string; fromType: string; toType: string; text: string }[] = []
-  const seen = new Set<string>()
   for (const [relationship, def] of Object.entries(o.relationshipTypes)) {
     for (const fromType of def.from) {
       for (const toType of def.to) {
         const key = `${relationship}:${fromType}:${toType}`
-        if ((fromType !== type && toType !== type) || seen.has(key)) continue
-        seen.add(key)
+        if ((fromType !== type && toType !== type)) continue
         out.push({ key, relationship, fromType, toType, text: relationSentence(o, relationship, typeLabel(o, fromType), typeLabel(o, toType)) })
       }
     }

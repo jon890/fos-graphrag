@@ -87,7 +87,7 @@ docker compose up -d --build --wait     # GHCR 이미지를 쓰면 WORKBENCH_IMA
 curl -fsS http://127.0.0.1:8081/api/health
 ```
 
-첫 관리자는 `WORKBENCH_BOOTSTRAP_ADMIN_EMAIL` 의 Gmail 로 로그인한다. 그 뒤 「사용자」 탭에서 다른 사람의 Gmail 과 역할을 추가한다.
+첫 관리자는 `WORKBENCH_BOOTSTRAP_ADMIN_EMAIL` 의 Gmail 로 로그인한다. 그 뒤 오른쪽 위 「더보기」 메뉴의 「사용자」 에서 다른 사람의 Gmail 과 역할을 추가한다.
 공개 가입은 없다. 목록에 없는 계정은 로그인 화면에서 「접근 권한이 없습니다」 를 본다.
 
 | 역할 | 할 수 있는 일 |

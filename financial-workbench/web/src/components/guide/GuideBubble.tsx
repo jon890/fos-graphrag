@@ -129,7 +129,7 @@ export function GuideBubble({ kind, step, index, total, busy, wide, onNext, onFi
       data-testid="guide-bubble"
       data-step={step.id}
       data-placement={placement.mode}
-      className={cn('guide-bubble pointer-events-auto z-[60]', card && 'guide-bubble-card')}
+      className={cn('guide-bubble', card && 'guide-bubble-card')}
       style={placement.mode === 'anchored' ? { top: placement.top, left: placement.left } : undefined}
       onKeyDown={onKeyDown}
     >

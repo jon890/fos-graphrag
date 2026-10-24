@@ -156,7 +156,7 @@ VIEWER 에게는 `node-edit`, `node-edit-form`, `edit-prop-*`, `node-save`, `nod
 | `node-more` | 「⋯」(`aria-label="더 보기"`). 아래 메뉴 항목을 연다 |
 | `node-copy-link` | 메뉴의 「링크 복사」. 열람자에게도 보인다 |
 | `node-copy-link-done`, `node-copy-link-fallback` | 버튼 줄 아래의 복사했다는 안내, 클립보드를 못 쓸 때 주소를 보이는 읽기 전용 입력칸. 메뉴가 닫혀도 남는다 |
-| `node-history-link` | 메뉴의 「변경 이력」. 변경 이력 탭으로 가며 targetId 필터를 채운다 |
+| `node-history-link` | 메뉴의 「변경 이력」. 변경 이력 화면으로 가며 targetId 필터를 채운다 |
 | `node-archive-button` | 메뉴의 「보관」(보관되지 않은 노드). 보관 창을 연다 |
 | `node-archive-dialog`, `node-archive-reason`, `node-archive-confirm` | 보관 창, 보관 사유(선택), 창의 「보관」. 성공하든 실패하든 창은 닫히고 결과는 `detail-notice` 에 나온다 |
 | `node-restore-button` | 메뉴의 「복원」(보관된 노드). 묻지 않고 바로 복원한다 |
@@ -232,7 +232,7 @@ VIEWER 에게는 `node-edit`, `node-edit-form`, `edit-prop-*`, `node-save`, `nod
 | `list-empty` | 결과 없음 |
 | `list-pager-prev`, `list-pager-next`, `list-pager-info` | 페이지 이동 |
 
-## 검토 대기 탭
+## 검토 대기 화면
 
 | testid | 요소 |
 | --- | --- |
@@ -249,7 +249,7 @@ VIEWER 에게는 `node-edit`, `node-edit-form`, `edit-prop-*`, `node-save`, `nod
 | `review-load-error`, `review-mine-load-error` | 구역 목록을 읽지 못한 오류 |
 | `review-pager-prev`, `review-pager-next`, `review-pager-info` | 페이지 이동 |
 
-## 변경 이력 탭
+## 변경 이력 화면
 
 | testid | 요소 |
 | --- | --- |
@@ -263,7 +263,7 @@ VIEWER 에게는 `node-edit`, `node-edit-form`, `edit-prop-*`, `node-save`, `nod
 | `changes-empty` | 이력 없음 |
 | `changes-pager-prev`, `changes-pager-next`, `changes-pager-info` | 페이지 이동 |
 
-## 온톨로지 탭
+## 온톨로지 상세 화면
 
 | testid | 요소 |
 | --- | --- |
@@ -301,7 +301,7 @@ ADMIN 에게만 나오는 요소다.
 | `ontology-history`, `ontology-history-row` *(`data-version`)*, `ontology-history-pager-prev`, `ontology-history-pager-next`, `ontology-history-pager-info` | 버전 기록과 행, 쪽 넘기기 |
 | `ontology-history-detail`, `ontology-history-yaml`, `ontology-history-download`, `ontology-restore` | 연 버전, 읽기 전용 YAML, 「이 버전 내려받기」, 「이 버전으로 되돌리기」(최신 버전에는 없다) |
 
-## 사용자 탭 (ADMIN)
+## 사용자 화면 (ADMIN)
 
 | testid | 요소 |
 | --- | --- |

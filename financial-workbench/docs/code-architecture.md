@@ -148,14 +148,14 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | --- | --- |
 | `web/src/api/` | fetch 래퍼, CSRF 처리, 계약 타입 |
 | `web/src/components/` | 화면 조각. 그래프, 상세 패널, 표, 폼. `ErrorBoundary` 가 탭 단위로 렌더링 오류를 붙잡아 머리글과 탭을 지키고, 앱 최상위(`main.tsx`)에도 하나 있다 |
-| `web/src/lib/` | 타입 순서(`typeOrder.ts`: 관계 방향의 깊이로 정한 순서와 깊이, 뿌리), 관계 문장(`relationSentence.ts`: 문장 틀 채우기와 합니다체 바꾸기), 조사 고르기(`labels.ts` 의 `withJosa`: 한글 받침, 영문과 숫자의 읽는 소리), 그래프 병합과 주장 접기(`graph.ts` 의 `collapseClaims`), 입력값 변환(`formValues.ts`), 충돌 때 세 값 비교(`conflict.ts`), 표시 이름과 구분 정보 조회, 문장 틀 채우기(`labels.ts`)처럼 화면과 무관한 함수와 단위 테스트. 첫 접속 가이드의 단계 정의와 진행 상태 저장, 자동 시작 판정(`guide.ts`), `utils.ts` 의 `cn` 은 Tailwind class 를 합친다. shadcn 부품도 이것을 import 한다. registry 가 내려주는 `import { cn } from "cn"` 은 `@/lib/utils` 로 바꾸고 `cn` 패키지는 들이지 않는다 |
-| `web/src/components/ui/` | shadcn 으로 복사한 화면 부품(Button, Input, Textarea, NativeSelect, Tabs, Card, Badge, Table, Alert, Label, Dialog, DropdownMenu). 저장소가 소스를 소유한다. 고칠 때는 이 폴더를 직접 고친다 |
+| `web/src/lib/` | 화면과 무관한 순수 함수와 그 단위 테스트. 타입 순서, 관계 문장, 조사 고르기의 규칙은 [흐름](flow.md) 의 「타입 순서」, 「관계 문장」, 「조사 고르기」 가 소유한다. 그래프 병합과 주장 접기, 입력값 변환, 충돌 비교, 표시 이름, 첫 접속 가이드의 단계와 진행 상태도 여기 있다. `utils.ts` 의 `cn` 은 Tailwind class 를 합친다. shadcn 부품도 이것을 import 하고, registry 가 내려주는 `import { cn } from "cn"` 은 `@/lib/utils` 로 바꾼다 |
+| `web/src/components/ui/` | shadcn 으로 복사한 화면 부품. 저장소가 소스를 소유하고 고칠 때는 이 폴더를 직접 고친다 |
 | `web/components.json` | shadcn CLI 설정. 부품을 더할 때 CLI 가 읽는다 |
 | `web/src/hooks/` | 화면 상태 훅. `useMediaQuery` 가 배치 경계를 판정한다 |
-| `web/src/components/header/` | 머리글. 상단 탭 셋(`TopTabs`), 「더보기」 메뉴(`MoreMenu`, 역할별 항목은 `routes.ts` 의 `moreItems`) |
-| `web/src/components/map/` | 개념 지도(`ConceptMapTab`: 지도 그림과 타입 목록, `TypePanel`: 고른 타입의 설명, 최근 항목, 관계 문장, 단추). 개수는 `GET /api/nodes/counts` 로 받는다 |
-| `web/src/components/add/` | 「＋ 추가」. `AddProvider` 가 만들기 창의 열림과 고른 타입을 들고 `useAdd().open(type?)` 를 내준다. `AddMenu` 는 타입 메뉴(머리글과 그래프의 ＋ 단추가 같은 것을 쓴다), `AddDialog` 는 창과 단계 표시이고 안에서 `NodeCreateForm` 이나 `ClaimCreateForm` 을 그린다. 만든 뒤에는 `App` 이 넘긴 콜백으로 작업 공간의 새 항목을 연다 |
-| `web/src/components/ontology/` | 온톨로지 탭의 보기, 폼 편집기, YAML 편집기, 미리보기, 버전 기록. 초안은 `App` 이 들고 있어 탭을 옮겨도 남는다. YAML 은 서버의 미리보기 응답으로 바꾸고 웹에 YAML 라이브러리를 들이지 않는다. `form/` 은 폼 편집기의 부품(공용 입력, 노드 타입, 관계 종류, 주장 종류 구역)이다 |
+| `web/src/components/header/` | 머리글의 상단 탭과 「더보기」 메뉴 |
+| `web/src/components/map/` | 개념 지도 화면 |
+| `web/src/components/add/` | 전역 「＋ 추가」 메뉴와 만들기 창 |
+| `web/src/components/ontology/` | 온톨로지 상세 화면의 보기, 폼 편집기, YAML 편집기, 미리보기, 버전 기록. 초안은 `App` 이 들고 있어 화면을 옮겨도 남는다. YAML 은 서버의 미리보기 응답으로 바꾸고 웹에 YAML 라이브러리를 들이지 않는다. `form/` 은 폼 편집기의 부품(공용 입력, 노드 타입, 관계 종류, 주장 종류 구역)이다 |
 | `web/src/components/guide/` | 첫 접속 가이드. 단계 정의, 진행 상태(`localStorage` 의 `workbench.guide`), 말풍선. 만들기 폼과 주장 폼은 가이드가 넘긴 미리 채울 값을 props 로 받고, 만들기에 성공하면 가이드에 알린다 |
 | `web/src/routes.ts` | 화면 경로 목록과 query 를 읽고 쓰는 순수 함수(기본값 생략, 옛 `/?node=` 넘기기, 로그인 뒤 돌아갈 주소 검사). 경로와 query 의 뜻은 [흐름](flow.md) 의 「주소와 뒤로가기」 가 소유한다 |
 | `web/src/styles.css` | Tailwind 진입점과 색 토큰. shadcn 의 CSS 변수(`--background`, `--primary` 등)를 여기 둔다 |
@@ -228,7 +228,7 @@ ADR 로 남기지 않은 작은 결정은 다음과 같다.
 - 동시 수정 때 입력을 지키는 비교는 화면이 한다(2026-10-21 사용자 결정). 409 응답에 서버의 현재 값을 담는 안은 버렸다. 화면은 어차피 상세를 다시 읽고, 편집 시작 값은 화면만 들고 있어 서버가 세 값을 비교할 수 없다. 노드 편집 폼은 부모가 key 에 revision 을 넣어 다시 그려지므로, 내 입력은 폼이 아니라 `DetailPanel` 이 들고 있다가 새 폼에 넘긴다.
 - 문자열 칸을 enum 으로 바꾼 뒤의 예전 값은 API 시작 때 고친다(2026-10-21 사용자 결정). 운영 배포가 이미지 교체뿐이라 따로 돌릴 이전 스크립트의 자리가 없고, 개발과 e2e 데이터도 같은 길로 맞춰진다. 별칭은 코드가 아니라 온톨로지의 `valueAliases` 가 소유한다. 이력 없이 데이터를 바꾸지 않으려고 `system` 작업자로 ChangeEvent 를 남긴다.
 - 같은 이름은 막지 않고 저장 전에 경고한다(2026-10-21 사용자 결정). 이름이 같은 다른 기업이 실제로 있을 수 있어 서버의 유일성 제약으로 두지 않았다. 검사는 화면이 기존 검색 API 로 한다.
-- 종목의 발행 기업은 종목을 만든 뒤 화면이 관계 API 를 한 번 더 불러 잇는다(2026-10-21 사용자 결정). 노드 생성 API 가 관계를 함께 받는 안은 한 트랜잭션이 되지만 생성 계약과 검증이 커진다. 관계만 실패하는 경우는 안내하고 상세의 관계 추가로 다시 잇게 한다.
+- 종목의 발행 기업은 종목을 만든 뒤 화면이 관계 API 를 한 번 더 불러 잇는다(2026-10-21 사용자 결정). 노드 생성 API 가 관계를 함께 받는 안은 한 트랜잭션이 되지만 생성 계약과 검증이 커진다. 관계만 실패하는 경우는 안내하고 상세의 「＋ 연결 추가」 로 다시 잇게 한다.
 - 검토 대기를 「내가 검토할 주장」 과 「내가 쓰거나 고친 주장」 으로 나누는 일은 서버가 한다(2026-10-21 사용자 결정). 화면이 받은 쪽 안에서 나누면 한 쪽에 두 종류가 섞이고, 마지막 내용 수정자 규칙은 화면이 알 수 없다. `GET /api/claims` 의 `scope` 가 자기 검토 금지 규칙과 같은 조건(`createdBy`, `contentUpdatedBy`)으로 나눈다.
 - 변경 이력의 노드 ID 는 읽을 때 이름으로 바꾼다(2026-10-21 사용자 결정). 쓸 때 이름을 저장하는 안은 그때의 이름이 남지만 이미 쌓인 이력은 ID 그대로라 버렸다. `ChangeController` 가 자기 쿼리로 이름을 읽는다. `history` 가 `knowledge` 를 부르지 않는다는 호출 방향을 지키기 위해서다. 바꾸는 ID 는 Claim 이 아닌 노드(주체, 대상, 근거 문서, 관계의 끝)라 `Ontology.labelOf` 로 충분하다.
 - 화면 상태는 경로와 query 로 주소에 두고 React Router 로 다룬다([ADR-007](adr/007-routes-in-url.md)). 처음 링크를 만들 때는 router 를 들이지 않고 `/?node=` 만 썼으나, 뒤로가기와 새로고침을 고치면서 바꿨다(2026-10-22 사용자 결정).
