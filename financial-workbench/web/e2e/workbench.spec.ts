@@ -87,6 +87,22 @@ async function searchAndOpen(page: Page, label: string, options: { includeArchiv
   await expect(page.getByTestId('detail-label')).toHaveText(label)
 }
 
+/** 상세의 「⋯」 메뉴를 열고 항목을 누른다 */
+async function detailMenu(page: Page, item: 'node-copy-link' | 'node-history-link' | 'node-archive-button' | 'node-restore-button'): Promise<void> {
+  await page.getByTestId('node-more').click()
+  await page.getByTestId(item).click()
+}
+
+/** 상세의 「⋯」 메뉴에서 보관 창을 열고 보관한다. 성공하든 실패하든 창은 닫힌다 */
+async function archiveFromDetail(page: Page, reason?: string): Promise<void> {
+  await detailMenu(page, 'node-archive-button')
+  const dialog = page.getByTestId('node-archive-dialog')
+  await expect(dialog).toBeVisible()
+  if (reason) await dialog.getByTestId('node-archive-reason').fill(reason)
+  await dialog.getByTestId('node-archive-confirm').click()
+  await expect(dialog).toHaveCount(0)
+}
+
 function searchResult(page: Page, label: string): Locator {
   return page.getByTestId('search-result').filter({ has: page.locator('.result-label', { hasText: exact(label) }) })
 }
@@ -367,7 +383,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       currency: 'KRW',
     })
 
-    // 종목 쪽에서 (Company) —ISSUES→ 이 종목 관계를 추가한다.
+    // 종목 쪽에서 「기업이 이 종목을 발행한다」 관계를 추가한다.
     await pageA.getByTestId('relationship-add-toggle').click()
     await pageA.getByTestId('relationship-type-select').selectOption('ISSUES:in')
     await pick(pageA, 'relationship-target-picker', data.company)
@@ -377,6 +393,10 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     const row = pageA.getByTestId('relationship-row').filter({ hasText: data.company })
     await expect(row).toBeVisible()
     await expect(row).toHaveAttribute('data-rel-type', 'ISSUES')
+    // 종목은 관계의 끝이다. 문장에서 종목 이름은 굵게, 기업 이름은 여는 단추로 보인다.
+    await expect(row).toHaveAttribute('data-direction', 'in')
+    await expect(row.getByTestId('relationship-self')).toHaveText(data.security)
+    await expect(row.getByTestId('relationship-open')).toHaveText(data.company)
     await expect(pageA.locator('[data-testid="graph-node"]').filter({ hasText: data.company })).toHaveCount(1)
     await shot(pageA, '01-issues')
   })
@@ -411,7 +431,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     // 뒤 테스트의 검색과 고르기에 섞이지 않게 두 번째 기업을 보관한다.
     await pageA.locator(`[data-testid="search-result"][data-node-id="${secondId}"]`).click()
     await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-id', secondId)
-    await pageA.getByTestId('node-archive-button').click()
+    await archiveFromDetail(pageA)
     await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
 
     // 종목을 만들면서 발행 기업을 고르면 ISSUES 관계가 함께 이어진다.
@@ -709,6 +729,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       await loginAs(page, editorB, 'success', `/?node=${encodeURIComponent(supplyClaimId)}`)
       await expect(page.getByTestId('detail-panel')).toHaveAttribute('data-node-id', supplyClaimId)
       await expect(page.getByTestId('detail-label')).toHaveText(`${data.company} → ${data.sector} 속한다`)
+      await page.getByTestId('node-more').click()
       await expect(page.getByTestId('node-copy-link')).toBeVisible()
       await expect(page).toHaveURL(new RegExp(`/workspace\\?node=${supplyClaimId}&pane=detail$`))
     } finally {
@@ -829,11 +850,35 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA.getByTestId('advanced-filters-toggle')).toHaveText('고급 필터')
   })
 
+  test('4d) 상세는 읽기 카드로 열리고 편집을 눌러야 폼이 열린다', async () => {
+    await searchAndOpen(pageA, data.company)
+    await expect(pageA.getByTestId('node-props')).toBeVisible()
+    await expect(pageA.locator('[data-testid="node-prop"][data-prop="name"]')).toContainText(data.company)
+    // enum 은 저장 값(KR)이 아니라 선택지 이름으로 보인다.
+    await expect(pageA.locator('[data-testid="node-prop"][data-prop="country"]')).toContainText('대한민국 (KR)')
+    await expect(pageA.locator('[data-testid^="edit-prop-"]')).toHaveCount(0)
+    await expect(pageA.getByTestId('node-save')).toHaveCount(0)
+    // 「편집자A」 는 영문자 A(받침 없음)로 끝나 「가」 가 붙는다.
+    await expect(pageA.getByTestId('node-created-line')).toContainText(`${editorA.name}가 `)
+    await expect(pageA.getByTestId('node-created-line')).toContainText('에 등록')
+    await expect(pageA.getByTestId('node-meta-details')).not.toHaveAttribute('open', '')
+    await shot(pageA, 'detail-read-card')
+
+    await pageA.getByTestId('node-edit').click()
+    await expect(pageA.getByTestId('node-edit-form')).toBeVisible()
+    await expect(pageA.getByTestId('edit-prop-name')).toHaveValue(data.company)
+    await expect(pageA.getByTestId('node-props')).toHaveCount(0)
+    await pageA.getByTestId('node-edit-cancel').click()
+    await expect(pageA.getByTestId('node-edit-form')).toHaveCount(0)
+    await expect(pageA.getByTestId('node-props')).toBeVisible()
+  })
+
   test('5) 같은 노드를 동시에 고치면 나중 저장은 409 안내 뒤 최신 값을 보이고, 내 입력을 골라 다시 적용해 저장한다', async () => {
     await searchAndOpen(pageA, data.company)
     await searchAndOpen(pageB, data.company)
     const revisionBefore = Number(await pageB.getByTestId('node-revision').textContent())
 
+    await pageA.getByTestId('node-edit').click()
     await pageA.getByTestId('edit-prop-description').fill(data.editByA)
     await pageA.getByTestId('node-save').click()
     await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
@@ -842,6 +887,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
 
     // B 는 아직 예전 revision 을 들고 있다.
     await expect(pageB.getByTestId('node-revision')).toHaveText(String(revisionBefore))
+    await pageB.getByTestId('node-edit').click()
     await pageB.getByTestId('edit-prop-description').fill(data.editByB)
     await pageB.getByTestId('edit-prop-registrationNumber').fill(data.registrationByB)
     await pageB.getByTestId('node-save').click()
@@ -850,6 +896,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(notice).toHaveAttribute('data-kind', 'conflict')
     await expect(notice).toContainText('다른 탭이나 다른 사용자가 먼저 저장했습니다')
     await expect(notice).not.toContainText('서버 응답')
+    // 409 뒤에도 편집 폼은 열린 채로 비교를 보인다.
+    await expect(pageB.getByTestId('node-edit-form')).toBeVisible()
     await expect(pageB.getByTestId('edit-prop-description')).toHaveValue(data.editByA)
     await expect(pageB.locator('[data-testid="edit-conflict-field"][data-field="description"]')).toHaveAttribute('data-kind', 'both')
     await expect(pageB.locator('[data-testid="edit-conflict-field"][data-field="registrationNumber"]')).toHaveAttribute('data-kind', 'mine')
@@ -868,13 +916,17 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageB.getByTestId('node-save').click()
     await expect(pageB.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
     await expect(pageB.getByTestId('node-revision')).toHaveText(String(revisionBefore + 2))
+    // 저장에 성공하면 읽기 카드로 돌아온다.
+    await expect(pageB.getByTestId('node-edit-form')).toHaveCount(0)
+    await expect(pageB.getByTestId('node-props')).toBeVisible()
   })
 
   test('6) 보관하면 기본 검색에서 빠지고, 복원하면 이력에 ARCHIVE 와 RESTORE 가 남는다', async () => {
     await searchAndOpen(pageA, data.customer)
-    await pageA.getByTestId('node-archive-reason').fill('e2e 보관 확인')
-    await pageA.getByTestId('node-archive-button').click()
+    await archiveFromDetail(pageA, 'e2e 보관 확인')
     await expect(pageA.getByTestId('detail-archived')).toBeVisible()
+    // 보관된 항목에는 「편집」 이 없다.
+    await expect(pageA.getByTestId('node-edit')).toHaveCount(0)
 
     // 기본 검색에서는 보이지 않는다.
     await pageA.getByTestId('search-input').fill(data.customer)
@@ -885,11 +937,11 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     // 「보관 포함」 으로 찾아 복원한다.
     await searchAndOpen(pageA, data.customer, { includeArchived: true })
     await expect(pageA.getByTestId('detail-archived')).toBeVisible()
-    await pageA.getByTestId('node-restore-button').click()
+    await detailMenu(pageA, 'node-restore-button')
     await expect(pageA.getByTestId('detail-notice')).toHaveAttribute('data-kind', 'success')
     await expect(pageA.getByTestId('detail-archived')).toHaveCount(0)
 
-    await pageA.getByTestId('node-history-link').click()
+    await detailMenu(pageA, 'node-history-link')
     await expect(pageA.getByTestId('changes-tab')).toBeVisible()
     await expect(pageA.locator('[data-testid="change-row"][data-action="ARCHIVE"]')).toHaveCount(1)
     await expect(pageA.locator('[data-testid="change-row"][data-action="RESTORE"]')).toHaveCount(1)
@@ -932,7 +984,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await pageA.goto('/?node=' + supplyClaimId)
     await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-id', supplyClaimId)
     await expect(pageA).toHaveURL(new RegExp('/workspace\\?node=' + supplyClaimId))
-    await pageA.getByTestId('node-history-link').click()
+    await detailMenu(pageA, 'node-history-link')
     const created = pageA.locator('[data-testid="change-row"][data-action="CREATE"]')
     await expect(created).toHaveCount(1)
     await expect(created).toContainText('주체')
@@ -989,7 +1041,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
 
   test('6b) 유일한 근거 문서를 보관하려 하면 해당 주장을 여는 버튼이 나온다', async () => {
     await searchAndOpen(pageA, data.docTitle)
-    await pageA.getByTestId('node-archive-button').click()
+    // 실패해도 보관 창은 닫히고 오류는 상세 위에 보인다.
+    await archiveFromDetail(pageA)
     const notice = pageA.getByTestId('detail-notice')
     await expect(notice).toHaveAttribute('data-kind', 'error')
     await expect(notice).toContainText('그 주장을 먼저 보관하세요')
@@ -999,6 +1052,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-type', 'Claim')
     // 주장 상세에는 「이 항목에 걸린 주장」 절이 없고, 수정 폼은 「다시 검토」 안내를 쓴다. revision 은 「자세히」 안에 있다.
     await expect(pageA.getByTestId('node-claims-section')).toHaveCount(0)
+    await expect(pageA.getByTestId('claim-edit-form')).toHaveCount(0)
+    await pageA.getByTestId('node-edit').click()
     await expect(pageA.getByTestId('claim-edit-form')).toContainText('다시 검토를 받아야 합니다')
     await expect(pageA.getByTestId('claim-edit-confidence')).toHaveCount(0)
     await expect(pageA.getByTestId('node-meta-details')).not.toHaveAttribute('open', '')
@@ -1020,10 +1075,17 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
 
     await searchAndOpen(pageViewer, data.supplier)
     await expect(pageViewer.getByTestId('viewer-hint')).toBeVisible()
-    for (const id of ['node-save', 'node-archive-button', 'node-restore-button', 'relationship-add-toggle', 'claim-add-toggle']) {
+    // 열람자에게는 편집 폼이 그려지지 않는다.
+    for (const id of ['node-edit', 'node-save', 'edit-prop-name', 'relationship-add-toggle', 'claim-add-toggle']) {
       await expect(pageViewer.getByTestId(id)).toHaveCount(0)
     }
-    await expect(pageViewer.getByTestId('edit-prop-name')).toBeDisabled()
+    // 「⋯」 메뉴에는 링크 복사와 변경 이력만 있다.
+    await pageViewer.getByTestId('node-more').click()
+    await expect(pageViewer.getByTestId('node-history-link')).toBeVisible()
+    for (const id of ['node-archive-button', 'node-restore-button']) {
+      await expect(pageViewer.getByTestId(id)).toHaveCount(0)
+    }
+    await pageViewer.keyboard.press('Escape')
 
     // 열람자의 더보기 메뉴에는 검토 대기가 없지만 주소로는 열린다.
     await pageViewer.goto('/review')
@@ -1357,6 +1419,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       await pageA.getByTestId('ontology-reload').click()
       await expect(pageA.getByTestId('ontology-stale')).toHaveCount(0)
       await searchResult(pageA, `워런 버핏-${suffix}`).click()
+      await expect(pageA.getByTestId('detail-label')).toHaveText(`워런 버핏-${suffix}`)
+      await pageA.getByTestId('node-edit').click()
       await expect(pageA.getByTestId(`edit-prop-${propKey}`)).toBeVisible()
       await expect(pageA.getByTestId('node-edit-form')).toContainText('별명')
 

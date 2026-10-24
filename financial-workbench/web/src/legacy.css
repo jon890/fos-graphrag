@@ -144,8 +144,10 @@ button:where(:not([data-slot])).link-button:disabled { color: var(--text); opaci
 .detail-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .detail-head h2 { margin: 0; word-break: break-all; }
 .detail-section { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px; }
+/* 절 제목과 오른쪽의 「＋ 추가」 단추 */
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.section-head h3 { margin: 0; }
 .actions { margin: 6px 0; }
-.reason-input { flex: 1; }
 .kv { display: grid; grid-template-columns: 80px 1fr; gap: 4px 8px; margin: 6px 0; }
 .kv dt { color: var(--legacy-muted); }
 .kv dd { margin: 0; word-break: break-word; }
@@ -163,7 +165,7 @@ button:where(:not([data-slot])).link-button:disabled { color: var(--text); opaci
 .rel-list { list-style: none; padding: 0; margin: 0 0 8px; }
 .rel-list li { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 3px 0; }
 .rel-list li.archived { opacity: 0.6; }
-.rel-type { color: var(--legacy-muted); font-size: 12px; }
+.rel-sentence { min-width: 0; word-break: break-word; }
 
 .claim-card { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: #fff; }
 .claim-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

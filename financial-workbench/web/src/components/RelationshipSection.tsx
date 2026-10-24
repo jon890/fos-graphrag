@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { api, errorMessage } from '../api/client'
 import type { NodeView, RelationshipView } from '../api/types'
 import { useApp, useLabels } from '../context'
+import { relationSentence, relationSentenceParts } from '../lib/relationSentence'
 import { NodePicker } from './NodePicker'
 import { TypeBadge } from './TypeBadge'
 
@@ -39,6 +40,11 @@ export function RelationshipSection({ node, relationships, onChanged, onError, o
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const option = options.find((o) => o.key === optionKey) ?? options[0]
+  /** 선택지 글자. 이 항목 쪽 자리에는 「이 항목」, 상대 쪽 자리에는 상대 타입 이름을 넣은 관계 문장이다 */
+  const optionText = (o: Option) => {
+    const others = o.otherTypes.map(labels.type).join(', ')
+    return o.direction === 'out' ? relationSentence(ontology, o.type, '이 항목', others) : relationSentence(ontology, o.type, others, '이 항목')
+  }
 
   const submit = async () => {
     if (!option || !target) {
@@ -73,38 +79,60 @@ export function RelationshipSection({ node, relationships, onChanged, onError, o
 
   return (
     <section className="detail-section" data-testid="relationship-section">
-      <h3>관계</h3>
-      {relationships.length === 0 && <div className="muted small">연결된 항목이 없습니다.</div>}
+      <div className="section-head">
+        <h3>연결</h3>
+        {canEdit && options.length > 0 && !adding && (
+          <button data-testid="relationship-add-toggle" onClick={() => setAdding(true)} disabled={node.archived}>
+            ＋ 연결 추가
+          </button>
+        )}
+      </div>
+      {relationships.length === 0 && <div className="muted small">아직 연결된 항목이 없습니다.</div>}
       <ul className="rel-list">
-        {relationships.map((r) => (
-          <li key={r.id} data-testid="relationship-row" data-rel-type={r.type} className={r.archived ? 'archived' : ''}>
-            <button className="link-button" disabled={r.from.id === node.id} onClick={() => onOpenNode(r.from.id)}>
-              <TypeBadge type={r.from.type} /> {r.from.label}
-            </button>
-            <span className="rel-type">—{labels.relationship(r.type)}→</span>
-            <button className="link-button" disabled={r.to.id === node.id} onClick={() => onOpenNode(r.to.id)}>
-              <TypeBadge type={r.to.type} /> {r.to.label}
-            </button>
-            {r.archived && <span className="archived-badge">보관됨</span>}
-            {!ontology.relationshipTypes[r.type] && (
-              <span className="archived-badge" data-testid="relationship-undefined">
-                정의에서 빠진 관계
+        {relationships.map((r) => {
+          // 양쪽 상세에서 같은 문장이다. 이 항목 자리는 굵게, 상대 자리는 그 항목을 여는 단추로 그린다.
+          const direction = r.from.id === node.id ? 'out' : 'in'
+          const other = direction === 'out' ? r.to : r.from
+          return (
+            <li
+              key={r.id}
+              data-testid="relationship-row"
+              data-rel-type={r.type}
+              data-direction={direction}
+              className={r.archived ? 'archived' : ''}
+            >
+              <TypeBadge type={other.type} />
+              <span className="rel-sentence">
+                {relationSentenceParts(ontology, r.type, r.from.label, r.to.label).map((part, i) => {
+                  if (part.kind === 'text') return <span key={i}>{part.text}</span>
+                  const end = part.slot === 'from' ? r.from : r.to
+                  return end.id === node.id ? (
+                    <strong key={i} data-testid="relationship-self">
+                      {part.text}
+                    </strong>
+                  ) : (
+                    <button key={i} className="link-button" data-testid="relationship-open" data-node-id={end.id} onClick={() => onOpenNode(end.id)}>
+                      {part.text}
+                    </button>
+                  )
+                })}
               </span>
-            )}
-            {canEdit && ontology.relationshipTypes[r.type] && (
-              <button className="link-button small" data-testid="relationship-archive-toggle" onClick={() => void toggleArchive(r)}>
-                {r.archived ? '관계 복원' : '관계 보관'}
-              </button>
-            )}
-          </li>
-        ))}
+              {r.archived && <span className="archived-badge">보관됨</span>}
+              {!ontology.relationshipTypes[r.type] && (
+                <span className="archived-badge" data-testid="relationship-undefined">
+                  정의에서 빠진 관계
+                </span>
+              )}
+              {canEdit && ontology.relationshipTypes[r.type] && (
+                <button className="link-button small" data-testid="relationship-archive-toggle" onClick={() => void toggleArchive(r)}>
+                  {r.archived ? '연결 복원' : '연결 보관'}
+                </button>
+              )}
+            </li>
+          )
+        })}
       </ul>
 
-      {canEdit && options.length > 0 && !adding && (
-        <button data-testid="relationship-add-toggle" onClick={() => setAdding(true)} disabled={node.archived}>
-          관계 추가
-        </button>
-      )}
       {canEdit && adding && option && (
         <div className="sub-form" data-testid="relationship-add-form">
           <div className="field">
@@ -119,9 +147,7 @@ export function RelationshipSection({ node, relationships, onChanged, onError, o
             >
               {options.map((o) => (
                 <option key={o.key} value={o.key}>
-                  {o.direction === 'out'
-                    ? `이 항목 —${labels.relationship(o.type)}→ (${o.otherTypes.map(labels.type).join(', ')})`
-                    : `(${o.otherTypes.map(labels.type).join(', ')}) —${labels.relationship(o.type)}→ 이 항목`}
+                  {optionText(o)}
                 </option>
               ))}
             </select>

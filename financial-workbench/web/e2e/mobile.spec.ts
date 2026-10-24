@@ -121,6 +121,13 @@ test('휴대폰 폭에서 노드를 만들고 그래프에서 골라 상세를 �
   await expect(page.getByTestId('detail-label')).toHaveText(exact(company))
   const companyId = (await page.getByTestId('detail-panel').getAttribute('data-node-id')) ?? ''
   expect(companyId).not.toBe('')
+  // 상세의 버튼 줄(편집, 그래프 중심으로, ⋯)은 가로 스크롤 없이 화면 폭 안에 보인다.
+  await expect(page.getByTestId('node-more')).toBeVisible()
+  const actionsBox = await page.getByTestId('node-actions').boundingBox()
+  expect(actionsBox, '상세 버튼 줄').not.toBeNull()
+  expect(actionsBox!.x, '버튼 줄의 왼쪽 끝').toBeGreaterThanOrEqual(0)
+  expect(actionsBox!.x + actionsBox!.width, '버튼 줄의 오른쪽 끝').toBeLessThanOrEqual(page.viewportSize()!.width)
+  await expectNoHorizontalOverflow(page)
 
   // 6a. 뒤로가기는 앞 화면으로 돌아간다. 기록은 「그래프 탭(앞 노드) → 노드 고르기 → 상세 보기」 다.
   const graphCanvas = page.getByTestId('graph-canvas')

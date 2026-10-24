@@ -137,7 +137,8 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 
 ## 작업 공간: 오른쪽 상세
 
-VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relationship-add-toggle`, `relationship-archive-toggle`, `claim-add-toggle`, `review-controls`, `claim-edit-form` 이 나오지 않는다. `edit-prop-*` 입력은 비활성이다.
+상세는 읽기 카드로 열린다. 편집 폼(`node-edit-form`, `claim-edit-form`)은 `node-edit` 를 눌러야 나오고, 링크 복사와 변경 이력, 보관과 복원은 `node-more` 를 연 메뉴 안에 있다.
+VIEWER 에게는 `node-edit`, `node-edit-form`, `edit-prop-*`, `node-save`, `node-archive-*`, `node-restore-button`, `relationship-add-toggle`, `relationship-archive-toggle`, `claim-add-toggle`, `review-controls`, `claim-edit-form` 이 나오지 않는다.
 
 | testid | 요소 |
 | --- | --- |
@@ -145,29 +146,39 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 | `detail-empty`, `detail-error` | 선택 없음, 상세 조회 실패 |
 | `detail-panel` | 상세 전체. `data-node-id`, `data-node-type` |
 | `detail-label`, `detail-archived` | 노드 이름, 「보관됨」 표시 |
+| `node-created-line` | 머리 아래 「{작성자}이(가) {날짜}에 등록」 한 줄 |
 | `detail-notice` | 저장, 보관 결과 안내. `data-kind` 가 `success`, `conflict`(409 REVISION_CONFLICT), `error` |
 | `viewer-hint` | VIEWER 에게 보이는 「조회만 할 수 있습니다」 안내 |
-| `node-history-link` | 「이 노드 이력」. 변경 이력 탭으로 가며 targetId 필터를 채운다 |
+| `node-actions` | 버튼 줄(「편집」, 「그래프 중심으로」, 「⋯」) |
+| `node-edit` | 「편집」. 편집 권한이 있고 보관되지 않은 노드에만 나온다. 누르면 속성 수정 폼이나 Claim 내용 수정 폼이 열린다 |
+| `node-edit-cancel` | 편집 폼 옆의 「취소」. 읽기 카드로 돌아간다 |
 | `node-center-graph` | 이 노드를 그래프 중심으로 |
-| `node-copy-link`, `node-copy-link-done`, `node-copy-link-fallback` | 「링크 복사」 단추, 복사했다는 안내, 클립보드를 못 쓸 때 주소를 보이는 읽기 전용 입력칸. 열람자에게도 보인다 |
-| `node-archive-reason`, `node-archive-button` | 보관 사유와 보관 버튼(보관되지 않은 노드) |
-| `node-restore-button` | 복원 버튼(보관된 노드) |
-| `node-meta`, `node-revision`, `node-updated-by` | 메타 정보 |
+| `node-more` | 「⋯」(`aria-label="더 보기"`). 아래 메뉴 항목을 연다 |
+| `node-copy-link` | 메뉴의 「링크 복사」. 열람자에게도 보인다 |
+| `node-copy-link-done`, `node-copy-link-fallback` | 버튼 줄 아래의 복사했다는 안내, 클립보드를 못 쓸 때 주소를 보이는 읽기 전용 입력칸. 메뉴가 닫혀도 남는다 |
+| `node-history-link` | 메뉴의 「변경 이력」. 변경 이력 탭으로 가며 targetId 필터를 채운다 |
+| `node-archive-button` | 메뉴의 「보관」(보관되지 않은 노드). 보관 창을 연다 |
+| `node-archive-dialog`, `node-archive-reason`, `node-archive-confirm` | 보관 창, 보관 사유(선택), 창의 「보관」. 성공하든 실패하든 창은 닫히고 결과는 `detail-notice` 에 나온다 |
+| `node-restore-button` | 메뉴의 「복원」(보관된 노드). 묻지 않고 바로 복원한다 |
+| `node-props`, `node-prop` * | 읽기 카드의 속성 목록과 한 줄(`data-prop`). 빈 값은 빠지고, 값이 하나도 없으면 `node-props` 가 「적은 내용이 없습니다.」 를 보인다 |
+| `node-meta-details`, `node-revision`, `node-updated-by` | 「자세히」(기본은 접힘)와 그 안의 revision, 수정자. 생성, 보관 시각, ID 도 이 안에 있다 |
 | `node-edit-form`, `node-save`, `node-edit-local-message` | 속성 수정 폼(Claim 이 아닌 노드) |
 | `node-undefined-type` | 온톨로지에서 빠진 타입의 노드일 때 폼 대신 나오는 안내. 속성은 읽기 전용으로 보이고 주장 추가 단추는 없다 |
 | `edit-conflict`, `edit-conflict-field` *(`data-field`, `data-kind` 가 `theirs`, `mine`, `both`)*, `edit-conflict-choice-<속성>-mine`, `edit-conflict-choice-<속성>-latest`, `edit-conflict-apply`, `edit-conflict-discard` | 409 뒤 내 입력과 최신 값의 칸별 비교. 다시 읽은 뒤 되살릴 입력이 있을 때만 나온다 |
 | `edit-prop-<속성>` | 수정 폼의 속성 입력. 예: `edit-prop-description` |
 | `edit-prop-<속성>-unlisted` | 저장된 값이 목록 밖일 때만 나오는 선택지 |
-| `relationship-section` | 관계 영역 |
-| `relationship-row` * | 관계 한 줄. `data-rel-type` |
-| `relationship-archive-toggle` * | 관계 보관 또는 복원. 정의에서 빠진 관계 종류에는 없다 |
+| `relationship-section` | 「연결」 절 |
+| `relationship-row` * | 관계 한 줄(관계 문장). `data-rel-type`, `data-direction` 이 `out`(이 노드가 시작점) 또는 `in`(이 노드가 끝점) |
+| `relationship-self` * | 문장 안의 이 노드 이름(굵게) |
+| `relationship-open` * | 문장 안의 상대 이름 단추. `data-node-id`. 누르면 그 항목의 상세를 연다 |
+| `relationship-archive-toggle` * | 「연결 보관」 또는 「연결 복원」. 정의에서 빠진 관계 종류에는 없다 |
 | `relationship-undefined` * | 「정의에서 빠진 관계」 배지. 온톨로지에 없는 관계 종류의 행에만 나온다 |
-| `relationship-add-toggle`, `relationship-add-form` | 「관계 추가」 |
+| `relationship-add-toggle`, `relationship-add-form` | 절 머리의 「＋ 연결 추가」 와 그 추가 칸 |
 | `relationship-type-select` | 값은 `<타입>:out`(이 노드가 시작점) 또는 `<타입>:in`(이 노드가 끝점). 예: Security 에서는 `ISSUES:in` |
 | `relationship-target-picker-*` | 대상 노드 고르기(아래 「노드 고르기」) |
 | `relationship-target-selected`, `relationship-add-submit`, `relationship-add-error` | 고른 대상, 추가, 오류 |
-| `node-claims-section` | 이 노드에 걸린 Claim 영역 |
-| `claim-add-toggle`, `claim-add-form` | 「주장 추가」 와 주장 만들기 폼(왼쪽 「주장」 선택지에서도 열린다) |
+| `node-claims-section` | 「주장 (N)」 절. 이 노드에 걸린 Claim |
+| `claim-add-toggle`, `claim-add-form` | 절 머리의 「＋ 주장 추가」 와 주장 만들기 폼(「＋ 추가」 의 주장 줄에서도 열린다) |
 | `claim-predicate-select` | predicate select |
 | `claim-sentence`, `claim-sentence-text` * | 문장 틀, 문장 틀의 칸 사이 글 |
 | `claim-subject-picker-*`, `claim-subject-selected` | 주체 고르기, 고른 주체 |

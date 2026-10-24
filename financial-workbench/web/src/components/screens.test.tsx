@@ -146,6 +146,12 @@ describe('노드 편집 409 뒤 입력 지키기', () => {
     expect(render(node({ archived: true }), draft())).not.toContain('edit-conflict')
   })
 
+  it('상세가 넘긴 취소가 있을 때만 저장 옆에 취소 단추가 있다', () => {
+    const withCancel = renderToStaticMarkup(withApp(<NodeEditForm node={node()} onSaved={() => {}} onError={() => {}} onCancel={() => {}} />))
+    expect(withCancel).toMatch(/data-testid="node-save"[^>]*>저장<\/button><button[^>]*data-testid="node-edit-cancel"[^>]*>취소</)
+    expect(renderToStaticMarkup(withApp(<NodeEditForm node={node()} onSaved={() => {}} onError={() => {}} />))).not.toContain('node-edit-cancel')
+  })
+
   it('둘 다 바꾼 칸은 최신 값이 기본으로 골라진다', () => {
     const html = render(node({ properties: { name: 'z', country: 'KR' } }), draft())
     expect(html).toContain('data-kind="both"')
