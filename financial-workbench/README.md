@@ -56,4 +56,4 @@ Colima 처럼 Docker 소켓이 VM 안에 있는 환경에서는 `api/build.gradl
 - [API 계약](docs/api-contract.md)
 - [데이터 스키마](docs/data-schema.md)
 - [배포와 백업](docs/deployment.md)
-- [이미지 workflow](../.github/workflows/workbench-image.yml): `homeserver` label 의 self-hosted runner 가 필요하다. GitHub-hosted 로는 돌지 않는다. 로컬 확인은 `docker build --platform linux/amd64 financial-workbench` 로 한다.
+- [이미지 workflow](../.github/workflows/workbench-image.yml): GitHub-hosted runner(`ubuntu-latest`)에서 Buildx 로 `linux/amd64` 이미지를 GHCR 에 올린다. 공개 저장소이므로 홈서버 runner 를 쓰지 않는다(사용자 결정: 2026-10-24). 로컬 확인은 `docker buildx build --platform linux/amd64 financial-workbench` 로 한다.

@@ -101,12 +101,12 @@ curl -fsS http://127.0.0.1:8081/api/health
 ## 이미지 배포
 
 `.github/workflows/workbench-image.yml` 이 `ghcr.io/jon890/fos-graphrag-workbench` 에 `latest` 와 `sha-<7자리>` 태그로 올린다.
-이 workflow 는 `homeserver` label 이 붙은 self-hosted runner 가 있어야 돈다. GitHub-hosted runner 로는 돌지 않는다.
-runner 에는 docker 와 socket 이 없어서, workflow 는 checkout 다음에 `homeserver-image-build financial-workbench` 만 실행한다.
-이미지 이름, 태그, label 은 그 명령이 정하고 workflow 에는 적지 않는다.
-`workflow_dispatch` 로만 실행하고 플랫폼은 `linux/amd64` 다.
-빌드는 BuildKit 이 아닌 기존 빌더로 하므로 Dockerfile 에 `RUN --mount`, `COPY --chmod`, `# syntax=` 를 쓰지 않는다.
-runner 없이 확인하려면 로컬에서 `docker build --platform linux/amd64 financial-workbench` 를 실행한다.
+이 workflow 는 GitHub-hosted runner(`ubuntu-latest`)에서 Buildx 로 빌드하고, `GITHUB_TOKEN` 으로 GHCR 에 로그인해 올린다.
+공개 저장소이므로 홈서버 self-hosted runner 를 쓰지 않는다(사용자 결정: 2026-10-24). 홈서버 runner 는 비공개 저장소에만 쓴다.
+이미지 이름과 태그, OCI label(`org.opencontainers.image.source`, `org.opencontainers.image.revision`)은 workflow 에 명시한다.
+`workflow_dispatch` 로 main 에서만 실행하고 플랫폼은 `linux/amd64` 다. 기존 이미지와 같이 provenance 는 만들지 않는다(`provenance: false`).
+action 은 commit SHA 로 고정하고 버전 주석을 단다.
+로컬에서 확인하려면 `docker buildx build --platform linux/amd64 financial-workbench` 를 실행한다.
 홈서버에서는 `latest` 대신 `sha-<7자리>` 를 `WORKBENCH_IMAGE` 에 고정해 쓴다.
 
 운영 배포는 `scripts/deploy-prod.sh` 한 명령으로 한다. main 의 이미지 workflow 를 돌려 성공을 기다리고, 홈서버의 `scripts/deploy/host-deploy-service.sh financial-workbench`(fos-home-infra)로 배포한 뒤 공개 주소의 health 를 본다.
