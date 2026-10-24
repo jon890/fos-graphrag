@@ -129,9 +129,6 @@ button:where(:not([data-slot])).link-button:disabled { color: var(--text); opaci
   text-align: center;
 }
 .graph-overlay.subtle { align-items: flex-end; padding-bottom: 16px; }
-.welcome { max-width: 460px; text-align: left; color: var(--text, #1f2937); }
-.welcome h2 { margin: 0 0 8px; font-size: 18px; }
-.welcome ol { padding-left: 20px; margin: 8px 0; display: grid; gap: 6px; }
 .meta-details { margin: 4px 0 8px; font-size: 12px; }
 .meta-details summary { cursor: pointer; color: var(--legacy-muted); }
 .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; }
@@ -176,7 +173,6 @@ blockquote { margin: 0; padding: 4px 8px; border-left: 3px solid #cbd5e1; backgr
 /* Tailwind 기본 초기화가 지운 브라우저 기본값을 옛 화면에 되살린다 */
 h1, h2, h3, h4 { font-weight: 700; }
 p { margin: 1em 0; }
-.welcome ol { list-style: decimal; }
 .graph-node-list ul { list-style: disc; }
 body { line-height: normal; }
 a { color: revert; text-decoration: revert; }

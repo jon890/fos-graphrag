@@ -1,14 +1,29 @@
 /** 화면 경로와 query 를 읽고 쓰는 순수 함수. 경로와 query 이름은 docs/flow.md 「주소와 뒤로가기」 의 표와 같다 */
 
-export type TabKey = 'workspace' | 'list' | 'review' | 'changes' | 'ontology' | 'users'
+export type TabKey = 'map' | 'workspace' | 'list' | 'review' | 'changes' | 'ontology' | 'users'
 
 export const TAB_PATHS: Record<TabKey, string> = {
+  map: '/map',
   workspace: '/workspace',
   list: '/list',
   review: '/review',
   changes: '/changes',
   ontology: '/ontology',
   users: '/users',
+}
+
+/** 첫 화면. `/`, 모르는 경로, 권한 없는 화면 경로를 여기로 바꿔 연다 */
+export const LANDING_PATH = TAB_PATHS.map
+
+/** 머리글에 탭으로 늘 보이는 화면 */
+export const TOP_TABS: TabKey[] = ['map', 'workspace', 'list']
+
+/** 「더보기」 메뉴의 화면. 검토 대기는 EDITOR 와 ADMIN, 사용자는 ADMIN 에게만 보인다 */
+export function moreItems(role: string): TabKey[] {
+  const items: TabKey[] = ['changes', 'ontology']
+  if (role === 'EDITOR' || role === 'ADMIN') items.push('review')
+  if (role === 'ADMIN') items.push('users')
+  return items
 }
 
 /** 경로의 탭. 모르는 경로면 null */
@@ -41,6 +56,10 @@ export const DEFAULT_WORKSPACE_QUERY: WorkspaceQuery = {
   archived: false,
   hops: 1,
   claimsAsNodes: false,
+}
+
+export interface MapQuery {
+  type: string
 }
 
 export interface ListQuery {
@@ -115,6 +134,14 @@ export function workspaceSearch(q: WorkspaceQuery): string {
     ['hops', q.hops === 2 ? '2' : null],
     ['claims', q.claimsAsNodes ? 'nodes' : null],
   ])
+}
+
+export function parseMapQuery(search: string): MapQuery {
+  return { type: text(new URLSearchParams(search), 'type') }
+}
+
+export function mapSearch(q: MapQuery): string {
+  return build([['type', q.type || null]])
 }
 
 export function parseListQuery(search: string): ListQuery {

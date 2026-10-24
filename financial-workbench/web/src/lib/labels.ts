@@ -173,6 +173,13 @@ export function nodeHint(o: Ontology, node: Pick<NodeView, 'type' | 'properties'
   return parts.join(' · ')
 }
 
+/** 처음 나오는 「.」, 「!」, 「?」 뒤가 공백이나 끝이면 거기까지 자른다. 없으면 전체, undefined 면 빈 문자열 */
+export function firstSentence(text: string | undefined): string {
+  if (!text) return ''
+  const m = /[.!?](?=\s|$)/.exec(text)
+  return m ? text.slice(0, m.index + 1) : text
+}
+
 /** 앞뒤 공백을 지우고 소문자로 바꿔 같으면 같은 이름이다. 서버 검색(CONTAINS)과 같은 규칙이라 가운데 공백은 그대로 비교한다 */
 export function sameName(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase()

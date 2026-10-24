@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { admin, exact, loginAs, shot } from './support'
+import { admin, exact, loginAs, openScreen, shot } from './support'
 
 // 휴대폰 폭(390px)에서 작업 공간이 검색, 그래프, 상세 탭으로 나뉘어 동작하는지 확인한다.
 // 노드는 그래프 탭이 숨겨진 동안 만들어지므로, 그래프 탭을 열 때 미뤄 둔 배치가 도는지도 함께 본다.
@@ -51,7 +51,8 @@ test('휴대폰 폭에서 노드를 만들고 그래프에서 골라 상세를 �
   const workspaceTabBox = await page.getByTestId('tab-workspace').boundingBox()
   expect(workspaceTabBox?.width ?? 0, '머리글 작업 공간 탭의 폭').toBeGreaterThanOrEqual(60)
 
-  // 2. 처음에는 검색 탭이 열려 있고 그래프는 숨겨져 있다.
+  // 2. 작업 공간을 처음 열면 검색 탭이 열려 있고 그래프는 숨겨져 있다.
+  await openScreen(page, 'workspace')
   await expect(page.getByTestId('workspace-tab-search')).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByTestId('search-input')).toBeVisible()
   await expect(page.getByTestId('graph-canvas')).toBeHidden()
@@ -141,7 +142,7 @@ test('휴대폰 폭에서 노드를 만들고 그래프에서 골라 상세를 �
 
 test('휴대폰 폭에서 온톨로지 폼 편집기가 가로 스크롤 없이 열린다', async ({ page }) => {
   await loginAs(page, admin)
-  await page.getByTestId('tab-ontology').click()
+  await openScreen(page, 'ontology')
   await page.getByTestId('ontology-edit-form').click()
   await expect(page.getByTestId('ontology-form')).toBeVisible()
   await expectNoHorizontalOverflow(page)
@@ -150,6 +151,7 @@ test('휴대폰 폭에서 온톨로지 폼 편집기가 가로 스크롤 없이 
 
 test('휴대폰 폭에서 사용법 따라하기가 아래쪽 카드로 열리고 검색 탭의 만들기 폼을 가리지 않는다', async ({ page }) => {
   await loginAs(page, admin)
+  await openScreen(page, 'workspace')
   // 관리자의 따라하기는 주장의 대상으로 고를 산업이 있어야 열린다.
   const sector = `모바일산업-${suffix}`
   await createNodeOnMobile(page, 'Sector', sector, { name: sector })
@@ -187,4 +189,20 @@ test('휴대폰 폭에서 사용법 따라하기가 아래쪽 카드로 열리�
 
   await page.getByTestId('guide-stop').click()
   await expect(bubble).toHaveCount(0)
+})
+
+test('휴대폰 폭에서 개념 지도와 머리글이 한 줄에 들어간다', async ({ page }) => {
+  await loginAs(page, admin, 'success', '/map')
+  await expect(page.getByTestId('concept-map-canvas')).toHaveAttribute('data-layout-done', 'true')
+  // 둘째 줄의 탭 셋과 「더보기」 가 줄바꿈 없이 한 줄에 놓인다.
+  const ys = await Promise.all(
+    ['tab-map', 'tab-workspace', 'tab-list', 'more-open'].map(async (id) => (await page.getByTestId(id).boundingBox())?.y ?? Number.NaN),
+  )
+  expect(new Set(ys).size, `머리글 둘째 줄의 y 좌표 ${ys.join(', ')}`).toBe(1)
+  await expectNoHorizontalOverflow(page)
+
+  await page.getByTestId('map-type').first().click()
+  await expect(page.getByTestId('map-type-panel')).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await shot(page, 'map-mobile')
 })

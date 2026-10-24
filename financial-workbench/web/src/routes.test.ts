@@ -5,9 +5,12 @@ import {
   isSafeReturnTo,
   legacyRedirect,
   listSearch,
+  mapSearch,
+  moreItems,
   ontologySearch,
   parseChangesQuery,
   parseListQuery,
+  parseMapQuery,
   parseOntologyQuery,
   parseReviewQuery,
   parseWorkspaceQuery,
@@ -19,6 +22,7 @@ import {
 describe('tabOfPath', () => {
   it('경로의 탭을 돌려주고 모르는 경로는 null 이다', () => {
     expect(tabOfPath('/changes')).toBe('changes')
+    expect(tabOfPath('/map')).toBe('map')
     expect(tabOfPath('/')).toBeNull()
     expect(tabOfPath('/nope')).toBeNull()
   })
@@ -115,5 +119,28 @@ describe('온톨로지 주소', () => {
     expect(ontologySearch({ view: 'yaml' })).toBe('?view=yaml')
     expect(ontologySearch({ view: 'history', version: 3 })).toBe('?view=history&version=3')
     expect(ontologySearch({})).toBe('')
+  })
+})
+
+describe('개념 지도와 더보기', () => {
+  it('지도 query 는 쓰고 읽으면 처음 값으로 돌아오고 빈 type 은 쓰지 않는다', () => {
+    expect(mapSearch(parseMapQuery('?type=Bottleneck'))).toBe('?type=Bottleneck')
+    expect(parseMapQuery('?type=Bottleneck')).toEqual({ type: 'Bottleneck' })
+    expect(mapSearch({ type: '' })).toBe('')
+    expect(parseMapQuery('')).toEqual({ type: '' })
+  })
+
+  it('지도 주소는 로그인 뒤 돌아갈 주소로 받는다', () => {
+    expect(isSafeReturnTo('/map?type=X')).toBe(true)
+  })
+
+  it('더보기 항목은 역할에 따라 검토 대기와 사용자가 붙는다', () => {
+    expect(moreItems('VIEWER')).toEqual(['changes', 'ontology'])
+    expect(moreItems('EDITOR')).toEqual(['changes', 'ontology', 'review'])
+    expect(moreItems('ADMIN')).toEqual(['changes', 'ontology', 'review', 'users'])
+  })
+
+  it('옛 /?node 링크는 지도가 첫 화면이어도 작업 공간 상세로 연다', () => {
+    expect(legacyRedirect('/', '?node=a')).toBe('/workspace?node=a&pane=detail')
   })
 })

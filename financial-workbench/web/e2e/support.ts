@@ -64,8 +64,16 @@ export async function loginAs(
     return
   }
   await expect(page.getByTestId('current-user-name')).toHaveText(user.name)
-  // 온톨로지를 받아야 작업 공간이 그려진다.
-  await expect(page.getByTestId('search-input')).toBeVisible()
+  // 첫 화면(/)은 개념 지도다. 온톨로지를 받아야 지도가 그려진다. 다른 화면으로 들어왔으면 그 화면의 탭이 선택된 것을 본다.
+  const screen = screenOfPath(startPath)
+  if (screen === 'map') {
+    await expect(page.getByTestId('tab-map')).toBeVisible()
+    await expect(page.getByTestId('concept-map')).toBeVisible()
+  } else if (TOP_SCREENS.includes(screen)) {
+    await expect(page.getByTestId(`tab-${screen}`)).toHaveAttribute('aria-selected', 'true')
+  } else {
+    await expect(page.getByTestId('more-open')).toHaveAttribute('data-active', 'true')
+  }
   if (options.guide === 'keep') return
   // 끝낸 기록이 있는 사용자나 다른 탭으로 들어온 사용자는 가이드가 열리지 않는다.
   const bubble = page.getByTestId('guide-bubble')
@@ -79,6 +87,27 @@ export async function loginAs(
   if (await stop.isVisible()) await stop.click()
   else await page.getByTestId('guide-skip').click()
   await expect(bubble).toHaveCount(0)
+}
+
+export type ScreenKey = 'map' | 'workspace' | 'list' | 'changes' | 'ontology' | 'review' | 'users'
+
+const TOP_SCREENS: ScreenKey[] = ['map', 'workspace', 'list']
+
+/** 주소가 열리는 화면. `/` 는 개념 지도이고, 옛 `/?node=` 링크는 작업 공간이다 */
+function screenOfPath(startPath: string): ScreenKey {
+  const url = new URL(startPath, 'http://localhost')
+  if (url.pathname === '/') return url.searchParams.get('node') ? 'workspace' : 'map'
+  return url.pathname.slice(1) as ScreenKey
+}
+
+/** 화면을 연다. 상단 탭이면 탭을, 아니면 「더보기」 메뉴의 항목을 누른다 */
+export async function openScreen(page: Page, key: ScreenKey): Promise<void> {
+  if (TOP_SCREENS.includes(key)) {
+    await page.getByTestId(`tab-${key}`).click()
+    return
+  }
+  await page.getByTestId('more-open').click()
+  await page.getByTestId(`more-item-${key}`).click()
 }
 
 export async function newPage(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {

@@ -10,6 +10,7 @@ import { rememberReturnTo, takeReturnTo } from './lib/links'
 import type { OntologyDraft } from './lib/ontologyEdit'
 import {
   DEFAULT_WORKSPACE_QUERY,
+  LANDING_PATH,
   TAB_PATHS,
   changesSearch,
   legacyRedirect,
@@ -28,16 +29,10 @@ import { ChangesTab } from './components/ChangesTab'
 import { OntologyTab } from './components/ontology/OntologyTab'
 import { UsersTab } from './components/UsersTab'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { ConceptMapTab } from './components/map/ConceptMapTab'
+import { MoreMenu } from './components/header/MoreMenu'
+import { TopTabs } from './components/header/TopTabs'
 import { GuideMessage, GuideOpenButton, GuideProvider } from './components/guide/GuideProvider'
-
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'workspace', label: '작업 공간' },
-  { key: 'list', label: '목록' },
-  { key: 'review', label: '검토 대기' },
-  { key: 'changes', label: '변경 이력' },
-  { key: 'ontology', label: '온톨로지' },
-  { key: 'users', label: '사용자' },
-]
 
 const ROLE_BADGE_CLASS: Record<string, string> = {
   ADMIN: 'bg-[#7c2d12] text-[#ffedd5]',
@@ -130,8 +125,8 @@ export default function App() {
   // 모르는 경로(/ 포함)와 권한 없는 경로는 기록을 쌓지 않고 바꿔 연다.
   useEffect(() => {
     if (!signedIn) return
-    if (tab === null) navigateRef.current(legacyRedirect(location.pathname, location.search) ?? TAB_PATHS.workspace, { replace: true })
-    else if (tab === 'users' && role !== 'ADMIN') navigateRef.current(TAB_PATHS.workspace, { replace: true })
+    if (tab === null) navigateRef.current(legacyRedirect(location.pathname, location.search) ?? LANDING_PATH, { replace: true })
+    else if (tab === 'users' && role !== 'ADMIN') navigateRef.current(LANDING_PATH, { replace: true })
     else if (tab === 'ontology' && role !== 'ADMIN' && new URLSearchParams(location.search).has('view')) navigateRef.current(TAB_PATHS.ontology, { replace: true })
   }, [signedIn, tab, role, location.pathname, location.search])
 
@@ -197,7 +192,7 @@ export default function App() {
       // 세션이 이미 끊겼어도 로그인 화면으로 간다.
     }
     lastUrlOf.current = {}
-    navigateRef.current(TAB_PATHS.workspace, { replace: true })
+    navigateRef.current(LANDING_PATH, { replace: true })
     setOntology(null)
     setLatestVersion(0)
     setOntologyDraft(null)
@@ -216,9 +211,9 @@ export default function App() {
 
   const user = auth.user
   const canEdit = canEditRole(user.role)
-  const visibleTabs = TABS.filter((t) => t.key !== 'users' || user.role === 'ADMIN')
   // 모르는 경로나 권한 없는 경로는 위 effect 가 바꿔 열 때까지 아무 화면도 그리지 않는다.
-  const activeTab: TabKey | null = visibleTabs.some((t) => t.key === tab) ? tab : null
+  // 열람자의 /review 는 메뉴에 없어도 주소로 열린다.
+  const activeTab: TabKey | null = tab === 'users' && user.role !== 'ADMIN' ? null : tab
   const workspaceQuery = parseWorkspaceQuery(location.search)
   const changesQuery = parseChangesQuery(location.search)
 
@@ -226,21 +221,13 @@ export default function App() {
     <div className="flex h-screen flex-col">
       {/* 탭 단위 ErrorBoundary 바깥이라 탭을 옮겨도 가이드가 남는다. 로그인 화면이 되면 함께 사라진다 */}
       <GuideProvider user={user} onUserChange={(u) => setAuth({ status: 'signed-in', user: u })} ontology={ontology}>
+        {/* 넓은 화면은 한 줄, 좁은 화면은 두 줄(제목과 사용자 상자 / 탭 셋과 더보기)이다 */}
         <header className="flex shrink-0 flex-wrap items-center gap-x-2 bg-slate-900 px-2 text-slate-200 lg:h-12 lg:flex-nowrap lg:gap-x-6 lg:px-4">
           <div className="min-w-0 flex-1 truncate py-2 font-bold lg:flex-none lg:py-0">금융 온톨로지 워크벤치</div>
-          <nav className="order-3 flex min-w-0 basis-full flex-nowrap gap-1 overflow-x-auto lg:order-none lg:flex-1 lg:basis-auto" role="tablist">
-            {visibleTabs.map((t) => (
-              <button
-                key={t.key}
-                role="tab"
-                aria-selected={activeTab === t.key}
-                className="shrink-0 cursor-pointer rounded-none border-0 border-b-[3px] border-transparent bg-transparent px-2.5 py-2.5 text-sm text-slate-300 aria-selected:border-blue-400 aria-selected:text-white lg:px-3 lg:py-3"
-                data-testid={`tab-${t.key}`}
-                onClick={() => openTab(t.key)}
-              >
-                {t.label}
-              </button>
-            ))}
+          {/* 둘째 줄 오른쪽 끝은 「＋ 추가」 자리다 */}
+          <nav className="order-3 flex min-w-0 basis-full flex-nowrap items-center lg:order-none lg:flex-1 lg:basis-auto">
+            <TopTabs activeTab={activeTab} onOpen={openTab} />
+            <MoreMenu role={user.role} activeTab={activeTab} onOpen={openTab} />
           </nav>
           <div className="flex shrink-0 items-center gap-1 text-sm">
             <GuideOpenButton />
@@ -282,6 +269,7 @@ export default function App() {
           {ontology && (
             <AppContext.Provider value={{ user, ontology, canEdit }}>
               <ErrorBoundary resetKey={activeTab ?? undefined}>
+                {activeTab === 'map' && <ConceptMapTab onOpenNode={focusNode} />}
                 {activeTab === 'workspace' && (
                   <Workspace
                     centerId={workspaceQuery.center ?? workspaceQuery.node}

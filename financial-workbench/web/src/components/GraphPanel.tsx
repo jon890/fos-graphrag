@@ -4,7 +4,6 @@ import { useApp, useLabels } from '../context'
 import { collapseClaims, expandedDisplay, type GraphData, type GraphDisplay, typeColor, typeShape } from '../lib/graph'
 import type { Ontology } from '../api/types'
 import { nodeDisplayLabel, predicateLabel, relationshipLabel } from '../lib/labels'
-import { WelcomeGuide } from './WelcomeGuide'
 
 interface Props {
   data: GraphData
@@ -267,7 +266,7 @@ export function GraphPanel(props: Props) {
         />
         {empty === 'none' && (
           <div className="graph-overlay" data-testid="graph-empty">
-            <WelcomeGuide />
+            <p>항목을 검색해 고르면 이어진 항목이 그래프로 보입니다.</p>
           </div>
         )}
         {empty === 'no-neighbors' && (

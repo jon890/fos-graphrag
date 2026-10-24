@@ -50,9 +50,15 @@ function practiceOntology(): Ontology {
 const progress: GuideProgress = { userId: 'u1', kind: 'browse', step: 2, startedAt: '2026-10-23T01:02:03.000Z', created: {} }
 
 describe('첫 접속 가이드', () => {
-  it('둘러보기는 소개, 검색 입력칸, 그래프, 상세 칸 순서로 가리킨다', () => {
-    expect(BROWSE_STEPS.map((s) => s.target)).toEqual([null, 'search-input', 'graph-canvas', 'workspace-pane-detail'])
-    expect(BROWSE_STEPS.map((s) => s.pane)).toEqual([null, 'search', 'graph', 'detail'])
+  it('둘러보기는 소개, 개념 지도, 검색 입력칸, 그래프, 상세 칸 순서로 가리킨다', () => {
+    expect(BROWSE_STEPS.map((s) => s.id)).toEqual(['intro', 'map', 'search', 'graph', 'detail'])
+    expect(BROWSE_STEPS.map((s) => s.target)).toEqual([null, 'concept-map-canvas', 'search-input', 'graph-canvas', 'workspace-pane-detail'])
+    expect(BROWSE_STEPS.map((s) => s.pane)).toEqual([null, null, 'search', 'graph', 'detail'])
+  })
+
+  it('개념 지도 단계는 지도 화면이고 검색, 그래프, 상세 단계는 작업 공간이다', () => {
+    expect(BROWSE_STEPS.find((s) => s.id === 'map')?.route).toBe('map')
+    expect(BROWSE_STEPS.filter((s) => s.id !== 'map' && s.id !== 'intro').map((s) => s.route)).toEqual(['workspace', 'workspace', 'workspace'])
   })
 
   it('같은 사용자는 쓴 진행 상태를 그대로 읽고 다른 사용자는 null 이다', () => {

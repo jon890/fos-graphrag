@@ -7,6 +7,7 @@ import {
   claimSentenceParts,
   createFirstHint,
   finalSound,
+  firstSentence,
   nodeDisplayLabel,
   nodeHint,
   predicateLabel,
@@ -244,5 +245,25 @@ describe('sameName', () => {
   it('다른 글자와 가운데 공백 차이는 다른 이름이다', () => {
     expect(sameName('가나', '가나전자')).toBe(false)
     expect(sameName('가나 전자', '가나  전자')).toBe(false)
+  })
+})
+
+describe('firstSentence', () => {
+  it('문장이 둘이면 첫 문장까지 자른다', () => {
+    expect(firstSentence('공급이 수요를 못 따라가는 곳입니다. 가격 결정력이 생깁니다.')).toBe('공급이 수요를 못 따라가는 곳입니다.')
+    expect(firstSentence('정말인가? 그렇다.')).toBe('정말인가?')
+  })
+
+  it('문장이 하나면 그대로다', () => {
+    expect(firstSentence('세상의 변화입니다.')).toBe('세상의 변화입니다.')
+  })
+
+  it('마침표가 없으면 전체를, 값이 없으면 빈 문자열을 돌려준다', () => {
+    expect(firstSentence('마침표 없는 설명')).toBe('마침표 없는 설명')
+    expect(firstSentence(undefined)).toBe('')
+  })
+
+  it('뒤가 공백이 아닌 마침표에서는 자르지 않는다', () => {
+    expect(firstSentence('배수(예: 2.5)를 적습니다. 다음 문장')).toBe('배수(예: 2.5)를 적습니다.')
   })
 })

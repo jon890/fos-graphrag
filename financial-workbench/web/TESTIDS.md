@@ -12,22 +12,23 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `login-google` | 「Google 로 로그인」. `/oauth2/authorization/google` 로 브라우저가 이동한다 |
 | `login-denied` | `/?login=denied` 로 돌아왔을 때 「접근 권한이 없습니다」 안내. `login-google` 도 함께 보인다 |
 | `login-notice` | 세션이 끊겨 돌아왔을 때의 안내 |
-| `tab-workspace`, `tab-list`, `tab-review`, `tab-changes`, `tab-ontology` | 상단 탭 |
-| `tab-users` | 사용자 탭. ADMIN 에게만 나온다 |
+| `tab-map`, `tab-workspace`, `tab-list` | 상단 탭(개념 지도, 작업 공간, 목록). `role=tab`, 고른 탭은 `aria-selected="true"` |
+| `more-open` | 「더보기」 메뉴 단추. 메뉴의 화면(변경 이력, 온톨로지 상세, 검토 대기, 사용자)이 열려 있으면 `data-active="true"` |
+| `more-item-<key>` | 더보기 메뉴 항목. `key` 는 `changes`, `ontology`, `review`(EDITOR, ADMIN), `users`(ADMIN). 열람자가 주소로 연 `/review` 도 `more-open` 이 `data-active="true"` 다 |
 | `current-user-name`, `current-user-email` | 로그인 사용자의 표시 이름, 이메일 |
 | `current-user-role` | 역할 배지. `data-role` 이 VIEWER, EDITOR, ADMIN |
-| `guide-open` | 머리글의 「사용법」. 작업 공간으로 옮겨 첫 접속 가이드를 처음부터 연다 |
+| `guide-open` | 머리글의 「사용법」. 개념 지도나 작업 공간이 아니면 개념 지도로 옮겨 첫 접속 가이드를 처음부터 연다 |
 | `logout-button` | 로그아웃 |
 | `ontology-error` | 온톨로지를 받지 못했을 때 |
 | `ontology-stale`, `ontology-reload` | 다른 곳에서 온톨로지 버전이 바뀌었다는 안내와 「다시 읽기」 단추. 응답 헤더의 버전이 들고 있는 버전보다 클 때만 나온다 |
 
 ## 첫 접속 가이드
 
-`guideDoneAt` 이 없는 사용자가 작업 공간에 들어오거나 「사용법」(`guide-open`)을 누르면 열린다. `e2e/support.ts` 의 `loginAs` 는 기본으로 가이드를 건너뛴다. 가이드를 확인하는 테스트만 `{ guide: 'keep' }` 을 넘긴다.
+`guideDoneAt` 이 없는 사용자가 개념 지도나 작업 공간에 들어오거나 「사용법」(`guide-open`)을 누르면 열린다. `e2e/support.ts` 의 `loginAs` 는 기본으로 가이드를 건너뛴다. 가이드를 확인하는 테스트만 `{ guide: 'keep' }` 을 넘긴다.
 
 | testid | 요소 |
 | --- | --- |
-| `guide-bubble` | 말풍선(`role=dialog`). `data-step` 이 단계 id 다. 둘러보기는 `intro`, `search`, `graph`, `detail`, 따라하기는 `intro`, `company`, `document`, `claim`, `done` 이다. 진행 중인 따라하기를 이어서 할지 묻는 단계는 `resume` 이다. `data-placement` 는 `anchored`(대상 옆) 또는 `card`(화면 아래쪽 카드)다 |
+| `guide-bubble` | 말풍선(`role=dialog`). `data-step` 이 단계 id 다. 둘러보기는 `intro`, `map`, `search`, `graph`, `detail`, 따라하기는 `intro`, `company`, `document`, `claim`, `done` 이다. 진행 중인 따라하기를 이어서 할지 묻는 단계는 `resume` 이다. `data-placement` 는 `anchored`(대상 옆) 또는 `card`(화면 아래쪽 카드)다 |
 | `guide-start` | 소개 단계의 「시작」 |
 | `guide-next` | 둘러보기 중간 단계의 「다음」. 따라하기의 만드는 단계에는 없다 |
 | `guide-finish` | 마지막 단계의 「끝내기」 |
@@ -39,6 +40,28 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `guide-archive-failed` | `guide-message` 안의 보관하지 못한 연습 항목 이름 한 줄. 누르면 `/workspace?node=<id>` 로 연다 |
 
 가이드가 가리키는 요소에는 class `guide-target` 이 붙는다. 단계가 바뀌거나 가이드가 닫히면 떨어진다.
+
+## 개념 지도
+
+첫 화면(`/map`)이다. `e2e/support.ts` 의 `loginAs` 는 `/` 로 들어오면 `tab-map` 과 `concept-map` 이 보일 때까지 기다린다.
+
+| testid | 요소 |
+| --- | --- |
+| `concept-map` | 개념 지도 화면 전체 |
+| `map-intro` | 지도 위 소개(「투자 지식 지도」) |
+| `map-counts-error` | 항목 수(`GET /api/nodes/counts`)를 받지 못했을 때의 안내와 이유 |
+| `map-empty` | 모든 타입의 항목 수가 0 일 때의 안내 |
+| `concept-map-canvas` | Cytoscape 컨테이너. `data-node-count` 는 그린 타입 노드 수, `data-layout-done` 은 배치가 끝나면 `"true"` |
+| `map-claim-note` | 지도 아래 「주장은 어느 항목에나 붙일 수 있습니다」 와 주장 수. 주장 타입이 온톨로지에 없으면 없다 |
+| `map-type-list` | 타입 목록 |
+| `map-type` * | 타입 단추. `data-type`, 고른 타입은 `aria-pressed="true"`. 순서는 타입 순서다 |
+| `map-type-count` * | 타입 단추 안의 항목 수. 개수를 받지 못하면 없다 |
+| `map-type-panel` | 고른 타입의 칸. `data-type`. 주소의 `type` 이 지도에 있는 타입일 때만 나온다 |
+| `map-type-description` | 타입 설명 |
+| `map-recent-item` * | 최근 항목 한 줄. `data-node-id`. 누르면 작업 공간에서 그 항목의 상세를 연다 |
+| `map-recent-empty`, `map-recent-error` | 최근 항목이 없음, 받지 못한 오류 |
+| `map-relation` * | 관계 문장 한 줄. `data-relationship` |
+| `map-open-list`, `map-open-workspace` | 「목록에서 보기」, 「작업 공간에서 보기」 |
 
 ## 작업 공간: 좁은 화면
 
@@ -236,6 +259,8 @@ ADMIN 에게만 나오는 요소다.
 | `ontology-form-type` *(`data-type`)*, `ontology-form-type-label` | 노드 타입 카드, 그 표시 이름 입력칸 |
 | `ontology-form-prop` *(`data-prop`)*, `ontology-form-required`, `ontology-form-enum-value` *(`data-value`)* | 속성 한 줄, 필수 확인란, enum 값 한 줄 |
 | `ontology-form-rel` *(`data-rel`)*, `ontology-form-predicate` *(`data-predicate`)* | 관계 종류 행, 주장 종류 행 |
+| `ontology-form-rel-sentence` | 관계 종류 행의 문장 틀 입력칸 |
+| `ontology-form-new-sentence` | 더하기 줄의 문장 틀 입력칸. 주장 종류와 관계 종류가 같은 이름을 쓴다 |
 | `ontology-form-remove`, `ontology-form-restore` | 「빼기」, 「되살리기」(뺄 예정인 행에만 나온다) |
 | `ontology-form-type-add`, `ontology-form-prop-add`, `ontology-form-rel-add`, `ontology-form-predicate-add` | 「노드 타입 더하기」, 「속성 더하기」(타입 카드 안), 「관계 종류 더하기」, 「주장 종류 더하기」 |
 | `ontology-form-new` | 더하기 입력 영역. 안에 `ontology-form-new-key`, `-new-type`(속성 값 타입), `-new-label`, `-new-values`(enum 값), `-new-sentence`(문장 틀), `-new-submit`(「더하기」) |

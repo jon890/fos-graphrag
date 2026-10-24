@@ -120,6 +120,11 @@ export interface Page<T> {
   totalPages: number
 }
 
+/** GET /api/nodes/counts. 보관하지 않은 노드 수. 온톨로지의 모든 타입 키가 있고 없는 타입은 0 이다 */
+export interface NodeCounts {
+  counts: Record<string, number>
+}
+
 export interface GraphNode {
   id: string
   type: string

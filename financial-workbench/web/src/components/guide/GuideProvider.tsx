@@ -23,7 +23,7 @@ import {
   type PracticePlan,
 } from '../../lib/guide'
 import { predicateLabel, typeLabel } from '../../lib/labels'
-import { DEFAULT_WORKSPACE_QUERY, parseWorkspaceQuery, TAB_PATHS, tabOfPath, workspaceSearch, type WorkspaceQuery } from '../../routes'
+import { DEFAULT_WORKSPACE_QUERY, LANDING_PATH, parseWorkspaceQuery, TAB_PATHS, tabOfPath, workspaceSearch, type WorkspaceQuery } from '../../routes'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -120,7 +120,7 @@ async function choosePlan(ontology: Ontology): Promise<PracticePlan | null> {
 interface Props {
   user: CurrentUser
   onUserChange: (user: CurrentUser) => void
-  /** 받기 전에는 null. 작업 공간이 그려진 뒤에 저절로 연다 */
+  /** 받기 전에는 null. 개념 지도나 작업 공간이 그려진 뒤에 저절로 연다 */
   ontology: Ontology | null
   children: ReactNode
 }
@@ -184,7 +184,8 @@ export function GuideProvider({ user, onUserChange, ontology, children }: Props)
     if (busyRef.current || openingRef.current) return
     openingRef.current = true
     try {
-      if (locationRef.current.pathname !== TAB_PATHS.workspace) navigateRef.current(TAB_PATHS.workspace)
+      const here = locationRef.current.pathname
+      if (here !== TAB_PATHS.map && here !== TAB_PATHS.workspace) navigateRef.current(LANDING_PATH)
       const me = userRef.current
       setMessage(null)
       setArchiveFailed([])
@@ -291,7 +292,7 @@ export function GuideProvider({ user, onUserChange, ontology, children }: Props)
   }, [])
 
   useEffect(() => {
-    if (autoTriedRef.current || tab !== 'workspace' || ontology === null) return
+    if (autoTriedRef.current || (tab !== 'map' && tab !== 'workspace') || ontology === null) return
     if (!shouldAutoStart(user, readProgress(user.id))) return
     autoTriedRef.current = true
     void open()
@@ -309,7 +310,12 @@ export function GuideProvider({ user, onUserChange, ontology, children }: Props)
     if (!s.active || s.resuming) return
     const current = s.steps[s.step]
     const here = locationRef.current
-    if (!current || here.pathname !== TAB_PATHS.workspace) return
+    // 소개는 지금 화면에서 보인다.
+    if (!current || current.id === 'intro') return
+    if (current.route === 'map') {
+      if (here.pathname !== TAB_PATHS.map) navigateRef.current(TAB_PATHS.map, { replace: true })
+      return
+    }
     const narrowPane = wideRef.current ? null : current.pane
     let target: WorkspaceQuery | null = null
     if (s.kind === 'practice') {
@@ -317,6 +323,8 @@ export function GuideProvider({ user, onUserChange, ontology, children }: Props)
       if (current.id === 'company' || current.id === 'document') target = { ...DEFAULT_WORKSPACE_QUERY, pane: narrowPane }
       else if (current.id === 'claim' && company) target = { ...DEFAULT_WORKSPACE_QUERY, node: company, pane: narrowPane }
       else if (current.id === 'done' && company) target = { ...DEFAULT_WORKSPACE_QUERY, node: company, center: company, pane: narrowPane }
+    } else if (here.pathname !== TAB_PATHS.workspace) {
+      target = { ...DEFAULT_WORKSPACE_QUERY, pane: narrowPane }
     } else if (narrowPane) {
       const query = parseWorkspaceQuery(here.search)
       if (query.pane !== narrowPane) target = { ...query, pane: narrowPane }
@@ -436,7 +444,7 @@ export function GuideMessage() {
   )
 }
 
-/** 머리글의 「사용법」. 작업 공간으로 옮겨 가이드를 연다 */
+/** 머리글의 「사용법」. 개념 지도나 작업 공간이 아니면 개념 지도로 옮겨 가이드를 연다 */
 export function GuideOpenButton() {
   const { open, busy } = useGuide()
   return (

@@ -3,13 +3,13 @@ import { describe, expect, it } from 'vitest'
 import type { ClaimView, NodeView } from '../api/types'
 import { ReviewControls } from './ClaimEditor'
 import { CopyLinkButton } from './CopyLinkButton'
+import { ConceptMapTab } from './map/ConceptMapTab'
 import { NodeCreateForm } from './NodeCreateForm'
 import { NodeEditForm } from './NodeEditForm'
 import { PropertyFields } from './PropertyFields'
 import { SearchPanel } from './SearchPanel'
 import { StatusBadge, TypeBadge } from './TypeBadge'
 import { UndefinedTypeProperties } from './UndefinedTypeProperties'
-import { WelcomeGuide } from './WelcomeGuide'
 import { Workspace } from './Workspace'
 import { testOntology, withApp } from './testSupport'
 
@@ -95,14 +95,10 @@ describe('온톨로지에 새로 더한 타입', () => {
 })
 
 describe('첫 화면 안내', () => {
-  it('앱을 한 줄로 소개하고 시작 순서를 보인다', () => {
-    const html = renderToStaticMarkup(withApp(<WelcomeGuide />))
-    expect(html).toContain('투자 지식을 근거와 함께 쌓는 곳')
-    expect(html).toContain('기업 추가')
-    expect(html).toContain('근거 문서 등록')
-    expect(html).toContain('주장 추가')
-    // 소개 문장은 종목에만 묶이지 않는다.
-    expect(html).not.toContain('종목을')
+  it('개념 지도 위에서 앱을 한 줄로 소개한다', () => {
+    const html = renderToStaticMarkup(withApp(<ConceptMapTab onOpenNode={() => {}} />, testOntology, undefined, '/map'))
+    expect(html).toMatch(/data-testid="map-intro"[^>]*>.*투자 지식 지도/)
+    expect(html).toContain('투자 지식을 근거와 함께 쌓는 곳입니다. 상자를 누르면 그 종류의 항목을 보고 바로 추가할 수 있습니다.')
   })
 })
 

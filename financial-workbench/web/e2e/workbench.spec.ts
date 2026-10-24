@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
-import { admin, exact, loginAs, newPage, shot, shotElement, type TestUser } from './support'
+import { admin, exact, loginAs, newPage, openScreen, shot, shotElement, type TestUser } from './support'
 
 // 두 편집자(A, B)와 관리자, 열람자가 같은 서버에서 협업하는 흐름을 순서대로 확인한다.
 // 로그인은 실제 Google 대신 가짜 OIDC 서버(navikt/mock-oauth2-server, interactiveLogin)를 거친다.
@@ -135,7 +135,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await loginAs(pageAdmin, admin)
     await expect(pageAdmin.getByTestId('current-user-role')).toHaveAttribute('data-role', 'ADMIN')
 
-    await pageAdmin.getByTestId('tab-users').click()
+    await openScreen(pageAdmin, 'users')
+    await expect(pageAdmin.getByTestId('more-open')).toHaveAttribute('data-active', 'true')
     await expect(pageAdmin.getByTestId('users-table')).toBeVisible()
     await addUser(pageAdmin, editorA, 'EDITOR')
     await addUser(pageAdmin, editorB, 'EDITOR')
@@ -161,7 +162,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
         return response.request().method() === 'GET' && url.pathname === '/api/changes' && url.searchParams.get('page') === String(page) && url.searchParams.get('size') === '20'
       })
     const initialPage = waitForChangesPage(0)
-    await pageAdmin.getByTestId('tab-changes').click()
+    await openScreen(pageAdmin, 'changes')
     await initialPage
     await expect(pageAdmin.getByTestId('changes-table')).toBeVisible()
     // 첫 관리자를 만든 이력은 가장 오래돼서 뒤쪽 쪽에 있을 수 있다.
@@ -178,7 +179,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(systemRow).toHaveCount(1)
     await expect(systemRow).toContainText('시스템')
     // 머리글과 탭이 남아 있다.
-    await expect(pageAdmin.getByTestId('tab-changes')).toBeVisible()
+    await expect(pageAdmin.getByTestId('more-open')).toHaveAttribute('data-active', 'true')
     await expect(pageAdmin.getByTestId('current-user-name')).toHaveText(admin.name)
     await expect(pageAdmin.getByTestId('error-boundary')).toHaveCount(0)
     await shot(pageAdmin, '00c-changes-all-system-actor')
@@ -190,7 +191,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: null, page: 0, size: 20, totalItems: 0, totalPages: 0 }) }),
     )
     await pageAdmin.getByTestId('tab-list').click()
-    await pageAdmin.getByTestId('tab-changes').click()
+    await openScreen(pageAdmin, 'changes')
     await expect(pageAdmin.getByTestId('error-boundary')).toContainText('이 화면을 불러오지 못했습니다.')
     await expect(pageAdmin.getByTestId('tab-workspace')).toBeVisible()
     await expect(pageAdmin.getByTestId('current-user-name')).toHaveText(admin.name)
@@ -202,7 +203,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageAdmin.getByTestId('error-boundary')).toHaveCount(0)
 
     // 서버가 정상으로 돌아오면 「다시 시도」 로 화면이 돌아온다.
-    await pageAdmin.getByTestId('tab-changes').click()
+    await openScreen(pageAdmin, 'changes')
     await expect(pageAdmin.getByTestId('error-boundary')).toBeVisible()
     await pageAdmin.unroute('**/api/changes*')
     await pageAdmin.getByTestId('error-boundary-retry').click()
@@ -211,12 +212,13 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   })
 
   test('0e) 첫 화면 안내와 만들기 폼이 한국어 표시 이름으로 보인다', async () => {
-    await pageAdmin.getByTestId('tab-workspace').click()
-    await expect(pageAdmin.getByTestId('welcome-guide')).toBeVisible()
-    await expect(pageAdmin.getByTestId('welcome-guide')).toContainText('기업 추가')
-    await expect(pageAdmin.getByTestId('welcome-guide')).toContainText('근거 문서 등록')
-    await expect(pageAdmin.getByTestId('welcome-guide')).toContainText('주장 추가')
+    await openScreen(pageAdmin, 'map')
+    await expect(pageAdmin.getByTestId('map-intro')).toBeVisible()
+    await expect(pageAdmin.getByTestId('map-intro')).toContainText('투자 지식 지도')
+    await expect(pageAdmin.getByTestId('map-intro')).toContainText('상자를 누르면 그 종류의 항목을 보고 바로 추가할 수 있습니다.')
     await shot(pageAdmin, '00e-first-screen')
+
+    await openScreen(pageAdmin, 'workspace')
 
     const typeSelect = pageAdmin.getByTestId('new-node-type')
     await expect(typeSelect.locator('option')).toHaveText(['무엇을 만들까요?', '기업', '종목', '산업', '근거 문서', '인물', '개념', '세상의 변화', '병목', '밸류에이션', '시나리오', '투자 결정', '주장'])
@@ -260,7 +262,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   test('0f) 상단 탭은 경로를 바꾸고 뒤로가기로 앞 탭에 돌아온다', async () => {
     await pageAdmin.getByTestId('tab-list').click()
     await expect(pageAdmin).toHaveURL(/\/list(\?|$)/)
-    await pageAdmin.getByTestId('tab-changes').click()
+    await openScreen(pageAdmin, 'changes')
     await expect(pageAdmin).toHaveURL(/\/changes(\?|$)/)
     await pageAdmin.goBack()
     await expect(pageAdmin).toHaveURL(/\/list(\?|$)/)
@@ -269,19 +271,43 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageAdmin.getByTestId('tab-list')).toHaveAttribute('aria-selected', 'true')
     await expect(pageAdmin).toHaveURL(/\/list(\?|$)/)
     await pageAdmin.goto('/')
-    await expect(pageAdmin).toHaveURL(/\/workspace$/)
-    await expect(pageAdmin.getByTestId('tab-workspace')).toHaveAttribute('aria-selected', 'true')
+    await expect(pageAdmin).toHaveURL(/\/map$/)
+    await expect(pageAdmin.getByTestId('tab-map')).toHaveAttribute('aria-selected', 'true')
+  })
+
+  test('0g) 개념 지도가 첫 화면이고 타입을 고르면 칸이 열린다', async () => {
+    await pageAdmin.goto('/')
+    await expect(pageAdmin).toHaveURL(/\/map$/)
+    const canvas = pageAdmin.getByTestId('concept-map-canvas')
+    await expect(canvas).toHaveAttribute('data-layout-done', 'true')
+    expect(await pageAdmin.getByTestId('map-type').count()).toBeGreaterThan(0)
+
+    await pageAdmin.locator('[data-testid="map-type"][data-type="Bottleneck"]').click()
+    const panel = pageAdmin.getByTestId('map-type-panel')
+    await expect(panel).toHaveAttribute('data-type', 'Bottleneck')
+    await expect(pageAdmin).toHaveURL(/[?&]type=Bottleneck(&|$)/)
+    await expect(pageAdmin.locator('[data-testid="map-type"][data-type="Bottleneck"]')).toHaveAttribute('aria-pressed', 'true')
+    await expect(panel.getByTestId('map-relation').first()).toBeVisible()
+    await expect(panel.getByTestId('map-recent-item').first()).toBeVisible()
+    await shot(pageAdmin, 'map-wide')
+
+    await panel.getByTestId('map-open-list').click()
+    await expect(pageAdmin).toHaveURL(/\/list\?type=Bottleneck$/)
+    await expect(pageAdmin.getByTestId('tab-list')).toHaveAttribute('aria-selected', 'true')
   })
 
   test('1) A 가 기업과 산업, 종목을 만들고 ISSUES 관계를 잇는다', async ({ browser }) => {
     pageA = await open(browser)
     await loginAs(pageA, editorA)
     await expect(pageA.getByTestId('current-user-role')).toHaveAttribute('data-role', 'EDITOR')
-    await expect(pageA.getByTestId('tab-users')).toHaveCount(0)
-    // ADMIN 이 아니면 /users 는 작업 공간으로 바뀐다.
+    await pageA.getByTestId('more-open').click()
+    await expect(pageA.getByTestId('more-item-changes')).toBeVisible()
+    await expect(pageA.getByTestId('more-item-users')).toHaveCount(0)
+    await pageA.keyboard.press('Escape')
+    // ADMIN 이 아니면 /users 는 개념 지도로 바뀐다.
     await pageA.goto('/users')
-    await expect(pageA).toHaveURL(/\/workspace$/)
-    await expect(pageA.getByTestId('search-input')).toBeVisible()
+    await expect(pageA).toHaveURL(/\/map$/)
+    await expect(pageA.getByTestId('concept-map')).toBeVisible()
 
     await createNode(pageA, 'Company', data.company, { name: data.company, country: 'KR' })
     await createNode(pageA, 'Sector', data.sector, { name: data.sector, scheme: 'GICS' })
@@ -587,7 +613,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
 
   test('3) B 가 검토 대기 탭에서 Claim 을 검토 완료한다', async ({ browser }) => {
     // 작성자 A 에게는 그 주장이 「내가 쓰거나 고친 주장」 구역에만 있고, 링크를 복사할 수 있다.
-    await pageA.getByTestId('tab-review').click()
+    await openScreen(pageA, 'review')
     const mineSection = pageA.getByTestId('review-section-mine')
     const mineRow = mineSection.locator(`[data-testid="review-mine-row"][data-claim-id="${supplyClaimId}"]`)
     await expect(mineRow).toBeVisible()
@@ -604,7 +630,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     pageB = await open(browser)
     await loginAs(pageB, editorB)
 
-    await pageB.getByTestId('tab-review').click()
+    await openScreen(pageB, 'review')
     const reviewable = pageB.getByTestId('review-section-reviewable')
     await expect(reviewable.getByTestId('review-table')).toBeVisible()
     const row = reviewable.getByTestId('review-row').filter({ hasText: data.company })
@@ -802,7 +828,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   })
 
   test('6c) 변경 이력에서 사용자를 표시 이름으로 고르고 주장 이력의 주체와 대상이 이름으로 보인다', async () => {
-    await pageA.getByTestId('tab-changes').click()
+    await openScreen(pageA, 'changes')
     await expect(pageA.getByTestId('changes-tab')).toBeVisible()
     const clear = pageA.getByTestId('changes-filter-clear')
     await expect(pageA.getByTestId('changes-target-selected')).toBeVisible()
@@ -867,7 +893,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA.getByTestId('list-row').filter({ hasText: data.supplier })).toHaveCount(1)
     await shot(pageA, '06d-list-back')
 
-    await pageA.getByTestId('tab-changes').click()
+    await openScreen(pageA, 'changes')
     await expect(pageA.getByTestId('changes-tab')).toBeVisible()
     await pageA.getByTestId('changes-actor-filter').selectOption({ value: editorA.email })
     await expect(pageA).toHaveURL(/actor=/)
@@ -915,7 +941,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     pageViewer = page
     await loginAs(pageViewer, viewer)
     await expect(pageViewer.getByTestId('current-user-role')).toHaveAttribute('data-role', 'VIEWER')
-    await expect(pageViewer.getByTestId('tab-users')).toHaveCount(0)
+    await openScreen(pageViewer, 'workspace')
+    await expect(pageViewer.getByTestId('search-input')).toBeVisible()
     await expect(pageViewer.getByTestId('new-node-button')).toHaveCount(0)
 
     await searchAndOpen(pageViewer, data.supplier)
@@ -925,7 +952,9 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     }
     await expect(pageViewer.getByTestId('edit-prop-name')).toBeDisabled()
 
-    await pageViewer.getByTestId('tab-review').click()
+    // 열람자의 더보기 메뉴에는 검토 대기가 없지만 주소로는 열린다.
+    await pageViewer.goto('/review')
+    await expect(pageViewer.getByTestId('more-open')).toHaveAttribute('data-active', 'true')
     await expect(pageViewer.getByTestId('review-table')).toBeVisible()
     const approveButtons = pageViewer.getByTestId('review-row-approve')
     for (let i = 0; i < (await approveButtons.count()); i += 1) await expect(approveButtons.nth(i)).toBeDisabled()
@@ -947,8 +976,30 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await shot(pageViewer, '07-viewer')
   })
 
+  test('7b) 더보기 메뉴는 역할별 항목을 보이고 열린 화면을 표시한다', async () => {
+    const itemsOf = async (page: Page): Promise<string[]> => {
+      await page.getByTestId('more-open').click()
+      const items = page.locator('[data-testid^="more-item-"]')
+      await expect(items.first()).toBeVisible()
+      const ids = await items.evaluateAll((els) => els.map((el) => el.getAttribute('data-testid') ?? ''))
+      await page.keyboard.press('Escape')
+      await expect(items).toHaveCount(0)
+      return ids
+    }
+    expect(await itemsOf(pageAdmin)).toEqual(['more-item-changes', 'more-item-ontology', 'more-item-review', 'more-item-users'])
+    expect(await itemsOf(pageA)).toEqual(['more-item-changes', 'more-item-ontology', 'more-item-review'])
+    expect(await itemsOf(pageViewer)).toEqual(['more-item-changes', 'more-item-ontology'])
+
+    await openScreen(pageAdmin, 'map')
+    await expect(pageAdmin.getByTestId('more-open')).toHaveAttribute('data-active', 'false')
+    await openScreen(pageAdmin, 'changes')
+    await expect(pageAdmin).toHaveURL(/\/changes(\?|$)/)
+    await expect(pageAdmin.getByTestId('more-open')).toHaveAttribute('data-active', 'true')
+    await expect(pageAdmin.getByTestId('tab-map')).toHaveAttribute('aria-selected', 'false')
+  })
+
   test('8) 관리자가 열람자를 비활성화하면 열람자의 기존 세션이 끊긴다', async () => {
-    await pageAdmin.getByTestId('tab-users').click()
+    await openScreen(pageAdmin, 'users')
     await pageAdmin.getByTestId('users-refresh').click()
     const row = usersRow(pageAdmin, viewer.email)
     await expect(row.getByTestId('users-row-linked')).toHaveText('로그인함')
@@ -973,6 +1024,13 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     const bubble = page.getByTestId('guide-bubble')
     await expect(bubble).toHaveAttribute('data-step', 'intro')
     await page.getByTestId('guide-start').click()
+
+    // 개념 지도 단계는 지도에서, 다음 단계부터는 작업 공간에서 가리킨다.
+    await expect(page).toHaveURL(/\/map$/)
+    await expect(bubble).toHaveAttribute('data-step', 'map')
+    await expect(page.getByTestId('concept-map-canvas')).toHaveClass(/(^|\s)guide-target(\s|$)/)
+    await page.getByTestId('guide-next').click()
+    await expect(page).toHaveURL(/\/workspace(\?|$)/)
 
     const steps: [string, string][] = [
       ['search', 'search-input'],
@@ -1115,7 +1173,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA.getByTestId('search-input')).toBeVisible()
 
     // 2. 관리자가 저장 전 버전 번호를 읽어 두고 YAML 로 새 타입을 더해 저장한다.
-    await pageAdmin.getByTestId('tab-ontology').click()
+    await openScreen(pageAdmin, 'ontology')
     const versionText = await pageAdmin.getByTestId('ontology-version').innerText()
     const before = Number(/\d+/.exec(versionText)?.[0])
     expect(before, '저장 전 온톨로지 버전').toBeGreaterThan(0)
@@ -1184,7 +1242,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   test('9b) 관리자가 폼으로 인물에 속성을 더하면 편집자의 고치기 폼에 그 칸이 나오고, 되돌린다', async () => {
     const propKey = `nickname${suffix}`
     // 1. 관리자가 저장 전 버전 번호를 읽어 둔다.
-    await pageAdmin.getByTestId('tab-ontology').click()
+    await openScreen(pageAdmin, 'ontology')
     const versionText = await pageAdmin.getByTestId('ontology-version').innerText()
     const before = Number(/\d+/.exec(versionText)?.[0])
     expect(before, '저장 전 온톨로지 버전').toBeGreaterThan(0)
@@ -1218,7 +1276,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       await expect(pageA.getByTestId('node-edit-form')).toContainText('별명')
 
       // 4. 관리자가 관계 종류의 문장 틀에서 {to} 를 빼면 입력 아래와 미리보기에 오류가 보인다. 저장하지 않고 초안을 버린다.
-      await pageAdmin.getByTestId('tab-ontology').click()
+      await openScreen(pageAdmin, 'ontology')
       await pageAdmin.getByTestId('ontology-edit-form').click()
       const issues = pageAdmin.locator('[data-testid="ontology-form-rel"][data-rel="ISSUES"]')
       await expect(issues).toBeVisible()
@@ -1249,7 +1307,7 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
   test('9c) 관리자가 기존 데이터와 어긋나는 변경을 미리보면 영향과 확인란이 보이고, 저장하지 않고 초안을 버린다', async () => {
     const propKey = `required${suffix}`
     // 1. 관리자가 시작 전 버전 번호를 읽어 둔다. 9b 의 정리는 API 로 되돌려 화면이 예전 버전을 들고 있으므로 새로고침해 최신 버전을 읽는다.
-    await pageAdmin.getByTestId('tab-ontology').click()
+    await openScreen(pageAdmin, 'ontology')
     await pageAdmin.reload()
     await expect(pageAdmin.getByTestId('ontology-stale')).toHaveCount(0)
     const before = Number(/\d+/.exec(await pageAdmin.getByTestId('ontology-version').innerText())?.[0])

@@ -37,10 +37,10 @@ describe('GuideBubble', () => {
 
   it('중간 단계는 「다음」 을 담는다', () => {
     const html = render(1)
-    expect(html).toContain('data-step="search"')
+    expect(html).toContain('data-step="map"')
     expect(html).toContain('data-testid="guide-next"')
     expect(html).toContain('data-testid="guide-skip"')
-    expect(html).toContain('2 / 4')
+    expect(html).toContain('2 / 5')
     expect(html).not.toContain('data-testid="guide-finish"')
   })
 
