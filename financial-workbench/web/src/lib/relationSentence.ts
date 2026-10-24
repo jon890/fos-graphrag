@@ -74,7 +74,7 @@ export function typeRelationSentences(
     for (const fromType of def.from) {
       for (const toType of def.to) {
         const key = `${relationship}:${fromType}:${toType}`
-        if ((fromType !== type && toType !== type)) continue
+        if (fromType !== type && toType !== type) continue
         out.push({ key, relationship, fromType, toType, text: relationSentence(o, relationship, typeLabel(o, fromType), typeLabel(o, toType)) })
       }
     }

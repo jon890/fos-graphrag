@@ -95,9 +95,9 @@ describe('따라하기 말풍선', () => {
     expect(renderPractice(PRACTICE[3], 3, true)).toContain('data-testid="guide-reopen"')
   })
 
-  it('말풍선은 만들기 창의 오버레이보다 위에 그리고 누르기를 받는다', () => {
-    expect(renderPractice()).toMatch(/data-testid="guide-bubble"[^>]*class="guide-bubble/)
-  })
+  // 말풍선이 만들기 창의 오버레이보다 위에 그려지고 누르기를 받는 동작은 정적 렌더링으로 확인할 수 없다.
+  // e2e/mobile.spec.ts 「휴대폰 폭에서 사용법 따라하기가 아래쪽 카드로 열리고 만들기 창을 가리지 않는다」 가
+  // 창이 열린 채로 말풍선의 「그만두기」 를 눌러 확인한다.
 
   it('마침 단계는 「끝내기」 만 있다', () => {
     const html = renderPractice(PRACTICE[4], 4)
