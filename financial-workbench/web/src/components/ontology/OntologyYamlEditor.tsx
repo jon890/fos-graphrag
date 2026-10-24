@@ -54,6 +54,12 @@ function YamlHelp() {
         <li>
           <code>createPicker</code>: 끝(<code>to</code>) 타입 만들기 폼에 시작(<code>from</code>) 노드를 고르는 칸을 더합니다.
         </li>
+        <li>
+          <code>sentence</code>: 주장 종류(<code>claimPredicates</code>)에서는 주장 만들기 폼의 문장 틀입니다. <code>{'{subject}'}</code>,{' '}
+          <code>{'{object}'}</code> 자리에 고르기 칸이 들어갑니다. 관계 종류(<code>relationshipTypes</code>)에서는 <code>{'{from}'}</code>,{' '}
+          <code>{'{to}'}</code> 를 한 번씩 담는 한다체 문장입니다. 화면이 끝을 합니다체로 바꾸고 조사를 이름에 맞춰 고릅니다. 없으면 「
+          {'{from}'}이(가) {'{to}'}을(를) 표시 이름」 으로 보입니다.
+        </li>
       </ul>
       <p className="mb-0 mt-2 text-xs">
         YAML 흐름 표기(<code>{'{ ... }'}</code>) 안에서는 쉼표와 콜론이 값을 끊습니다. 쉼표나 콜론이 든 문장은 반드시 따옴표로 감싸세요. 알 수 없는 키가 있으면

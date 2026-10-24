@@ -51,6 +51,51 @@ class SearchAndGraphIntegrationTest : IntegrationTest() {
     }
 
     @Test
+    fun `개수 API 는 보관하지 않은 노드를 타입마다 세고 없는 타입은 0 이다`() {
+        val alice = loggedIn(ALICE)
+        val fx = Fixtures(alice)
+        val before = alice.get("/api/nodes/counts").body["counts"]
+        fx.company("개수기업")
+        val archived = fx.company("개수보관")
+        fx.sector("개수산업")
+        alice.post("/api/nodes/${archived.id}/archive", mapOf("expectedRevision" to 1))
+
+        val response = alice.get("/api/nodes/counts")
+        assertThat(response.status).isEqualTo(200)
+        val counts = response.body["counts"]
+        assertThat(counts["Company"].asLong() - before["Company"].asLong()).isEqualTo(1)
+        assertThat(counts["Sector"].asLong() - before["Sector"].asLong()).isEqualTo(1)
+        // 키 집합은 온톨로지 노드 타입과 같고, 값은 타입 필터 조회의 총 개수와 같다(0 인 타입 포함)
+        val typeKeys = alice.get("/api/ontology").body["nodeTypes"].propertyNames().asSequence().toSet()
+        assertThat(counts.propertyNames().asSequence().toSet()).isEqualTo(typeKeys)
+        for (type in typeKeys) {
+            val total = alice.get("/api/nodes?types=$type&size=1").body["totalItems"].asLong()
+            assertThat(counts[type].asLong()).describedAs(type).isEqualTo(total)
+        }
+    }
+
+    @Test
+    fun `열람자도 개수를 읽고 로그인하지 않으면 401 이다`() {
+        assertThat(loggedIn(VIEWER).get("/api/nodes/counts").status).isEqualTo(200)
+        val anonymous = anonymous().get("/api/nodes/counts")
+        assertThat(anonymous.status).isEqualTo(401)
+        assertThat(anonymous.code).isEqualTo("UNAUTHENTICATED")
+    }
+
+    @Test
+    fun `최근 정렬은 만든 순서의 역순이고 모르는 정렬은 400 이다`() {
+        val alice = loggedIn(ALICE)
+        val fx = Fixtures(alice)
+        val created = (1..3).map { fx.node("Concept", mapOf("name" to "정렬$it-${fx.suffix}", "summary" to "개념 $it")) }
+
+        val recent = alice.get("/api/nodes?types=Concept&sort=recent&size=3").body
+        assertThat(recent["items"][0]["id"].asString()).isEqualTo(created.last().id)
+        val bad = alice.get("/api/nodes?sort=nope")
+        assertThat(bad.status).isEqualTo(400)
+        assertThat(bad.code).isEqualTo("VALIDATION_FAILED")
+    }
+
+    @Test
     fun `페이지 크기는 100 을 넘을 수 없다`() {
         val alice = loggedIn(ALICE)
         assertThat(alice.get("/api/nodes?size=101").code).isEqualTo("VALIDATION_FAILED")

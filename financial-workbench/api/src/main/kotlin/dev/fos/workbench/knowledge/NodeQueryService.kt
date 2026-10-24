@@ -56,11 +56,24 @@ class NodeQueryService(
         )
     }
 
-    /** label, ticker, 타입의 searchProperties 를 소문자로 이은 searchText 에서 부분 일치로 찾는다. 보관된 노드는 기본으로 뺀다. */
+    @Transactional(readOnly = true)
+    fun counts(): NodeCounts {
+        val ontology = holder.current()
+        val found = client.query("MATCH (n:Knowledge) WHERE n.archived = false AND n.type IS NOT NULL RETURN n.type AS type, count(n) AS count")
+            .fetch().all().associate { it["type"] as String to (it["count"] as Number).toLong() }
+        return NodeCounts(ontology.nodeTypes.keys.associateWithTo(LinkedHashMap()) { found[it] ?: 0L })
+    }
+
+    /** label, ticker, 타입의 searchProperties 를 소문자로 이은 searchText 에서 부분 일치로 찾는다. 보관된 노드는 기본으로 뺀다. sort 는 label(기본)과 recent(만든 시각 역순)다. */
     @Transactional(readOnly = true)
     @Suppress("UNCHECKED_CAST")
-    fun search(q: String?, types: List<String>?, reviewStatus: String?, includeArchived: Boolean, page: PageQuery): Page<NodeView> {
+    fun search(q: String?, types: List<String>?, reviewStatus: String?, includeArchived: Boolean, sort: String?, page: PageQuery): Page<NodeView> {
         Ontology.requireTypeFilter(types)
+        val orderBy = when (sort) {
+            null, "label" -> "n.searchText, n.id"
+            "recent" -> "n.createdAt DESC, n.id"
+            else -> throw ValidationFailedException(mapOf("sort" to "label, recent 가운데 하나여야 합니다."))
+        }
         if ((q?.trim()?.length ?: 0) > Limits.MAX_QUERY_LENGTH) {
             throw ValidationFailedException(mapOf("q" to "검색어는 ${Limits.MAX_QUERY_LENGTH}자 이하여야 합니다."))
         }
@@ -80,7 +93,7 @@ class NodeQueryService(
         """
         val total = client.query("MATCH (n:Knowledge) $where RETURN count(n) AS total").bindAll(params)
             .fetch().one().map { (it["total"] as Number).toLong() }.orElse(0L)
-        val rows = client.query("MATCH (n:Knowledge) $where RETURN properties(n) AS n ORDER BY n.searchText, n.id SKIP ${'$'}skip LIMIT ${'$'}limit")
+        val rows = client.query("MATCH (n:Knowledge) $where RETURN properties(n) AS n ORDER BY $orderBy SKIP ${'$'}skip LIMIT ${'$'}limit")
             .bindAll(params).fetch().all().map { it["n"] as Map<String, Any?> }
         return page.of(reader.nodes(rows), total)
     }

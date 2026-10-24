@@ -148,11 +148,14 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | --- | --- |
 | `web/src/api/` | fetch 래퍼, CSRF 처리, 계약 타입 |
 | `web/src/components/` | 화면 조각. 그래프, 상세 패널, 표, 폼. `ErrorBoundary` 가 탭 단위로 렌더링 오류를 붙잡아 머리글과 탭을 지키고, 앱 최상위(`main.tsx`)에도 하나 있다 |
-| `web/src/lib/` | 그래프 병합과 주장 접기(`graph.ts` 의 `collapseClaims`), 입력값 변환(`formValues.ts`), 충돌 때 세 값 비교(`conflict.ts`), 표시 이름과 구분 정보 조회, 문장 틀 채우기(`labels.ts`)처럼 화면과 무관한 함수와 단위 테스트. 첫 접속 가이드의 단계 정의와 진행 상태 저장, 자동 시작 판정(`guide.ts`), `utils.ts` 의 `cn` 은 Tailwind class 를 합친다. shadcn 부품도 이것을 import 한다. registry 가 내려주는 `import { cn } from "cn"` 은 `@/lib/utils` 로 바꾸고 `cn` 패키지는 들이지 않는다 |
-| `web/src/components/ui/` | shadcn 으로 복사한 화면 부품(Button, Input, Textarea, NativeSelect, Tabs, Card, Badge, Table, Alert, Label). 저장소가 소스를 소유한다. 고칠 때는 이 폴더를 직접 고친다 |
+| `web/src/lib/` | 화면과 무관한 순수 함수와 그 단위 테스트. 타입 순서, 관계 문장, 조사 고르기의 규칙은 [흐름](flow.md) 의 「타입 순서」, 「관계 문장」, 「조사 고르기」 가 소유한다. `utils.ts` 의 `cn` 은 Tailwind class 를 합친다. shadcn 부품도 이것을 import 하고, registry 가 내려주는 `import { cn } from "cn"` 은 `@/lib/utils` 로 바꾼다 |
+| `web/src/components/ui/` | shadcn 으로 복사한 화면 부품. 저장소가 소스를 소유하고 고칠 때는 이 폴더를 직접 고친다 |
 | `web/components.json` | shadcn CLI 설정. 부품을 더할 때 CLI 가 읽는다 |
 | `web/src/hooks/` | 화면 상태 훅. `useMediaQuery` 가 배치 경계를 판정한다 |
-| `web/src/components/ontology/` | 온톨로지 탭의 보기, 폼 편집기, YAML 편집기, 미리보기, 버전 기록. 초안은 `App` 이 들고 있어 탭을 옮겨도 남는다. YAML 은 서버의 미리보기 응답으로 바꾸고 웹에 YAML 라이브러리를 들이지 않는다. `form/` 은 폼 편집기의 부품(공용 입력, 노드 타입, 관계 종류, 주장 종류 구역)이다 |
+| `web/src/components/header/` | 머리글의 상단 탭과 「더보기」 메뉴 |
+| `web/src/components/map/` | 개념 지도 화면 |
+| `web/src/components/add/` | 전역 「＋ 추가」 메뉴와 만들기 창 |
+| `web/src/components/ontology/` | 온톨로지 상세 화면의 보기, 폼 편집기, YAML 편집기, 미리보기, 버전 기록. 초안은 `App` 이 들고 있어 화면을 옮겨도 남는다. YAML 은 서버의 미리보기 응답으로 바꾸고 웹에 YAML 라이브러리를 들이지 않는다. `form/` 은 폼 편집기의 부품이다 |
 | `web/src/components/guide/` | 첫 접속 가이드. 단계 정의, 진행 상태(`localStorage` 의 `workbench.guide`), 말풍선. 만들기 폼과 주장 폼은 가이드가 넘긴 미리 채울 값을 props 로 받고, 만들기에 성공하면 가이드에 알린다 |
 | `web/src/routes.ts` | 화면 경로 목록과 query 를 읽고 쓰는 순수 함수(기본값 생략, 옛 `/?node=` 넘기기, 로그인 뒤 돌아갈 주소 검사). 경로와 query 의 뜻은 [흐름](flow.md) 의 「주소와 뒤로가기」 가 소유한다 |
 | `web/src/styles.css` | Tailwind 진입점과 색 토큰. shadcn 의 CSS 변수(`--background`, `--primary` 등)를 여기 둔다 |
@@ -161,6 +164,10 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 화면 부품은 shadcn 으로 만든다. 소스를 복사해 저장소가 소유하므로 버전 올림에 끌려가지 않고, 접근성(키보드, 포커스)은 Radix 가 맡는다.
 선택 칸은 HTML 기본 `<select>` 를 감싼 `NativeSelect` 를 쓴다. 휴대폰에서 시스템 선택기가 뜨고, Radix Select 가 여는 스크롤 잠금이 없어 CSP 와 부딪히지 않는다.
 경로 별칭 `@/` 는 `web/src/` 를 가리킨다. `tsconfig.json`, `tsconfig.app.json`, `vite.config.ts` 에 함께 둔다. shadcn CLI 는 루트 `tsconfig.json` 의 별칭을 읽어 부품을 놓을 폴더를 정한다. TypeScript 6 에서 `baseUrl` 은 폐기 경고로 빌드를 멈추므로 `paths` 만 쓴다.
+
+`App` 은 화면을 경로로 고른다. `/map` 은 `ConceptMapTab`, `/workspace` 는 `Workspace` 다. `AddProvider` 와 첫 접속 가이드(`GuideProvider`)는 탭 단위 `ErrorBoundary` 바깥에 있어 화면을 옮겨도 남는다. 만들기 성공 안내(`flash`)는 `App` 이 들고 `Workspace` 에 넘긴다. 만든 곳이 작업 공간 밖일 수 있기 때문이다.
+창(Dialog)과 메뉴(DropdownMenu)는 shadcn 부품으로 만든다. 메뉴는 `modal={false}` 로 연다. 모달 메뉴가 여는 스크롤 잠금은 실행 중에 `<style>` 을 넣어 CSP 에 막히기 때문이다. 만들기 창은 모달이고, 같은 이유로 뒤 화면 스크롤은 막히지 않는다.
+작업 공간 상세(`DetailPanel`)는 읽기 카드(`NodeReadCard`)가 기본이고 편집 여부를 상태로 들고 있다. 동시 수정 비교용 입력(`EditDraft`)도 지금처럼 `DetailPanel` 이 들고 있어 편집 폼이 다시 그려져도 남는다.
 
 배치는 폭 1024px 를 경계로 두 가지다. 이상이면 `Workspace` 가 세 칸(왼쪽 260px, 그래프, 오른쪽 380px)으로 놓고, 미만이면 `Workspace` 가 `Tabs` 로 검색, 그래프, 상세를 나눈다.
 탭 배치에서도 세 칸을 모두 그려 두고 고르지 않은 칸만 숨긴다(`Tabs` 의 `forceMount` 와 `hidden`). 상세에서 쓰던 입력이 탭을 옮겨도 남아야 하기 때문이다.
@@ -190,15 +197,24 @@ mock 으로 Neo4j 를 대신한 테스트는 없다. 트랜잭션 일관성 테�
 | [001](adr/001-kotlin-spring-neo4jclient.md) | API 는 Kotlin, Spring Boot 4.1, Neo4jClient 로 만든다 |
 | [002](adr/002-claim-as-node.md) | 근거가 필요한 금융 주장은 Claim 노드로 저장한다 |
 | [003](adr/003-revision-lock-then-check.md) | revision 비교 전에 대상 노드에 쓰기 잠금을 건다 |
-| [004](adr/004-session-csrf-same-origin.md) | 세션과 쿠키 CSRF 토큰을 쓰고 웹과 API 를 같은 origin 으로 제공한다. 로그인 방식은 006 이 대체했다 |
-| [005](adr/005-ontology-yaml-server-validation.md) | 온톨로지는 Git 의 YAML 로 관리하고 API 가 쓰기를 검증한다. YAML 로 관리하는 부분은 008 이 대체했다 |
-| [006](adr/006-google-oidc-allowlist-roles.md) | Google OpenID Connect 로 로그인하고 허용 사용자와 역할로 권한을 나눈다. ADR 004 의 비밀번호 로그인을 대체한다 |
+| [006](adr/006-google-oidc-allowlist-roles.md) | Google OpenID Connect 로 로그인하고 허용 사용자와 역할로 권한을 나눈다. ADR-004 의 비밀번호 로그인을 대체한다 |
 | [007](adr/007-routes-in-url.md) | 화면 상태를 경로와 query 로 주소에 두고 React Router 로 다룬다. 서버는 화면 경로를 `index.html` 로 돌려준다 |
 | [008](adr/008-ontology-versions-in-db.md) | 온톨로지를 DB 에 버전으로 쌓고 ADMIN 이 웹에서 편집한다. 서버 코드와 맞물린 부분은 저장소 YAML 이 소유한다 |
-| [009](adr/009-investment-logic-chain.md) | 온톨로지를 투자 논리 사슬(변화, 병목, 산업, 기업, 밸류에이션, 결정) 중심으로 바꾸고 기업 사이의 관계를 뺀다 |
+| [009](adr/009-investment-logic-chain.md) | 온톨로지를 변화, 병목, 산업, 기업, 밸류에이션, 결정을 잇는 투자 온톨로지로 바꾸고 기업 사이의 관계를 뺀다 |
+| [010](adr/010-concept-map-first-screen.md) | 첫 화면을 개념 지도로 두고, 상단 탭 셋과 더보기 메뉴, 읽기 우선 상세, 전역 「＋ 추가」 로 화면 구조를 바꾼다 |
+
+대체된 ADR 은 `adr/superseded/` 에 있다. 당시 맥락을 읽을 때만 본다.
+
+| ADR | 결정 | 대체한 ADR |
+| --- | --- | --- |
+| [004](adr/superseded/004-session-csrf-same-origin.md) | 세션과 쿠키 CSRF 토큰을 쓰고 웹과 API 를 같은 origin 으로 제공한다. 세션, 쿠키 CSRF, 같은 origin 제공은 지금도 유효하다 | 006(비밀번호 로그인) |
+| [005](adr/superseded/005-ontology-yaml-server-validation.md) | 온톨로지는 Git 의 YAML 로 관리하고 API 가 쓰기를 검증한다. 쓰기 검증과 허용 목록 규칙은 지금도 유효하다 | 008(YAML 로 관리하는 부분) |
 
 ADR 로 남기지 않은 작은 결정은 다음과 같다.
 
+- 개념 지도와 작업 공간 그래프는 Cytoscape.js 내장 `breadthfirst` 배치(directed)를 쓴다(2026-10-24). 관계 방향대로 위에서 아래로 놓여 변화에서 결정까지 읽힌다. dagre 같은 계층 배치 확장은 새 의존이라 넣지 않았다.
+- 타입 순서는 온톨로지 필드가 아니라 관계 방향으로 계산한다([ADR-010](adr/010-concept-map-first-screen.md)). 깊이는 뿌리에서의 너비 우선 거리라 개념 지도의 `breadthfirst` 층과 같다.
+- 개념 지도의 최근 항목은 검색 API 에 `sort=recent` 를 더해 받는다(2026-10-24). 화면이 여러 쪽을 받아 정렬하는 안은 항목이 늘면 요청이 커져 버렸다.
 - 첫 접속 가이드는 라이브러리 없이 만든다(2026-10-23). 말풍선 라이브러리는 실행 중에 `<style>` 을 넣는 것이 많아 `style-src 'self'` 와 부딪히고, 가이드가 만들기 폼을 미리 채우고 만들기 성공을 받아야 해서 단계마다 화면 코드와 맞물린다. 말풍선 위치는 대상 요소의 `getBoundingClientRect` 로 계산해 React 의 `style` 속성(CSSOM)으로 둔다. 끝낸 기록은 서버의 `:User.guideDoneAt` 이다(사용자 결정 2026-10-23). 기기를 바꿔도 다시 열리지 않게 하려는 것이다.
 - 브라우저 테스트는 `prod` 를 켜지 않고 `e2e` 프로필(= `container` + `mockoidc`)로 돈다. `prod` 와 `mockoidc` 를 함께 켜면 시작을 막는다.
   e2e 스택은 운영 Compose 위에 override 만 겹치므로 이미지, 보안 헤더, cap_drop, 메모리 상한, 포트 규칙이 운영과 같다. Secure 쿠키와 forward headers 만 끈다.
@@ -212,7 +228,7 @@ ADR 로 남기지 않은 작은 결정은 다음과 같다.
 - 동시 수정 때 입력을 지키는 비교는 화면이 한다(2026-10-21 사용자 결정). 409 응답에 서버의 현재 값을 담는 안은 버렸다. 화면은 어차피 상세를 다시 읽고, 편집 시작 값은 화면만 들고 있어 서버가 세 값을 비교할 수 없다. 노드 편집 폼은 부모가 key 에 revision 을 넣어 다시 그려지므로, 내 입력은 폼이 아니라 `DetailPanel` 이 들고 있다가 새 폼에 넘긴다.
 - 문자열 칸을 enum 으로 바꾼 뒤의 예전 값은 API 시작 때 고친다(2026-10-21 사용자 결정). 운영 배포가 이미지 교체뿐이라 따로 돌릴 이전 스크립트의 자리가 없고, 개발과 e2e 데이터도 같은 길로 맞춰진다. 별칭은 코드가 아니라 온톨로지의 `valueAliases` 가 소유한다. 이력 없이 데이터를 바꾸지 않으려고 `system` 작업자로 ChangeEvent 를 남긴다.
 - 같은 이름은 막지 않고 저장 전에 경고한다(2026-10-21 사용자 결정). 이름이 같은 다른 기업이 실제로 있을 수 있어 서버의 유일성 제약으로 두지 않았다. 검사는 화면이 기존 검색 API 로 한다.
-- 종목의 발행 기업은 종목을 만든 뒤 화면이 관계 API 를 한 번 더 불러 잇는다(2026-10-21 사용자 결정). 노드 생성 API 가 관계를 함께 받는 안은 한 트랜잭션이 되지만 생성 계약과 검증이 커진다. 관계만 실패하는 경우는 안내하고 상세의 관계 추가로 다시 잇게 한다.
+- 종목의 발행 기업은 종목을 만든 뒤 화면이 관계 API 를 한 번 더 불러 잇는다(2026-10-21 사용자 결정). 노드 생성 API 가 관계를 함께 받는 안은 한 트랜잭션이 되지만 생성 계약과 검증이 커진다. 관계만 실패하는 경우는 안내하고 상세의 「＋ 연결 추가」 로 다시 잇게 한다.
 - 검토 대기를 「내가 검토할 주장」 과 「내가 쓰거나 고친 주장」 으로 나누는 일은 서버가 한다(2026-10-21 사용자 결정). 화면이 받은 쪽 안에서 나누면 한 쪽에 두 종류가 섞이고, 마지막 내용 수정자 규칙은 화면이 알 수 없다. `GET /api/claims` 의 `scope` 가 자기 검토 금지 규칙과 같은 조건(`createdBy`, `contentUpdatedBy`)으로 나눈다.
 - 변경 이력의 노드 ID 는 읽을 때 이름으로 바꾼다(2026-10-21 사용자 결정). 쓸 때 이름을 저장하는 안은 그때의 이름이 남지만 이미 쌓인 이력은 ID 그대로라 버렸다. `ChangeController` 가 자기 쿼리로 이름을 읽는다. `history` 가 `knowledge` 를 부르지 않는다는 호출 방향을 지키기 위해서다. 바꾸는 ID 는 Claim 이 아닌 노드(주체, 대상, 근거 문서, 관계의 끝)라 `Ontology.labelOf` 로 충분하다.
 - 화면 상태는 경로와 query 로 주소에 두고 React Router 로 다룬다([ADR-007](adr/007-routes-in-url.md)). 처음 링크를 만들 때는 router 를 들이지 않고 `/?node=` 만 썼으나, 뒤로가기와 새로고침을 고치면서 바꿨다(2026-10-22 사용자 결정).

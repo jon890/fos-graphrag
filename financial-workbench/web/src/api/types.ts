@@ -120,6 +120,11 @@ export interface Page<T> {
   totalPages: number
 }
 
+/** GET /api/nodes/counts. 보관하지 않은 노드 수. 온톨로지의 모든 타입 키가 있고 없는 타입은 0 이다 */
+export interface NodeCounts {
+  counts: Record<string, number>
+}
+
 export interface GraphNode {
   id: string
   type: string
@@ -231,6 +236,8 @@ export interface RelationshipTypeDef {
   description: string
   from: string[]
   to: string[]
+  /** 관계 문장 틀. {from}, {to} 자리에 두 항목 이름이 들어간다 */
+  sentence?: string | null
   /** 끝(to) 타입 만들기 폼에 시작(from) 노드를 고르는 칸 */
   createPicker?: CreatePickerDef | null
 }

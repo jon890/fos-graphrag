@@ -7,10 +7,12 @@ export type GuideKind = 'browse' | 'practice'
 
 export interface GuideStep {
   id: string
-  /** 가리킬 요소의 data-testid. 없으면 화면 아래쪽 카드로 보인다 */
-  target: string | null
+  /** 가리킬 요소의 data-testid 목록. 앞에서부터 처음 보이는 것을 가리킨다. 비었거나 하나도 보이지 않으면 화면 아래쪽 카드로 보인다 */
+  target: string[]
   /** 좁은 화면에서 이 단계에 들어갈 때 옮길 작업 공간 탭 */
   pane: 'search' | 'graph' | 'detail' | null
+  /** 이 단계의 대상이 있는 화면. 둘러보기는 단계에 들어갈 때 이 화면으로 옮긴다 */
+  route: 'map' | 'workspace'
   title: string
   body: string
 }
@@ -19,25 +21,36 @@ export interface GuideStep {
 export const BROWSE_STEPS: GuideStep[] = [
   {
     id: 'intro',
-    target: null,
+    target: [],
     pane: null,
+    route: 'workspace',
     title: '워크벤치 둘러보기',
-    body: '투자 지식을 근거와 함께 쌓는 곳입니다. 화면을 세 단계로 둘러봅니다.',
+    body: '투자 판단을 근거와 함께 쌓는 온톨로지입니다. 화면을 차례로 둘러봅니다.',
   },
-  { id: 'search', target: 'search-input', pane: 'search', title: '검색', body: '기업, 인물, 개념의 이름으로 찾습니다.' },
+  {
+    id: 'map',
+    target: ['concept-map-canvas'],
+    pane: null,
+    route: 'map',
+    title: '개념 지도',
+    body: '워크벤치가 담는 지식의 종류와 서로의 관계입니다. 상자를 누르면 그 종류의 항목을 봅니다.',
+  },
+  { id: 'search', target: ['search-input'], pane: 'search', route: 'workspace', title: '검색', body: '기업, 인물, 개념의 이름으로 찾습니다.' },
   {
     id: 'graph',
-    target: 'graph-canvas',
+    target: ['graph-canvas'],
     pane: 'graph',
+    route: 'workspace',
     title: '그래프',
     body: '고른 항목과 이어진 항목이 그래프로 보입니다. 기업 사이의 선은 주장입니다.',
   },
   {
     id: 'detail',
-    target: 'workspace-pane-detail',
+    target: ['workspace-pane-detail'],
     pane: 'detail',
+    route: 'workspace',
     title: '상세',
-    body: '항목을 누르면 속성, 주장, 근거 문서, 검토 상태가 여기에 나옵니다.',
+    body: '항목을 누르면 속성, 연결, 주장, 검토 상태가 여기에 나옵니다.',
   },
 ]
 
@@ -73,40 +86,47 @@ export interface GuideLabels {
 /** 따라하기의 단계. 문구는 docs/flow.md 「편집자와 관리자의 따라하기」 다 */
 export function practiceSteps(labels: GuideLabels, plan: PracticePlan): GuideStep[] {
   const company = labels.type('Company')
+  const documentType = labels.type('Document')
   const object = labels.type(plan.objectType)
   return [
     {
       id: 'intro',
-      target: null,
+      target: [],
       pane: null,
+      route: 'workspace',
       title: '워크벤치 따라하기',
-      body: '투자 지식을 근거와 함께 쌓는 곳입니다. 연습 항목 세 개를 직접 만들어 봅니다. 끝나면 연습 항목은 보관되어 검색에 나오지 않습니다.',
+      body: '투자 판단을 근거와 함께 쌓는 온톨로지입니다. 연습 항목 세 개를 직접 만들어 봅니다. 끝나면 연습 항목은 보관되어 검색에 나오지 않습니다.',
     },
+    // 기업과 근거 문서는 어느 화면에서나 「＋ 추가」 로 만든다. 창이 열려 있으면 창의 만들기 단추를 가리킨다.
     {
       id: 'company',
-      target: 'create-submit',
-      pane: 'search',
+      target: ['create-submit', 'add-open'],
+      pane: null,
+      route: 'workspace',
       title: `${company} 만들기`,
-      body: `먼저 ${withEulReul(company)} 하나 만듭니다. 이름은 바꿔도 됩니다. 「만들기」 를 누르세요.`,
+      body: `먼저 ${withEulReul(company)} 하나 만듭니다. 오른쪽 위 「＋ 추가」 를 누르고 ${withEulReul(company)} 고르세요. 이름은 연습 이름으로 채워 둡니다.`,
     },
     {
       id: 'document',
-      target: 'create-submit',
-      pane: 'search',
-      title: `${labels.type('Document')} 만들기`,
-      body: '주장에는 근거가 필요합니다. 근거로 쓸 문서를 등록합니다.',
+      target: ['create-submit', 'add-open'],
+      pane: null,
+      route: 'workspace',
+      title: `${documentType} 만들기`,
+      body: `주장에는 근거가 필요합니다. 「＋ 추가」 에서 ${withEulReul(documentType)} 골라 등록합니다.`,
     },
     {
       id: 'claim',
-      target: 'claim-add-submit',
+      target: ['claim-add-submit'],
       pane: 'detail',
+      route: 'workspace',
       title: `주장 만들기: ${labels.predicate(plan.predicate)}`,
       body: `이제 주장을 만듭니다. 대상에 ${object} 하나를 고르고 「만들기」 를 누르세요. 관계, 근거 문서, 설명과 근거 문장은 미리 채웠습니다.`,
     },
     {
       id: 'done',
-      target: 'graph-canvas',
+      target: ['graph-canvas'],
       pane: 'graph',
+      route: 'workspace',
       title: '마침',
       body: `주장이 그래프에 ${withJosa(company, '와(과)')} ${withEulReul(object)} 잇는 선으로 보입니다. 다른 편집자가 검토하면 실선이 됩니다. 「끝내기」 를 누르면 연습 항목을 보관합니다.`,
     },
@@ -116,8 +136,9 @@ export function practiceSteps(labels: GuideLabels, plan: PracticePlan): GuideSte
 /** 진행 중인 따라하기가 있을 때 먼저 묻는 단계 */
 export const RESUME_STEP: GuideStep = {
   id: 'resume',
-  target: null,
+  target: [],
   pane: null,
+  route: 'workspace',
   title: '따라하기 이어서 하기',
   body: '하던 따라하기가 있습니다. 이어서 하거나 그만둘 수 있습니다. 그만두면 만든 연습 항목을 보관합니다.',
 }
@@ -209,7 +230,7 @@ export function clearProgress(storage?: Storage | null): void {
   }
 }
 
-/** 로그인한 뒤 작업 공간에서 가이드를 저절로 열지. 진행 중인 따라하기는 끝낸 기록과 상관없이 연다 */
+/** 로그인한 뒤 개념 지도나 작업 공간에서 가이드를 저절로 열지. 진행 중인 따라하기는 끝낸 기록과 상관없이 연다 */
 export function shouldAutoStart(user: CurrentUser, progress: GuideProgress | null = null): boolean {
   return user.guideDoneAt == null || progress?.kind === 'practice'
 }

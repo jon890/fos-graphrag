@@ -37,10 +37,10 @@ describe('GuideBubble', () => {
 
   it('중간 단계는 「다음」 을 담는다', () => {
     const html = render(1)
-    expect(html).toContain('data-step="search"')
+    expect(html).toContain('data-step="map"')
     expect(html).toContain('data-testid="guide-next"')
     expect(html).toContain('data-testid="guide-skip"')
-    expect(html).toContain('2 / 4')
+    expect(html).toContain('2 / 5')
     expect(html).not.toContain('data-testid="guide-finish"')
   })
 
@@ -91,9 +91,13 @@ describe('따라하기 말풍선', () => {
     expect(html).not.toContain('data-testid="guide-reopen"')
   })
 
-  it('폼을 취소했으면 「폼 다시 열기」 가 나온다', () => {
-    expect(renderPractice(PRACTICE[1], 1, true)).toContain('data-testid="guide-reopen"')
+  it('주장 폼을 취소했으면 「폼 다시 열기」 가 나온다', () => {
+    expect(renderPractice(PRACTICE[3], 3, true)).toContain('data-testid="guide-reopen"')
   })
+
+  // 말풍선이 만들기 창의 오버레이보다 위에 그려지고 누르기를 받는 동작은 정적 렌더링으로 확인할 수 없다.
+  // e2e/mobile.spec.ts 「휴대폰 폭에서 사용법 따라하기가 아래쪽 카드로 열리고 만들기 창을 가리지 않는다」 가
+  // 창이 열린 채로 말풍선의 「그만두기」 를 눌러 확인한다.
 
   it('마침 단계는 「끝내기」 만 있다', () => {
     const html = renderPractice(PRACTICE[4], 4)

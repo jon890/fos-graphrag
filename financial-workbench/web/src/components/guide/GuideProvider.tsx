@@ -23,7 +23,7 @@ import {
   type PracticePlan,
 } from '../../lib/guide'
 import { predicateLabel, typeLabel } from '../../lib/labels'
-import { DEFAULT_WORKSPACE_QUERY, parseWorkspaceQuery, TAB_PATHS, tabOfPath, workspaceSearch, type WorkspaceQuery } from '../../routes'
+import { DEFAULT_WORKSPACE_QUERY, LANDING_PATH, parseWorkspaceQuery, TAB_PATHS, tabOfPath, workspaceSearch, type WorkspaceQuery } from '../../routes'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -68,7 +68,7 @@ export interface GuideContextValue {
   /** 항목을 만들었을 때. 지금 단계의 종류면 다음 단계로 간다 */
   report: (event: GuideReport) => void
   consumePrefill: () => void
-  /** 만들기 폼을 닫았을 때. 말풍선에 「폼 다시 열기」 가 나온다 */
+  /** 만들기 폼이나 창을 닫았을 때. 주장 단계는 말풍선에 「폼 다시 열기」 가 나오고, 기업과 근거 문서 단계는 다음에 그 타입의 창을 열 때 다시 채운다 */
   cancelForm: () => void
 }
 
@@ -120,7 +120,7 @@ async function choosePlan(ontology: Ontology): Promise<PracticePlan | null> {
 interface Props {
   user: CurrentUser
   onUserChange: (user: CurrentUser) => void
-  /** 받기 전에는 null. 작업 공간이 그려진 뒤에 저절로 연다 */
+  /** 받기 전에는 null. 개념 지도나 작업 공간이 그려진 뒤에 저절로 연다 */
   ontology: Ontology | null
   children: ReactNode
 }
@@ -184,7 +184,8 @@ export function GuideProvider({ user, onUserChange, ontology, children }: Props)
     if (busyRef.current || openingRef.current) return
     openingRef.current = true
     try {
-      if (locationRef.current.pathname !== TAB_PATHS.workspace) navigateRef.current(TAB_PATHS.workspace)
+      const here = locationRef.current.pathname
+      if (here !== TAB_PATHS.map && here !== TAB_PATHS.workspace) navigateRef.current(LANDING_PATH)
       const me = userRef.current
       setMessage(null)
       setArchiveFailed([])
@@ -284,14 +285,19 @@ export function GuideProvider({ user, onUserChange, ontology, children }: Props)
     setPrefillUsed(true)
     setFormClosed(false)
   }, [])
-  const cancelForm = useCallback(() => setFormClosed(true), [])
   const reopen = useCallback(() => {
     setPrefillUsed(false)
     setFormClosed(false)
   }, [])
+  const cancelForm = useCallback(() => {
+    const s = stateRef.current
+    const id = s.steps[s.step]?.id
+    if (id === 'company' || id === 'document') reopen()
+    else if (id === 'claim') setFormClosed(true)
+  }, [reopen])
 
   useEffect(() => {
-    if (autoTriedRef.current || tab !== 'workspace' || ontology === null) return
+    if (autoTriedRef.current || (tab !== 'map' && tab !== 'workspace') || ontology === null) return
     if (!shouldAutoStart(user, readProgress(user.id))) return
     autoTriedRef.current = true
     void open()
@@ -309,21 +315,28 @@ export function GuideProvider({ user, onUserChange, ontology, children }: Props)
     if (!s.active || s.resuming) return
     const current = s.steps[s.step]
     const here = locationRef.current
-    if (!current || here.pathname !== TAB_PATHS.workspace) return
+    // 소개는 지금 화면에서 보인다.
+    if (!current || current.id === 'intro') return
+    if (current.route === 'map') {
+      if (here.pathname !== TAB_PATHS.map) navigateRef.current(TAB_PATHS.map, { replace: true })
+      return
+    }
     const narrowPane = wideRef.current ? null : current.pane
     let target: WorkspaceQuery | null = null
     if (s.kind === 'practice') {
       const company = s.created.company ?? null
-      if (current.id === 'company' || current.id === 'document') target = { ...DEFAULT_WORKSPACE_QUERY, pane: narrowPane }
-      else if (current.id === 'claim' && company) target = { ...DEFAULT_WORKSPACE_QUERY, node: company, pane: narrowPane }
+      // 기업과 근거 문서는 어느 화면에서나 「＋ 추가」 로 만들어 주소를 바꾸지 않는다.
+      if (current.id === 'claim' && company) target = { ...DEFAULT_WORKSPACE_QUERY, node: company, pane: narrowPane }
       else if (current.id === 'done' && company) target = { ...DEFAULT_WORKSPACE_QUERY, node: company, center: company, pane: narrowPane }
+    } else if (here.pathname !== TAB_PATHS.workspace) {
+      target = { ...DEFAULT_WORKSPACE_QUERY, pane: narrowPane }
     } else if (narrowPane) {
       const query = parseWorkspaceQuery(here.search)
       if (query.pane !== narrowPane) target = { ...query, pane: narrowPane }
     }
     if (!target) return
     const url = TAB_PATHS.workspace + workspaceSearch(target)
-    // 만들기가 성공하면 작업 공간이 만든 항목을 여는 주소를 같은 이벤트에서 쌓는다. 아직 반영되지 않은 주소와 비교하면
+    // 만들기가 성공하면 App 이 만든 항목을 여는 주소를 같은 이벤트에서 쌓는다. 아직 반영되지 않은 주소와 비교하면
     // 바꾸지 않고 넘어갈 수 있어, 따라하기는 비교하지 않고 언제나 바꾼다. replace 라 기록은 쌓이지 않는다.
     if (s.kind === 'practice' || url !== here.pathname + here.search) navigateRef.current(url, { replace: true })
     // entry 가 바뀔 때만 돈다. 주소나 폭이 바뀌어도 다시 옮기지 않는다.
@@ -436,7 +449,7 @@ export function GuideMessage() {
   )
 }
 
-/** 머리글의 「사용법」. 작업 공간으로 옮겨 가이드를 연다 */
+/** 머리글의 「사용법」. 개념 지도나 작업 공간이 아니면 개념 지도로 옮겨 가이드를 연다 */
 export function GuideOpenButton() {
   const { open, busy } = useGuide()
   return (

@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { api, errorMessage } from '../api/client'
 import type { NodeView, Page, ReviewStatus } from '../api/types'
-import { creatableTypes, useApp, useLabels } from '../context'
-import { withEulReul, withJosa } from '../lib/labels'
-import { ClaimCreateForm } from './ClaimCreateForm'
-import { NodeCreateForm } from './NodeCreateForm'
-import { useGuide, type GuidePrefill } from './guide/GuideProvider'
+import { useApp, useLabels } from '../context'
+import { managedTypes, orderedTypes } from '../lib/typeOrder'
 import { Pager } from './Pager'
 import { StatusBadge, TypeBadge } from './TypeBadge'
 
@@ -16,20 +13,29 @@ export interface SearchFilters {
   includeArchived: boolean
 }
 
+/** 고급 필터에서 기본값과 다른 조건의 개수. 접혀 있어도 조건이 걸린 것을 머리글자로 알린다 */
+export function advancedFilterCount(f: { reviewStatus: string; includeArchived: boolean; hops: number; claimsAsNodes: boolean }): number {
+  return [f.reviewStatus !== '', f.includeArchived, f.hops !== 1, f.claimsAsNodes].filter(Boolean).length
+}
+
 interface Props {
   filters: SearchFilters
   onFiltersChange: (f: SearchFilters) => void
   selectedId: string | null
   onFocus: (id: string) => void
-  /** 새 노드를 만들었을 때. 안내 문장과 함께 부른다 */
-  onCreated: (node: NodeView, message: string, kind?: 'success' | 'error') => void
   refreshTick: number
   typesParam: (types: string[]) => string[] | undefined
+  hops: number
+  onHopsChange: (hops: number) => void
+  claimsAsNodes: boolean
+  onClaimsAsNodesChange: (value: boolean) => void
 }
 
-export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onCreated, refreshTick, typesParam }: Props) {
-  const { ontology, canEdit } = useApp()
+export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, refreshTick, typesParam, hops, onHopsChange, claimsAsNodes, onClaimsAsNodesChange }: Props) {
+  const { canEdit, ontology } = useApp()
   const labels = useLabels()
+  // 칩 순서는 개념 지도와 같다. 관계 방향으로 얕은 타입이 앞이고 주장이 맨 뒤다.
+  const chipTypes = useMemo(() => [...orderedTypes(ontology), ...managedTypes(ontology)], [ontology])
   const [qInput, setQInput] = useState(filters.q)
   // 뒤로가기로 주소의 검색어가 바뀌면 입력칸도 따라간다.
   useEffect(() => setQInput(filters.q), [filters.q])
@@ -37,26 +43,6 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
   const [result, setResult] = useState<Page<NodeView> | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [createType, setCreateType] = useState<string>('')
-  const [creating, setCreating] = useState(false)
-  const guide = useGuide()
-  // 가이드가 연 폼의 프리필. 가이드의 값은 가져가면 비므로 폼이 다시 만들어지지 않게 여기에 복사해 둔다.
-  const [openedPrefill, setOpenedPrefill] = useState<GuidePrefill | null>(null)
-  const { prefill, consumePrefill } = guide
-
-  useEffect(() => {
-    if (!canEdit || creating || !prefill?.type || !ontology.nodeTypes[prefill.type]) return
-    setOpenedPrefill(prefill)
-    setCreateType(prefill.type)
-    setCreating(true)
-    consumePrefill()
-  }, [canEdit, creating, prefill, ontology, consumePrefill])
-
-  const closeForm = () => {
-    setCreating(false)
-    setOpenedPrefill(null)
-  }
-
   const run = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -95,12 +81,11 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
 
   const toggleType = (type: string, on: boolean) => {
     const next = on ? [...filters.types, type] : filters.types.filter((t) => t !== type)
-    update({ types: labels.types.filter((t) => next.includes(t)) })
+    update({ types: chipTypes.filter((t) => next.includes(t)) })
   }
 
-  const creatable = creatableTypes(ontology)
-  const claimType = Object.keys(ontology.nodeTypes).find((t) => ontology.nodeTypes[t].managedBy === 'claims')
-  const claimCreatable = !!claimType && Object.keys(ontology.claimPredicates).length > 0
+  const advancedCount = advancedFilterCount({ reviewStatus: filters.reviewStatus, includeArchived: filters.includeArchived, hops, claimsAsNodes })
+
   // 조건 없이 검색해도 결과가 없으면 아직 아무것도 등록하지 않은 것이다.
   const nothingRegistered =
     !filters.q && !filters.reviewStatus && !filters.includeArchived && filters.types.length === labels.types.length
@@ -110,7 +95,7 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
       <form onSubmit={submit} className="row">
         <input
           data-testid="search-input"
-          placeholder="이름 또는 종목 코드"
+          placeholder="이름이나 종목 코드로 찾기"
           value={qInput}
           onChange={(e) => setQInput(e.target.value)}
         />
@@ -119,19 +104,28 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
         </button>
       </form>
 
-      <fieldset className="filters">
-        <legend>종류</legend>
-        {labels.types.map((t) => (
-          <label key={t} className="check">
-            <input
-              type="checkbox"
+      <div className="type-chips">
+        {chipTypes.map((t) => {
+          const on = filters.types.includes(t)
+          return (
+            <button
+              key={t}
+              type="button"
+              className={on ? 'type-chip on' : 'type-chip'}
               data-testid={`filter-type-${t}`}
-              checked={filters.types.includes(t)}
-              onChange={(e) => toggleType(t, e.target.checked)}
-            />
-            <TypeBadge type={t} />
-          </label>
-        ))}
+              aria-pressed={on}
+              onClick={() => toggleType(t, !on)}
+            >
+              <TypeBadge type={t} />
+            </button>
+          )
+        })}
+      </div>
+
+      <details className="filters" data-testid="advanced-filters">
+        <summary data-testid="advanced-filters-toggle">
+          {advancedCount === 0 ? '고급 필터' : `고급 필터 (${advancedCount})`}
+        </summary>
         <label className="field-inline">
           주장 검토 상태
           <select
@@ -156,8 +150,24 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
           />
           보관 포함
         </label>
-        <div className="hint">종류와 검토 상태 필터는 주변 그래프에도 적용됩니다.</div>
-      </fieldset>
+        <label className="field-inline">
+          이웃 단계
+          <select data-testid="graph-hops" value={hops} onChange={(e) => onHopsChange(Number(e.target.value))}>
+            <option value={1}>1</option>
+            <option value={2}>2</option>
+          </select>
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            data-testid="graph-claims-as-nodes"
+            checked={claimsAsNodes}
+            onChange={(e) => onClaimsAsNodesChange(e.target.checked)}
+          />
+          주장을 따로 보기
+        </label>
+        <div className="hint">종류와 검토 상태는 그래프에도 적용됩니다.</div>
+      </details>
 
       <div className="search-results" data-testid="search-results">
         {loading && <div className="muted">검색 중…</div>}
@@ -165,7 +175,7 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
         {result && !loading && result.items.length === 0 && (
           <div className="muted" data-testid="search-empty">
             {nothingRegistered
-              ? `아직 등록된 항목이 없습니다.${canEdit ? ' 아래에서 처음 항목을 만들어 보세요.' : ''}`
+              ? `아직 등록한 항목이 없습니다.${canEdit ? ' 오른쪽 위 「＋ 추가」 로 첫 항목을 만드세요.' : ''}`
               : '검색 결과가 없습니다.'}
           </div>
         )}
@@ -195,86 +205,6 @@ export function SearchPanel({ filters, onFiltersChange, selectedId, onFocus, onC
           </ul>
         )}
         {result && result.totalPages > 1 && <Pager page={result} onPage={setPageNo} testIdPrefix="search-pager" />}
-      </div>
-
-      <div className="create-box">
-        {!canEdit ? (
-          <div className="muted small" data-testid="viewer-create-hint">
-            열람자는 항목을 만들 수 없습니다.
-          </div>
-        ) : !creating ? (
-          <div className="row">
-            <select data-testid="new-node-type" value={createType} onChange={(e) => setCreateType(e.target.value)}>
-              <option value="">무엇을 만들까요?</option>
-              {creatable.map((t) => (
-                <option key={t} value={t}>
-                  {labels.type(t)}
-                </option>
-              ))}
-              {claimCreatable && <option value={claimType}>{labels.type(claimType!)}</option>}
-            </select>
-            <button
-              className="primary"
-              data-testid="new-node-button"
-              disabled={!createType}
-              onClick={() => setCreating(true)}
-            >
-              새로 만들기
-            </button>
-          </div>
-        ) : (
-          <>
-            <h3>새 {labels.type(createType)}</h3>
-            <div className="hint">{ontology.nodeTypes[createType]?.description}</div>
-            {createType === claimType ? (
-              <ClaimCreateForm
-                onCancel={() => {
-                  closeForm()
-                  guide.cancelForm()
-                }}
-                onCreated={(claim) => {
-                  closeForm()
-                  guide.report({ kind: 'claim-created', node: claim })
-                  onCreated(claim, `「${labels.node(claim)}」 ${withEulReul(labels.type(claim.type))} 만들었습니다. 다른 편집자의 검토를 기다립니다.`)
-                  void run()
-                }}
-              />
-            ) : (
-              <NodeCreateForm
-                key={openedPrefill ? `${createType}:${openedPrefill.step}` : createType}
-                type={createType}
-                testIdPrefix="create"
-                initialValues={openedPrefill?.values}
-                onCancel={() => {
-                  closeForm()
-                  guide.cancelForm()
-                }}
-                onUseExisting={(n) => {
-                  // 있는 항목을 여는 것은 만들기가 아니다. 가이드는 그 단계에 남고 폼을 다시 열 수 있다.
-                  closeForm()
-                  guide.cancelForm()
-                  onFocus(n.id)
-                }}
-                onCreated={(node, linkError) => {
-                  closeForm()
-                  guide.report({ kind: 'node-created', node })
-                  if (linkError) {
-                    const pickerLabel =
-                      Object.values(ontology.relationshipTypes).find((r) => r.createPicker && r.to.includes(node.type))?.createPicker?.label ?? '관계'
-                    onCreated(
-                      node,
-                      `「${labels.node(node)}」 ${withEulReul(labels.type(node.type))} 만들었지만 ${withJosa(pickerLabel, '을(를)')} 잇지 못했습니다. 상세의 관계 추가로 다시 이으세요. (${linkError})`,
-                      'error',
-                    )
-                  } else {
-                    onCreated(node, `「${labels.node(node)}」 ${withEulReul(labels.type(node.type))} 만들었습니다.`)
-                  }
-                  void run()
-                }}
-              />
-            )}
-          </>
-        )}
       </div>
     </div>
   )

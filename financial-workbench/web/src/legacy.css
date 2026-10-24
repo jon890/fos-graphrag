@@ -77,6 +77,10 @@ button:where(:not([data-slot])).link-button:disabled { color: var(--text); opaci
 .pane-center { background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
 
 .filters { border: 1px solid var(--border); border-radius: 4px; margin: 8px 0; padding: 6px 10px; display: flex; flex-direction: column; gap: 4px; }
+.type-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.type-chip { padding: 2px 6px; border-radius: 12px; opacity: 0.5; }
+.type-chip.on { opacity: 1; border-color: var(--primary); }
+.filters > summary { cursor: pointer; }
 .check { display: flex; align-items: center; gap: 6px; }
 .field-inline { display: inline-flex; align-items: center; gap: 6px; }
 .search-results ul { list-style: none; padding: 0; margin: 0; }
@@ -95,7 +99,6 @@ button:where(:not([data-slot])).link-button:disabled { color: var(--text); opaci
 /* 이름과 구분 정보를 두 줄로 쌓는다. 한 줄에 두면 왼쪽 칸(260px)에서 이름이 두세 글자로 잘린다 */
 .result-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .result-label, .result-hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.create-box { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 
 .type-badge {
   display: inline-block;
@@ -129,9 +132,6 @@ button:where(:not([data-slot])).link-button:disabled { color: var(--text); opaci
   text-align: center;
 }
 .graph-overlay.subtle { align-items: flex-end; padding-bottom: 16px; }
-.welcome { max-width: 460px; text-align: left; color: var(--text, #1f2937); }
-.welcome h2 { margin: 0 0 8px; font-size: 18px; }
-.welcome ol { padding-left: 20px; margin: 8px 0; display: grid; gap: 6px; }
 .meta-details { margin: 4px 0 8px; font-size: 12px; }
 .meta-details summary { cursor: pointer; color: var(--legacy-muted); }
 .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; }
@@ -144,8 +144,10 @@ button:where(:not([data-slot])).link-button:disabled { color: var(--text); opaci
 .detail-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .detail-head h2 { margin: 0; word-break: break-all; }
 .detail-section { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px; }
+/* 절 제목과 오른쪽의 「＋ 추가」 단추 */
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.section-head h3 { margin: 0; }
 .actions { margin: 6px 0; }
-.reason-input { flex: 1; }
 .kv { display: grid; grid-template-columns: 80px 1fr; gap: 4px 8px; margin: 6px 0; }
 .kv dt { color: var(--legacy-muted); }
 .kv dd { margin: 0; word-break: break-word; }
@@ -163,7 +165,9 @@ button:where(:not([data-slot])).link-button:disabled { color: var(--text); opaci
 .rel-list { list-style: none; padding: 0; margin: 0 0 8px; }
 .rel-list li { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 3px 0; }
 .rel-list li.archived { opacity: 0.6; }
-.rel-type { color: var(--legacy-muted); font-size: 12px; }
+.rel-sentence { min-width: 0; word-break: break-word; }
+.rel-sentence a { color: var(--primary); text-decoration: none; }
+.rel-sentence a:hover { text-decoration: underline; }
 
 .claim-card { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: #fff; }
 .claim-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -176,7 +180,6 @@ blockquote { margin: 0; padding: 4px 8px; border-left: 3px solid #cbd5e1; backgr
 /* Tailwind 기본 초기화가 지운 브라우저 기본값을 옛 화면에 되살린다 */
 h1, h2, h3, h4 { font-weight: 700; }
 p { margin: 1em 0; }
-.welcome ol { list-style: decimal; }
 .graph-node-list ul { list-style: disc; }
 body { line-height: normal; }
 a { color: revert; text-decoration: revert; }

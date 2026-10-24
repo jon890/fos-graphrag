@@ -1,7 +1,7 @@
 ## ADR-006: Google OpenID Connect 로 로그인하고 허용 사용자와 역할로 권한을 나눈다
 
 - **status**: `accepted`
-- **결정**: 운영 로그인은 Google OpenID Connect(Spring Security `oauth2Login`) 하나다. Google 이 확인한 이메일(`email_verified`)이 허용 사용자 목록에 있고 그 사용자가 활성일 때만 세션을 만든다. 첫 로그인 때 Google `sub` 을 사용자에 묶고 그 뒤에는 `sub` 으로 찾는다. 사용자마다 `VIEWER`, `EDITOR`, `ADMIN` 가운데 역할 하나를 두고 서버가 경로별로 집행한다. 첫 관리자는 `WORKBENCH_BOOTSTRAP_ADMIN_EMAIL` 로 시작할 때 한 번 만든다. [ADR-004](004-session-csrf-same-origin.md) 의 비밀번호 로그인 부분을 대체한다. 세션과 쿠키 CSRF, 같은 origin 제공은 ADR-004 를 그대로 따른다.
+- **결정**: 운영 로그인은 Google OpenID Connect(Spring Security `oauth2Login`) 하나다. Google 이 확인한 이메일(`email_verified`)이 허용 사용자 목록에 있고 그 사용자가 활성일 때만 세션을 만든다. 첫 로그인 때 Google `sub` 을 사용자에 묶고 그 뒤에는 `sub` 으로 찾는다. 사용자마다 `VIEWER`, `EDITOR`, `ADMIN` 가운데 역할 하나를 두고 서버가 경로별로 집행한다. 첫 관리자는 `WORKBENCH_BOOTSTRAP_ADMIN_EMAIL` 로 시작할 때 한 번 만든다. [ADR-004](superseded/004-session-csrf-same-origin.md) 의 비밀번호 로그인 부분을 대체한다. 세션과 쿠키 CSRF, 같은 origin 제공은 ADR-004 를 그대로 따른다.
 - **맥락**: 워크벤치를 VPN 없이 공개 HTTPS 경로에 두고 앱 로그인이 유일한 접근 제어가 된다. 사용자가 Gmail 로 로그인하고, 허용한 사람만 들어오고, 편집 권한을 나누기를 요청했다. 비밀번호를 직접 저장하면 시도 제한, 재설정, 유출 대응을 앱이 모두 맡아야 한다.
 - **대안 기각**:
   - 비밀번호 로그인에 시도 제한과 계정 존재 숨김을 더하기: 공개 경로에서 비밀번호 저장과 무차별 대입 방어를 앱이 맡는다. Google 이 이미 하는 일이다.

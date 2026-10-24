@@ -12,33 +12,83 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `login-google` | 「Google 로 로그인」. `/oauth2/authorization/google` 로 브라우저가 이동한다 |
 | `login-denied` | `/?login=denied` 로 돌아왔을 때 「접근 권한이 없습니다」 안내. `login-google` 도 함께 보인다 |
 | `login-notice` | 세션이 끊겨 돌아왔을 때의 안내 |
-| `tab-workspace`, `tab-list`, `tab-review`, `tab-changes`, `tab-ontology` | 상단 탭 |
-| `tab-users` | 사용자 탭. ADMIN 에게만 나온다 |
+| `tab-map`, `tab-workspace`, `tab-list` | 상단 탭(개념 지도, 작업 공간, 목록). `role=tab`, 고른 탭은 `aria-selected="true"` |
+| `more-open` | 「더보기」 메뉴 단추. 메뉴의 화면(변경 이력, 온톨로지 상세, 검토 대기, 사용자)이 열려 있으면 `data-active="true"` |
+| `more-item-<key>` | 더보기 메뉴 항목. `key` 는 `changes`, `ontology`, `review`(EDITOR, ADMIN), `users`(ADMIN). 열람자가 주소로 연 `/review` 도 `more-open` 이 `data-active="true"` 다 |
 | `current-user-name`, `current-user-email` | 로그인 사용자의 표시 이름, 이메일 |
 | `current-user-role` | 역할 배지. `data-role` 이 VIEWER, EDITOR, ADMIN |
-| `guide-open` | 머리글의 「사용법」. 작업 공간으로 옮겨 첫 접속 가이드를 처음부터 연다 |
+| `guide-open` | 머리글의 「사용법」. 개념 지도나 작업 공간이 아니면 개념 지도로 옮겨 첫 접속 가이드를 처음부터 연다 |
 | `logout-button` | 로그아웃 |
 | `ontology-error` | 온톨로지를 받지 못했을 때 |
 | `ontology-stale`, `ontology-reload` | 다른 곳에서 온톨로지 버전이 바뀌었다는 안내와 「다시 읽기」 단추. 응답 헤더의 버전이 들고 있는 버전보다 클 때만 나온다 |
 
-## 첫 접속 가이드
+## ＋ 추가
 
-`guideDoneAt` 이 없는 사용자가 작업 공간에 들어오거나 「사용법」(`guide-open`)을 누르면 열린다. `e2e/support.ts` 의 `loginAs` 는 기본으로 가이드를 건너뛴다. 가이드를 확인하는 테스트만 `{ guide: 'keep' }` 을 넘긴다.
+머리글의 「＋ 추가」 메뉴와 만들기 창이다. 메뉴와 창은 Portal 로 `body` 아래에 그려진다. 편집 권한이 없으면(VIEWER) 여는 단추가 없다.
 
 | testid | 요소 |
 | --- | --- |
-| `guide-bubble` | 말풍선(`role=dialog`). `data-step` 이 단계 id 다. 둘러보기는 `intro`, `search`, `graph`, `detail`, 따라하기는 `intro`, `company`, `document`, `claim`, `done` 이다. 진행 중인 따라하기를 이어서 할지 묻는 단계는 `resume` 이다. `data-placement` 는 `anchored`(대상 옆) 또는 `card`(화면 아래쪽 카드)다 |
+| `add-open` | 머리글의 「＋ 추가」 단추. 좁은 화면에서는 ＋ 만 보이고 `aria-label="추가"` 다. 온톨로지를 받기 전에는 없다 |
+| `add-type-<타입>` * | 메뉴의 타입 줄. 타입 순서대로이고 주장(`add-type-Claim`)은 맨 아래 구분선 밑에 있다. 주장 종류가 없으면 주장 줄이 없다 |
+| `add-dialog` | 만들기 창. `data-type` 이 고른 타입이다. 주장이면 안에 주장 만들기 폼(`claim-add-form`)이 있다 |
+| `add-steps` | 창 위쪽의 단계 표시(「1. 종류 고르기」, 「2. 내용 적기」, 「3. 연결하기」). 주장과 고르기 칸이 없는 타입은 3단계가 없다 |
+| `graph-add` | 작업 공간 그래프 오른쪽 아래의 둥근 ＋ 단추. `add-open` 과 같은 메뉴를 연다 |
+| `map-add-type` | 개념 지도 타입 칸의 「＋ {타입} 추가」. 메뉴 없이 그 타입의 창을 연다 |
+| `create-optional-toggle` | 「선택 항목 더 보기」. `aria-expanded`. 선택 속성이 없는 타입에는 없다. 선택 속성에 오류가 생기면 저절로 펼친다 |
+| `create-form`, `create-submit`, `create-cancel`, `create-error` | 만들기 창의 폼 |
+| `create-prop-<속성>` | 만들기 창 폼의 속성 입력. 선택 속성은 `create-optional-toggle` 을 눌러야 나온다. 예: `create-prop-name`, `create-prop-market` |
+| `create-prop-<속성>-error` | 그 속성의 오류 |
+| `create-duplicate` | 같은 이름 경고(`role=status`). 저장 전에 같은 이름이 있으면 나온다 |
+| `create-duplicate-item` * | 경고의 후보 한 줄. `data-node-id` |
+| `create-duplicate-open` | 후보의 「열기」 단추. `claim-doc-create-` 에서는 「이 문서 고르기」 |
+| `create-duplicate-confirm` | 「그래도 만들기」 단추 |
+| `create-link-<관계>-picker-*` | 만들기 창 폼의 시작 노드 고르기(NodePicker). 예: `create-link-ISSUES-picker-input` |
+| `create-link-<관계>-selected` | 고른 시작 노드 |
+| `create-link-<관계>-clear` | 「다시 고르기」 단추 |
+
+`create-duplicate*` 와 `create-link-*` 는 근거 문서 등록 폼에서 `claim-doc-create-` 접두사로도 생긴다.
+
+## 첫 접속 가이드
+
+`guideDoneAt` 이 없는 사용자가 개념 지도나 작업 공간에 들어오거나 「사용법」(`guide-open`)을 누르면 열린다. `e2e/support.ts` 의 `loginAs` 는 기본으로 가이드를 건너뛴다. 가이드를 확인하는 테스트만 `{ guide: 'keep' }` 을 넘긴다.
+
+| testid | 요소 |
+| --- | --- |
+| `guide-bubble` | 말풍선(`role=dialog`). `data-step` 이 단계 id 다. 둘러보기는 `intro`, `map`, `search`, `graph`, `detail`, 따라하기는 `intro`, `company`, `document`, `claim`, `done` 이다. 진행 중인 따라하기를 이어서 할지 묻는 단계는 `resume` 이다. `data-placement` 는 `anchored`(대상 옆) 또는 `card`(화면 아래쪽 카드)다 |
 | `guide-start` | 소개 단계의 「시작」 |
 | `guide-next` | 둘러보기 중간 단계의 「다음」. 따라하기의 만드는 단계에는 없다 |
 | `guide-finish` | 마지막 단계의 「끝내기」 |
 | `guide-skip` | 「건너뛰기」. 둘러보기의 모든 단계와 따라하기의 소개에 있다. 말풍선 안에 초점이 있을 때 `Escape` 도 같다 |
 | `guide-stop` | 따라하기의 기업, 근거 문서, 주장 단계와 `resume` 단계의 「그만두기」. 만든 연습 항목을 보관하고 끝낸다 |
 | `guide-resume` | `resume` 단계의 「이어서 하기」. 저장된 단계로 연다 |
-| `guide-reopen` | 「폼 다시 열기」. 따라하기의 만드는 단계에서 만들기 폼을 취소했을 때만 나온다 |
+| `guide-reopen` | 「폼 다시 열기」. 따라하기의 주장 단계에서 주장 폼을 취소했을 때만 나온다. 기업과 근거 문서 단계에서 창을 닫으면 말풍선은 다시 `add-open` 을 가리킨다 |
 | `guide-message` | 끝낸 기록을 남기지 못했거나 연습 항목을 보관하지 못했을 때 머리글 아래 안내 |
 | `guide-archive-failed` | `guide-message` 안의 보관하지 못한 연습 항목 이름 한 줄. 누르면 `/workspace?node=<id>` 로 연다 |
 
 가이드가 가리키는 요소에는 class `guide-target` 이 붙는다. 단계가 바뀌거나 가이드가 닫히면 떨어진다.
+따라하기의 기업과 근거 문서 단계는 만들기 창이 열려 있으면 `create-submit`, 아니면 `add-open` 을 가리킨다. 말풍선은 창 위에 보이고, 말풍선을 눌러도 창이 닫히지 않는다.
+
+## 개념 지도
+
+첫 화면(`/map`)이다. `e2e/support.ts` 의 `loginAs` 는 `/` 로 들어오면 `tab-map` 과 `concept-map` 이 보일 때까지 기다린다.
+
+| testid | 요소 |
+| --- | --- |
+| `concept-map` | 개념 지도 화면 전체 |
+| `map-intro` | 지도 위 소개(「투자 온톨로지」) |
+| `map-counts-error` | 항목 수(`GET /api/nodes/counts`)를 받지 못했을 때의 안내와 이유 |
+| `map-empty` | 모든 타입의 항목 수가 0 일 때의 안내 |
+| `concept-map-canvas` | Cytoscape 컨테이너. `data-node-count` 는 그린 타입 노드 수, `data-layout-done` 은 배치가 끝나면 `"true"` |
+| `map-claim-note` | 지도 아래 「주장은 어느 항목에나 붙일 수 있습니다」 와 주장 수. 주장 타입이 온톨로지에 없으면 없다 |
+| `map-type-list` | 타입 목록 |
+| `map-type` * | 타입 단추. `data-type`, 고른 타입은 `aria-pressed="true"`. 순서는 타입 순서다 |
+| `map-type-count` * | 타입 단추 안의 항목 수. 개수를 받지 못하면 없다 |
+| `map-type-panel` | 고른 타입의 칸. `data-type`. 주소의 `type` 이 지도에 있는 타입일 때만 나온다 |
+| `map-type-description` | 타입 설명 |
+| `map-recent-item` * | 최근 항목 한 줄. `data-node-id`. 누르면 작업 공간에서 그 항목의 상세를 연다 |
+| `map-recent-empty`, `map-recent-error` | 최근 항목이 없음, 받지 못한 오류 |
+| `map-relation` * | 관계 문장 한 줄. `data-relationship` |
+| `map-open-list`, `map-open-workspace` | 「목록에서 보기」, 「작업 공간에서 보기」 |
 
 ## 작업 공간: 좁은 화면
 
@@ -55,39 +105,27 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | testid | 요소 |
 | --- | --- |
 | `search-input`, `search-submit` | 검색어(q)와 검색 버튼 |
-| `filter-type-Company` 등 `filter-type-<타입>` | 타입 필터 체크박스. 주변 그래프에도 적용된다 |
-| `filter-review-status` | Claim 검토 상태 select(`""`, DRAFT, REVIEWED, REJECTED) |
-| `filter-include-archived` | 「보관 포함」 체크 |
+| `filter-type-Company` 등 `filter-type-<타입>` | 종류 칩 단추. `aria-pressed` 로 눌림을 보인다. 주변 그래프에도 적용된다 |
+| `advanced-filters` | 「고급 필터」 `<details>`. 기본은 접힘이고 열림은 주소에 두지 않는다 |
+| `advanced-filters-toggle` | 고급 필터의 `<summary>`. 바뀐 조건이 있으면 「고급 필터 (N)」 |
+| `filter-review-status` | (고급 필터 안) Claim 검토 상태 select(`""`, DRAFT, REVIEWED, REJECTED) |
+| `filter-include-archived` | (고급 필터 안) 「보관 포함」 체크 |
+| `graph-hops` | (고급 필터 안) 이웃 단계 select(1, 2) |
+| `graph-claims-as-nodes` | (고급 필터 안) 「주장을 따로 보기」 체크 상자. 켜면 주장을 노드로 그린다. 작업 공간을 떠날 때까지 남는다 |
 | `search-results` | 결과 영역 |
 | `search-result` * | 결과 한 줄. `data-node-id`, `data-node-type`. 이름은 안쪽 `.result-label` |
 | `search-result-hint` * | 결과 한 줄의 구분 정보(`hintProperties` 값과 만든 날) |
 | `search-empty` | 결과 없음 |
 | `search-pager-prev`, `search-pager-next`, `search-pager-info` | 결과가 2쪽 이상일 때 |
-| `new-node-type`, `new-node-button` | 새 노드 타입 select 와 만들기 버튼. VIEWER 에게는 없다. 값 `Claim` 을 고르면 주장 만들기 폼(`claim-add-form`)이 열린다 |
-| `viewer-create-hint` | VIEWER 에게 보이는 「노드를 만들 수 없습니다」 안내 |
-| `create-form`, `create-submit`, `create-cancel`, `create-error` | 새 노드 폼 |
-| `create-prop-<속성>` | 새 노드 폼의 속성 입력. 예: `create-prop-name`, `create-prop-market` |
-| `create-prop-<속성>-error` | 그 속성의 오류 |
-| `create-duplicate` | 같은 이름 경고(`role=status`). 저장 전에 같은 이름이 있으면 나온다 |
-| `create-duplicate-item` * | 경고의 후보 한 줄. `data-node-id` |
-| `create-duplicate-open` | 후보의 「열기」 단추. `claim-doc-create-` 에서는 「이 문서 고르기」 |
-| `create-duplicate-confirm` | 「그래도 만들기」 단추 |
-| `create-link-<관계>-picker-*` | 만들기 폼의 시작 노드 고르기(NodePicker). 예: `create-link-ISSUES-picker-input` |
-| `create-link-<관계>-selected` | 고른 시작 노드 |
-| `create-link-<관계>-clear` | 「다시 고르기」 단추 |
-
-`create-duplicate*` 와 `create-link-*` 는 근거 문서 등록 폼에서 `claim-doc-create-` 접두사로도 생긴다.
 
 ## 작업 공간: 가운데 그래프
 
 | testid | 요소 |
 | --- | --- |
-| `graph-hops` | 홉 수 select(1, 2) |
 | `graph-expand` | 선택 노드 이웃 확장(더블클릭과 같다) |
 | `graph-recenter` | 선택 노드를 새 중심으로 다시 불러온다 |
 | `graph-fit` | 화면 맞춤 |
 | `graph-status` | 「항목 N · 관계 M」. N 은 「그래프에 나온 항목」 수, M 은 그린 관계와 접은 주장 선을 합한 수 |
-| `graph-claims-as-nodes` | 「주장을 따로 보기」 체크 상자. 켜면 주장을 노드로 그린다. 작업 공간을 떠날 때까지 남는다 |
 | `graph-loading`, `graph-error` | 로딩, 오류(서버 `message`) |
 | `graph-truncated` | 「결과가 잘렸습니다(최대 노드 N, 관계 M)」 |
 | `graph-empty` | 선택한 노드가 없음 |
@@ -99,7 +137,8 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 
 ## 작업 공간: 오른쪽 상세
 
-VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relationship-add-toggle`, `relationship-archive-toggle`, `claim-add-toggle`, `review-controls`, `claim-edit-form` 이 나오지 않는다. `edit-prop-*` 입력은 비활성이다.
+상세는 읽기 카드로 열린다. 편집 폼(`node-edit-form`, `claim-edit-form`)은 `node-edit` 를 눌러야 나오고, 링크 복사와 변경 이력, 보관과 복원은 `node-more` 를 연 메뉴 안에 있다.
+VIEWER 에게는 `node-edit`, `node-edit-form`, `edit-prop-*`, `node-save`, `node-archive-*`, `node-restore-button`, `relationship-add-toggle`, `relationship-archive-toggle`, `claim-add-toggle`, `review-controls`, `claim-edit-form` 이 나오지 않는다.
 
 | testid | 요소 |
 | --- | --- |
@@ -107,29 +146,39 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 | `detail-empty`, `detail-error` | 선택 없음, 상세 조회 실패 |
 | `detail-panel` | 상세 전체. `data-node-id`, `data-node-type` |
 | `detail-label`, `detail-archived` | 노드 이름, 「보관됨」 표시 |
+| `node-created-line` | 머리 아래 「{작성자}이(가) {날짜}에 등록」 한 줄 |
 | `detail-notice` | 저장, 보관 결과 안내. `data-kind` 가 `success`, `conflict`(409 REVISION_CONFLICT), `error` |
 | `viewer-hint` | VIEWER 에게 보이는 「조회만 할 수 있습니다」 안내 |
-| `node-history-link` | 「이 노드 이력」. 변경 이력 탭으로 가며 targetId 필터를 채운다 |
+| `node-actions` | 버튼 줄(「편집」, 「그래프 중심으로」, 「⋯」) |
+| `node-edit` | 「편집」. 편집 권한이 있고 보관되지 않은 노드에만 나온다. 누르면 속성 수정 폼이나 Claim 내용 수정 폼이 열린다 |
+| `node-edit-cancel` | 편집 폼 옆의 「취소」. 읽기 카드로 돌아간다 |
 | `node-center-graph` | 이 노드를 그래프 중심으로 |
-| `node-copy-link`, `node-copy-link-done`, `node-copy-link-fallback` | 「링크 복사」 단추, 복사했다는 안내, 클립보드를 못 쓸 때 주소를 보이는 읽기 전용 입력칸. 열람자에게도 보인다 |
-| `node-archive-reason`, `node-archive-button` | 보관 사유와 보관 버튼(보관되지 않은 노드) |
-| `node-restore-button` | 복원 버튼(보관된 노드) |
-| `node-meta`, `node-revision`, `node-updated-by` | 메타 정보 |
+| `node-more` | 「⋯」(`aria-label="더 보기"`). 아래 메뉴 항목을 연다 |
+| `node-copy-link` | 메뉴의 「링크 복사」. 열람자에게도 보인다 |
+| `node-copy-link-done`, `node-copy-link-fallback` | 버튼 줄 아래의 복사했다는 안내, 클립보드를 못 쓸 때 주소를 보이는 읽기 전용 입력칸. 메뉴가 닫혀도 남는다 |
+| `node-history-link` | 메뉴의 「변경 이력」. 변경 이력 화면으로 가며 targetId 필터를 채운다 |
+| `node-archive-button` | 메뉴의 「보관」(보관되지 않은 노드). 보관 창을 연다 |
+| `node-archive-dialog`, `node-archive-reason`, `node-archive-confirm` | 보관 창, 보관 사유(선택), 창의 「보관」. 성공하든 실패하든 창은 닫히고 결과는 `detail-notice` 에 나온다 |
+| `node-restore-button` | 메뉴의 「복원」(보관된 노드). 묻지 않고 바로 복원한다 |
+| `node-props`, `node-prop` * | 읽기 카드의 속성 목록과 한 줄(`data-prop`). 빈 값은 빠지고, 값이 하나도 없으면 `node-props` 가 「적은 내용이 없습니다.」 를 보인다 |
+| `node-meta-details`, `node-revision`, `node-updated-by` | 「자세히」(기본은 접힘)와 그 안의 revision, 수정자. 생성, 보관 시각, ID 도 이 안에 있다 |
 | `node-edit-form`, `node-save`, `node-edit-local-message` | 속성 수정 폼(Claim 이 아닌 노드) |
 | `node-undefined-type` | 온톨로지에서 빠진 타입의 노드일 때 폼 대신 나오는 안내. 속성은 읽기 전용으로 보이고 주장 추가 단추는 없다 |
 | `edit-conflict`, `edit-conflict-field` *(`data-field`, `data-kind` 가 `theirs`, `mine`, `both`)*, `edit-conflict-choice-<속성>-mine`, `edit-conflict-choice-<속성>-latest`, `edit-conflict-apply`, `edit-conflict-discard` | 409 뒤 내 입력과 최신 값의 칸별 비교. 다시 읽은 뒤 되살릴 입력이 있을 때만 나온다 |
 | `edit-prop-<속성>` | 수정 폼의 속성 입력. 예: `edit-prop-description` |
 | `edit-prop-<속성>-unlisted` | 저장된 값이 목록 밖일 때만 나오는 선택지 |
-| `relationship-section` | 관계 영역 |
-| `relationship-row` * | 관계 한 줄. `data-rel-type` |
-| `relationship-archive-toggle` * | 관계 보관 또는 복원. 정의에서 빠진 관계 종류에는 없다 |
+| `relationship-section` | 「연결」 절 |
+| `relationship-row` * | 관계 한 줄(관계 문장). `data-rel-type`, `data-direction` 이 `out`(이 노드가 시작점) 또는 `in`(이 노드가 끝점) |
+| `relationship-self` * | 문장 안의 이 노드 이름(굵게) |
+| `relationship-open` * | 문장 안의 상대 이름 링크(`<a>`, `href` 는 `/workspace?node=<id>&pane=detail`). `data-node-id`. 누르면 그 항목의 상세를 열고, 보조 키를 누르고 클릭하면 브라우저가 새 탭으로 연다 |
+| `relationship-archive-toggle` * | 「연결 보관」 또는 「연결 복원」. 정의에서 빠진 관계 종류에는 없다 |
 | `relationship-undefined` * | 「정의에서 빠진 관계」 배지. 온톨로지에 없는 관계 종류의 행에만 나온다 |
-| `relationship-add-toggle`, `relationship-add-form` | 「관계 추가」 |
+| `relationship-add-toggle`, `relationship-add-form` | 절 머리의 「＋ 연결 추가」 와 그 추가 칸 |
 | `relationship-type-select` | 값은 `<타입>:out`(이 노드가 시작점) 또는 `<타입>:in`(이 노드가 끝점). 예: Security 에서는 `ISSUES:in` |
 | `relationship-target-picker-*` | 대상 노드 고르기(아래 「노드 고르기」) |
 | `relationship-target-selected`, `relationship-add-submit`, `relationship-add-error` | 고른 대상, 추가, 오류 |
-| `node-claims-section` | 이 노드에 걸린 Claim 영역 |
-| `claim-add-toggle`, `claim-add-form` | 「주장 추가」 와 주장 만들기 폼(왼쪽 「주장」 선택지에서도 열린다) |
+| `node-claims-section` | 「주장 (N)」 절. 이 노드에 걸린 Claim |
+| `claim-add-toggle`, `claim-add-form` | 절 머리의 「＋ 주장 추가」 와 주장 만들기 폼(「＋ 추가」 의 주장 줄에서도 열린다) |
 | `claim-predicate-select` | predicate select |
 | `claim-sentence`, `claim-sentence-text` * | 문장 틀, 문장 틀의 칸 사이 글 |
 | `claim-subject-picker-*`, `claim-subject-selected` | 주체 고르기, 고른 주체 |
@@ -183,7 +232,7 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 | `list-empty` | 결과 없음 |
 | `list-pager-prev`, `list-pager-next`, `list-pager-info` | 페이지 이동 |
 
-## 검토 대기 탭
+## 검토 대기 화면
 
 | testid | 요소 |
 | --- | --- |
@@ -200,7 +249,7 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 | `review-load-error`, `review-mine-load-error` | 구역 목록을 읽지 못한 오류 |
 | `review-pager-prev`, `review-pager-next`, `review-pager-info` | 페이지 이동 |
 
-## 변경 이력 탭
+## 변경 이력 화면
 
 | testid | 요소 |
 | --- | --- |
@@ -214,7 +263,7 @@ VIEWER 에게는 `node-save`, `node-archive-*`, `node-restore-button`, `relation
 | `changes-empty` | 이력 없음 |
 | `changes-pager-prev`, `changes-pager-next`, `changes-pager-info` | 페이지 이동 |
 
-## 온톨로지 탭
+## 온톨로지 상세 화면
 
 | testid | 요소 |
 | --- | --- |
@@ -236,6 +285,8 @@ ADMIN 에게만 나오는 요소다.
 | `ontology-form-type` *(`data-type`)*, `ontology-form-type-label` | 노드 타입 카드, 그 표시 이름 입력칸 |
 | `ontology-form-prop` *(`data-prop`)*, `ontology-form-required`, `ontology-form-enum-value` *(`data-value`)* | 속성 한 줄, 필수 확인란, enum 값 한 줄 |
 | `ontology-form-rel` *(`data-rel`)*, `ontology-form-predicate` *(`data-predicate`)* | 관계 종류 행, 주장 종류 행 |
+| `ontology-form-rel-sentence` | 관계 종류 행의 문장 틀 입력칸 |
+| `ontology-form-new-sentence` | 더하기 줄의 문장 틀 입력칸. 주장 종류와 관계 종류가 같은 이름을 쓴다 |
 | `ontology-form-remove`, `ontology-form-restore` | 「빼기」, 「되살리기」(뺄 예정인 행에만 나온다) |
 | `ontology-form-type-add`, `ontology-form-prop-add`, `ontology-form-rel-add`, `ontology-form-predicate-add` | 「노드 타입 더하기」, 「속성 더하기」(타입 카드 안), 「관계 종류 더하기」, 「주장 종류 더하기」 |
 | `ontology-form-new` | 더하기 입력 영역. 안에 `ontology-form-new-key`, `-new-type`(속성 값 타입), `-new-label`, `-new-values`(enum 값), `-new-sentence`(문장 틀), `-new-submit`(「더하기」) |
@@ -250,7 +301,7 @@ ADMIN 에게만 나오는 요소다.
 | `ontology-history`, `ontology-history-row` *(`data-version`)*, `ontology-history-pager-prev`, `ontology-history-pager-next`, `ontology-history-pager-info` | 버전 기록과 행, 쪽 넘기기 |
 | `ontology-history-detail`, `ontology-history-yaml`, `ontology-history-download`, `ontology-restore` | 연 버전, 읽기 전용 YAML, 「이 버전 내려받기」, 「이 버전으로 되돌리기」(최신 버전에는 없다) |
 
-## 사용자 탭 (ADMIN)
+## 사용자 화면 (ADMIN)
 
 | testid | 요소 |
 | --- | --- |

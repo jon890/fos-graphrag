@@ -20,10 +20,21 @@ interface Props {
   useExistingLabel?: string
   /** 폼의 처음 값 위에 덮어쓸 값. 첫 접속 가이드가 연습 이름을 넣는다 */
   initialValues?: FormValues
+  /** 만들기 창의 단계 소제목(「2. 내용 적기」, 「3. 연결하기 (선택)」)을 그린다. 주장 폼 안의 근거 문서 등록은 그리지 않는다 */
+  showStepHeadings?: boolean
 }
 
 /** 온톨로지 속성 정의로 생성 폼을 만든다. */
-export function NodeCreateForm({ type, onCreated, onCancel, testIdPrefix, onUseExisting, useExistingLabel, initialValues }: Props) {
+export function NodeCreateForm({
+  type,
+  onCreated,
+  onCancel,
+  testIdPrefix,
+  onUseExisting,
+  useExistingLabel,
+  initialValues,
+  showStepHeadings = false,
+}: Props) {
   const { ontology } = useApp()
   const labels = useLabels()
   const typeDef = ontology.nodeTypes[type]
@@ -35,6 +46,15 @@ export function NodeCreateForm({ type, onCreated, onCancel, testIdPrefix, onUseE
   const [busy, setBusy] = useState(false)
   const [duplicates, setDuplicates] = useState<NodeView[]>([])
   const [picked, setPicked] = useState<Record<string, NodeView>>({})
+  // 처음에는 필수 칸만 보인다. 접혀 있어도 선택 칸의 값(미리 채운 값 포함)은 함께 저장한다.
+  const [showOptional, setShowOptional] = useState(false)
+  const hasOptional = Object.values(defs).some((def) => !def.required)
+
+  /** 칸 오류를 보이고, 선택 칸에 오류가 있으면 선택 칸을 펼친다 */
+  const showErrors = (next: Record<string, string>) => {
+    setErrors(next)
+    if (Object.keys(next).some((name) => defs[name] && !defs[name].required)) setShowOptional(true)
+  }
 
   const pickers = Object.entries(ontology.relationshipTypes).filter(
     ([, rel]) => rel.createPicker && rel.to.includes(type),
@@ -42,7 +62,7 @@ export function NodeCreateForm({ type, onCreated, onCancel, testIdPrefix, onUseE
 
   const save = async ({ skipDuplicateCheck }: { skipDuplicateCheck: boolean }) => {
     const { properties, errors: localErrors } = buildCreateProperties(defs, values)
-    setErrors(localErrors)
+    showErrors(localErrors)
     if (Object.keys(localErrors).length > 0) {
       setError('입력값을 확인하세요.')
       return
@@ -78,7 +98,7 @@ export function NodeCreateForm({ type, onCreated, onCancel, testIdPrefix, onUseE
       onCreated(created, linkErrors.length > 0 ? linkErrors.join('\n') : undefined)
     } catch (err) {
       setError(errorMessage(err))
-      if (err instanceof ApiError) setErrors(fieldErrorsOf(err.details))
+      if (err instanceof ApiError) showErrors(fieldErrorsOf(err.details))
     } finally {
       setBusy(false)
     }
@@ -90,18 +110,36 @@ export function NodeCreateForm({ type, onCreated, onCancel, testIdPrefix, onUseE
     void save({ skipDuplicateCheck: false })
   }
 
+  const fieldProps = {
+    defs,
+    values,
+    errors,
+    testIdPrefix: `${testIdPrefix}-prop`,
+    onChange: (name: string, v: string) => {
+      if (name === labelProperty) setDuplicates([])
+      setValues((prev) => ({ ...prev, [name]: v }))
+    },
+  }
+
   return (
     <form className="create-form" onSubmit={submit} data-testid={`${testIdPrefix}-form`}>
-      <PropertyFields
-        defs={defs}
-        values={values}
-        errors={errors}
-        testIdPrefix={`${testIdPrefix}-prop`}
-        onChange={(name, v) => {
-          if (name === labelProperty) setDuplicates([])
-          setValues((prev) => ({ ...prev, [name]: v }))
-        }}
-      />
+      {showStepHeadings && <h3 className="mb-2 text-sm font-semibold">2. 내용 적기</h3>}
+      <PropertyFields only="required" {...fieldProps} />
+      {hasOptional && (
+        <>
+          <button
+            type="button"
+            className="link-button mb-2"
+            aria-expanded={showOptional}
+            data-testid={`${testIdPrefix}-optional-toggle`}
+            onClick={() => setShowOptional((v) => !v)}
+          >
+            {showOptional ? '선택 항목 접기' : '선택 항목 더 보기'}
+          </button>
+          {showOptional && <PropertyFields only="optional" {...fieldProps} />}
+        </>
+      )}
+      {showStepHeadings && pickers.length > 0 && <h3 className="mt-3 mb-2 text-sm font-semibold">3. 연결하기 (선택)</h3>}
       {pickers.map(([relType, rel]) => (
         <div className="field" key={relType}>
           <div className="label">{rel.createPicker?.label}</div>

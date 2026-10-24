@@ -1,4 +1,4 @@
-# 친구가 Obsidian 에 정리한 투자 기록에서 옮긴 투자 논리 사슬. API 가 시작할 때 한 번만 적용한다(docs/data-schema.md 「초기 데이터」).
+# 친구가 Obsidian 에 정리한 투자 기록에서 옮긴 투자 온톨로지 항목. API 가 시작할 때 한 번만 적용한다(docs/data-schema.md 「초기 데이터」).
 # 같은 key 는 다시 적용하지 않는다. 내용을 바꾸려면 새 key 의 파일을 더한다.
 # 원문과 대조하지 못한 값은 description 이나 reason 에 「원문 대조 대기」 라고 적었다.
 key: investment-logic-2026-10

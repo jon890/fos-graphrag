@@ -60,6 +60,12 @@ export function sentenceError(sentence: string): string | null {
   return count('{subject}') === 1 && count('{object}') === 1 ? null : '문장 틀에 {subject} 와 {object} 를 한 번씩 넣습니다'
 }
 
+/** 관계 문장 틀에 {from} 과 {to} 가 한 번씩 없으면 이유를 돌려준다. 서버가 다시 검사한다 */
+export function relationSentenceError(sentence: string): string | null {
+  const count = (token: string) => sentence.split(token).length - 1
+  return count('{from}') === 1 && count('{to}') === 1 ? null : '문장 틀에 {from} 과 {to} 를 한 번씩 넣습니다'
+}
+
 /** 서버는 알 수 없는 키를 거절하므로 버전 정보를 뺀다 */
 export function toDefinition(ontology: Ontology): OntologyDefinition {
   const { version: _version, versionCreatedAt: _createdAt, versionCreatedBy: _createdBy, ...definition } = ontology
@@ -139,17 +145,20 @@ export interface NewRelationshipType {
   description: string
   from: string[]
   to: string[]
+  /** 비우면 undefined 다. 정의에 키를 남기지 않는다 */
+  sentence?: string
 }
 
 export function addRelationshipType(def: OntologyDefinition, key: string, input: NewRelationshipType): OntologyDefinition {
-  return { ...def, relationshipTypes: { ...def.relationshipTypes, [key]: input } }
+  return { ...def, relationshipTypes: { ...def.relationshipTypes, [key]: compact(input) } }
 }
 
-export type RelationshipTypePatch = Partial<Pick<RelationshipTypeDef, 'label' | 'description' | 'from' | 'to'>>
+export type RelationshipTypePatch = Partial<Pick<RelationshipTypeDef, 'label' | 'description' | 'from' | 'to' | 'sentence'>>
 
+/** patch 에서 값이 undefined 인 키는 지운다 */
 export function updateRelationshipType(def: OntologyDefinition, key: string, patch: RelationshipTypePatch): OntologyDefinition {
   const current = def.relationshipTypes[key]
-  return current ? { ...def, relationshipTypes: { ...def.relationshipTypes, [key]: { ...current, ...patch } } } : def
+  return current ? { ...def, relationshipTypes: { ...def.relationshipTypes, [key]: compact({ ...current, ...patch }) } } : def
 }
 
 export interface NewClaimPredicate {

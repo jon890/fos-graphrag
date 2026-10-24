@@ -220,6 +220,41 @@ class OntologyLabelsTest {
     }
 
     @Test
+    fun `관계 문장 틀에 자리가 빠지면 오류이고 문장 틀이 없는 관계는 통과한다`() {
+        val issues = ontology.relationshipTypes.getValue("ISSUES")
+        val broken = ontology.copy(
+            relationshipTypes = ontology.relationshipTypes +
+                ("ISSUES" to issues.copy(sentence = "{from}이(가) 발행한다")) +
+                ("HAS_DECISION" to ontology.relationshipTypes.getValue("HAS_DECISION").copy(sentence = null)),
+        )
+
+        assertThat(OntologyLoader.consistencyErrors(broken)).containsExactly("ISSUES 의 sentence 는 {from} 과 {to} 를 한 번씩 담아야 한다")
+        val twice = ontology.copy(relationshipTypes = ontology.relationshipTypes + ("ISSUES" to issues.copy(sentence = "{from} {to} {to}")))
+        assertThat(OntologyLoader.consistencyErrors(twice)).containsExactly("ISSUES 의 sentence 는 {from} 과 {to} 를 한 번씩 담아야 한다")
+        val ok = ontology.copy(relationshipTypes = ontology.relationshipTypes + ("ISSUES" to issues.copy(sentence = "{from}이(가) {to}을(를) 발행한다")))
+        assertThat(OntologyLoader.consistencyErrors(ok)).isEmpty()
+    }
+
+    @Test
+    fun `저장소 온톨로지의 모든 관계 종류는 문장 틀이 있다`() {
+        val missing = ontology.relationshipTypes.filterValues { it.sentence.isNullOrBlank() }.keys
+        assertThat(missing).describedAs("문장 틀이 없는 관계 종류").isEmpty()
+        assertThat(OntologyLoader.consistencyErrors(ontology)).isEmpty()
+    }
+
+    @Test
+    fun `관계 문장 틀이 없으면 YAML 에 sentence 키를 쓰지 않는다`() {
+        val withoutSentence = ontology.copy(relationshipTypes = ontology.relationshipTypes.mapValues { it.value.copy(sentence = null) })
+        assertThat(OntologyLoader.toYaml(withoutSentence)).doesNotContain("sentence: null")
+
+        val issues = ontology.relationshipTypes.getValue("ISSUES").copy(sentence = "{from}이(가) {to}을(를) 발행한다")
+        val withSentence = withoutSentence.copy(relationshipTypes = withoutSentence.relationshipTypes + ("ISSUES" to issues))
+        val yaml = OntologyLoader.toYaml(withSentence)
+        assertThat(yaml).doesNotContain("sentence: null")
+        assertThat(OntologyLoader.parse(yaml).relationshipTypes.getValue("ISSUES").sentence).isEqualTo("{from}이(가) {to}을(를) 발행한다")
+    }
+
+    @Test
     fun `알 수 없는 키는 줄 번호와 함께 알린다`() {
         // 다섯째 줄에 Company 타입의 알 수 없는 키를 둔다
         val yaml = minimal("{ type: string }").replace("    description: x\n", "    description: x\n    oddKey: 1\n")

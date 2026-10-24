@@ -25,7 +25,8 @@ cp .env.example .env    # NEO4J_PASSWORD, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 docker compose up -d --build --wait
 ```
 
-로그인은 Google 계정으로만 한다. 첫 관리자가 「사용자」 탭에서 다른 사람의 Gmail 과 역할(VIEWER, EDITOR, ADMIN)을 추가한다.
+로그인은 Google 계정으로만 한다. 첫 관리자가 오른쪽 위 「더보기」 메뉴의 「사용자」 에서 다른 사람의 Gmail 과 역할(VIEWER, EDITOR, ADMIN)을 추가한다.
+처음 열면 온톨로지의 타입과 관계를 그린 개념 지도가 보인다. 항목은 어느 화면에서나 오른쪽 위 「＋ 추가」 로 만든다.
 Google OAuth client 만들기, 공개 HTTPS 배포, 백업과 복원, 개발 환경 실행은 [배포 문서](docs/deployment.md)에 있다.
 
 ## 검증

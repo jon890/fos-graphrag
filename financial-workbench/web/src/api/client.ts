@@ -5,6 +5,7 @@ import type {
   ClaimView,
   CreateClaimRequest,
   GraphView,
+  NodeCounts,
   NodeDetail,
   NodeView,
   Ontology,
@@ -159,6 +160,8 @@ export interface NodeSearchParams {
   includeArchived?: boolean
   page?: number
   size?: number
+  /** 서버 기본은 label(이름순). recent 는 만든 시각이 늦은 순서다 */
+  sort?: 'label' | 'recent'
 }
 
 export interface NeighborhoodParams {
@@ -203,10 +206,12 @@ export const api = {
           types: p.types,
           reviewStatus: p.reviewStatus,
           includeArchived: p.includeArchived ? true : undefined,
+          sort: p.sort,
           page: p.page,
           size: p.size,
         })}`,
       ),
+    counts: () => request<NodeCounts>('GET', '/api/nodes/counts'),
     get: (id: string) => request<NodeDetail>('GET', `/api/nodes/${enc(id)}`),
     create: (type: string, properties: Record<string, PropertyValue>) =>
       request<NodeView>('POST', '/api/nodes', { type, properties }),

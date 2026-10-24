@@ -1,15 +1,21 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, ApiError, errorMessage } from '../api/client'
 import type { NodeDetail, NodeView } from '../api/types'
 import { useApp, useLabels } from '../context'
 import type { EditDraft } from '../lib/conflict'
-import { formatDateTime, userName } from '../lib/format'
+import { formatDate, formatDateTime, userName } from '../lib/format'
+import { withJosa } from '../lib/labels'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import { ClaimCard } from './ClaimCard'
 import { ClaimCreateForm } from './ClaimCreateForm'
 import { ClaimEditForm, ReviewControls } from './ClaimEditor'
-import { CopyLinkButton } from './CopyLinkButton'
+import { CopyLinkResult, useCopyLink } from './CopyLinkButton'
 import { useGuide, type GuidePrefill } from './guide/GuideProvider'
 import { NodeEditForm } from './NodeEditForm'
+import { NodeReadCard } from './NodeReadCard'
 import { RelationshipSection } from './RelationshipSection'
 import { StatusBadge, TypeBadge } from './TypeBadge'
 import { UndefinedTypeProperties } from './UndefinedTypeProperties'
@@ -48,6 +54,15 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
   const [archiveReason, setArchiveReason] = useState('')
   const [addingClaim, setAddingClaim] = useState(false)
   const [draft, setDraft] = useState<EditDraft | null>(null)
+  // 편집 폼을 여는 상태. 409 를 받아도 그대로 두어 비교가 보이게 하고, 다른 항목을 고르면 닫는다.
+  const [editing, setEditing] = useState(false)
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [archiveBusy, setArchiveBusy] = useState(false)
+  const copyLink = useCopyLink(selectedId ?? '')
+  const resetCopyLink = copyLink.reset
+  // 「⋯」 메뉴에서 보관 창을 열었으면 메뉴가 닫히며 단추로 초점을 돌려보내지 않는다. 창 밖으로 초점이 나가 창이 닫히는 것을 막는다.
+  // 링크 복사도 같다. 클립보드를 쓸 수 없을 때 선택해 둔 주소 입력칸의 초점을 뺏지 않는다.
+  const menuPickedRef = useRef(false)
   const guide = useGuide()
   const { prefill, consumePrefill } = guide
   // 가이드가 연 주장 폼의 프리필과 미리 고른 근거 문서. 가이드의 값은 가져가면 비므로 여기에 복사해 둔다.
@@ -58,7 +73,10 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
     setAddingClaim(false)
     setOpenedPrefill(null)
     setArchiveReason('')
+    setArchiveOpen(false)
     setDraft(null)
+    setEditing(false)
+    resetCopyLink()
   }, [selectedId, flash])
 
   // 가이드의 주장 프리필. 위 effect 가 폼을 닫은 뒤에 열리도록 상세와 근거 문서를 읽은 다음에 연다.
@@ -161,18 +179,32 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
   const typeDefined = !!ontology.nodeTypes[node.type]
   const hasClaimPredicates = hasClaimPredicateForNode(ontology, node.type)
 
-  const archiveOrRestore = async () => {
+  const canEditNode = canEdit && !node.archived && typeDefined
+
+  const restore = async () => {
     try {
-      if (node.archived) {
-        await api.nodes.restore(node.id, node.revision)
-        succeed('복원했습니다.')
-      } else {
-        await api.nodes.archive(node.id, node.revision, archiveReason.trim() || undefined)
-        setArchiveReason('')
-        succeed('보관했습니다. 기본 검색과 주변 그래프에서 빠집니다.')
-      }
+      await api.nodes.restore(node.id, node.revision)
+      succeed('복원했습니다.')
     } catch (e) {
       fail(e)
+    }
+  }
+
+  // 성공하든 실패하든 창을 닫는다. 실패는 상세 위 알림으로 보인다.
+  const archive = async (e: FormEvent) => {
+    e.preventDefault()
+    setArchiveBusy(true)
+    try {
+      await api.nodes.archive(node.id, node.revision, archiveReason.trim() || undefined)
+      setArchiveOpen(false)
+      setArchiveReason('')
+      setEditing(false)
+      succeed('보관했습니다. 기본 검색과 주변 그래프에서 빠집니다.')
+    } catch (err) {
+      setArchiveOpen(false)
+      fail(err)
+    } finally {
+      setArchiveBusy(false)
     }
   }
 
@@ -188,6 +220,9 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
           </span>
         )}
         {loading && <span className="muted small">갱신 중…</span>}
+      </div>
+      <div className="muted small" data-testid="node-created-line">
+        {`${withJosa(userName(node.createdBy), '이(가)')} ${formatDate(node.createdAt)}에 등록`}
       </div>
 
       {notice && (
@@ -205,33 +240,94 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
         </div>
       )}
 
-      <div className="row actions">
-        <button className="link-button" data-testid="node-history-link" onClick={() => onOpenHistory(node.id)}>
-          이 항목의 변경 이력
-        </button>
-        <button className="link-button" data-testid="node-center-graph" onClick={() => onFocus(node.id)}>
+      <div className="row actions" data-testid="node-actions">
+        {canEditNode && (
+          <Button type="button" size="sm" data-testid="node-edit" disabled={editing} onClick={() => setEditing(true)}>
+            편집
+          </Button>
+        )}
+        <Button type="button" size="sm" variant="outline" data-testid="node-center-graph" onClick={() => onFocus(node.id)}>
           그래프 중심으로
-        </button>
-        <CopyLinkButton nodeId={node.id} testId="node-copy-link" />
-        {canEdit && !node.archived && (
-          <input
-            className="reason-input"
-            data-testid="node-archive-reason"
-            placeholder="보관 사유(선택)"
-            value={archiveReason}
-            onChange={(e) => setArchiveReason(e.target.value)}
-          />
-        )}
-        {canEdit && (
-        <button
-          className={node.archived ? '' : 'danger'}
-          data-testid={node.archived ? 'node-restore-button' : 'node-archive-button'}
-          onClick={() => void archiveOrRestore()}
-        >
-          {node.archived ? '복원' : '보관'}
-        </button>
-        )}
+        </Button>
+        {/* 모달 메뉴는 스크롤을 잠그려고 <style> 을 넣어 CSP(style-src 'self')에 막히므로 modal={false} 로 연다 */}
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" size="sm" variant="outline" data-testid="node-more" aria-label="더 보기">
+              ⋯
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            onCloseAutoFocus={(event) => {
+              if (menuPickedRef.current) event.preventDefault()
+              menuPickedRef.current = false
+            }}
+          >
+            <DropdownMenuItem
+              data-testid="node-copy-link"
+              onSelect={() => {
+                menuPickedRef.current = true
+                void copyLink.copy()
+              }}
+            >
+              링크 복사
+            </DropdownMenuItem>
+            <DropdownMenuItem data-testid="node-history-link" onSelect={() => onOpenHistory(node.id)}>
+              변경 이력
+            </DropdownMenuItem>
+            {canEdit &&
+              (node.archived ? (
+                <DropdownMenuItem data-testid="node-restore-button" onSelect={() => void restore()}>
+                  복원
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  variant="destructive"
+                  data-testid="node-archive-button"
+                  onSelect={() => {
+                    menuPickedRef.current = true
+                    setArchiveOpen(true)
+                  }}
+                >
+                  보관
+                </DropdownMenuItem>
+              ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+      {/* 메뉴가 닫혀도 남도록 복사 결과는 메뉴 밖에 그린다 */}
+      {copyLink.result && (
+        <div className="actions">
+          <CopyLinkResult testId="node-copy-link" url={copyLink.url} result={copyLink.result} inputRef={copyLink.inputRef} />
+        </div>
+      )}
+
+      <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+        <DialogContent data-testid="node-archive-dialog">
+          <form className="grid gap-4" onSubmit={(e) => void archive(e)}>
+            <DialogHeader>
+              <DialogTitle>이 항목을 보관할까요?</DialogTitle>
+              <DialogDescription>보관하면 기본 검색과 주변 그래프에서 빠집니다. 복원할 수 있습니다.</DialogDescription>
+            </DialogHeader>
+            <Input
+              data-testid="node-archive-reason"
+              placeholder="보관 사유(선택)"
+              value={archiveReason}
+              onChange={(e) => setArchiveReason(e.target.value)}
+            />
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">
+                  취소
+                </Button>
+              </DialogClose>
+              <Button type="submit" variant="destructive" data-testid="node-archive-confirm" disabled={archiveBusy}>
+                보관
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {!canEdit && (
         <div className="info-box" data-testid="viewer-hint">
@@ -239,47 +335,32 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
         </div>
       )}
 
-      <dl className="kv meta" data-testid="node-meta">
-        <dt>생성</dt>
-        <dd>
-          {userName(node.createdBy)} · {formatDateTime(node.createdAt)}
-        </dd>
-        <dt>수정</dt>
-        <dd data-testid="node-updated-by">
-          {userName(node.updatedBy)} · {formatDateTime(node.updatedAt)}
-        </dd>
-        {node.archivedAt && (
-          <>
-            <dt>보관</dt>
-            <dd>{formatDateTime(node.archivedAt)}</dd>
-          </>
-        )}
-      </dl>
-      <details className="meta-details" data-testid="node-meta-details">
-        <summary>자세히</summary>
-        <dl className="kv meta">
-          <dt>revision</dt>
-          <dd data-testid="node-revision">{node.revision}</dd>
-          <dt>ID</dt>
-          <dd className="mono small">{node.id}</dd>
-        </dl>
-      </details>
-
       {claim ? (
         <section className="detail-section">
           <h3>{labels.type(node.type)}</h3>
           <ClaimCard claim={claim} onOpenNode={onSelect} />
-          {canEdit && (
+          {canEdit && <ReviewControls claim={claim} onDone={succeed} onError={fail} />}
+          {canEditNode && editing && (
             <>
-              <ReviewControls claim={claim} onDone={succeed} onError={fail} />
-              <ClaimEditForm key={`${claim.id}:${claim.revision}`} claim={claim} onSaved={succeed} onError={fail} />
+              <ClaimEditForm
+                key={`${claim.id}:${claim.revision}`}
+                claim={claim}
+                onSaved={(message) => {
+                  setEditing(false)
+                  succeed(message)
+                }}
+                onError={fail}
+              />
+              <button type="button" data-testid="node-edit-cancel" onClick={() => setEditing(false)}>
+                취소
+              </button>
             </>
           )}
         </section>
       ) : (
         <section className="detail-section">
           <h3>속성</h3>
-          {typeDefined ? (
+          {canEditNode && editing ? (
             <>
               <div className="hint">{ontology.nodeTypes[node.type]?.description}</div>
               <NodeEditForm
@@ -287,14 +368,21 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
                 node={node}
                 onSaved={() => {
                   setDraft(null)
+                  setEditing(false)
                   succeed('저장했습니다.')
                 }}
                 onError={fail}
                 draft={draft}
                 onConflict={setDraft}
                 onDraftDone={() => setDraft(null)}
+                onCancel={() => {
+                  setDraft(null)
+                  setEditing(false)
+                }}
               />
             </>
+          ) : typeDefined ? (
+            <NodeReadCard node={node} />
           ) : (
             <UndefinedTypeProperties node={node} />
           )}
@@ -318,7 +406,14 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
 
       {!claim && (
         <section className="detail-section" data-testid="node-claims-section">
-          <h3>이 항목에 걸린 주장 ({detail.claims.length})</h3>
+          <div className="section-head">
+            <h3>주장 ({detail.claims.length})</h3>
+            {canEdit && typeDefined && hasClaimPredicates && !addingClaim && (
+              <button data-testid="claim-add-toggle" disabled={node.archived} onClick={() => setAddingClaim(true)}>
+                ＋ 주장 추가
+              </button>
+            )}
+          </div>
           {detail.claims.length === 0 && <div className="muted small">걸린 주장이 없습니다.</div>}
           {detail.claimsTruncated && (
             <div className="info-box" data-testid="detail-claims-truncated">
@@ -328,11 +423,6 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
           {detail.claims.map((c) => (
             <ClaimCard key={c.id} claim={c} onOpenNode={onSelect} showOpen />
           ))}
-          {canEdit && typeDefined && hasClaimPredicates && !addingClaim && (
-            <button data-testid="claim-add-toggle" disabled={node.archived} onClick={() => setAddingClaim(true)}>
-              주장 추가
-            </button>
-          )}
           {canEdit && addingClaim && (
             <ClaimCreateForm
               key={openedPrefill?.prefill.documentId ?? ''}
@@ -356,6 +446,30 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
           )}
         </section>
       )}
+
+      <details className="meta-details" data-testid="node-meta-details">
+        <summary>자세히</summary>
+        <dl className="kv meta">
+          <dt>생성</dt>
+          <dd>
+            {userName(node.createdBy)} · {formatDateTime(node.createdAt)}
+          </dd>
+          <dt>수정</dt>
+          <dd data-testid="node-updated-by">
+            {userName(node.updatedBy)} · {formatDateTime(node.updatedAt)}
+          </dd>
+          {node.archivedAt && (
+            <>
+              <dt>보관</dt>
+              <dd>{formatDateTime(node.archivedAt)}</dd>
+            </>
+          )}
+          <dt>revision</dt>
+          <dd data-testid="node-revision">{node.revision}</dd>
+          <dt>ID</dt>
+          <dd className="mono small">{node.id}</dd>
+        </dl>
+      </details>
     </div>
   )
 }

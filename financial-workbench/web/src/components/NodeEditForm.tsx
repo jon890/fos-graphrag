@@ -19,6 +19,8 @@ interface Props {
   onConflict?: (draft: EditDraft) => void
   /** 비교를 닫을 때(다시 적용, 버리기) */
   onDraftDone?: () => void
+  /** 있으면 저장 옆에 「취소」 를 그린다. 상세는 이것으로 읽기 카드로 돌아간다 */
+  onCancel?: () => void
 }
 
 type Choices = Record<string, 'mine' | 'latest'>
@@ -88,7 +90,7 @@ function ConflictBox({
 /**
  * 노드 속성 수정 폼. 부모가 key 에 revision 을 넣어, 최신 상세를 다시 읽으면 입력값도 새 값으로 바뀐다.
  */
-export function NodeEditForm({ node, onSaved, onError, draft, onConflict, onDraftDone }: Props) {
+export function NodeEditForm({ node, onSaved, onError, draft, onConflict, onDraftDone, onCancel }: Props) {
   const { ontology, canEdit } = useApp()
   const defs = ontology.nodeTypes[node.type]?.properties ?? {}
   const [values, setValues] = useState<FormValues>(() => initialFormValues(defs, node.properties))
@@ -156,11 +158,18 @@ export function NodeEditForm({ node, onSaved, onError, draft, onConflict, onDraf
           {localMessage}
         </div>
       )}
-      {canEdit && (
-        <button type="submit" className="primary" disabled={busy || node.archived} data-testid="node-save">
-          {busy ? '저장 중…' : '저장'}
-        </button>
-      )}
+      <div className="row">
+        {canEdit && (
+          <button type="submit" className="primary" disabled={busy || node.archived} data-testid="node-save">
+            {busy ? '저장 중…' : '저장'}
+          </button>
+        )}
+        {onCancel && (
+          <button type="button" data-testid="node-edit-cancel" onClick={onCancel}>
+            취소
+          </button>
+        )}
+      </div>
     </form>
   )
 }

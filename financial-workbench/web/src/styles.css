@@ -65,7 +65,8 @@
 @layer components {
   .guide-bubble {
     position: fixed;
-    z-index: 50;
+    z-index: 60;
+    pointer-events: auto;
     width: 320px;
     max-width: calc(100vw - 32px);
     max-height: 40vh;

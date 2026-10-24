@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import cytoscape, { type Core, type ElementDefinition } from 'cytoscape'
 import { useApp, useLabels } from '../context'
-import { collapseClaims, expandedDisplay, type GraphData, type GraphDisplay, typeColor, typeShape } from '../lib/graph'
+import { collapseClaims, expandedDisplay, type GraphData, type GraphDisplay, layoutRoots, typeColor, typeShape } from '../lib/graph'
 import type { Ontology } from '../api/types'
 import { nodeDisplayLabel, predicateLabel, relationshipLabel } from '../lib/labels'
-import { WelcomeGuide } from './WelcomeGuide'
+import { AddMenu } from './add/AddMenu'
 
 interface Props {
   data: GraphData
@@ -12,13 +12,10 @@ interface Props {
   selectedId: string | null
   loading: boolean
   error: string | null
-  hops: number
-  onHopsChange: (hops: number) => void
   onSelect: (id: string) => void
   onExpand: (id: string) => void
   onRecenter: (id: string) => void
   claimsAsNodes: boolean
-  onClaimsAsNodesChange: (value: boolean) => void
   /** 탭 배치에서 그래프 탭이 숨겨져 있으면 false. 숨겨진 컨테이너는 크기가 0 이라 배치를 미룬다 */
   visible?: boolean
 }
@@ -110,8 +107,9 @@ function limitZoom(cy: Core): void {
   }
 }
 
-function runLayout(cy: Core): void {
-  const layout = cy.layout({ name: 'cose', animate: false, fit: true, padding: 48, nodeRepulsion: () => 20000, idealEdgeLength: () => 140, nodeOverlap: 20, componentSpacing: 120 })
+function runLayout(cy: Core, roots: string[]): void {
+  // 관계 방향대로 위에서 아래로 놓는다. 뿌리는 layoutRoots 가 고른 값을 그대로 쓴다.
+  const layout = cy.layout({ name: 'breadthfirst', directed: true, roots, spacingFactor: 1.2, padding: 48, animate: false, fit: true })
   layout.one('layoutstop', () => {
     cy.fit(undefined, 48)
     limitZoom(cy)
@@ -120,8 +118,8 @@ function runLayout(cy: Core): void {
 }
 
 export function GraphPanel(props: Props) {
-  const { data, centerId, selectedId, loading, error, hops, onHopsChange, claimsAsNodes, visible = true } = props
-  const { ontology } = useApp()
+  const { data, centerId, selectedId, loading, error, claimsAsNodes, visible = true } = props
+  const { ontology, canEdit } = useApp()
   const labels = useLabels()
   const display = useMemo(() => (claimsAsNodes ? expandedDisplay(data) : collapseClaims(data, centerId)), [data, centerId, claimsAsNodes])
   const containerRef = useRef<HTMLDivElement>(null)
@@ -135,6 +133,12 @@ export function GraphPanel(props: Props) {
   const [layoutPending, setLayoutPending] = useState(false)
   const visibleRef = useRef(visible)
   visibleRef.current = visible
+  // 마지막으로 배치한 중심 노드. 숨김이 풀릴 때 배치에 쓰는 최신 그래프와 중심도 ref 로 읽는다.
+  const layoutCenter = useRef<string | null>(null)
+  const displayRef = useRef(display)
+  displayRef.current = display
+  const centerRef = useRef(centerId)
+  centerRef.current = centerId
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -170,14 +174,17 @@ export function GraphPanel(props: Props) {
         }
       }
     })
-    if (added && cy.nodes().length > 0) {
-      if (visibleRef.current) runLayout(cy)
+    // 중심 노드가 바뀌면 뿌리가 달라질 수 있어 새 요소가 없어도 다시 배치한다.
+    const centerChanged = layoutCenter.current !== centerId
+    layoutCenter.current = centerId
+    if ((added || centerChanged) && cy.nodes().length > 0) {
+      if (visibleRef.current) runLayout(cy, layoutRoots(display, centerId))
       else {
         pendingLayout.current = true
         setLayoutPending(true)
       }
     }
-  }, [display, ontology])
+  }, [display, ontology, centerId])
 
   // 다시 보이면 크기를 새로 재고, 미뤄 둔 배치를 돌리거나 지금 크기에 맞춘다.
   useEffect(() => {
@@ -187,7 +194,7 @@ export function GraphPanel(props: Props) {
     if (pendingLayout.current) {
       pendingLayout.current = false
       setLayoutPending(false)
-      if (cy.nodes().length > 0) runLayout(cy)
+      if (cy.nodes().length > 0) runLayout(cy, layoutRoots(displayRef.current, centerRef.current))
     } else if (cy.nodes().length > 0) {
       cy.fit(undefined, 48)
       limitZoom(cy)
@@ -211,13 +218,6 @@ export function GraphPanel(props: Props) {
   return (
     <div className="graph-panel">
       <div className="graph-toolbar">
-        <label className="field-inline">
-          홉 수
-          <select data-testid="graph-hops" value={hops} onChange={(e) => onHopsChange(Number(e.target.value))}>
-            <option value={1}>1</option>
-            <option value={2}>2</option>
-          </select>
-        </label>
         <button data-testid="graph-expand" disabled={!canExpand || loading} onClick={() => selectedId && props.onExpand(selectedId)}>
           이웃 확장
         </button>
@@ -231,15 +231,6 @@ export function GraphPanel(props: Props) {
         <button data-testid="graph-fit" disabled={data.nodes.length === 0} onClick={() => cyRef.current?.fit(undefined, 48)}>
           화면 맞춤
         </button>
-        <label className="field-inline">
-          <input
-            type="checkbox"
-            data-testid="graph-claims-as-nodes"
-            checked={claimsAsNodes}
-            onChange={(e) => props.onClaimsAsNodesChange(e.target.checked)}
-          />{' '}
-          주장을 따로 보기
-        </label>
         <span className="muted small" data-testid="graph-status">
           항목 {display.listed.length} · 관계 {display.edges.length + display.claimEdges.length}
         </span>
@@ -267,13 +258,29 @@ export function GraphPanel(props: Props) {
         />
         {empty === 'none' && (
           <div className="graph-overlay" data-testid="graph-empty">
-            <WelcomeGuide />
+            <p>항목을 검색해 고르면 이어진 항목이 그래프로 보입니다.</p>
           </div>
         )}
         {empty === 'no-neighbors' && (
           <div className="graph-overlay subtle" data-testid="graph-no-neighbors">
             이 항목에 연결된 이웃이 없습니다.
           </div>
+        )}
+        {/* 캔버스 위에 떠 있는 「＋ 추가」 메뉴 단추. 그래프 조작을 가리지 않게 작게 둔다 */}
+        {canEdit && (
+          <AddMenu
+            align="end"
+            trigger={
+              <button
+                type="button"
+                className="absolute right-3 bottom-3 z-10 flex size-10 items-center justify-center rounded-full bg-primary text-xl text-primary-foreground shadow-md"
+                aria-label="추가"
+                data-testid="graph-add"
+              >
+                ＋
+              </button>
+            }
+          />
         )}
       </div>
 

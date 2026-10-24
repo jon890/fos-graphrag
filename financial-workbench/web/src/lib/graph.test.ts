@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { collapseClaims, EMPTY_GRAPH, expandedDisplay, graphFromView, mergeGraph, typeColor, typeShape, type GraphData } from './graph'
+import { collapseClaims, EMPTY_GRAPH, expandedDisplay, graphFromView, layoutRoots, mergeGraph, typeColor, typeShape, type GraphData } from './graph'
 import { testOntology } from '../components/testSupport'
 import type { GraphView } from '../api/types'
 
@@ -132,5 +132,34 @@ describe('타입 표시', () => {
     expect(typeColor(testOntology, 'Person')).toBe(color)
     expect(typeShape(testOntology, 'Person')).toBe('ellipse')
     expect(typeShape(testOntology, 'Unknown')).toBe('ellipse')
+  })
+})
+
+describe('layoutRoots', () => {
+  const node = (id: string, type = 'Company') => ({ id, type, label: id, reviewStatus: null })
+  const edge = (id: string, source: string, target: string) => ({ id, type: 'ISSUES', source, target })
+
+  it('들어오는 선이 없는 노드가 뿌리다', () => {
+    const data: GraphData = { ...EMPTY_GRAPH, nodes: [node('a'), node('b'), node('c')], edges: [edge('e1', 'a', 'b'), edge('e2', 'b', 'c')] }
+    expect(layoutRoots(expandedDisplay(data), 'b')).toEqual(['a'])
+  })
+
+  it('고리만 있으면 중심 노드가 뿌리다', () => {
+    const data: GraphData = { ...EMPTY_GRAPH, nodes: [node('a'), node('b')], edges: [edge('e1', 'a', 'b'), edge('e2', 'b', 'a')] }
+    expect(layoutRoots(expandedDisplay(data), 'b')).toEqual(['b'])
+  })
+
+  it('자기 자신을 잇는 선만 있는 노드도 뿌리다', () => {
+    const data: GraphData = { ...EMPTY_GRAPH, nodes: [node('a'), node('b')], edges: [edge('e1', 'a', 'a'), edge('e2', 'a', 'b')] }
+    expect(layoutRoots(expandedDisplay(data), null)).toEqual(['a'])
+  })
+
+  it('접힌 주장 선이 대상 노드를 뿌리에서 뺀다', () => {
+    const data: GraphData = {
+      ...EMPTY_GRAPH,
+      nodes: [node('a'), node('b'), node('c', 'Claim')],
+      edges: [edge('s', 'c', 'a'), edge('o', 'c', 'b')].map((e, i) => ({ ...e, type: i === 0 ? 'SUBJECT' : 'OBJECT' })),
+    }
+    expect(layoutRoots(collapseClaims(data, null), null)).toEqual(['a'])
   })
 })

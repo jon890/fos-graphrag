@@ -212,13 +212,16 @@ revision 은 그대로이고 ChangeEvent 도 만들지 않는다. `expectedRevis
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
-| GET | `/api/nodes` | 검색. 쿼리: `q`, `types`(쉼표 구분), `reviewStatus`, `includeArchived`(기본 `false`), `page`, `size`. 응답 `Page<NodeView>`. 대소문자를 무시한 `label` 오름차순(Security 는 그 뒤에 `ticker`) |
+| GET | `/api/nodes` | 검색. 쿼리: `q`, `types`(쉼표 구분), `reviewStatus`, `includeArchived`(기본 `false`), `sort`(`label` 이 기본, `recent`), `page`, `size`. 응답 `Page<NodeView>`. `label` 은 대소문자를 무시한 `label` 오름차순(Security 는 그 뒤에 `ticker`), `recent` 는 만든 시각(`createdAt`)이 늦은 순서다 |
+| GET | `/api/nodes/counts` | 타입별 항목 수. 응답 `200 {"counts": {"<타입 키>": <정수>}}`. 로그인한 모든 역할이 읽는다 |
 | GET | `/api/nodes/{id}` | 상세. 응답 `NodeDetail` |
 | POST | `/api/nodes` | 생성. 본문 `{"type","properties"}`. 응답 `201 NodeView` |
 | PATCH | `/api/nodes/{id}` | 속성 수정. 본문 `{"expectedRevision", "properties": {키: 값 또는 null}}`. `null` 은 그 속성을 지운다. 응답 `NodeView` |
 | POST | `/api/nodes/{id}/archive` | 보관. 본문 `{"expectedRevision","reason"}`. `reason` 은 선택. 응답 `NodeView` |
 | POST | `/api/nodes/{id}/restore` | 복원. 본문 `{"expectedRevision"}`. 응답 `NodeView` |
 
+- `sort` 가 `label`, `recent` 가 아니면 `400 VALIDATION_FAILED` 다. 같은 순서 안에서는 `id` 로 순서를 고정한다. 개념 지도의 최근 항목이 `sort=recent` 를 쓴다.
+- `counts` 는 보관하지 않은 노드만 센다. 지금 온톨로지의 모든 노드 타입 키(Claim 포함)를 담고, 항목이 없는 타입은 `0` 이다. 온톨로지에 없는 타입의 노드는 담지 않는다. 쿼리는 `MATCH (n:Knowledge) WHERE n.archived = false RETURN n.type, count(n)` 하나다.
 - `q` 는 `label`, Security 의 `ticker`, 그 타입의 `searchProperties` 값(예: 인물과 개념의 `englishName`)에서 대소문자를 무시하고 부분 일치로 찾는다. 100자까지다. 비우면 전체를 돌려준다.
 - `POST /api/nodes` 의 `type` 은 현재 온톨로지에서 `managedBy` 가 없는 노드 타입이다. `Claim` 처럼 별도 API 가 관리하는 타입은 `400 ONTOLOGY_VIOLATION` 이고, `Claim` 은 `/api/claims` 로 만든다.
 - `PATCH` 로 Claim 을 고치면 `400 ONTOLOGY_VIOLATION` 이다. `PATCH /api/claims/{id}` 를 쓴다.
@@ -370,7 +373,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 
 | 메서드 | 경로 | 인증 | 응답 |
 | --- | --- | --- | --- |
-| GET | `/api/ontology` | 필요 | 최신 온톨로지 버전을 옮긴 JSON. `version`(정수), `versionCreatedAt`, `versionCreatedBy`(UserRef, 서버가 만든 버전이면 `null`)가 더 있다. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`), 주장 문장 틀(`claimPredicates.<predicate>.sentence`), 만들기 폼 정보(`nodeTypes.<타입>.hintProperties`, `relationshipTypes.<관계>.createPicker`), 타입의 색과 모양(`nodeTypes.<타입>.display`), 검색에 넣을 속성(`nodeTypes.<타입>.searchProperties`), 변경 이력의 항목 이름(`changeFields`), 예전 값 별칭(`valueAliases`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다. 뜻은 [데이터 스키마](data-schema.md) 의 「표시 이름」 과 그 아래 절이다 |
+| GET | `/api/ontology` | 필요 | 최신 온톨로지 버전을 옮긴 JSON. `version`(정수), `versionCreatedAt`, `versionCreatedBy`(UserRef, 서버가 만든 버전이면 `null`)가 더 있다. 화면용 표시 이름(`label`, `valueLabels`, `reviewStatuses`, `changeActions`), 주장 문장 틀(`claimPredicates.<predicate>.sentence`), 관계 문장 틀(`relationshipTypes.<관계>.sentence`), 만들기 폼 정보(`nodeTypes.<타입>.hintProperties`, `relationshipTypes.<관계>.createPicker`), 타입의 색과 모양(`nodeTypes.<타입>.display`), 검색에 넣을 속성(`nodeTypes.<타입>.searchProperties`), 변경 이력의 항목 이름(`changeFields`), 예전 값 별칭(`valueAliases`)이 들어 있다. 저장되는 값과 키는 표시 이름과 따로다. 뜻은 [데이터 스키마](data-schema.md) 의 「표시 이름」 과 그 아래 절이다 |
 | GET | `/api/ontology/versions` | ADMIN | 버전 목록. 최근 것부터 `Page<{"version","createdAt","createdBy":UserRef?,"note","restoredFrom"}>`. 쪽 나누기는 `page`, `size` |
 | GET | `/api/ontology/versions/{version}` | ADMIN | 그 버전의 `{"version", "yaml", …목록의 필드}` |
 | GET | `/api/ontology/export` | ADMIN | 최신 버전의 YAML 파일. `Content-Type: application/yaml;charset=UTF-8`, `Content-Disposition: attachment; filename="financial-ontology-v<버전>.yaml"` |

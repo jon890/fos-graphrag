@@ -168,6 +168,12 @@ object OntologyLoader {
                 addAll(aliasErrors(name, prop, p))
             }
         }
+        o.relationshipTypes.forEach { (name, def) ->
+            val sentence = def.sentence ?: return@forEach
+            if (sentence.split("{from}").size != 2 || sentence.split("{to}").size != 2) {
+                add("$name 의 sentence 는 {from} 과 {to} 를 한 번씩 담아야 한다")
+            }
+        }
         if (!Regex("[A-Za-z][A-Za-z0-9_]*").let { r -> (types + o.allRelationshipTypes).all { r.matches(it) } }) {
             add("타입과 관계 이름은 영문자, 숫자, 밑줄만 쓴다")
         }

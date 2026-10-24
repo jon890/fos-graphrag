@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { addRelationshipType, keyError, updateRelationshipType } from '../../../lib/ontologyDraft'
-import { Field, RemoveControl, TypeChecks, KeyInput, type FormContext } from './shared'
+import { addRelationshipType, keyError, relationSentenceError, updateRelationshipType } from '../../../lib/ontologyDraft'
+import { Field, FieldError, RemoveControl, TypeChecks, KeyInput, type FormContext } from './shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+
+const SENTENCE_LABEL = '문장 틀(예: {from}이(가) {to}을(를) 발행한다)'
 
 /** 노드 타입을 빼서 이 종류가 쓸 수 없게 됐다는 안내 */
 export function EmptiedWarning({ show }: { show: boolean }) {
@@ -20,6 +22,7 @@ export function RelationshipRow({ ctx, relKey }: { ctx: FormContext; relKey: str
   const path = `relationshipTypes.${relKey}`
   const emptied = rel.from.length + rel.to.length > 0 && now.from.length === 0 && now.to.length === 0
   const patch = (p: Parameters<typeof updateRelationshipType>[2]) => ctx.change(updateRelationshipType(ctx.def, relKey, p))
+  const sentence = rel.sentence ?? ''
   return (
     <div className={cn('mb-2 rounded-md border p-2', ctx.removed.includes(path) && 'opacity-50')} data-testid="ontology-form-rel" data-rel={relKey}>
       <div className="flex flex-wrap items-center gap-2">
@@ -36,6 +39,10 @@ export function RelationshipRow({ ctx, relKey }: { ctx: FormContext; relKey: str
           <Input value={rel.description} onChange={(e) => patch({ description: e.target.value })} />
         </Field>
       </div>
+      <Field label={SENTENCE_LABEL} className="mt-2">
+        <Input data-testid="ontology-form-rel-sentence" value={sentence} onChange={(e) => patch({ sentence: e.target.value || undefined })} />
+      </Field>
+      <FieldError message={sentence ? relationSentenceError(sentence) : null} />
       <div className="mt-2 flex flex-col gap-2">
         <TypeChecks ctx={ctx} label="시작 타입" selected={rel.from} onChange={(from) => patch({ from })} />
         <TypeChecks ctx={ctx} label="끝 타입" selected={rel.to} onChange={(to) => patch({ to })} />
@@ -50,10 +57,12 @@ export function AddRelationshipPanel({ ctx }: { ctx: FormContext }) {
   const [key, setKey] = useState('')
   const [label, setLabel] = useState('')
   const [description, setDescription] = useState('')
+  const [sentence, setSentence] = useState('')
   const [from, setFrom] = useState<string[]>([])
   const [to, setTo] = useState<string[]>([])
   const error = keyError('relationshipType', key, Object.keys(ctx.def.relationshipTypes))
-  const ready = key !== '' && !error && from.length > 0 && to.length > 0
+  const sError = sentence ? relationSentenceError(sentence) : null
+  const ready = key !== '' && !error && !sError && from.length > 0 && to.length > 0
 
   if (!open) {
     return (
@@ -73,6 +82,10 @@ export function AddRelationshipPanel({ ctx }: { ctx: FormContext }) {
           <Input value={description} onChange={(e) => setDescription(e.target.value)} />
         </Field>
       </div>
+      <Field label={SENTENCE_LABEL}>
+        <Input data-testid="ontology-form-new-sentence" value={sentence} onChange={(e) => setSentence(e.target.value)} />
+      </Field>
+      <FieldError message={sError} />
       <TypeChecks ctx={ctx} label="시작 타입" selected={from} onChange={setFrom} />
       <TypeChecks ctx={ctx} label="끝 타입" selected={to} onChange={setTo} />
       <div className="flex gap-2">
@@ -82,11 +95,12 @@ export function AddRelationshipPanel({ ctx }: { ctx: FormContext }) {
           data-testid="ontology-form-new-submit"
           disabled={!ready}
           onClick={() => {
-            ctx.change(addRelationshipType(ctx.def, key, { label, description, from, to }))
+            ctx.change(addRelationshipType(ctx.def, key, { label, description, from, to, sentence: sentence || undefined }))
             setOpen(false)
             setKey('')
             setLabel('')
             setDescription('')
+            setSentence('')
             setFrom([])
             setTo([])
           }}
