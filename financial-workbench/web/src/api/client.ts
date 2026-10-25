@@ -22,9 +22,13 @@ import type {
   PatchClaimRequest,
   PatchUserRequest,
   PropertyValue,
+  ProposalStatus,
+  ProposalSummary,
+  ProposalView,
   RelationshipView,
   ReviewStatus,
   StudyItem,
+  TokenScope,
   TraceView,
   CurrentUser,
   Role,
@@ -197,8 +201,16 @@ export const api = {
   },
   tokens: {
     list: () => request<IntegrationTokenView[]>('GET', '/api/me/tokens'),
-    issue: (name: string) => request<IssuedIntegrationToken>('POST', '/api/me/tokens', { name }),
+    issue: (name: string, scope: TokenScope) => request<IssuedIntegrationToken>('POST', '/api/me/tokens', { name, scope }),
     revoke: (id: string) => request<void>('DELETE', `/api/me/tokens/${enc(id)}`),
+  },
+  proposals: {
+    list: (status: ProposalStatus, page: number) =>
+      request<Page<ProposalView>>('GET', `/api/me/proposals${buildQuery({ status, page, size: 20 })}`),
+    summary: () => request<ProposalSummary>('GET', '/api/me/proposals/summary'),
+    accept: (id: string, payload?: Record<string, unknown>) =>
+      request<ProposalView>('POST', `/api/me/proposals/${enc(id)}/accept`, payload === undefined ? undefined : { payload }),
+    reject: (id: string, reason?: string) => request<ProposalView>('POST', `/api/me/proposals/${enc(id)}/reject`, reason ? { reason } : undefined),
   },
   ontology: {
     get: () => request<Ontology>('GET', '/api/ontology'),

@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { withApp } from '../testSupport'
-import { canCloseIssue, canIssue, maskedLast4, TokensTab } from './TokensTab'
+import { canCloseIssue, canIssue, maskedLast4, scopeLabel, TokensTab } from './TokensTab'
 
 describe('TokensTab', () => {
   it('첫 렌더에 화면, Hermes 안내, 발급 단추가 있다', () => {
@@ -24,5 +24,10 @@ describe('TokensTab', () => {
 
   it('끝 네 자리 앞에 줄임표를 붙인다', () => {
     expect(maskedLast4('x9Qa')).toBe('…x9Qa')
+  })
+
+  it('범위는 조회만과 조회와 기록으로 보인다', () => {
+    expect(scopeLabel('READ')).toBe('조회만')
+    expect(scopeLabel('READ_WRITE')).toBe('조회와 기록')
   })
 })
