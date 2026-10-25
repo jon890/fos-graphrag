@@ -13,8 +13,8 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `login-denied` | `/?login=denied` 로 돌아왔을 때 「접근 권한이 없습니다」 안내. `login-google` 도 함께 보인다 |
 | `login-notice` | 세션이 끊겨 돌아왔을 때의 안내 |
 | `tab-map`, `tab-workspace`, `tab-list`, `tab-study` | 상단 탭(개념 지도, 작업 공간, 목록, 공부). `role=tab`, 고른 탭은 `aria-selected="true"` |
-| `more-open` | 「더보기」 메뉴 단추. 메뉴의 화면(변경 이력, 온톨로지 상세, 검토 대기, 사용자)이 열려 있으면 `data-active="true"` |
-| `more-item-<key>` | 더보기 메뉴 항목. `key` 는 `changes`, `ontology`, `review`(EDITOR, ADMIN), `users`(ADMIN). 열람자가 주소로 연 `/review` 도 `more-open` 이 `data-active="true"` 다 |
+| `more-open` | 「더보기」 메뉴 단추. 메뉴의 화면(변경 이력, 온톨로지 상세, 검토 대기, 사용자, 연동 토큰)이 열려 있으면 `data-active="true"` |
+| `more-item-<key>` | 더보기 메뉴 항목. `key` 는 `changes`, `ontology`, `review`(EDITOR, ADMIN), `users`(ADMIN), `tokens`(모든 역할). 열람자가 주소로 연 `/review` 도 `more-open` 이 `data-active="true"` 다 |
 | `current-user-name`, `current-user-email` | 로그인 사용자의 표시 이름, 이메일 |
 | `current-user-role` | 역할 배지. `data-role` 이 VIEWER, EDITOR, ADMIN |
 | `guide-open` | 머리글의 「사용법」. 개념 지도나 작업 공간이 아니면 개념 지도로 옮겨 첫 접속 가이드를 처음부터 연다 |
@@ -393,3 +393,23 @@ ADMIN 에게만 나오는 요소다.
 | `users-row-disable`, `users-row-enable` | 비활성화, 다시 활성화(상태에 따라 하나만 보인다) |
 | `users-row-enabled`, `users-row-linked` | 「활성」/「비활성」, 「로그인함」/「첫 로그인 전」 |
 | `users-row-history` | 그 사용자의 변경 이력 |
+
+## 연동 토큰 화면
+
+발급 창과 폐기 확인 창은 Portal 로 `body` 아래에 그려진다.
+
+| testid | 요소 |
+| --- | --- |
+| `tokens-tab` | 화면 전체 |
+| `tokens-guide` | 위쪽의 Hermes 연결 안내 |
+| `tokens-table`, `tokens-empty`, `tokens-error`, `tokens-retry` | 목록 표, 토큰이 없을 때의 안내, 목록을 받지 못했을 때의 이유와 「다시 시도」 |
+| `tokens-message` | 처리 결과. `data-kind` 가 `success` 나 `error` |
+| `tokens-row` * | 행. `data-id`, `data-name` |
+| `tokens-row-name`, `tokens-row-created`, `tokens-row-last-used`, `tokens-row-last4` | 이름, 만든 때, 마지막 사용(「아직 쓰지 않음」), 끝 네 자리(`…x9Qa`) |
+| `tokens-row-revoke` | 「폐기」. 확인 창을 연다 |
+| `tokens-issue-open` | 「＋ 토큰 발급」. 상한이면 `disabled` |
+| `tokens-limit` | 상한 안내. 폐기하지 않은 토큰이 5개일 때만 나온다 |
+| `tokens-issue-dialog`, `tokens-issue-name`, `tokens-issue-submit`, `tokens-issue-cancel`, `tokens-issue-error` | 발급 창, 이름 칸, 「발급」, 「취소」, 창 안의 오류(`TOKEN_LIMIT` 등 서버 `message`) |
+| `tokens-issued-value` | 발급한 토큰 원문(읽기 전용 입력칸). `value` 가 `fwb_` 로 시작한다 |
+| `tokens-issued-copy`, `tokens-issued-copied`, `tokens-issued-warning`, `tokens-issued-close` | 「복사」, 「복사했습니다」, 「다시 볼 수 없습니다」 안내, 「닫기」 |
+| `tokens-revoke-dialog`, `tokens-revoke-confirm`, `tokens-revoke-cancel` | 폐기 확인 창, 「폐기」, 「취소」 |

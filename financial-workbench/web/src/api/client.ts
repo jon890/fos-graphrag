@@ -5,6 +5,8 @@ import type {
   ClaimView,
   CreateClaimRequest,
   GraphView,
+  IntegrationTokenView,
+  IssuedIntegrationToken,
   KnowledgeLevel,
   KnowledgeMark,
   KnowledgeSummary,
@@ -192,6 +194,11 @@ export const api = {
     create: (email: string, displayName: string, role: Role) =>
       request<UserView>('POST', '/api/users', { email, displayName, role }),
     patch: (id: string, body: PatchUserRequest) => request<UserView>('PATCH', `/api/users/${enc(id)}`, body),
+  },
+  tokens: {
+    list: () => request<IntegrationTokenView[]>('GET', '/api/me/tokens'),
+    issue: (name: string) => request<IssuedIntegrationToken>('POST', '/api/me/tokens', { name }),
+    revoke: (id: string) => request<void>('DELETE', `/api/me/tokens/${enc(id)}`),
   },
   ontology: {
     get: () => request<Ontology>('GET', '/api/ontology'),

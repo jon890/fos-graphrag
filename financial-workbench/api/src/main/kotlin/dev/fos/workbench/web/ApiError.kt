@@ -68,3 +68,6 @@ class OntologyImpactUnconfirmedException(impacts: List<OntologyImpact>) :
         HttpStatus.CONFLICT, "ONTOLOGY_IMPACT_UNCONFIRMED", "기존 데이터와 어긋나는 변경입니다. 영향을 확인한 뒤 다시 저장하세요.",
         mapOf("impacts" to impacts),
     )
+
+class TokenLimitException(max: Int) :
+    ApiException(HttpStatus.CONFLICT, "TOKEN_LIMIT", "토큰은 ${max}개까지 만들 수 있습니다. 쓰지 않는 토큰을 폐기하세요.", mapOf("max" to max))

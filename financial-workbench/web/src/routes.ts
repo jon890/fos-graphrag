@@ -1,6 +1,6 @@
 /** 화면 경로와 query 를 읽고 쓰는 순수 함수. 경로와 query 이름은 docs/flow.md 「주소와 뒤로가기」 의 표와 같다 */
 
-export type TabKey = 'map' | 'workspace' | 'list' | 'study' | 'trace' | 'review' | 'changes' | 'ontology' | 'users'
+export type TabKey = 'map' | 'workspace' | 'list' | 'study' | 'trace' | 'review' | 'changes' | 'ontology' | 'users' | 'tokens'
 
 export const TAB_PATHS: Record<TabKey, string> = {
   map: '/map',
@@ -13,6 +13,7 @@ export const TAB_PATHS: Record<TabKey, string> = {
   changes: '/changes',
   ontology: '/ontology',
   users: '/users',
+  tokens: '/tokens',
 }
 
 /** 첫 화면. `/`, 모르는 경로, 권한 없는 화면 경로를 여기로 바꿔 연다 */
@@ -21,11 +22,12 @@ export const LANDING_PATH = TAB_PATHS.map
 /** 머리글에 탭으로 늘 보이는 화면 */
 export const TOP_TABS: TabKey[] = ['map', 'workspace', 'list', 'study']
 
-/** 「더보기」 메뉴의 화면. 검토 대기는 EDITOR 와 ADMIN, 사용자는 ADMIN 에게만 보인다 */
+/** 「더보기」 메뉴의 화면. 검토 대기는 EDITOR 와 ADMIN, 사용자는 ADMIN 에게만 보이고 연동 토큰은 모든 역할에 보인다 */
 export function moreItems(role: string): TabKey[] {
   const items: TabKey[] = ['changes', 'ontology']
   if (role === 'EDITOR' || role === 'ADMIN') items.push('review')
   if (role === 'ADMIN') items.push('users')
+  items.push('tokens')
   return items
 }
 

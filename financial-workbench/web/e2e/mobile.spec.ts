@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { admin, exact, loginAs, openScreen, shot } from './support'
+import { admin, exact, loginAs, openScreen, revokeTokensExcept, shot, tokenIds } from './support'
 
 // 휴대폰 폭(390px)에서 작업 공간이 검색, 그래프, 상세 탭으로 나뉘어 동작하는지 확인한다.
 // 노드는 그래프 탭이 숨겨진 동안 만들어지므로, 그래프 탭을 열 때 미뤄 둔 배치가 도는지도 함께 본다.
@@ -278,4 +278,38 @@ test('휴대폰 폭에서 근거 따라가기와 공부 탭이 가로 스크롤 
   // 다른 테스트에 남지 않게 이해했다고 표시해 목록에서 뺀다.
   await item.getByTestId('study-known').click()
   await expect(item).toHaveCount(0)
+})
+
+test('휴대폰 폭에서 연동 토큰을 발급하고 폐기해도 가로 스크롤이 없다', async ({ page }) => {
+  await loginAs(page, admin)
+  await page.getByTestId('more-open').click()
+  await page.getByTestId('more-item-tokens').click()
+  await expect(page.getByTestId('tokens-tab')).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+
+  // 중간에 실패해도 이 테스트가 발급한 토큰이 남지 않게, 시작 전 목록에 없던 토큰을 끝에 폐기한다.
+  const kept = await tokenIds(page)
+  try {
+    // 기본 이름 그대로 발급한다.
+    await page.getByTestId('tokens-issue-open').click()
+    await page.getByTestId('tokens-issue-submit').click()
+    await expect(page.getByTestId('tokens-issued-value')).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+    await shot(page, 'tokens-issued-mobile')
+
+    await page.getByTestId('tokens-issued-close').click()
+    await expect(page.getByTestId('tokens-issue-dialog')).toHaveCount(0)
+    const rows = page.getByTestId('tokens-row')
+    await expect(rows.first()).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+    await shot(page, 'tokens-list-mobile')
+
+    // 다른 테스트에 남지 않게 방금 만든 토큰(목록 맨 아래 행)을 폐기한다.
+    const before = await rows.count()
+    await rows.last().getByTestId('tokens-row-revoke').click()
+    await page.getByTestId('tokens-revoke-confirm').click()
+    await expect(rows).toHaveCount(before - 1)
+  } finally {
+    await revokeTokensExcept(page, kept)
+  }
 })

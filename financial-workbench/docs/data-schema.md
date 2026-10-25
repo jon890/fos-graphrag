@@ -267,6 +267,7 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 - 범위로 받은 가치는 중간값을 `valuePerShare` 에 넣고 범위는 `description` 에 적는다.
 - 하방률, 상방률 같은 계산값은 아직 저장하지도 보이지도 않는다.
 - 이 노드도 다른 노드처럼 로그인한 모든 사용자가 본다. 개인 기록의 열람 제한은 아직 없다.
+- 에이전트 API 의 종목 찾기(`GET /api/v1/securities/lookup`)는 타입 키 `Security`, `Company`, `Decision`, `Valuation`, `Scenario`, 관계 키 `ISSUES`, `HAS_DECISION`, `BASED_ON`, `HAS_VALUATION`, `HAS_SCENARIO`, 속성 `market`, `ticker`, `currency`, `action`, `decidedAt`, `reason`, `asOf`, `currentPrice`, `method`, `kind`, `valuePerShare`, `assumptions` 를 이름으로 읽는다. 온톨로지에서 빠지면 그 칸이 `null` 이거나 목록이 빌 뿐 저장은 막지 않으므로 `CodeReadKeys` 에 넣지 않는다.
 
 ### 초기 데이터
 
@@ -296,6 +297,7 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 - `role` 은 `VIEWER`, `EDITOR`, `ADMIN` 가운데 하나다.
 - 비밀번호는 저장하지 않는다. 로그인은 Google OpenID Connect 로만 한다.
 - 개인 계좌 키, 잔고, 주문 내역은 이 모델에 넣지 않는다.
+- 사용자가 발급한 연동 토큰은 `OWNS` 로 이어진 `:IntegrationToken` 이다(「연동 토큰」).
 - `:User` 는 `:Knowledge` label 이 없어 검색과 그래프에 나오지 않는다.
 - `guideDoneAt` 은 첫 접속 가이드를 끝내거나 건너뛴 시각이다. 없으면 로그인할 때 가이드가 열린다([흐름](flow.md) 의 「첫 접속 가이드」). 화면 상태라 `revision`, `updatedAt`, `updatedBy` 를 바꾸지 않고 ChangeEvent 도 남기지 않는다. 한 번 쓰면 지우지 않는다.
 - 사용자 관리 변경도 ChangeEvent(`targetKind = USER`)로 남는다. 첫 관리자를 만든 이벤트의 actor 는 `system` 이다.
@@ -317,6 +319,29 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 - 항목을 보관해도 표시는 남는다. 공부 목록은 그 항목을 「보관됨」 으로 보인다. 보관된 항목에도 표시를 쓰고 지울 수 있다.
 - 사용자를 비활성화해도 표시는 남는다. 사용자 노드를 지우면(`DETACH DELETE`) 함께 사라진다. 지금은 사용자를 지우는 API 가 없다.
 - `:User` 는 `:Knowledge` 가 아니다. 상세의 관계와 근거 따라가기는 양 끝을 `:Knowledge` 로 묶어 이 관계를 타지 않는다. 주변 그래프의 여러 단계 경로는 경로 위 관계와 노드에 거는 `archived = false` 조건 때문에 `KNOWS` 와 `:User` 를 지나지 않는다. 그래서 `KNOWS` 와 `:User` 에 `archived` 속성을 두지 않는다. 관계 id, revision 이 없고 `rel_<타입>_id` 인덱스도 만들지 않는다.
+
+## 연동 토큰
+
+`(:User)-[:OWNS]->(:IntegrationToken {id, name, hash, last4, createdAt, lastUsedAt, revokedAt})` 가 사용자가 외부 에이전트에 넣으려고 발급한 개인 연동 토큰이다. 결정과 근거는 [ADR-012](adr/012-agent-integration-token.md), 계약은 [API 계약](api-contract.md) 의 「연동 토큰」 이다.
+
+| 속성 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | String | UUID. 목록과 폐기에 쓰는 식별자 |
+| `name` | String | 사용자가 붙인 이름. 50자까지 |
+| `hash` | String | 토큰 원문(`fwb_` 포함 47자)의 SHA-256 을 소문자 16진수 64자로 쓴 값. 원문은 저장하지 않는다 |
+| `last4` | String | 원문의 끝 네 글자. 목록에서 토큰을 구분하는 데 쓴다 |
+| `createdAt` | String | 발급 시각. 서버가 기록하는 시각 형식이다 |
+| `lastUsedAt` | String | `/api/v1` 인증에 마지막으로 성공한 시각. 쓴 적이 없으면 속성이 없다 |
+| `revokedAt` | String | 폐기한 시각. 폐기하지 않았으면 속성이 없다 |
+
+- 토큰 원문은 `fwb_` 뒤에 `SecureRandom` 32바이트를 base64url(채움 문자 없음)로 쓴 43자를 붙인다. 앞자리 `fwb_` 는 유출 검사 도구가 찾을 수 있게 붙인다.
+- 인증할 때 받은 원문의 SHA-256 으로 `hash` 를 찾는다. 원문이 무작위 32바이트라 느린 해시(bcrypt)를 쓰지 않는다.
+- 폐기는 지우지 않고 `revokedAt` 을 쓴다. 폐기한 토큰은 인증에 실패하고 목록에 나오지 않는다. 다시 살리는 API 는 없다.
+- 사용자마다 폐기하지 않은 토큰은 5개까지다. 발급은 그 사용자 노드에 쓰기 잠금(`_lock`)을 건 뒤 세고 만든다. 같은 사람이 동시에 발급해도 5개를 넘지 않는다.
+- `lastUsedAt` 은 앞 값보다 1분 넘게 지났을 때만 고쳐 쓴다. 요청마다 쓰기를 만들지 않으려는 것이다. 이 쓰기가 실패해도 요청은 처리한다.
+- 토큰은 사용자 노드에만 이어진다. `:IntegrationToken` 은 `:Knowledge` 가 아니어서 검색, 그래프, 근거 따라가기에 나오지 않는다. `OWNS` 와 `:IntegrationToken` 에 `archived` 속성을 두지 않아 주변 그래프의 경로 조건(`archived = false`)에 걸려 지나가지 않는다.
+- 사용자를 비활성화해도 토큰은 남지만 인증은 실패한다. 다시 활성화하면 폐기하지 않은 토큰이 다시 통한다. 사용자 노드를 지우면(`DETACH DELETE`) 그 사용자의 토큰도 함께 지운다. 지금은 사용자를 지우는 API 가 없어 운영자가 Neo4j 에서 지울 때 `MATCH (u:User {id: $id}) OPTIONAL MATCH (u)-[:OWNS]->(t:IntegrationToken) DETACH DELETE u, t` 로 함께 지운다.
+- 발급, 폐기, 사용 시각은 변경 이력(ChangeEvent)에 남기지 않는다. 지식 데이터가 아니라 개인 설정이고, 이력 화면은 다른 사용자에게도 보이기 때문이다.
 
 ## 변경 이력
 
@@ -344,6 +369,8 @@ API 가 시작할 때, 웹 서버가 요청을 받기 전에 `IF NOT EXISTS` 로
 | `change_event_at` | `(:ChangeEvent).at` 인덱스 | 최근 이력 조회 |
 | `ontology_version_unique` | `(:OntologyVersion).version` 유일 | 온톨로지 버전 번호 |
 | `ontology_head_key_unique` | `(:OntologyHead).key` 유일 | 온톨로지 저장 잠금 노드가 하나만 생기게 한다 |
+| `integration_token_id_unique` | `(:IntegrationToken).id` 유일 | 연동 토큰 ID |
+| `integration_token_hash_unique` | `(:IntegrationToken).hash` 유일 | 인증할 때 해시로 토큰을 바로 찾는다 |
 | `seed_run_key_unique` | `(:SeedRun).key` 유일 | 초기 데이터 파일을 한 번만 적용한다. `:SeedRun` 은 `:Knowledge` 가 아니라 검색과 그래프에 나오지 않는다 |
 | `knowledge_search_text` | `(:Knowledge).searchText` TEXT 인덱스 | 검색어 `CONTAINS`. 첫 버전의 RANGE 인덱스가 있으면 시작할 때 지우고 TEXT 로 다시 만든다 |
 | `rel_<타입>_id` | 관계 타입마다 `()-[r:<타입>]-()` 의 `r.id` 인덱스 | 관계 보관, 복원, 조회. 타입은 온톨로지의 관계와 Claim 관계 전부다 |

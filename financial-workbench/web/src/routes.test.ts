@@ -139,10 +139,11 @@ describe('개념 지도와 더보기', () => {
     expect(isSafeReturnTo('/map?type=X')).toBe(true)
   })
 
-  it('더보기 항목은 역할에 따라 검토 대기와 사용자가 붙는다', () => {
-    expect(moreItems('VIEWER')).toEqual(['changes', 'ontology'])
-    expect(moreItems('EDITOR')).toEqual(['changes', 'ontology', 'review'])
-    expect(moreItems('ADMIN')).toEqual(['changes', 'ontology', 'review', 'users'])
+  it('더보기 항목은 역할에 따라 검토 대기와 사용자가 붙고 연동 토큰은 모두에게 붙는다', () => {
+    expect(moreItems('VIEWER')).toEqual(['changes', 'ontology', 'tokens'])
+    expect(moreItems('EDITOR')).toEqual(['changes', 'ontology', 'review', 'tokens'])
+    expect(moreItems('ADMIN')).toEqual(['changes', 'ontology', 'review', 'users', 'tokens'])
+    expect(tabOfPath('/tokens')).toBe('tokens')
   })
 
   it('옛 /?node 링크는 지도가 첫 화면이어도 작업 공간 상세로 연다', () => {
