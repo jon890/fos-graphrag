@@ -316,7 +316,7 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 - 열람자(VIEWER)도 쓴다.
 - 항목을 보관해도 표시는 남는다. 공부 목록은 그 항목을 「보관됨」 으로 보인다. 보관된 항목에도 표시를 쓰고 지울 수 있다.
 - 사용자를 비활성화해도 표시는 남는다. 사용자 노드를 지우면(`DETACH DELETE`) 함께 사라진다. 지금은 사용자를 지우는 API 가 없다.
-- `:User` 는 `:Knowledge` 가 아니다. 주변 그래프, 상세의 관계, 근거 따라가기는 끝을 `:Knowledge` 로 묶어 이 관계를 타지 않는다. 관계 id, revision, 보관 속성이 없고 `rel_<타입>_id` 인덱스도 만들지 않는다.
+- `:User` 는 `:Knowledge` 가 아니다. 상세의 관계와 근거 따라가기는 양 끝을 `:Knowledge` 로 묶어 이 관계를 타지 않는다. 주변 그래프의 여러 단계 경로는 경로 위 관계와 노드에 거는 `archived = false` 조건 때문에 `KNOWS` 와 `:User` 를 지나지 않는다. 그래서 `KNOWS` 와 `:User` 에 `archived` 속성을 두지 않는다. 관계 id, revision 이 없고 `rel_<타입>_id` 인덱스도 만들지 않는다.
 
 ## 변경 이력
 

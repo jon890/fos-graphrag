@@ -20,7 +20,7 @@ import { ConceptChips } from './ConceptChips'
 import { ConceptSections } from './ConceptSections'
 import { KnowledgeMarkControls } from './KnowledgeMarkControls'
 import { StudyCard, StudySummary } from './StudyTab'
-import { TraceBody } from './TracePage'
+import { shownLoad, TraceBody } from './TracePage'
 
 const nodeView = (id: string, type: string, label: string, properties: NodeView['properties'] = {}): NodeView => ({
   id,
@@ -163,6 +163,21 @@ describe('근거 따라가기 화면', () => {
   })
 })
 
+describe('근거 따라가기 읽기 상태', () => {
+  it('처음 읽는 항목은 불러오는 중이다', () => {
+    expect(shownLoad(null, 'd1')).toEqual({ kind: 'loading' })
+  })
+
+  it('같은 항목을 다시 읽는 동안에는 앞의 결과를 그대로 보인다', () => {
+    expect(shownLoad({ nodeId: 'd1', load: { kind: 'done', view } }, 'd1')).toEqual({ kind: 'done', view })
+    expect(shownLoad({ nodeId: 'd1', load: { kind: 'error', message: '서버 오류' } }, 'd1')).toEqual({ kind: 'error', message: '서버 오류' })
+  })
+
+  it('다른 항목으로 옮기면 앞 항목의 결과 대신 불러오는 중이다', () => {
+    expect(shownLoad({ nodeId: 'd1', load: { kind: 'done', view } }, 's1')).toEqual({ kind: 'loading' })
+  })
+})
+
 describe('이해 표시 토글', () => {
   const render = (level: KnowledgeLevel | null) =>
     renderToStaticMarkup(<KnowledgeMarkControls nodeId="n1" mark={level ? mark('n1', level) : null} />)
@@ -275,9 +290,12 @@ describe('공부 요약', () => {
 
   it('요약을 받지 못하면 이유와 다시 시도를 보인다', () => {
     const html = renderToStaticMarkup(withApp(<StudySummary load={{ kind: 'error', message: '서버 오류' }} onRetry={() => {}} />))
-    expect(html).toContain('data-testid="study-error"')
+    // 목록 오류(study-error)와 함께 보여도 겹치지 않는 testid 다
+    expect(html).toContain('data-testid="study-summary-error"')
     expect(html).toContain('서버 오류')
-    expect(html).toContain('data-testid="study-retry"')
+    expect(html).toContain('data-testid="study-summary-retry"')
+    expect(html).not.toContain('data-testid="study-error"')
+    expect(html).not.toContain('data-testid="study-retry"')
   })
 })
 

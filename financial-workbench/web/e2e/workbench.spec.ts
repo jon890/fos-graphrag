@@ -1157,9 +1157,8 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageA.getByTestId('trace-step').first()).toBeVisible()
 
     const steps = pageA.getByTestId('trace-step')
-    // 결정에서 종목, 기업, 병목, 변화까지 이어진다. 출발점은 변화다.
+    // 결정에서 종목, 기업, 병목, 변화까지 이어진다. 가장 깊은 단계(변화와 산업)가 출발점이다.
     await expect(pageA.locator('[data-testid="trace-step"][data-role="root"]')).toHaveCount(1)
-    await expect(pageA.locator('[data-testid="trace-step"][data-role="origin"]')).toHaveCount(1)
     await expect(steps.filter({ hasText: 'FLNC' }).first()).toBeVisible()
     await expect(steps.filter({ hasText: 'Fluence Energy' }).first()).toBeVisible()
     await expect(traceStep(pageA, seedChange)).toHaveAttribute('data-role', 'origin')

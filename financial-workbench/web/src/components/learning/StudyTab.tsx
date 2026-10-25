@@ -34,6 +34,8 @@ export function StudyTab({ onOpenNode, onTrace }: Props) {
   const [list, setList] = useState<Load<Page<StudyItem>>>({ kind: 'loading' })
   const [summary, setSummary] = useState<Load<KnowledgeSummary>>({ kind: 'loading' })
   const [reloadKey, setReloadKey] = useState(0)
+  /** 다시 읽기를 기다리는 쪽. 목록 읽기가 끝나면(실패 포함) 모두 깨운다 */
+  const listWaiters = useRef<(() => void)[]>([])
 
   /** 주소만 바꾸고 기록을 쌓지 않는다. 쪽 번호가 아닌 조건을 바꾸면 쪽은 0 으로 돌린다 */
   const change = (patch: Partial<StudyQuery>) => {
@@ -43,20 +45,26 @@ export function StudyTab({ onOpenNode, onTrace }: Props) {
 
   useEffect(() => {
     let cancelled = false
+    const settle = (next: Load<Page<StudyItem>>) => {
+      setList(next)
+      const waiters = listWaiters.current
+      listWaiters.current = []
+      waiters.forEach((wake) => wake())
+    }
     setList((l) => (l.kind === 'done' ? l : { kind: 'loading' }))
     api.me.knowledge
       .list({ levels: level ? [level] : STUDY_LEVELS, page: pageNo, size: PAGE_SIZE })
       .then((p) => {
         if (cancelled) return
-        // 「이해했어요」 로 끝 쪽이 비면 끝 쪽으로 바꿔 연다.
+        // 「이해했어요」 로 끝 쪽이 비면 끝 쪽으로 바꿔 연다. 기다리는 쪽은 바꾼 쪽을 읽은 뒤에 깨운다
         const last = Math.max(p.totalPages - 1, 0)
         if (last < pageNo) {
           navigateRef.current(TAB_PATHS.study + studySearch({ level, page: last }), { replace: true })
           return
         }
-        setList({ kind: 'done', value: p })
+        settle({ kind: 'done', value: p })
       })
-      .catch((e) => !cancelled && setList({ kind: 'error', message: errorMessage(e) }))
+      .catch((e) => !cancelled && settle({ kind: 'error', message: errorMessage(e) }))
     return () => {
       cancelled = true
     }
@@ -73,13 +81,21 @@ export function StudyTab({ onOpenNode, onTrace }: Props) {
     }
   }, [reloadKey])
 
-  const reload = useCallback(() => setReloadKey((k) => k + 1), [])
+  /** 요약과 목록을 다시 읽는다. 목록 읽기가 끝나면 풀린다 */
+  const reload = useCallback(
+    () =>
+      new Promise<void>((resolve) => {
+        listWaiters.current.push(resolve)
+        setReloadKey((k) => k + 1)
+      }),
+    [],
+  )
 
-  /** 쓰고 나면 요약과 목록을 다시 읽는다. 실패는 카드가 보인다 */
+  /** 쓰고 나면 요약과 목록을 다시 읽고, 목록을 받을 때까지 기다린다. 그동안 카드의 단추는 꺼져 있다. 쓰기 실패는 카드가 보인다 */
   const write = useCallback(
     async (nodeId: string, next: KnowledgeLevel, note: string | null) => {
       await api.me.knowledge.put(nodeId, next, note)
-      reload()
+      await reload()
     },
     [reload],
   )
@@ -109,7 +125,7 @@ export function StudyTab({ onOpenNode, onTrace }: Props) {
       </div>
 
       {list.kind === 'loading' && <p className="mt-4 text-muted-foreground">불러오는 중…</p>}
-      {list.kind === 'error' && <LoadError message={list.message} onRetry={reload} />}
+      {list.kind === 'error' && <LoadError testIdPrefix="study" message={list.message} onRetry={reload} />}
       {list.kind === 'done' &&
         (list.value.totalItems === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground" data-testid="study-empty">
@@ -129,11 +145,12 @@ export function StudyTab({ onOpenNode, onTrace }: Props) {
   )
 }
 
-function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+/** 요약과 목록이 함께 실패해도 testid 가 겹치지 않게 앞머리를 받는다(`{앞머리}-error`, `{앞머리}-retry`) */
+function LoadError({ testIdPrefix, message, onRetry }: { testIdPrefix: string; message: string; onRetry: () => void }) {
   return (
-    <div className="error-box mt-3" data-testid="study-error">
+    <div className="error-box mt-3" data-testid={`${testIdPrefix}-error`}>
       <p>{message}</p>
-      <Button type="button" size="sm" variant="outline" className="mt-2" data-testid="study-retry" onClick={onRetry}>
+      <Button type="button" size="sm" variant="outline" className="mt-2" data-testid={`${testIdPrefix}-retry`} onClick={onRetry}>
         다시 시도
       </Button>
     </div>
@@ -143,7 +160,7 @@ function LoadError({ message, onRetry }: { message: string; onRetry: () => void 
 /** 위쪽 요약. 개수 줄과 능력 범위 줄이다. 받지 못하면 그 자리에 오류를 보인다 */
 export function StudySummary({ load, onRetry }: { load: Load<KnowledgeSummary>; onRetry: () => void }) {
   if (load.kind === 'loading') return <p className="text-muted-foreground">불러오는 중…</p>
-  if (load.kind === 'error') return <LoadError message={load.message} onRetry={onRetry} />
+  if (load.kind === 'error') return <LoadError testIdPrefix="study-summary" message={load.message} onRetry={onRetry} />
   const s = load.value
   const competence = competenceText(s)
   return (
@@ -170,7 +187,7 @@ interface CardProps {
   item: StudyItem
   onOpenNode: (id: string) => void
   onTrace: (id: string) => void
-  /** 표시를 쓰고 목록을 다시 읽는다. 실패하면 던진다 */
+  /** 표시를 쓰고 목록을 다시 받을 때까지 기다린다. 쓰기가 실패하면 던진다 */
   onWrite: (nodeId: string, level: KnowledgeLevel, note: string | null) => Promise<void>
 }
 
@@ -209,7 +226,7 @@ export function StudyCard({ item, onOpenNode, onTrace, onWrite }: CardProps) {
         <Button
           type="button"
           variant="link"
-          className="h-auto min-w-0 px-0 py-0 text-left font-bold whitespace-normal"
+          className="h-auto max-w-full min-w-0 shrink px-0 py-0 text-left font-bold break-words whitespace-normal"
           data-testid="study-item-name"
           onClick={() => onOpenNode(node.id)}
         >

@@ -117,7 +117,7 @@ class KnowledgeReader(
     }
 
     /**
-     * 노드 id 마다 개념으로 나가는 보관되지 않은 관계의 끝 개념. 관계 종류로 좁히지 않는다.
+     * 노드 id 마다 개념으로 나가는 보관되지 않은 관계의 끝 개념. 주장 관계(Claim 의 SUBJECT, OBJECT 등)는 빼고, 그 밖의 관계 종류로는 좁히지 않는다.
      * 관계를 만든 순서이고, 같은 개념이 두 관계로 이어져 있으면 먼저 만든 관계 하나로 담는다. 개념이 없는 id 는 빠진다.
      */
     @Suppress("UNCHECKED_CAST")
@@ -128,13 +128,15 @@ class KnowledgeReader(
             """
             UNWIND ${'$'}ids AS nodeId
             MATCH (:Knowledge {id: nodeId})-[r]->(c:Knowledge:Concept)
-            WHERE r.archived = false AND c.archived = false
+            WHERE r.archived = false AND c.archived = false AND NOT type(r) IN ${'$'}claimRelationships
             WITH nodeId, c, r ORDER BY r.createdAt, r.id
             WITH nodeId, c, collect(r)[0] AS first
             WITH nodeId, c, first ORDER BY first.createdAt, first.id
             RETURN nodeId, collect({c: properties(c), type: type(first)})[0..${'$'}limit] AS concepts
             """,
-        ).bindAll(mapOf("ids" to nodeIds.toList(), "limit" to limit.toLong())).fetch().all().associate { row ->
+        ).bindAll(
+            mapOf("ids" to nodeIds.toList(), "claimRelationships" to ontology.claimRelationships.keys.toList(), "limit" to limit.toLong()),
+        ).fetch().all().associate { row ->
             row["nodeId"] as String to (row["concepts"] as List<Map<String, Any?>>).map {
                 val c = it["c"] as Map<String, Any?>
                 ConceptRef(c["id"] as String, ontology.labelOf(c["type"] as String, c), c["summary"] as String?, it["type"] as String)

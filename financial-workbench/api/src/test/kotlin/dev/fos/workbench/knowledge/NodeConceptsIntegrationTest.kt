@@ -38,4 +38,19 @@ class NodeConceptsIntegrationTest : IntegrationTest() {
         assertThat(archivedConcept.status).describedAs(archivedConcept.body.toString()).isEqualTo(200)
         assertThat(alice.get("/api/nodes/${valuation.id}").body["concepts"].size()).isEqualTo(0)
     }
+
+    @Test
+    fun `주장이 개념을 대상으로 삼아도 주장 관계는 상세의 concepts 에 담지 않는다`() {
+        val alice = loggedIn(ALICE)
+        val fx = Fixtures(alice)
+        val person = fx.node("Person", mapOf("name" to "투자자-${fx.suffix}"))
+        val concept = fx.node("Concept", mapOf("name" to "안전마진-${fx.suffix}", "summary" to "가치와 가격의 차이"))
+        val document = fx.document("인터뷰")
+        val claim = fx.claim("ADVOCATES", person.id, concept.id, listOf(document.id))
+        assertThat(claim.status).describedAs(claim.body.toString()).isEqualTo(201)
+
+        val detail = alice.get("/api/nodes/${claim.body.id}")
+        assertThat(detail.status).describedAs(detail.body.toString()).isEqualTo(200)
+        assertThat(detail.body["concepts"].toList()).describedAs(detail.body["concepts"].toString()).isEmpty()
+    }
 }

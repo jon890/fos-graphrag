@@ -17,6 +17,7 @@ interface Props {
 /**
  * 「알아요」, 「잘 모르겠어요」 토글과 「메모 남기기」. 규칙은 docs/flow.md 「내 이해 표시」.
  * 응답을 받은 뒤에 바꾼다. 실패하면 이유만 보이고 표시는 그대로 둔다.
+ * 처음 읽기가 실패해도 토글은 켜 두고 표시 없음으로 쓴다. 이유는 단추 옆에 보인다.
  */
 export function KnowledgeMarkControls({ nodeId, mark, onChange }: Props) {
   const [current, setCurrent] = useState<KnowledgeMark | null>(mark ?? null)
@@ -41,7 +42,10 @@ export function KnowledgeMarkControls({ nodeId, mark, onChange }: Props) {
         setLoaded(true)
       })
       .catch((e) => {
-        if (!cancelled) setError(errorMessage(e))
+        if (cancelled) return
+        setCurrent(null)
+        setLoaded(true)
+        setError(errorMessage(e))
       })
     return () => {
       cancelled = true

@@ -257,7 +257,8 @@ VIEWER 에게는 `node-edit`, `node-edit-form`, `edit-prop-*`, `node-save`, `nod
 | `study-note-input`, `study-note-save`, `study-note-cancel` * | 카드 안의 메모 입력칸(1000자)과 「저장」, 「취소」. 저장은 카드의 `level` 을 그대로 쓴다 |
 | `study-page-prev`, `study-page-next`, `study-page-info` | 쪽 넘기기 |
 | `study-empty` | 빈 상태 안내 |
-| `study-error`, `study-retry` | 목록이나 요약을 받지 못했을 때의 이유와 「다시 시도」 |
+| `study-error`, `study-retry` | 목록을 받지 못했을 때의 이유와 「다시 시도」 |
+| `study-summary-error`, `study-summary-retry` | 위쪽 요약을 받지 못했을 때의 이유와 「다시 시도」 |
 
 ## 개념 상세
 

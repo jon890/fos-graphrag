@@ -33,24 +33,33 @@ interface Props {
 }
 
 type Load = { kind: 'loading' } | { kind: 'not-found' } | { kind: 'error'; message: string } | { kind: 'done'; view: TraceView }
+/** 그 항목을 읽은 결과. 다른 항목의 결과면 아직 읽지 않은 것이다 */
+type Loaded = { nodeId: string; load: Load }
+
+/**
+ * 화면에 보일 상태. 항목을 처음 읽을 때만 「불러오는 중」 이고,
+ * 같은 항목을 다시 읽는 동안(후보를 이은 뒤, 다시 시도)에는 응답이 올 때까지 앞의 결과를 그대로 둔다
+ */
+export function shownLoad(loaded: Loaded | null, nodeId: string): Load {
+  return loaded?.nodeId === nodeId ? loaded.load : { kind: 'loading' }
+}
 
 /** 근거 따라가기 화면(/trace?node=). 규칙은 docs/flow.md 「근거 따라가기」 */
 export function TracePage({ nodeId, onOpenNode, onTrace }: Props) {
   const navigate = useNavigate()
-  const [load, setLoad] = useState<Load>({ kind: 'loading' })
+  const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (!nodeId) return
     let cancelled = false
-    setLoad({ kind: 'loading' })
     api.nodes
       .trace(nodeId)
-      .then((view) => !cancelled && setLoad({ kind: 'done', view }))
+      .then((view) => !cancelled && setLoaded({ nodeId, load: { kind: 'done', view } }))
       .catch((e) => {
         if (cancelled) return
-        if (e instanceof ApiError && e.status === 404) setLoad({ kind: 'not-found' })
-        else setLoad({ kind: 'error', message: errorMessage(e) })
+        if (e instanceof ApiError && e.status === 404) setLoaded({ nodeId, load: { kind: 'not-found' } })
+        else setLoaded({ nodeId, load: { kind: 'error', message: errorMessage(e) } })
       })
     return () => {
       cancelled = true
@@ -59,7 +68,8 @@ export function TracePage({ nodeId, onOpenNode, onTrace }: Props) {
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), [])
   const changeMark = useCallback(
-    (id: string, mark: KnowledgeMark) => setLoad((l) => (l.kind === 'done' ? { kind: 'done', view: withStepKnowledge(l.view, id, mark) } : l)),
+    (id: string, mark: KnowledgeMark) =>
+      setLoaded((l) => (l?.load.kind === 'done' ? { nodeId: l.nodeId, load: { kind: 'done', view: withStepKnowledge(l.load.view, id, mark) } } : l)),
     [],
   )
 
@@ -74,6 +84,7 @@ export function TracePage({ nodeId, onOpenNode, onTrace }: Props) {
     )
   }
 
+  const load = shownLoad(loaded, nodeId)
   return (
     <div className="mx-auto max-w-3xl min-w-0 p-4" data-testid="trace-page" data-node-id={nodeId}>
       {load.kind === 'loading' && <p className="text-muted-foreground">불러오는 중…</p>}
@@ -229,7 +240,7 @@ function StepCard({ view, step, role, onOpenNode, onTrace, onReload, onMarkChang
         <Button
           type="button"
           variant="link"
-          className="h-auto min-w-0 px-0 py-0 text-left font-bold whitespace-normal"
+          className="h-auto max-w-full min-w-0 shrink px-0 py-0 text-left font-bold break-words whitespace-normal"
           data-testid="trace-step-name"
           onClick={() => onTrace(node.id)}
         >
@@ -328,7 +339,7 @@ function MissingRow({ missing, stepId, onOpenNode, onReload }: { missing: TraceM
               type="button"
               size="xs"
               variant="outline"
-              className="h-auto min-h-6 whitespace-normal"
+              className="h-auto min-h-6 shrink break-words whitespace-normal"
               data-testid="trace-candidate-link"
               data-candidate-id={c.id}
               disabled={busy}

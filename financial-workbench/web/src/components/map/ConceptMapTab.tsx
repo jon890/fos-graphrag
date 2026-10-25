@@ -92,17 +92,26 @@ function limitZoom(cy: Core): void {
 const INITIAL_NODE_FONT = readableFontSize(MAP_NODE_FONT.base, MAP_NODE_FONT.minPx, 1)
 const INITIAL_EDGE_FONT = readableFontSize(MAP_EDGE_FONT.base, MAP_EDGE_FONT.minPx, 1)
 
+/** 스타일시트에 둔 글자 크기와, 그때 화면에 그려지는 노드 글자 크기(px, 반올림) */
+export interface AppliedFont {
+  node: number
+  edge: number
+  screenPx: number
+}
+
+const INITIAL_FONT: AppliedFont = { node: INITIAL_NODE_FONT, edge: INITIAL_EDGE_FONT, screenPx: Math.round(INITIAL_NODE_FONT) }
+
 /**
  * 배율에 맞춰 노드와 선의 글자 크기를 다시 둔다. 스타일시트만 바꾸고 요소는 다시 놓지 않는다.
  * selector() 로 규칙을 덧붙이면 확대할 때마다 스타일시트가 길어지므로 fromJson 으로 통째로 바꾼다.
- * 화면에 그려지는 노드 글자 크기(px)를 돌려준다.
+ * 글자 크기가 prev 와 같으면 스타일시트를 바꾸지 않는다. 지금 둔 크기를 돌려준다.
  */
-function applyReadableFont(cy: Core): number {
+export function applyReadableFont(cy: Core, prev: AppliedFont): AppliedFont {
   const zoom = cy.zoom()
   const node = readableFontSize(MAP_NODE_FONT.base, MAP_NODE_FONT.minPx, zoom)
   const edge = readableFontSize(MAP_EDGE_FONT.base, MAP_EDGE_FONT.minPx, zoom)
-  cy.style().fromJson(mapStyle(node, edge)).update()
-  return Math.round(node * zoom)
+  if (node !== prev.node || edge !== prev.edge) cy.style().fromJson(mapStyle(node, edge)).update()
+  return { node, edge, screenPx: Math.round(node * zoom) }
 }
 
 /** 첫 화면. 온톨로지의 타입과 관계를 그리고 타입마다 항목 수를 붙인다. 동작은 docs/flow.md 「개념 지도」 */
@@ -118,9 +127,17 @@ export function ConceptMapTab({ onOpenNode, onTrace }: { onOpenNode: (id: string
   const [counts, setCounts] = useState<Record<string, number> | null>(null)
   const [countsError, setCountsError] = useState<string | null>(null)
   const [layoutDone, setLayoutDone] = useState(false)
-  const [nodeFontPx, setNodeFontPx] = useState(Math.round(INITIAL_NODE_FONT))
+  const [nodeFontPx, setNodeFontPx] = useState(INITIAL_FONT.screenPx)
   const containerRef = useRef<HTMLDivElement>(null)
   const cyRef = useRef<Core | null>(null)
+  const fontRef = useRef<AppliedFont>(INITIAL_FONT)
+
+  /** zoom 마다 부른다. 화면 글자 크기가 반올림해서 바뀔 때만 다시 그린다 */
+  const refreshFont = (cy: Core) => {
+    const next = applyReadableFont(cy, fontRef.current)
+    if (next.screenPx !== fontRef.current.screenPx) setNodeFontPx(next.screenPx)
+    fontRef.current = next
+  }
 
   const select = (type: string) => {
     if (type === selected) return
@@ -145,7 +162,7 @@ export function ConceptMapTab({ onOpenNode, onTrace }: { onOpenNode: (id: string
     if (!containerRef.current) return
     const cy = cytoscape({
       container: containerRef.current,
-      style: mapStyle(INITIAL_NODE_FONT, INITIAL_EDGE_FONT),
+      style: mapStyle(INITIAL_FONT.node, INITIAL_FONT.edge),
       elements: [],
       minZoom: 0.2,
       maxZoom: 3,
@@ -153,7 +170,9 @@ export function ConceptMapTab({ onOpenNode, onTrace }: { onOpenNode: (id: string
     })
     cy.on('tap', 'node', (evt) => selectRef.current(evt.target.id()))
     // 확대와 축소, fit 이 모두 zoom 을 낸다. 글자가 최소 화면 크기 아래로 작아지지 않게 다시 둔다
-    cy.on('zoom', () => setNodeFontPx(applyReadableFont(cy)))
+    fontRef.current = INITIAL_FONT
+    setNodeFontPx(INITIAL_FONT.screenPx)
+    cy.on('zoom', () => refreshFont(cy))
     cyRef.current = cy
     return () => {
       cy.destroy()
@@ -178,7 +197,7 @@ export function ConceptMapTab({ onOpenNode, onTrace }: { onOpenNode: (id: string
     const layout = cy.elements().not(cy.edges('[?self]')).layout({ name: 'breadthfirst', directed: true, roots, spacingFactor: 1.6, padding: 24 })
     layout.one('layoutstop', () => {
       limitZoom(cy)
-      setNodeFontPx(applyReadableFont(cy))
+      refreshFont(cy)
       setLayoutDone(true)
     })
     layout.run()

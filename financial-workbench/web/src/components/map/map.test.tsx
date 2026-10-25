@@ -1,9 +1,10 @@
+import type { Core } from 'cytoscape'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { orderedTypes } from '../../lib/typeOrder'
 import { testOntology, withApp } from '../testSupport'
 import type { NodeView } from '../../api/types'
-import { ConceptMapTab } from './ConceptMapTab'
+import { applyReadableFont, ConceptMapTab } from './ConceptMapTab'
 import { RecentItems } from './TypePanel'
 
 function render(path: string): string {
@@ -60,5 +61,44 @@ describe('타입 칸의 최근 항목', () => {
     const ids = (testId: string) => [...html.matchAll(new RegExp(`data-testid="${testId}" data-node-id="([^"]+)"`, 'g'))].map((m) => m[1])
     expect(ids('map-recent-item')).toEqual(['a', 'b'])
     expect(ids('map-recent-trace')).toEqual(['a', 'b'])
+  })
+})
+
+describe('개념 지도 글자 크기 적용', () => {
+  /** 배율만 돌려주고 스타일시트 교체 횟수를 세는 대역 */
+  function fakeCy(zoom: number) {
+    const state = { zoom, replaced: 0 }
+    const cy = {
+      zoom: () => state.zoom,
+      style: () => ({ fromJson: () => ({ update: () => void (state.replaced += 1) }) }),
+    } as unknown as Core
+    return { cy, state }
+  }
+
+  it('글자 크기가 바뀔 때만 스타일시트를 바꾸고 화면 크기를 반올림해 돌려준다', () => {
+    const { cy, state } = fakeCy(1)
+    const first = applyReadableFont(cy, { node: 0, edge: 0, screenPx: 0 })
+    expect(first).toEqual({ node: 13, edge: 11, screenPx: 13 })
+    expect(state.replaced).toBe(1)
+
+    // 배율 1 에서 다시 부르면 값이 같아 바꾸지 않는다
+    expect(applyReadableFont(cy, first)).toEqual(first)
+    expect(state.replaced).toBe(1)
+
+    // 기본 크기에 닿은 뒤로는 더 확대해도 스타일 값이 같다. 화면 크기만 커진다
+    state.zoom = 1.5
+    const zoomedIn = applyReadableFont(cy, first)
+    expect(zoomedIn).toEqual({ node: 12, edge: 10, screenPx: 18 })
+    expect(state.replaced).toBe(2)
+    state.zoom = 2
+    expect(applyReadableFont(cy, zoomedIn)).toEqual({ node: 12, edge: 10, screenPx: 24 })
+    expect(state.replaced).toBe(2)
+  })
+
+  it('축소하면 스타일 값을 키워 화면 크기를 13px 로 지킨다', () => {
+    const { cy, state } = fakeCy(0.5)
+    const zoomedOut = applyReadableFont(cy, { node: 12, edge: 10, screenPx: 18 })
+    expect(zoomedOut).toEqual({ node: 26, edge: 22, screenPx: 13 })
+    expect(state.replaced).toBe(1)
   })
 })
