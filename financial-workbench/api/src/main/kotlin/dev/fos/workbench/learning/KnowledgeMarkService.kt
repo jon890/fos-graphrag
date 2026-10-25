@@ -76,17 +76,18 @@ class KnowledgeMarkService(
             .bindAll(mapOf("userId" to userId, "nodeId" to nodeId)).run()
     }
 
-    /** 공부 목록. 바꾼 시각이 늦은 순서, 같으면 노드 id 순서다. 보관된 항목도 담는다 */
+    /** 공부 목록. 바꾼 시각이 늦은 순서, 같으면 노드 id 순서다. `includeArchived` 가 거짓이면 보관된 항목을 뺀다 */
     @Transactional(readOnly = true)
     @Suppress("UNCHECKED_CAST")
-    fun list(userId: String, levels: List<String>?, page: PageQuery): Page<StudyItem> {
+    fun list(userId: String, levels: List<String>?, page: PageQuery, includeArchived: Boolean = true): Page<StudyItem> {
         val filter = levels?.map { it.trim() }?.filter { it.isNotEmpty() }?.takeIf { it.isNotEmpty() }
         if (filter != null && filter.any { it !in LEVELS }) {
             throw ValidationFailedException(mapOf("level" to LEVEL_MESSAGE))
         }
         val ontology = holder.current()
         val p = params("userId" to userId, "levels" to filter, "skip" to page.skip, "limit" to page.size)
-        val match = "MATCH (:User {id: \$userId})-[k:KNOWS]->(n:Knowledge) WHERE \$levels IS NULL OR k.level IN \$levels"
+        val archived = if (includeArchived) "" else " AND n.archived = false"
+        val match = "MATCH (:User {id: \$userId})-[k:KNOWS]->(n:Knowledge) WHERE (\$levels IS NULL OR k.level IN \$levels)$archived"
         val total = client.query("$match RETURN count(k) AS total").bindAll(p)
             .fetch().one().map { (it["total"] as Number).toLong() }.orElse(0L)
         val rows = client.query(

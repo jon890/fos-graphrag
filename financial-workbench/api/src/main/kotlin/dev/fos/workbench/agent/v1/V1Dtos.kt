@@ -170,3 +170,113 @@ data class V1Graph(
     val edges: List<V1GraphEdge>,
     val truncated: Boolean,
 )
+
+/** 이 단계에서 한 단계 아래(지금 항목 쪽, `childId`)로 가는 관계 */
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1TraceVia(val relationshipId: String, val relationshipType: String, val childId: String, val sentence: String)
+
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1TraceClaim(val id: String, val label: String, val predicate: String, val reviewStatus: String?)
+
+/** `label` 은 관계 종류의 표시 이름이다 */
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1TraceMissing(val relationshipType: String, val label: String, val candidates: List<V1NodeRef>)
+
+/** 토큰 주인의 이해 표시 */
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1Knowledge(val level: String, val note: String?, val updatedAt: String?)
+
+/** 지금 항목(`depth = 0`)의 `via` 는 null 이다. `myKnowledge` 는 토큰 주인의 표시가 없으면 null 이다 */
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1TraceStep(
+    val node: V1NodeRef,
+    val depth: Int,
+    val via: V1TraceVia?,
+    val status: String,
+    val documents: List<V1Document>,
+    val claims: List<V1TraceClaim>,
+    val concepts: List<V1Concept>,
+    val missing: List<V1TraceMissing>,
+    val myKnowledge: V1Knowledge?,
+)
+
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1TraceDependent(val node: V1NodeRef, val relationshipType: String, val sentence: String)
+
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1Trace(
+    val root: V1NodeRef,
+    val steps: List<V1TraceStep>,
+    val dependents: List<V1TraceDependent>,
+    val truncated: Boolean,
+    val dependentsTruncated: Boolean,
+)
+
+/** 값이 없는 속성은 null 이다. `marketLabel` 은 지금 온톨로지의 표시 이름이다 */
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1SecurityRef(
+    val id: String,
+    val type: String,
+    val typeLabel: String,
+    val label: String,
+    val market: String?,
+    val marketLabel: String?,
+    val ticker: String?,
+    val currency: String?,
+)
+
+/** `reason` 은 500자에서 자른다. `basedOn` 은 이 결정에 `BASED_ON` 으로 이어진 밸류에이션이다 */
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1Decision(
+    val node: V1NodeRef,
+    val action: String?,
+    val actionLabel: String?,
+    val decidedAt: String?,
+    val reason: String?,
+    val basedOn: List<V1NodeRef>,
+)
+
+/** `assumptions` 는 500자에서 자른다 */
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1Scenario(val node: V1NodeRef, val kind: String?, val valuePerShare: Number?, val assumptions: String?)
+
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1Valuation(
+    val node: V1NodeRef,
+    val asOf: String?,
+    val currentPrice: Number?,
+    val currency: String?,
+    val method: String?,
+    val scenarios: List<V1Scenario>,
+    val scenariosTruncated: Boolean,
+)
+
+/** `issuer` 는 이 종목을 발행한 보관하지 않은 기업 가운데 먼저 이은 하나이고, 없으면 null 이다 */
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1SecurityMatch(
+    val security: V1SecurityRef,
+    val issuer: V1NodeRef?,
+    val decisions: List<V1Decision>,
+    val valuations: List<V1Valuation>,
+    val decisionsTruncated: Boolean,
+    val valuationsTruncated: Boolean,
+)
+
+/** `market` 은 받은 값을 대문자로 바꾼 것이고 없었으면 null 이다. `ticker` 는 앞뒤 공백을 지운 입력이다 */
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1SecurityLookup(val market: String?, val ticker: String, val matches: List<V1SecurityMatch>, val matchesTruncated: Boolean)
+
+/** 공부 항목을 근거 단계로 가지는 투자 결정. `depth` 는 결정에서 이 항목까지의 단계 수다 */
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1StudyContext(val decision: V1NodeRef, val depth: Int)
+
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1StudyItem(
+    val node: V1NodeRef,
+    val level: String,
+    val note: String?,
+    val updatedAt: String,
+    val contexts: List<V1StudyContext>,
+    val documents: List<V1Document>,
+    val concepts: List<V1Concept>,
+)

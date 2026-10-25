@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController
 class AgentV1Controller(
     private val mapper: V1Mapper,
     private val queries: AgentQueryService,
+    private val lookups: SecurityLookupService,
     private val properties: WorkbenchProperties,
 ) {
 
@@ -46,4 +47,23 @@ class AgentV1Controller(
         @RequestParam id: String,
         @RequestParam(required = false, defaultValue = "1") hops: Int,
     ): V1Graph = queries.neighborhood(id, hops)
+
+    @GetMapping("/nodes/{id}/trace")
+    fun trace(@PathVariable id: String, @AuthenticationPrincipal principal: AgentPrincipal): V1Trace =
+        queries.trace(id, principal.userId)
+
+    /** `ticker` 가 없을 때도 계약의 오류 문구로 답하도록 서비스가 검사한다 */
+    @GetMapping("/securities/lookup")
+    fun lookup(
+        @RequestParam(required = false) market: String?,
+        @RequestParam(required = false) ticker: String?,
+    ): V1SecurityLookup = lookups.lookup(market, ticker)
+
+    @GetMapping("/me/knowledge")
+    fun knowledge(
+        @RequestParam(required = false) level: List<String>?,
+        @RequestParam(required = false) page: Int?,
+        @RequestParam(required = false) size: Int?,
+        @AuthenticationPrincipal principal: AgentPrincipal,
+    ): Page<V1StudyItem> = queries.knowledge(principal.userId, level, page, size)
 }
