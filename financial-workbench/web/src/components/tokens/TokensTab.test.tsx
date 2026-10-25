@@ -1,0 +1,23 @@
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it } from 'vitest'
+import { withApp } from '../testSupport'
+import { canIssue, maskedLast4, TokensTab } from './TokensTab'
+
+describe('TokensTab', () => {
+  it('첫 렌더에 화면, Hermes 안내, 발급 단추가 있다', () => {
+    const html = renderToStaticMarkup(withApp(<TokensTab />))
+    expect(html).toContain('data-testid="tokens-tab"')
+    expect(html).toContain('data-testid="tokens-guide"')
+    expect(html).toContain('data-testid="tokens-issue-open"')
+    expect(html).toContain('Hermes')
+  })
+
+  it('토큰이 4개면 더 발급할 수 있고 5개면 없다', () => {
+    expect(canIssue(4)).toBe(true)
+    expect(canIssue(5)).toBe(false)
+  })
+
+  it('끝 네 자리 앞에 줄임표를 붙인다', () => {
+    expect(maskedLast4('x9Qa')).toBe('…x9Qa')
+  })
+})

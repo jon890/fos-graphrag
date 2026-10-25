@@ -37,6 +37,20 @@ export interface UserView {
   lastLoginAt: string | null
 }
 
+/** GET /api/me/tokens 의 한 행. 원문은 없고 끝 네 자리만 있다 */
+export interface IntegrationTokenView {
+  id: string
+  name: string
+  last4: string
+  createdAt: string
+  lastUsedAt: string | null
+}
+
+/** POST /api/me/tokens 의 응답. token 원문은 이 응답에서만 볼 수 있다 */
+export interface IssuedIntegrationToken extends IntegrationTokenView {
+  token: string
+}
+
 export interface PatchUserRequest {
   expectedRevision: number
   role?: Role

@@ -30,6 +30,7 @@ import { ReviewTab } from './components/ReviewTab'
 import { ChangesTab } from './components/ChangesTab'
 import { OntologyTab } from './components/ontology/OntologyTab'
 import { UsersTab } from './components/UsersTab'
+import { TokensTab } from './components/tokens/TokensTab'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ConceptMapTab } from './components/map/ConceptMapTab'
 import { StudyTab } from './components/learning/StudyTab'
@@ -333,6 +334,7 @@ export default function App() {
           )}
           {activeTab === 'ontology' && <OntologyTab draft={ontologyDraft} onDraftChange={setOntologyDraft} reloadOntology={reloadOntology} />}
           {activeTab === 'users' && user.role === 'ADMIN' && <UsersTab onOpenHistory={openHistory} />}
+          {activeTab === 'tokens' && <TokensTab />}
         </ErrorBoundary>
       )}
     </main>
