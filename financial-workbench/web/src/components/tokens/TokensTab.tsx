@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, ApiError, errorMessage } from '../../api/client'
-import type { IntegrationTokenView } from '../../api/types'
+import type { IntegrationTokenView, TokenScope } from '../../api/types'
 import { formatDateTime } from '../../lib/format'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,13 @@ const LIMIT_TEXT = `토큰은 ${MAX_TOKENS}개까지 만들 수 있습니다. �
 export function canIssue(count: number, max = MAX_TOKENS): boolean {
   return count < max
 }
+
+/** 범위의 화면 이름 */
+export function scopeLabel(scope: TokenScope): string {
+  return scope === 'READ_WRITE' ? '조회와 기록' : '조회만'
+}
+
+const WRITE_HINT = '이 토큰을 가진 에이전트가 내 체결을 저장하고 제안을 올립니다. 공유 지식은 내가 승인한 제안으로만 바뀝니다.'
 
 /** 끝 네 자리를 목록에 보이는 모양으로 */
 export function maskedLast4(last4: string): string {
@@ -44,6 +51,7 @@ export function TokensTab() {
 
   const [issueOpen, setIssueOpen] = useState(false)
   const [name, setName] = useState('Hermes')
+  const [scope, setScope] = useState<TokenScope>('READ')
   const [issuing, setIssuing] = useState(false)
   const [issueError, setIssueError] = useState<string | null>(null)
   // 토큰 원문은 이 상태에만 둔다. 창의 닫힘 애니메이션이 끝나면 지운다.
@@ -75,6 +83,7 @@ export function TokensTab() {
 
   const openIssue = () => {
     setName('Hermes')
+    setScope('READ')
     setIssueError(null)
     setIssuedToken(null)
     setCopyResult(null)
@@ -101,7 +110,7 @@ export function TokensTab() {
     setIssuing(true)
     setIssueError(null)
     try {
-      const issued = await api.tokens.issue(trimmed)
+      const issued = await api.tokens.issue(trimmed, scope)
       setIssuedToken(issued.token)
     } catch (err) {
       setIssueError(issueErrorText(err))
@@ -147,7 +156,7 @@ export function TokensTab() {
         {loading && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
       </div>
       <p className="my-2 text-xs text-muted-foreground" data-testid="tokens-guide">
-        Hermes 같은 개인 비서가 이 워크벤치를 조회할 때 쓰는 토큰입니다. 토큰은 내 권한으로 조회만 합니다. fos-assistant 의 워크벤치 커넥터 설정에 토큰을 넣으면 연결됩니다.
+        Hermes 같은 개인 비서가 이 워크벤치를 조회하고 내 체결을 기록할 때 쓰는 토큰입니다. 「조회만」 토큰은 조회만 하고, 「조회와 기록」 토큰은 내 체결을 저장하고 제안을 올립니다. fos-assistant 의 워크벤치 커넥터 설정에 토큰을 넣으면 연결됩니다.
       </p>
       {atLimit && (
         <p className="my-2 text-xs text-amber-800" data-testid="tokens-limit">
@@ -189,6 +198,7 @@ export function TokensTab() {
           <TableHeader>
             <TableRow className="bg-slate-50 hover:bg-slate-50">
               <TableHead>이름</TableHead>
+              <TableHead className="hidden lg:table-cell">범위</TableHead>
               <TableHead>만든 때 / 마지막 사용</TableHead>
               <TableHead>끝 네 자리</TableHead>
               <TableHead>관리</TableHead>
@@ -197,8 +207,15 @@ export function TokensTab() {
           <TableBody>
             {tokens.map((t) => (
               <TableRow key={t.id} data-testid="tokens-row" data-id={t.id} data-name={t.name}>
-                <TableCell className="break-all" data-testid="tokens-row-name">
-                  {t.name}
+                <TableCell className="break-all">
+                  <div data-testid="tokens-row-name">{t.name}</div>
+                  {/* 좁은 화면에서는 범위 칸이 없고 이름 아래 작은 글자로 보인다 */}
+                  <div className="text-xs text-muted-foreground lg:hidden" aria-hidden="true">
+                    {scopeLabel(t.scope)}
+                  </div>
+                </TableCell>
+                <TableCell className="hidden lg:table-cell" data-testid="tokens-row-scope" data-scope={t.scope}>
+                  {scopeLabel(t.scope)}
                 </TableCell>
                 <TableCell>
                   <div data-testid="tokens-row-created">{formatDateTime(t.createdAt)}</div>
@@ -229,6 +246,26 @@ export function TokensTab() {
                 <DialogDescription>이 토큰을 쓰는 곳을 알아볼 수 있는 이름을 붙이세요.</DialogDescription>
               </DialogHeader>
               <Input data-testid="tokens-issue-name" maxLength={50} aria-label="토큰 이름" value={name} onChange={(e) => setName(e.target.value)} />
+              <fieldset className="grid gap-1.5 border-0 p-0">
+                <legend className="mb-1 text-sm font-medium">범위</legend>
+                {(['READ', 'READ_WRITE'] as const).map((value) => (
+                  <label key={value} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="tokens-issue-scope"
+                      data-testid={value === 'READ' ? 'tokens-issue-scope-read' : 'tokens-issue-scope-write'}
+                      checked={scope === value}
+                      onChange={() => setScope(value)}
+                    />
+                    {scopeLabel(value)}
+                  </label>
+                ))}
+                {scope === 'READ_WRITE' && (
+                  <p className="m-0 text-xs text-muted-foreground" data-testid="tokens-issue-scope-hint">
+                    {WRITE_HINT}
+                  </p>
+                )}
+              </fieldset>
               {issueError && (
                 <Alert variant="destructive" data-testid="tokens-issue-error">
                   <AlertDescription>{issueError}</AlertDescription>

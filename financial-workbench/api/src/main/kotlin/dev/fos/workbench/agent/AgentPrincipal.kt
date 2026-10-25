@@ -10,4 +10,5 @@ data class AgentPrincipal(
     val tokenId: String,
     val tokenName: String,
     val last4: String,
+    val scope: TokenScope,
 )

@@ -44,12 +44,17 @@ class IntegrationTokenService(
         if (name.isEmpty() || name.length > MAX_NAME) {
             throw ValidationFailedException(mapOf("name" to "1자 이상 ${MAX_NAME}자 이하여야 합니다."))
         }
+        val scope = if (body.scope.isNullOrEmpty()) {
+            TokenScope.READ
+        } else {
+            TokenScope.parse(body.scope) ?: throw ValidationFailedException(mapOf("scope" to "READ, READ_WRITE 가운데 하나여야 합니다."))
+        }
         val max = properties.agent.maxTokensPerUser
         // 세션 필터가 지운 사용자를 먼저 막으므로 정상 흐름에서는 null 이 나오지 않는다
         val active = tokens.countActiveLocked(userId) ?: throw IllegalStateException("사용자를 찾을 수 없다: $userId")
         if (active >= max) throw TokenLimitException(max)
         val raw = IntegrationTokens.generate()
-        val view = tokens.create(userId, name, IntegrationTokens.hash(raw), IntegrationTokens.last4(raw))
+        val view = tokens.create(userId, name, scope, IntegrationTokens.hash(raw), IntegrationTokens.last4(raw))
         return IssuedIntegrationToken(view, raw)
     }
 
@@ -74,7 +79,7 @@ class IntegrationTokenService(
                 log.warn("연동 토큰 {} 의 마지막 사용 시각을 쓰지 못했다", token.tokenId, e)
             }
         }
-        return AgentPrincipal(token.userId, token.displayName, token.role, token.tokenId, token.tokenName, token.last4)
+        return AgentPrincipal(token.userId, token.displayName, token.role, token.tokenId, token.tokenName, token.last4, token.scope)
     }
 
     private fun isStale(lastUsedAt: String?, now: Instant): Boolean {

@@ -1,5 +1,5 @@
 import { expect, request, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
-import { admin, exact, loginAs, newPage, openScreen, revokeTokensExcept, shot, shotElement, tokenIds, type TestUser } from './support'
+import { admin, exact, issueToken, loginAs, newPage, openScreen, revokeTokensExcept, shot, shotElement, tokenIds, type TestUser } from './support'
 
 // 두 편집자(A, B)와 관리자, 열람자가 같은 서버에서 협업하는 흐름을 순서대로 확인한다.
 // 로그인은 실제 Google 대신 가짜 OIDC 서버(navikt/mock-oauth2-server, interactiveLogin)를 거친다.
@@ -1144,9 +1144,18 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       'more-item-review',
       'more-item-users',
       'more-item-tokens',
+      'more-item-proposals',
+      'more-item-trades',
     ])
-    expect(await itemsOf(pageA)).toEqual(['more-item-changes', 'more-item-ontology', 'more-item-review', 'more-item-tokens'])
-    expect(await itemsOf(pageViewer)).toEqual(['more-item-changes', 'more-item-ontology', 'more-item-tokens'])
+    expect(await itemsOf(pageA)).toEqual([
+      'more-item-changes',
+      'more-item-ontology',
+      'more-item-review',
+      'more-item-tokens',
+      'more-item-proposals',
+      'more-item-trades',
+    ])
+    expect(await itemsOf(pageViewer)).toEqual(['more-item-changes', 'more-item-ontology', 'more-item-tokens', 'more-item-proposals', 'more-item-trades'])
 
     await openScreen(pageAdmin, 'map')
     await expect(pageAdmin.getByTestId('more-open')).toHaveAttribute('data-active', 'false')
@@ -1335,6 +1344,217 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       }
     } finally {
       await revokeTokensExcept(pageA, kept)
+    }
+  })
+
+  test('7h) 기록 토큰으로 체결과 제안을 쓰고, 제안을 고쳐 승인하면 결정과 체결이 이어지며 다른 사용자에게는 보이지 않는다', async () => {
+    const origin = new URL(pageA.url()).origin
+    const keptA = await tokenIds(pageA)
+    await openScreen(pageViewer, 'tokens')
+    const keptViewer = await tokenIds(pageViewer)
+    const bare = await request.newContext({ baseURL: origin })
+    const externalId = `e2e-${Date.now()}`
+    const newTitle = `e2e 추가 매수 ${suffix}`
+    const editedTitle = `e2e 추가 매수(고침) ${suffix}`
+    const rejectReason = `e2e 거절 이유 ${suffix}`
+    try {
+      // 1. 「조회와 기록」 토큰과 「조회만」 토큰을 발급한다.
+      await openScreen(pageA, 'tokens')
+      await pageA.getByTestId('tokens-issue-open').click()
+      await pageA.getByTestId('tokens-issue-scope-write').check()
+      await expect(pageA.getByTestId('tokens-issue-scope-hint')).toBeVisible()
+      await pageA.getByTestId('tokens-issue-cancel').click()
+      await expect(pageA.getByTestId('tokens-issue-dialog')).toHaveCount(0)
+      const writeToken = await issueToken(pageA, 'e2e 기록 토큰', 'write')
+      const readToken = await issueToken(pageA, 'e2e 조회 토큰', 'read')
+      await expect(pageA.locator('[data-testid="tokens-row"][data-name="e2e 기록 토큰"]').getByTestId('tokens-row-scope')).toHaveAttribute('data-scope', 'READ_WRITE')
+      await expect(pageA.locator('[data-testid="tokens-row"][data-name="e2e 조회 토큰"]').getByTestId('tokens-row-scope')).toHaveAttribute('data-scope', 'READ')
+      const bearer = (token: string) => ({ Authorization: `Bearer ${token}` })
+      const trade = {
+        broker: 'OTHER',
+        externalId,
+        side: 'BUY',
+        market: 'US',
+        ticker: 'flnc',
+        name: 'Fluence Energy',
+        quantity: 3,
+        price: 10,
+        currency: 'USD',
+        amount: 30,
+        fee: 0.1,
+        executedAt: '2026-10-24T23:31:05+09:00',
+      }
+
+      // 2. 조회만 토큰은 쓰지 못한다.
+      const denied = await bare.post('/api/v1/trades', { headers: bearer(readToken), data: { trades: [trade] } })
+      expect(denied.status()).toBe(403)
+      expect((await denied.json()).code).toBe('INSUFFICIENT_SCOPE')
+
+      // 3. 같은 체결을 두 번 보내면 처음은 created, 다음은 existing 이고 FLNC 종목에 이어진다.
+      const lookup = await (await bare.get('/api/v1/securities/lookup?market=US&ticker=FLNC', { headers: bearer(writeToken) })).json()
+      const flnc = lookup.matches[0].security as { id: string; label: string }
+      const valuationId = lookup.matches[0].valuations[0].node.id as string
+      const first = await bare.post('/api/v1/trades', { headers: bearer(writeToken), data: { trades: [trade] } })
+      expect(first.status()).toBe(200)
+      const firstBody = await first.json()
+      expect(firstBody.results[0].status).toBe('created')
+      expect(firstBody.results[0].trade.security.label).toBe(flnc.label)
+      const tradeId = firstBody.results[0].trade.id as string
+      const second = await (await bare.post('/api/v1/trades', { headers: bearer(writeToken), data: { trades: [trade] } })).json()
+      expect(second.results[0].status).toBe('existing')
+      expect(second.results[0].trade.id).toBe(tradeId)
+
+      // 4. 항목 만들기 제안과 공부 메모 제안을 올린다.
+      const proposed = await bare.post('/api/v1/proposals', {
+        headers: bearer(writeToken),
+        data: {
+          proposals: [
+            {
+              kind: 'CREATE_NODE',
+              payload: {
+                type: 'Decision',
+                properties: { title: newTitle, action: 'ADD' },
+                links: [{ type: 'HAS_DECISION', fromId: flnc.id }],
+                tradeIds: [tradeId],
+              },
+              rationale: '방금 체결한 FLNC 매수는 추가 매수 결정을 실행한 것이다.',
+              evidence: { nodeIds: [flnc.id], tradeIds: [tradeId], urls: [] },
+              dedupeKey: `e2e-create-${externalId}`,
+            },
+            {
+              kind: 'STUDY_NOTE',
+              payload: { nodeId: flnc.id, level: 'UNSURE', note: `e2e 메모 ${suffix}` },
+              rationale: '체결한 종목이라 이해 표시를 남긴다.',
+              dedupeKey: `e2e-note-${externalId}`,
+            },
+          ],
+        },
+      })
+      expect(proposed.status()).toBe(200)
+      const [createdProposal, noteProposal] = (await proposed.json()).results.map((r: { proposal: { id: string } }) => r.proposal.id) as string[]
+      const card = (id: string) => pageA.locator(`[data-testid="proposal-card"][data-id="${id}"]`)
+      const badgeCount = async (testId: string) => Number((await pageA.getByTestId(testId).getAttribute('data-count')) ?? '0')
+
+      // 5. 새로 고치면 대기 수 배지가 보이고 더보기 안의 배지와 같다.
+      await pageA.reload()
+      await expect(pageA.getByTestId('more-pending-badge')).toBeVisible()
+      const pending = await badgeCount('more-pending-badge')
+      expect(pending).toBeGreaterThanOrEqual(2)
+      await pageA.getByTestId('more-open').click()
+      await expect(pageA.getByTestId('more-item-proposals-badge')).toHaveAttribute('data-count', String(pending))
+      await pageA.keyboard.press('Escape')
+      await openScreen(pageA, 'proposals')
+      await expect(card(createdProposal)).toBeVisible()
+      await expect(card(noteProposal)).toBeVisible()
+      await expect(card(createdProposal).getByTestId('proposal-summary')).toContainText(newTitle)
+      await expect(card(createdProposal).getByTestId('proposal-rationale')).toBeVisible()
+      await shot(pageA, 'proposals-wide')
+
+      // 6. 항목 만들기는 제목을 고쳐 승인하고, 공부 메모는 이유를 적어 거절한다. 그때마다 배지가 한 개씩 준다.
+      await card(createdProposal).getByTestId('proposal-edit-open').click()
+      await card(createdProposal).getByTestId('proposal-edit-prop-title').fill(editedTitle)
+      await card(createdProposal).getByTestId('proposal-edit-submit').click()
+      await expect(pageA.getByTestId('proposals-message')).toHaveAttribute('data-kind', 'success')
+      await expect(card(createdProposal)).toHaveCount(0)
+      await expect.poll(() => badgeCount('more-pending-badge')).toBe(pending - 1)
+      await card(noteProposal).getByTestId('proposal-reject-open').click()
+      await pageA.getByTestId('proposal-reject-reason').fill(rejectReason)
+      await pageA.getByTestId('proposal-reject-confirm').click()
+      await expect(card(noteProposal)).toHaveCount(0)
+
+      // 7. 승인함에서 새 결정을 열면 체결 한 줄이 보이고, 근거 따라가기에도 체결 절이 있다.
+      await pageA.getByTestId('proposals-status-ACCEPTED').click()
+      await expect(card(createdProposal)).toHaveAttribute('data-status', 'ACCEPTED')
+      const open = card(createdProposal).getByTestId('proposal-result-open')
+      const decisionId = (await open.getAttribute('data-node-id')) ?? ''
+      expect(decisionId).not.toBe('')
+      await open.click()
+      await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-id', decisionId)
+      await expect(pageA.getByTestId('detail-label')).toHaveText(editedTitle)
+      await expect(pageA.getByTestId('detail-trades').getByTestId('trade-list-item')).toHaveCount(1)
+      await pageA.getByTestId('node-trace').click()
+      await expect(pageA.getByTestId('trace-step-trades')).toBeVisible()
+
+      // 8. 에이전트는 거절 이유를 읽는다.
+      const rejected = await (await bare.get('/api/v1/proposals?status=REJECTED', { headers: bearer(writeToken) })).json()
+      const rejectedNote = rejected.items.find((p: { id: string }) => p.id === noteProposal)
+      expect(rejectedNote.decisionNote).toBe(rejectReason)
+
+      // 9. 내 체결에 한 줄이 있고 이은 결정은 고친 이름이다. 종목 상세에도 체결 절이 있다.
+      await openScreen(pageA, 'trades')
+      const row = pageA.locator(`[data-testid="trade-row"][data-id="${tradeId}"]`)
+      await expect(row).toHaveCount(1)
+      await expect(row).toHaveAttribute('data-ticker', 'FLNC')
+      await expect(row.getByTestId('trade-decisions')).toContainText(editedTitle)
+      await shot(pageA, 'trades-wide')
+      await row.getByTestId('trade-security').click()
+      await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-id', flnc.id)
+      await expect(pageA.getByTestId('detail-trades')).toBeVisible()
+
+      // 10. 다른 사용자(편집자 B)와 관리자에게는 체결도 제안도 배지도 없다.
+      await pageB.reload()
+      await openScreen(pageB, 'trades')
+      await expect(pageB.getByTestId('trades-empty').or(pageB.getByTestId('trades-table'))).toBeVisible()
+      await expect(pageB.locator(`[data-testid="trade-row"][data-id="${tradeId}"]`)).toHaveCount(0)
+      await shot(pageB, 'trades-other-user-wide')
+      for (const id of [flnc.id, decisionId]) {
+        const loaded = pageB.waitForResponse((r) => r.url().includes('/api/me/trades') && r.request().method() === 'GET')
+        await pageB.goto(`/workspace?node=${id}&pane=detail`)
+        await loaded
+        await expect(pageB.getByTestId('detail-panel')).toHaveAttribute('data-node-id', id)
+        await expect(pageB.getByTestId('detail-trades')).toHaveCount(0)
+      }
+      await openScreen(pageB, 'proposals')
+      await expect(pageB.getByTestId('proposals-empty')).toBeVisible()
+      await expect(pageB.getByTestId('more-pending-badge')).toHaveCount(0)
+      await pageB.getByTestId('more-open').click()
+      await expect(pageB.getByTestId('more-item-proposals')).toBeVisible()
+      await expect(pageB.getByTestId('more-item-proposals-badge')).toHaveCount(0)
+      await pageB.keyboard.press('Escape')
+      const adminTrades = await pageAdmin.evaluate(async () => {
+        const body: { items: { id: string }[] } = await (await fetch('/api/me/trades?size=50')).json()
+        return body.items.map((t) => t.id)
+      })
+      expect(adminTrades).not.toContain(tradeId)
+
+      // 11. 열람자의 토큰도 제안을 올리지만 승인은 막히고 거절만 한다.
+      const viewerToken = await issueToken(pageViewer, 'e2e 열람자 기록 토큰', 'write')
+      const viewerProposed = await bare.post('/api/v1/proposals', {
+        headers: bearer(viewerToken),
+        data: {
+          proposals: [
+            {
+              kind: 'CREATE_RELATIONSHIP',
+              payload: { type: 'BASED_ON', fromId: valuationId, toId: decisionId },
+              rationale: '추가 매수는 이 밸류에이션을 근거로 했다.',
+              dedupeKey: `e2e-viewer-${externalId}`,
+            },
+          ],
+        },
+      })
+      expect(viewerProposed.status()).toBe(200)
+      const viewerProposalId = (await viewerProposed.json()).results[0].proposal.id as string
+      await openScreen(pageViewer, 'proposals')
+      const viewerCard = pageViewer.locator(`[data-testid="proposal-card"][data-id="${viewerProposalId}"]`)
+      await expect(viewerCard.getByTestId('proposal-editor-required')).toBeVisible()
+      await expect(viewerCard.getByTestId('proposal-accept')).toBeDisabled()
+      await viewerCard.getByTestId('proposal-reject-open').click()
+      await pageViewer.getByTestId('proposal-reject-confirm').click()
+      await expect(viewerCard).toHaveCount(0)
+
+      // 12. 체결을 지우면 행이 사라진다. 승인으로 만든 결정은 보관한다.
+      await openScreen(pageA, 'trades')
+      await row.getByTestId('trade-delete').click()
+      await pageA.getByTestId('trades-delete-confirm').click()
+      await expect(pageA.getByTestId('trades-message')).toHaveAttribute('data-kind', 'success')
+      await expect(row).toHaveCount(0)
+      await pageA.goto(`/workspace?node=${decisionId}&pane=detail`)
+      await expect(pageA.getByTestId('detail-panel')).toHaveAttribute('data-node-id', decisionId)
+      await archiveFromDetail(pageA)
+    } finally {
+      await bare.dispose()
+      await revokeTokensExcept(pageA, keptA)
+      await revokeTokensExcept(pageViewer, keptViewer)
     }
   })
 

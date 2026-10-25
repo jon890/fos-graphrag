@@ -128,6 +128,19 @@ unset WORKBENCH_TOKEN
 
 Hermes 에 넣는 토큰은 확인용과 따로 발급한다. 커넥터 설정 방법은 fos-assistant 의 커넥터 문서가 소유한다.
 
+체결 기록과 제안(쓰기)을 처음 배포한 뒤에는 아래를 더 확인한다. 범위를 둔 배포 전에 발급한 토큰은 「조회만」 이라, 기록을 맡길 Hermes 토큰은 「조회와 기록」 으로 새로 발급하고 예전 토큰을 폐기한다.
+
+```bash
+# 「조회만」 확인용 토큰으로. 쓰기는 403 이어야 한다
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H "Authorization: Bearer $WORKBENCH_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"trades":[]}' https://<공개 origin>/api/v1/trades   # 403
+curl -sS -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $WORKBENCH_TOKEN" https://<공개 origin>/api/v1/trades   # 200
+```
+
+실제 체결을 넣는 확인은 Hermes 커넥터가 한다. 이 확인에서 가짜 체결을 운영에 넣지 않는다.
+
+이 배포는 데이터 구조를 바꾸지 않고 새 label(`:Trade`, `:Proposal`)과 제약 조건만 더한다. 시작할 때 제약 조건이 생기므로 따로 옮길 데이터가 없다. 저장된 온톨로지에 코드가 소유하는 이름(`Trade`, `Proposal` 등, [데이터 스키마](data-schema.md) 의 「코드가 소유하는 이름」)을 쓴 타입이 있으면 시작할 때 그 버전을 읽지 못해 저장소 YAML 로 새 버전을 만든다. 운영 온톨로지에는 그런 타입이 없다.
+
 ## 자원 설정
 
 | 서비스 | 변수 | 기본값 | 근거 |

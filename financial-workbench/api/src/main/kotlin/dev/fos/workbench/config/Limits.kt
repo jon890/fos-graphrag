@@ -16,4 +16,16 @@ object Limits {
 
     /** 온톨로지 미리보기, 저장, 되돌리기(`POST /api/ontology/` 아래)의 요청 본문 크기(바이트). 정의 전체를 YAML 이나 JSON 으로 보낸다. */
     const val MAX_ONTOLOGY_BODY_BYTES = 512 * 1024L
+
+    /** 체결 저장 요청 하나에 담는 체결 수. */
+    const val MAX_TRADES_PER_REQUEST = 50
+
+    /** 제안 올리기 요청 하나에 담는 제안 수. */
+    const val MAX_PROPOSALS_PER_REQUEST = 20
+
+    /** 사용자마다 대기 중인 제안 수. */
+    const val MAX_PENDING_PROPOSALS = 200
+
+    /** 승인하거나 거절한 제안을 남겨 두는 날 수. 지나면 올리기 트랜잭션이 지운다. */
+    const val DECIDED_PROPOSAL_RETENTION_DAYS = 90L
 }

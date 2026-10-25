@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
-import { admin, exact, loginAs, openScreen, revokeTokensExcept, shot, tokenIds } from './support'
+import { expect, request, test, type Page } from '@playwright/test'
+import { admin, exact, issueToken, loginAs, openScreen, revokeTokensExcept, shot, tokenIds } from './support'
 
 // 휴대폰 폭(390px)에서 작업 공간이 검색, 그래프, 상세 탭으로 나뉘어 동작하는지 확인한다.
 // 노드는 그래프 탭이 숨겨진 동안 만들어지므로, 그래프 탭을 열 때 미뤄 둔 배치가 도는지도 함께 본다.
@@ -310,6 +310,82 @@ test('휴대폰 폭에서 연동 토큰을 발급하고 폐기해도 가로 스�
     await page.getByTestId('tokens-revoke-confirm').click()
     await expect(rows).toHaveCount(before - 1)
   } finally {
+    await revokeTokensExcept(page, kept)
+  }
+})
+
+test('휴대폰 폭에서 제안과 내 체결이 가로 스크롤 없이 열린다', async ({ page }) => {
+  await loginAs(page, admin)
+  const origin = new URL(page.url()).origin
+  const kept = await tokenIds(page)
+  const bare = await request.newContext({ baseURL: origin })
+  const externalId = `e2e-mobile-${Date.now()}`
+  try {
+    const token = await issueToken(page, '모바일 기록 토큰', 'write')
+    const headers = { Authorization: `Bearer ${token}` }
+    const lookup = await (await bare.get('/api/v1/securities/lookup?market=US&ticker=FLNC', { headers })).json()
+    const securityId = lookup.matches[0].security.id as string
+    const traded = await bare.post('/api/v1/trades', {
+      headers,
+      data: {
+        trades: [
+          { broker: 'OTHER', externalId, side: 'BUY', market: 'US', ticker: 'FLNC', quantity: 2, price: 10, currency: 'USD', amount: 20, executedAt: '2026-10-24T23:31:05+09:00' },
+        ],
+      },
+    })
+    expect(traded.status()).toBe(200)
+    const tradeId = (await traded.json()).results[0].trade.id as string
+    const proposed = await bare.post('/api/v1/proposals', {
+      headers,
+      data: {
+        proposals: [
+          {
+            kind: 'STUDY_NOTE',
+            payload: { nodeId: securityId, level: 'UNSURE', note: `모바일 메모 ${suffix}` },
+            rationale: '체결한 종목이라 이해 표시를 남긴다.',
+            dedupeKey: `e2e-mobile-note-${externalId}`,
+          },
+        ],
+      },
+    })
+    expect(proposed.status()).toBe(200)
+    const proposalId = (await proposed.json()).results[0].proposal.id as string
+
+    // 새로 고쳐 배지를 읽어 오면 머리글은 배지가 붙어도 한 줄에 들어간다.
+    await page.reload()
+    await expect(page.getByTestId('more-pending-badge')).toBeVisible()
+    const boxes = await Promise.all(
+      ['tab-map', 'tab-workspace', 'tab-list', 'tab-study', 'more-open', 'add-open'].map((id) => page.getByTestId(id).boundingBox()),
+    )
+    const [tops, addBox] = [boxes.slice(0, 5).map((b) => b?.y ?? Number.NaN), boxes[5]]
+    expect(new Set(tops).size, `탭 넷과 더보기의 y 좌표 ${tops.join(', ')}`).toBe(1)
+    expect(addBox, '「＋ 추가」 단추').not.toBeNull()
+    const addCenter = addBox!.y + addBox!.height / 2
+    expect(addCenter, '「＋ 추가」 가 탭과 같은 줄에 있다').toBeGreaterThanOrEqual(tops[0])
+    expect(addCenter, '「＋ 추가」 가 탭과 같은 줄에 있다').toBeLessThanOrEqual(tops[0] + (boxes[0]?.height ?? 0))
+
+    await openScreen(page, 'proposals')
+    const card = page.locator(`[data-testid="proposal-card"][data-id="${proposalId}"]`)
+    await expect(card).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+    await shot(page, 'proposals-mobile')
+
+    await openScreen(page, 'trades')
+    const row = page.locator(`[data-testid="trade-row"][data-id="${tradeId}"]`)
+    await expect(row).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+    await shot(page, 'trades-mobile')
+
+    // 다른 테스트에 남지 않게 제안을 거절하고 체결을 지운다.
+    await row.getByTestId('trade-delete').click()
+    await page.getByTestId('trades-delete-confirm').click()
+    await expect(row).toHaveCount(0)
+    await openScreen(page, 'proposals')
+    await card.getByTestId('proposal-reject-open').click()
+    await page.getByTestId('proposal-reject-confirm').click()
+    await expect(card).toHaveCount(0)
+  } finally {
+    await bare.dispose()
     await revokeTokensExcept(page, kept)
   }
 })

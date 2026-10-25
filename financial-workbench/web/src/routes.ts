@@ -1,6 +1,6 @@
 /** 화면 경로와 query 를 읽고 쓰는 순수 함수. 경로와 query 이름은 docs/flow.md 「주소와 뒤로가기」 의 표와 같다 */
 
-export type TabKey = 'map' | 'workspace' | 'list' | 'study' | 'trace' | 'review' | 'changes' | 'ontology' | 'users' | 'tokens'
+export type TabKey = 'map' | 'workspace' | 'list' | 'study' | 'trace' | 'review' | 'changes' | 'ontology' | 'users' | 'tokens' | 'proposals' | 'trades'
 
 export const TAB_PATHS: Record<TabKey, string> = {
   map: '/map',
@@ -14,6 +14,8 @@ export const TAB_PATHS: Record<TabKey, string> = {
   ontology: '/ontology',
   users: '/users',
   tokens: '/tokens',
+  proposals: '/proposals',
+  trades: '/trades',
 }
 
 /** 첫 화면. `/`, 모르는 경로, 권한 없는 화면 경로를 여기로 바꿔 연다 */
@@ -22,12 +24,12 @@ export const LANDING_PATH = TAB_PATHS.map
 /** 머리글에 탭으로 늘 보이는 화면 */
 export const TOP_TABS: TabKey[] = ['map', 'workspace', 'list', 'study']
 
-/** 「더보기」 메뉴의 화면. 검토 대기는 EDITOR 와 ADMIN, 사용자는 ADMIN 에게만 보이고 연동 토큰은 모든 역할에 보인다 */
+/** 「더보기」 메뉴의 화면. 검토 대기는 EDITOR 와 ADMIN, 사용자는 ADMIN 에게만 보이고 연동 토큰과 제안, 내 체결은 모든 역할에 보인다 */
 export function moreItems(role: string): TabKey[] {
   const items: TabKey[] = ['changes', 'ontology']
   if (role === 'EDITOR' || role === 'ADMIN') items.push('review')
   if (role === 'ADMIN') items.push('users')
-  items.push('tokens')
+  items.push('tokens', 'proposals', 'trades')
   return items
 }
 
@@ -89,6 +91,18 @@ export interface TraceQuery {
 export interface ReviewQuery {
   page: number
   minePage: number
+}
+
+export type ProposalsStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED'
+
+export interface ProposalsQuery {
+  status: ProposalsStatus
+  page: number
+}
+
+export interface TradesQuery {
+  ticker: string
+  page: number
 }
 
 export interface ChangesQuery {
@@ -220,6 +234,35 @@ export function changesSearch(q: ChangesQuery): string {
   return build([
     ['target', q.target || null],
     ['actor', q.actor || null],
+    ['page', q.page > 0 ? String(q.page) : null],
+  ])
+}
+
+const PROPOSAL_STATUSES: ProposalsStatus[] = ['PENDING', 'ACCEPTED', 'REJECTED']
+
+/** 없거나 모르는 status 는 PENDING(대기)이다 */
+export function parseProposalsQuery(search: string): ProposalsQuery {
+  const p = new URLSearchParams(search)
+  const status = p.get('status')
+  return { status: PROPOSAL_STATUSES.find((x) => x === status) ?? 'PENDING', page: pageOf(p, 'page') }
+}
+
+/** 기본값(PENDING, 0쪽)은 쓰지 않는다 */
+export function proposalsSearch(q: ProposalsQuery): string {
+  return build([
+    ['status', q.status === 'PENDING' ? null : q.status],
+    ['page', q.page > 0 ? String(q.page) : null],
+  ])
+}
+
+export function parseTradesQuery(search: string): TradesQuery {
+  const p = new URLSearchParams(search)
+  return { ticker: text(p, 'ticker'), page: pageOf(p, 'page') }
+}
+
+export function tradesSearch(q: TradesQuery): string {
+  return build([
+    ['ticker', q.ticker || null],
     ['page', q.page > 0 ? String(q.page) : null],
   ])
 }

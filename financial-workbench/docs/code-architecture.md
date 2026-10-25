@@ -81,12 +81,14 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `graph` | 주변 그래프 조회와 한도 적용 |
 | `learning` | 근거 따라가기와 내 이해 표시의 서비스와 컨트롤러. 계약은 [API 계약](api-contract.md) 의 「근거 따라가기」, 「내 이해 표시」 다. `knowledge` 의 읽기 도우미로 노드 표현을 만든다 |
 | `history` | ChangeEvent 기록(`ChangeEventRecorder`)과 이력 조회 |
-| `agent` | 연동 토큰의 저장, 발급과 폐기, `/api/v1` 의 Bearer 인증과 토큰마다의 요청 한도. 결정은 [ADR-012](adr/012-agent-integration-token.md) 다 |
-| `agent.v1` | 에이전트 API(`/api/v1`)의 입출력과 v1 응답. 화면용 조회 서비스의 결과를 v1 으로 옮긴다. 계약은 [API 계약](api-contract.md) 의 「에이전트 API」 절이다 |
+| `agent` | 연동 토큰과 `/api/v1` 의 Bearer 인증, 요청 한도. 결정은 [ADR-012](adr/012-agent-integration-token.md) 와 [ADR-013](adr/013-owner-trades-and-agent-proposals.md) 이다 |
+| `agent.v1` | 에이전트 API(`/api/v1`)의 입출력과 v1 응답. 화면용 조회 서비스의 결과를 v1 으로 옮긴다. 쓰기는 범위를 확인한 뒤 `trade`, `proposal` 의 서비스를 부른다. 계약은 [API 계약](api-contract.md) 의 「에이전트 API」 절이다 |
+| `trade` | 주인 전용 체결 기록과 그 세션 API. 저장 모델은 [데이터 스키마](data-schema.md) 의 「체결 기록」, 결정은 [ADR-013](adr/013-owner-trades-and-agent-proposals.md) 이다 |
+| `proposal` | 에이전트 제안의 검사, 저장, 승인과 거절. 저장 모델은 [데이터 스키마](data-schema.md) 의 「제안」 이다 |
 | `web` | 오류 형식(`ApiError`), 예외 처리기, health, 화면 경로(`/workspace` 등)의 GET 을 `index.html` 로 넘기는 `SpaRouteController` |
 
 호출 방향은 `컨트롤러 → 서비스 → Neo4jClient` 다. 서비스가 트랜잭션 경계다.
-`knowledge` 서비스는 `ontology` 의 검증기와 `history` 의 기록기를 부른다. `agent.v1` 은 `knowledge`, `learning`, `graph` 의 조회 서비스를 부르고 그 결과를 v1 DTO 로 옮긴다. 어느 패키지도 `agent` 를 부르지 않는다. 보안 설정(`config.SecurityConfig`)만 `agent` 의 필터를 건다. `learning` 은 `knowledge` 의 읽기 도우미를 부르고, `knowledge` 는 `learning` 을 부르지 않는다. 노드 상세의 `concepts` 는 `knowledge` 가 직접 읽는다. 반대 방향 호출은 없다.
+`knowledge` 서비스는 `ontology` 의 검증기와 `history` 의 기록기를 부른다. `agent.v1` 은 `knowledge`, `learning`, `graph` 의 조회 서비스를 부르고 그 결과를 v1 DTO 로 옮긴다. `proposal` 은 승인을 실행하려고 `knowledge`(노드와 관계 만들기), `learning`(이해 표시), `trade`(체결과 결정 잇기)를 부르고, `agent.v1` 은 `trade`, `proposal` 을 부른다. `trade` 는 노드 참조와 표시 이름을 만들려고 `knowledge`, `ontology` 를 부른다. `trade` 와 `proposal` 을 부르는 지식 패키지(`knowledge`, `graph`, `learning`, `history`)는 없다. 어느 패키지도 `agent` 를 부르지 않는다. 보안 설정(`config.SecurityConfig`)만 `agent` 의 필터를 건다. `learning` 은 `knowledge` 의 읽기 도우미를 부르고, `knowledge` 는 `learning` 을 부르지 않는다. 노드 상세의 `concepts` 는 `knowledge` 가 직접 읽는다. 반대 방향 호출은 없다.
 
 온톨로지를 쓰는 코드는 `Ontology` 를 주입받지 않고 `OntologyHolder.current()` 로 최신 버전을 받는다. 서비스는 메서드 처음에 한 번 받아 끝까지 그 값을 쓴다. 검증기와 읽기 도우미는 따로 받으므로, 요청 도중에 저장이 끼면 한 요청이 두 버전을 읽을 수 있다. 결과는 대부분 거절 쪽이라 받아들인다.
 `OntologyHolder` 는 최신 버전을 메모리에 두고, 저장 트랜잭션이 커밋된 뒤 새 버전으로 바꾼다. 번호가 지금보다 클 때만 바꾼다. API 는 프로세스 하나로만 돈다. 여러 개로 늘리면 요청마다 `OntologyHead` 의 번호를 읽어 비교하도록 바꿔야 한다.
@@ -120,6 +122,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `workbench.bootstrap.admin-email` | `WORKBENCH_BOOTSTRAP_ADMIN_EMAIL` | 없음 | 사용자가 없을 때 만들 첫 ADMIN |
 | `workbench.agent.rate-limit-per-minute` | | 60 | 연동 토큰 하나가 1분에 부를 수 있는 `/api/v1` 요청 수 |
 | `workbench.agent.max-tokens-per-user` | | 5 | 사용자마다 폐기하지 않은 연동 토큰 수 |
+| `workbench.agent.write-rate-limit-per-minute` | | 10 | 연동 토큰 하나가 1분에 부를 수 있는 `/api/v1` 쓰기 요청 수. 전체 한도에도 함께 센다 |
 | `spring.security.oauth2.client.registration.google.client-id`, `client-secret` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 없음 | 운영 프로필에서 비어 있으면 시작에 실패한다 |
 
 프로필은 아래와 같다.
@@ -165,6 +168,8 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `web/src/components/add/` | 전역 「＋ 추가」 메뉴와 만들기 창 |
 | `web/src/components/learning/` | 근거 따라가기, 공부 탭, 이해 표시, 개념 칩과 개념 상세 화면. 화면 규칙은 [흐름](flow.md) 의 「근거 따라가기」, 「공부」, 「개념 설명」 이 소유하고, 순수 규칙은 `web/src/lib/trace.ts` 에 있다 |
 | `web/src/components/tokens/` | 더보기 메뉴의 「연동 토큰」 화면. 화면 규칙은 [흐름](flow.md) 의 「연동 토큰」 이 소유한다 |
+| `web/src/components/proposals/` | 더보기 메뉴의 「제안」 화면과 대기 수 배지. 제안 내용을 문장으로 바꾸는 순수 규칙은 `web/src/lib/proposals.ts` 에 있다. 화면 규칙은 [흐름](flow.md) 의 「제안」 이 소유한다 |
+| `web/src/components/trades/` | 더보기 메뉴의 「내 체결」 화면과, 상세와 근거 따라가기에 끼우는 체결 목록. 수와 금액 표시는 `web/src/lib/trades.ts` 에 있다. 화면 규칙은 [흐름](flow.md) 의 「내 체결」 이 소유한다 |
 | `web/src/components/ontology/` | 온톨로지 상세 화면의 보기, 폼 편집기, YAML 편집기, 미리보기, 버전 기록. 초안은 `App` 이 들고 있어 화면을 옮겨도 남는다. YAML 은 서버의 미리보기 응답으로 바꾸고 웹에 YAML 라이브러리를 들이지 않는다. `form/` 은 폼 편집기의 부품이다 |
 | `web/src/components/guide/` | 첫 접속 가이드. 단계 정의, 진행 상태(`localStorage` 의 `workbench.guide`), 말풍선. 만들기 폼과 주장 폼은 가이드가 넘긴 미리 채울 값을 props 로 받고, 만들기에 성공하면 가이드에 알린다 |
 | `web/src/routes.ts` | 화면 경로 목록과 query 를 읽고 쓰는 순수 함수(기본값 생략, 옛 `/?node=` 넘기기, 로그인 뒤 돌아갈 주소 검사). 경로와 query 의 뜻은 [흐름](flow.md) 의 「주소와 뒤로가기」 가 소유한다 |
@@ -213,7 +218,8 @@ mock 으로 Neo4j 를 대신한 테스트는 없다. 트랜잭션 일관성 테�
 | [009](adr/009-investment-logic-chain.md) | 온톨로지를 변화, 병목, 산업, 기업, 밸류에이션, 결정을 잇는 투자 온톨로지로 바꾸고 기업 사이의 관계를 뺀다 |
 | [010](adr/010-concept-map-first-screen.md) | 첫 화면을 개념 지도로 두고, 상단 탭 셋과 더보기 메뉴, 읽기 우선 상세, 전역 「＋ 추가」 로 화면 구조를 바꾼다. 탭 수는 011 이 넷으로 바꿨다 |
 | [011](adr/011-learning-marks-and-trace.md) | 사용자별 이해 표시를 `KNOWS` 관계로 두고 이력에 남기지 않는다. 근거 따라가기를 서버 API 로 계산한다 |
-| [012](adr/012-agent-integration-token.md) | 에이전트는 개인 연동 토큰으로 Bearer 전용 `/api/v1` 조회 API 를 부른다. 세션 API 와 경로를 나누고 Hermes 내부망을 공유하지 않는다 |
+| [012](adr/012-agent-integration-token.md) | 에이전트는 개인 연동 토큰으로 Bearer 전용 `/api/v1` 조회 API 를 부른다. 세션 API 와 경로를 나누고 Hermes 내부망을 공유하지 않는다. 쓰기와 토큰 범위는 013 이 더했다 |
+| [013](adr/013-owner-trades-and-agent-proposals.md) | 체결 기록은 주인만 보는 코드 소유 모델(`:Trade`)로 지식 그래프와 나눈다. 에이전트 쓰기는 체결 사실은 바로, 해석은 제안으로 받고 승인은 기존 서비스를 거친다 |
 
 대체된 ADR 은 `adr/superseded/` 에 있다. 당시 맥락을 읽을 때만 본다.
 
@@ -255,6 +261,10 @@ ADR 로 남기지 않은 작은 결정은 다음과 같다.
 - 연동 토큰의 마지막 사용 시각은 인증 필터가 1분에 한 번만 따로 쓴다(2026-10-25). 조회 요청마다 쓰기 트랜잭션을 만들지 않으려는 것이다. 쓰기가 실패하면 `warn` 로그만 남기고 조회는 계속한다.
 - v1 응답은 화면용 조회 서비스(`NodeQueryService`, `TraceService`, `GraphService`, `KnowledgeMarkService`)의 결과를 옮겨 만든다(2026-10-25). v1 전용 Cypher 를 따로 쓰면 보관, 한도, 상태 판정 규칙이 두 벌이 된다. 종목 찾기만 화면에 같은 조회가 없어 `SecurityLookupService` 가 자기 쿼리를 쓴다. `AgentQueryService` 는 클래스 단위 트랜잭션을 두지 않는다. 주변 그래프와 근거 따라가기의 시간 제한은 그 서비스가 스스로 연 트랜잭션에만 걸려, 바깥 트랜잭션에 합류하면 제한이 사라지기 때문이다.
 - v1 의 관계 문장은 서버가 온톨로지 문장 틀의 `{from}`, `{to}` 만 바꿔 만든다. 조사 고르기(화면의 `lib`)는 서버로 옮기지 않았다. 읽는 쪽이 언어 모델이라 「은(는)」 표기를 그대로 읽는다.
+- 체결과 제안의 한 요청 상한(50건, 20건), 대기 제안 상한(200개), 결정한 제안을 지우는 기한(90일)은 `config.Limits` 의 상수다(2026-10-25). 운영에서 바꿀 일이 드문 계약 값이라 설정으로 두지 않았다. 쓰기 요청 한도만 조회 한도처럼 설정이다.
+- 결정한 제안의 정리는 그 사용자가 다음에 제안을 올리는 트랜잭션이 한다(2026-10-25). 시작 작업이나 예약 작업은 두 사람이 쓰는 도구에 비해 움직이는 부분이 늘어 버렸다.
+- 제안 승인의 실행 실패는 실행 트랜잭션을 롤백한 뒤 별도 트랜잭션으로 `lastError*` 만 쓴다(2026-10-25). 같은 트랜잭션에서 쓰면 롤백에 함께 사라진다. 이 처리는 `ProposalService` 가 `TransactionTemplate` 으로 두 트랜잭션을 연다.
+- 체결의 종목 연결은 저장할 때 한 번 찾고, 같은 체결을 다시 받을 때 아직 없으면 다시 찾는다(2026-10-25). 읽을 때마다 `market`, `ticker` 로 찾는 안은 관계가 없어 종목 상세의 「내 체결」 을 종목 id 로 고를 수 없어 버렸다. 종목을 만들 때 체결을 찾아 잇는 안은 `knowledge` 가 `trade` 를 부르게 되어 버렸다.
 - 반응형 경계는 1024px 하나다. 768px 에 두 칸 배치를 더하는 안은 검사할 배치가 늘어나는 데 비해 두 사람이 쓰는 도구에서 얻는 것이 작아 버렸다.
 
 - 작성자와 마지막으로 내용을 고친 사람은 그 Claim 을 검토할 수 없다. 다른 사람이 확인하는 것이 검토의 목적이다.

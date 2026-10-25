@@ -8,6 +8,7 @@ import dev.fos.workbench.auth.CurrentUserFilter
 import dev.fos.workbench.auth.UserRepository
 import dev.fos.workbench.web.ApiError
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.annotation.Order
@@ -37,6 +38,10 @@ class SecurityConfig {
     @Bean
     fun agentRateLimiter(properties: WorkbenchProperties) = RateLimiter(properties.agent.rateLimitPerMinute)
 
+    /** 쓰기 요청만 따로 센다. 쓰기 요청은 [agentRateLimiter] 에도 센다 */
+    @Bean
+    fun agentWriteRateLimiter(properties: WorkbenchProperties) = RateLimiter(properties.agent.writeRateLimitPerMinute)
+
     /**
      * `/api/v1` 아래 경로만 맡고 [filterChain] 보다 먼저 돈다. 연동 토큰(`Authorization: Bearer`)으로만 인증한다.
      * 세션을 읽지도 만들지도 않고 CSRF 를 쓰지 않는다(docs/adr/012-agent-integration-token.md).
@@ -47,7 +52,8 @@ class SecurityConfig {
         http: HttpSecurity,
         mapper: JsonMapper,
         tokens: IntegrationTokenService,
-        limiter: RateLimiter,
+        @Qualifier("agentRateLimiter") limiter: RateLimiter,
+        @Qualifier("agentWriteRateLimiter") writeLimiter: RateLimiter,
         properties: WorkbenchProperties,
     ): SecurityFilterChain {
         http
@@ -57,7 +63,7 @@ class SecurityConfig {
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             // STATELESS 만으로는 세션 저장소가 바뀌지 않는 버전이 있어 요청 범위 저장소를 직접 둔다
             .securityContext { it.securityContextRepository(RequestAttributeSecurityContextRepository()) }
-            .addFilterAfter(BearerTokenFilter(tokens, limiter, mapper), SecurityContextHolderFilter::class.java)
+            .addFilterAfter(BearerTokenFilter(tokens, limiter, writeLimiter, mapper), SecurityContextHolderFilter::class.java)
             .exceptionHandling {
                 it.authenticationEntryPoint { _, response, _ ->
                     write(mapper, response, 401, ApiError("UNAUTHENTICATED", "연동 토큰이 없거나 올바르지 않습니다."))

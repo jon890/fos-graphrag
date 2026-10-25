@@ -89,7 +89,7 @@ export async function loginAs(
   await expect(bubble).toHaveCount(0)
 }
 
-export type ScreenKey = 'map' | 'workspace' | 'list' | 'study' | 'changes' | 'ontology' | 'review' | 'users' | 'tokens'
+export type ScreenKey = 'map' | 'workspace' | 'list' | 'study' | 'changes' | 'ontology' | 'review' | 'users' | 'tokens' | 'proposals' | 'trades'
 
 const TOP_SCREENS: ScreenKey[] = ['map', 'workspace', 'list', 'study']
 
@@ -108,6 +108,8 @@ export async function openScreen(page: Page, key: ScreenKey): Promise<void> {
   }
   await page.getByTestId('more-open').click()
   await page.getByTestId(`more-item-${key}`).click()
+  // 닫히는 애니메이션이 끝나기 전에 스크린샷을 찍으면 메뉴가 겹쳐 찍힌다.
+  await expect(page.locator('[data-testid^="more-item-"]')).toHaveCount(0)
 }
 
 export async function newPage(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {
@@ -153,4 +155,22 @@ export async function revokeTokensExcept(page: Page, keep: string[]): Promise<vo
   } catch (e) {
     console.warn('연동 토큰 정리 실패', e)
   }
+}
+
+/**
+ * 「연동 토큰」 화면에서 토큰을 발급해 원문을 돌려준다. 발급 창은 닫고 목록 화면에 남는다.
+ * 호출한 쪽이 끝에 revokeTokensExcept 로 폐기한다.
+ */
+export async function issueToken(page: Page, name: string, scope: 'read' | 'write'): Promise<string> {
+  await openScreen(page, 'tokens')
+  await page.getByTestId('tokens-issue-open').click()
+  await page.getByTestId('tokens-issue-name').fill(name)
+  await page.getByTestId(`tokens-issue-scope-${scope}`).check()
+  await page.getByTestId('tokens-issue-submit').click()
+  const value = page.getByTestId('tokens-issued-value')
+  await expect(value).toHaveValue(/^fwb_[A-Za-z0-9_-]{43}$/)
+  const token = await value.inputValue()
+  await page.getByTestId('tokens-issued-close').click()
+  await expect(page.getByTestId('tokens-issue-dialog')).toHaveCount(0)
+  return token
 }

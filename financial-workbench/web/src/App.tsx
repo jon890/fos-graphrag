@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { api, errorMessage, setOntologyVersionListener, setUnauthorizedHandler } from './api/client'
 import type { CurrentUser, NodeView, Ontology } from './api/types'
@@ -31,6 +31,9 @@ import { ChangesTab } from './components/ChangesTab'
 import { OntologyTab } from './components/ontology/OntologyTab'
 import { UsersTab } from './components/UsersTab'
 import { TokensTab } from './components/tokens/TokensTab'
+import { ProposalCountProvider, useProposalCount } from './components/proposals/ProposalCountProvider'
+import { ProposalsTab } from './components/proposals/ProposalsTab'
+import { TradesTab } from './components/trades/TradesTab'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ConceptMapTab } from './components/map/ConceptMapTab'
 import { StudyTab } from './components/learning/StudyTab'
@@ -54,6 +57,11 @@ function readLoginDenied(): boolean {
 
 /** 만든 직후 상세 위에 보일 안내 */
 type Flash = { id: string; text: string; kind?: 'success' | 'error' }
+
+/** 대기 중인 제안 수를 배지로 붙인 「더보기」 메뉴 */
+function MoreMenuWithCount(props: Omit<ComponentProps<typeof MoreMenu>, 'pendingCount'>) {
+  return <MoreMenu {...props} pendingCount={useProposalCount().count} />
+}
 
 type AuthState = { status: 'checking' } | { status: 'anonymous'; notice?: string } | { status: 'signed-in'; user: CurrentUser }
 
@@ -264,7 +272,7 @@ export default function App() {
               }
             />
           )}
-          <MoreMenu role={user.role} activeTab={activeTab} onOpen={openTab} />
+          <MoreMenuWithCount role={user.role} activeTab={activeTab} onOpen={openTab} />
         </div>
       </nav>
       <div className="flex shrink-0 items-center gap-1 text-sm">
@@ -335,6 +343,8 @@ export default function App() {
           {activeTab === 'ontology' && <OntologyTab draft={ontologyDraft} onDraftChange={setOntologyDraft} reloadOntology={reloadOntology} />}
           {activeTab === 'users' && user.role === 'ADMIN' && <UsersTab onOpenHistory={openHistory} />}
           {activeTab === 'tokens' && <TokensTab />}
+          {activeTab === 'proposals' && <ProposalsTab onOpenNode={focusNode} />}
+          {activeTab === 'trades' && <TradesTab onOpenNode={focusNode} />}
         </ErrorBoundary>
       )}
     </main>
@@ -349,20 +359,22 @@ export default function App() {
   )
 
   return (
-    <div className="flex h-screen flex-col">
-      {/* 탭 단위 ErrorBoundary 바깥이라 탭을 옮겨도 가이드가 남는다. 로그인 화면이 되면 함께 사라진다 */}
-      <GuideProvider user={user} onUserChange={(u) => setAuth({ status: 'signed-in', user: u })} ontology={ontology}>
-        {/* 온톨로지를 받은 뒤에는 머리글의 「＋ 추가」 와 탭이 같은 만들기 창을 쓴다. 받기 전(불러오는 중, 오류)에는 Provider 없이 그린다 */}
-        {ontology ? (
-          <AppContext.Provider value={{ user, ontology, canEdit }}>
-            <AddProvider onCreated={onCreated} onOpenNode={focusNode}>
-              {body}
-            </AddProvider>
-          </AppContext.Provider>
-        ) : (
-          body
-        )}
-      </GuideProvider>
-    </div>
+    <ProposalCountProvider>
+      <div className="flex h-screen flex-col">
+        {/* 탭 단위 ErrorBoundary 바깥이라 탭을 옮겨도 가이드가 남는다. 로그인 화면이 되면 함께 사라진다 */}
+        <GuideProvider user={user} onUserChange={(u) => setAuth({ status: 'signed-in', user: u })} ontology={ontology}>
+          {/* 온톨로지를 받은 뒤에는 머리글의 「＋ 추가」 와 탭이 같은 만들기 창을 쓴다. 받기 전(불러오는 중, 오류)에는 Provider 없이 그린다 */}
+          {ontology ? (
+            <AppContext.Provider value={{ user, ontology, canEdit }}>
+              <AddProvider onCreated={onCreated} onOpenNode={focusNode}>
+                {body}
+              </AddProvider>
+            </AppContext.Provider>
+          ) : (
+            body
+          )}
+        </GuideProvider>
+      </div>
+    </ProposalCountProvider>
   )
 }

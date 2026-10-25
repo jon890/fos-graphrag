@@ -13,8 +13,9 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `login-denied` | `/?login=denied` 로 돌아왔을 때 「접근 권한이 없습니다」 안내. `login-google` 도 함께 보인다 |
 | `login-notice` | 세션이 끊겨 돌아왔을 때의 안내 |
 | `tab-map`, `tab-workspace`, `tab-list`, `tab-study` | 상단 탭(개념 지도, 작업 공간, 목록, 공부). `role=tab`, 고른 탭은 `aria-selected="true"` |
-| `more-open` | 「더보기」 메뉴 단추. 메뉴의 화면(변경 이력, 온톨로지 상세, 검토 대기, 사용자, 연동 토큰)이 열려 있으면 `data-active="true"` |
-| `more-item-<key>` | 더보기 메뉴 항목. `key` 는 `changes`, `ontology`, `review`(EDITOR, ADMIN), `users`(ADMIN), `tokens`(모든 역할). 열람자가 주소로 연 `/review` 도 `more-open` 이 `data-active="true"` 다 |
+| `more-open` | 「더보기」 메뉴 단추. 메뉴의 화면(변경 이력, 온톨로지 상세, 검토 대기, 사용자, 연동 토큰, 제안, 내 체결)이 열려 있으면 `data-active="true"` |
+| `more-item-<key>` | 더보기 메뉴 항목. `key` 는 `changes`, `ontology`, `review`(EDITOR, ADMIN), `users`(ADMIN), `tokens`, `proposals`, `trades`(모든 역할). 열람자가 주소로 연 `/review` 도 `more-open` 이 `data-active="true"` 다 |
+| `more-pending-badge`, `more-item-proposals-badge` | 「더보기」 단추와 「제안」 항목의 대기 제안 수 배지. `data-count`. 대기가 없거나 수를 읽지 못하면 없다 |
 | `current-user-name`, `current-user-email` | 로그인 사용자의 표시 이름, 이메일 |
 | `current-user-role` | 역할 배지. `data-role` 이 VIEWER, EDITOR, ADMIN |
 | `guide-open` | 머리글의 「사용법」. 개념 지도나 작업 공간이 아니면 개념 지도로 옮겨 첫 접속 가이드를 처음부터 연다 |
@@ -410,6 +411,56 @@ ADMIN 에게만 나오는 요소다.
 | `tokens-issue-open` | 「＋ 토큰 발급」. 상한이면 `disabled` |
 | `tokens-limit` | 상한 안내. 폐기하지 않은 토큰이 5개일 때만 나온다 |
 | `tokens-issue-dialog`, `tokens-issue-name`, `tokens-issue-submit`, `tokens-issue-cancel`, `tokens-issue-error` | 발급 창, 이름 칸, 「발급」, 「취소」, 창 안의 오류(`TOKEN_LIMIT` 등 서버 `message`) |
+| `tokens-issue-scope-read`, `tokens-issue-scope-write`, `tokens-issue-scope-hint` | 범위 고르기의 「조회만」(기본), 「조회와 기록」 라디오와, 「조회와 기록」 을 골랐을 때의 안내 |
+| `tokens-row-scope` | 행의 범위. `data-scope` 가 `READ`, `READ_WRITE` |
 | `tokens-issued-value` | 발급한 토큰 원문(읽기 전용 입력칸). `value` 가 `fwb_` 로 시작한다 |
 | `tokens-issued-copy`, `tokens-issued-copied`, `tokens-issued-warning`, `tokens-issued-close` | 「복사」, 「복사했습니다」, 「다시 볼 수 없습니다」 안내, 「닫기」 |
 | `tokens-revoke-dialog`, `tokens-revoke-confirm`, `tokens-revoke-cancel` | 폐기 확인 창, 「폐기」, 「취소」 |
+
+## 제안 화면
+
+거절 창은 Portal 로 `body` 아래에 그려진다.
+
+| testid | 요소 |
+| --- | --- |
+| `proposals-tab` | 화면 전체 |
+| `proposals-status-<key>` | 상태 칩. `key` 는 `PENDING`, `ACCEPTED`, `REJECTED`. 고른 칩은 `aria-pressed="true"` |
+| `proposals-empty`, `proposals-error`, `proposals-retry` | 빈 상태, 목록을 받지 못했을 때의 이유와 「다시 시도」 |
+| `proposals-message` | 처리 결과. `data-kind` 가 `success` 나 `error` |
+| `proposal-card` * | 제안 카드. `data-id`, `data-kind`, `data-status` |
+| `proposal-kind`, `proposal-meta` * | 종류 이름, 올린 때와 토큰 이름 |
+| `proposal-summary` * | 내용 문장(「{타입} 「{이름}」 을(를) 만듭니다」, 관계 문장, 체결 줄과 결정 이름, 공부 메모) |
+| `proposal-prop` * | 항목 만들기의 속성 한 줄. `data-prop` |
+| `proposal-link` * | 이어 만들 관계 문장 |
+| `proposal-trade` * | 체결 줄. `data-trade-id` |
+| `proposal-node-open` * | 항목 이름 링크. `data-node-id`. 작업 공간에서 그 항목을 연다 |
+| `proposal-rationale`, `proposal-evidence` * | 에이전트가 붙인 까닭, 근거 목록 |
+| `proposal-last-error` * | 「승인하지 못했습니다: …」 |
+| `proposal-editor-required` * | 열람자에게 보이는 「편집 권한이 있어야 승인할 수 있습니다」 안내 |
+| `proposal-accept`, `proposal-edit-open`, `proposal-reject-open` * | 「승인」, 「고쳐서 승인」, 「거절」. 열람자의 공유 지식 제안에서 앞의 둘은 `disabled` |
+| `proposal-edit-form`, `proposal-edit-prop-<속성>`, `proposal-edit-level`, `proposal-edit-note`, `proposal-edit-submit`, `proposal-edit-cancel` | 고칠 칸, 속성 칸, 공부 메모의 표시와 메모 칸, 「이대로 승인」, 「취소」 |
+| `proposal-card-error` * | 승인이나 거절 실패 이유. 그 카드 안에 나온다 |
+| `proposal-decided` * | 결정한 때와 거절 이유 |
+| `proposal-result-open` * | 승인으로 생긴 항목 링크. `data-node-id` |
+| `proposal-reject-dialog`, `proposal-reject-reason`, `proposal-reject-confirm`, `proposal-reject-cancel` | 거절 창, 이유 칸, 「거절」, 「취소」 |
+
+## 내 체결
+
+삭제 확인 창은 Portal 로 `body` 아래에 그려진다.
+
+| testid | 요소 |
+| --- | --- |
+| `trades-tab` | 화면 전체 |
+| `trades-guide` | 위쪽의 「다른 사용자에게는 보이지 않습니다」 안내 |
+| `trades-ticker` | 종목 코드 검색 칸 |
+| `trades-table`, `trades-empty`, `trades-error`, `trades-retry` | 표(넓은 화면)나 카드 목록(좁은 화면), 빈 상태, 이유와 「다시 시도」 |
+| `trades-message` | 처리 결과. `data-kind` 가 `success` 나 `error` |
+| `trade-row` * | 체결 한 행이나 카드. `data-id`, `data-side`, `data-ticker` |
+| `trade-executed`, `trade-side`, `trade-security`, `trade-quantity`, `trade-price`, `trade-amount`, `trade-fee`, `trade-decisions` * | 체결 시각, 매수·매도, 종목(이은 종목이면 링크), 수량, 단가, 금액, 수수료, 이은 결정 링크 |
+| `trade-delete` * | 「지우기」. 확인 창을 연다 |
+| `trades-delete-dialog`, `trades-delete-confirm`, `trades-delete-cancel` | 삭제 확인 창, 「지우기」, 「취소」 |
+| `detail-trades` | 종목과 투자 결정 상세의 「내 체결」 절. 이어진 내 체결이 있을 때만 나온다 |
+| `trace-step-trades` * | 근거 따라가기 투자 결정 단계의 「실행한 체결」. 있을 때만 나온다 |
+| `trade-list-item` * | 위 두 곳의 체결 한 줄. `data-id` |
+| `trade-list-more` * | 「내 체결에서 모두 보기」. 20건을 넘을 때만 나온다 |
+

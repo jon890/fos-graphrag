@@ -41,10 +41,14 @@ export interface UserView {
 export interface IntegrationTokenView {
   id: string
   name: string
+  /** 조회만(READ)인지 조회와 기록(READ_WRITE)인지. 발급한 뒤에는 바꿀 수 없다 */
+  scope: TokenScope
   last4: string
   createdAt: string
   lastUsedAt: string | null
 }
+
+export type TokenScope = 'READ' | 'READ_WRITE'
 
 /** POST /api/me/tokens 의 응답. token 원문은 이 응답에서만 볼 수 있다 */
 export interface IssuedIntegrationToken extends IntegrationTokenView {
@@ -63,6 +67,56 @@ export interface NodeRef {
   type: string
   label: string
   archived: boolean
+}
+
+/** GET /api/me/trades 의 한 행. 내 체결만 온다 */
+export interface TradeView {
+  id: string
+  broker: string
+  externalId: string
+  side: 'BUY' | 'SELL'
+  market: string
+  ticker: string
+  name: string | null
+  quantity: number
+  price: number
+  currency: string
+  amount: number
+  fee: number | null
+  executedAt: string
+  createdAt: string
+  createdVia: string
+  /** 이어진 종목. 없으면 null. 보관된 것도 담는다 */
+  security: NodeRef | null
+  decisions: NodeRef[]
+}
+
+export type ProposalKind = 'CREATE_NODE' | 'CREATE_RELATIONSHIP' | 'LINK_TRADE_DECISION' | 'STUDY_NOTE'
+export type ProposalStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED'
+
+/** GET /api/me/proposals 의 한 행. payload 의 모양은 kind 마다 다르다(docs/api-contract.md 「제안 내용」) */
+export interface ProposalView {
+  id: string
+  kind: ProposalKind
+  status: ProposalStatus
+  payload: Record<string, unknown>
+  rationale: string
+  evidence: { nodeIds?: string[]; tradeIds?: string[]; urls?: string[] }
+  createdAt: string
+  createdVia: string
+  token: { id: string | null; name: string | null } | null
+  decidedAt: string | null
+  decisionNote: string | null
+  result: { nodeIds: string[]; relationshipIds: string[]; tradeIds: string[] } | null
+  lastError: { code: string; message: string; at: string } | null
+  /** 공유 지식을 만드는 제안이면 true. 열람자는 승인할 수 없다 */
+  requiresEditor: boolean
+  refs: { nodes: Record<string, NodeRef>; trades: Record<string, TradeView> }
+}
+
+/** GET /api/me/proposals/summary */
+export interface ProposalSummary {
+  pending: number
 }
 
 export interface NodeView {
