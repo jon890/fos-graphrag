@@ -20,6 +20,7 @@ import { KnowledgeMarkControls } from './learning/KnowledgeMarkControls'
 import { NodeEditForm } from './NodeEditForm'
 import { NodeReadCard } from './NodeReadCard'
 import { RelationshipSection } from './RelationshipSection'
+import { TradeList } from './trades/TradeList'
 import { StatusBadge, TypeBadge } from './TypeBadge'
 import { UndefinedTypeProperties } from './UndefinedTypeProperties'
 
@@ -503,6 +504,9 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
           )}
         </section>
       )}
+
+      {!claim && node.type === 'Security' && <TradeList filter={{ securityId: node.id }} testId="detail-trades" />}
+      {!claim && node.type === 'Decision' && <TradeList filter={{ decisionId: node.id }} testId="detail-trades" />}
 
       <details className="meta-details" data-testid="node-meta-details">
         <summary>자세히</summary>

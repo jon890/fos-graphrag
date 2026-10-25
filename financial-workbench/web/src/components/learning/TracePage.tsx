@@ -9,6 +9,7 @@ import { TAB_PATHS } from '../../routes'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { StatusBadge, TypeBadge } from '../TypeBadge'
+import { TradeList } from '../trades/TradeList'
 import { ConceptChips } from './ConceptChips'
 import { KnowledgeMarkControls } from './KnowledgeMarkControls'
 
@@ -302,6 +303,8 @@ function StepCard({ view, step, role, onOpenNode, onTrace, onReload, onMarkChang
       {step.missing.map((m) => (
         <MissingRow key={m.relationshipType} missing={m} stepId={node.id} onOpenNode={onOpenNode} onReload={onReload} />
       ))}
+
+      {node.type === DECISION_TYPE && <TradeList filter={{ decisionId: node.id }} testId="trace-step-trades" />}
 
       <ConceptChips concepts={step.concepts} onOpen={onOpenNode} />
       <KnowledgeMarkControls nodeId={node.id} mark={step.knowledge} onChange={(mark) => onMarkChange(node.id, mark)} />

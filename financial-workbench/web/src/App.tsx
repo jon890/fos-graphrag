@@ -33,6 +33,7 @@ import { UsersTab } from './components/UsersTab'
 import { TokensTab } from './components/tokens/TokensTab'
 import { ProposalCountProvider, useProposalCount } from './components/proposals/ProposalCountProvider'
 import { ProposalsTab } from './components/proposals/ProposalsTab'
+import { TradesTab } from './components/trades/TradesTab'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ConceptMapTab } from './components/map/ConceptMapTab'
 import { StudyTab } from './components/learning/StudyTab'
@@ -343,6 +344,7 @@ export default function App() {
           {activeTab === 'users' && user.role === 'ADMIN' && <UsersTab onOpenHistory={openHistory} />}
           {activeTab === 'tokens' && <TokensTab />}
           {activeTab === 'proposals' && <ProposalsTab onOpenNode={focusNode} />}
+          {activeTab === 'trades' && <TradesTab onOpenNode={focusNode} />}
         </ErrorBoundary>
       )}
     </main>

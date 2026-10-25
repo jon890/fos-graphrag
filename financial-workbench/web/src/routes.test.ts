@@ -16,6 +16,7 @@ import {
   parseReviewQuery,
   parseStudyQuery,
   parseTraceQuery,
+  parseTradesQuery,
   parseWorkspaceQuery,
   proposalsSearch,
   reviewSearch,
@@ -23,6 +24,7 @@ import {
   tabOfPath,
   TOP_TABS,
   traceSearch,
+  tradesSearch,
   workspaceSearch,
 } from './routes'
 
@@ -142,11 +144,12 @@ describe('개념 지도와 더보기', () => {
   })
 
   it('더보기 항목은 역할에 따라 검토 대기와 사용자가 붙고 연동 토큰은 모두에게 붙는다', () => {
-    expect(moreItems('VIEWER')).toEqual(['changes', 'ontology', 'tokens', 'proposals'])
-    expect(moreItems('EDITOR')).toEqual(['changes', 'ontology', 'review', 'tokens', 'proposals'])
-    expect(moreItems('ADMIN')).toEqual(['changes', 'ontology', 'review', 'users', 'tokens', 'proposals'])
+    expect(moreItems('VIEWER')).toEqual(['changes', 'ontology', 'tokens', 'proposals', 'trades'])
+    expect(moreItems('EDITOR')).toEqual(['changes', 'ontology', 'review', 'tokens', 'proposals', 'trades'])
+    expect(moreItems('ADMIN')).toEqual(['changes', 'ontology', 'review', 'users', 'tokens', 'proposals', 'trades'])
     expect(tabOfPath('/tokens')).toBe('tokens')
     expect(tabOfPath('/proposals')).toBe('proposals')
+    expect(tabOfPath('/trades')).toBe('trades')
   })
 
   it('옛 /?node 링크는 지도가 첫 화면이어도 작업 공간 상세로 연다', () => {
@@ -192,6 +195,15 @@ describe('공부 주소', () => {
     expect(TOP_TABS[TOP_TABS.length - 1]).toBe('study')
     expect(tabOfPath('/study')).toBe('study')
     expect(isSafeReturnTo('/study?level=UNSURE')).toBe(true)
+  })
+})
+
+describe('내 체결 주소', () => {
+  it('ticker 와 page 를 읽고 기본값은 쓰지 않는다', () => {
+    expect(parseTradesQuery('?ticker=FLNC&page=1')).toEqual({ ticker: 'FLNC', page: 1 })
+    expect(parseTradesQuery('')).toEqual({ ticker: '', page: 0 })
+    expect(tradesSearch({ ticker: '', page: 0 })).toBe('')
+    expect(tradesSearch({ ticker: 'FLNC', page: 1 })).toBe('?ticker=FLNC&page=1')
   })
 })
 

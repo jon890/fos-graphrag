@@ -2,7 +2,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { moreItems, type TabKey } from '../../routes'
 import { HEADER_TAB_CLASS } from './TopTabs'
 
-const MORE_LABEL: Partial<Record<TabKey, string>> = { changes: '변경 이력', ontology: '온톨로지 상세', review: '검토 대기', users: '사용자', tokens: '연동 토큰', proposals: '제안' }
+const MORE_LABEL: Partial<Record<TabKey, string>> = { changes: '변경 이력', ontology: '온톨로지 상세', review: '검토 대기', users: '사용자', tokens: '연동 토큰', proposals: '제안', trades: '내 체결' }
 
 interface Props {
   role: string

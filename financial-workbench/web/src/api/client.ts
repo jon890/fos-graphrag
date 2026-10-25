@@ -30,6 +30,7 @@ import type {
   StudyItem,
   TokenScope,
   TraceView,
+  TradeView,
   CurrentUser,
   Role,
   UserRef,
@@ -211,6 +212,11 @@ export const api = {
     accept: (id: string, payload?: Record<string, unknown>) =>
       request<ProposalView>('POST', `/api/me/proposals/${enc(id)}/accept`, payload === undefined ? undefined : { payload }),
     reject: (id: string, reason?: string) => request<ProposalView>('POST', `/api/me/proposals/${enc(id)}/reject`, reason ? { reason } : undefined),
+  },
+  trades: {
+    list: (q: { securityId?: string; decisionId?: string; ticker?: string; page?: number; size?: number }) =>
+      request<Page<TradeView>>('GET', `/api/me/trades${buildQuery({ securityId: q.securityId, decisionId: q.decisionId, ticker: q.ticker, page: q.page, size: q.size ?? 20 })}`),
+    remove: (id: string) => request<void>('DELETE', `/api/me/trades/${enc(id)}`),
   },
   ontology: {
     get: () => request<Ontology>('GET', '/api/ontology'),
