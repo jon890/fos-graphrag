@@ -22,6 +22,7 @@ import tools.jackson.module.kotlin.readValue
  * classpath 의 seeds 폴더에 있는 YAML 파일을 파일 이름 순서로 한 번씩 적용한다. docs/data-schema.md 「초기 데이터」.
  * 파일 하나가 트랜잭션 하나다. 실패하면 그 파일만 롤백하고 warn 로그를 남긴 뒤 다음 파일로 간다.
  * 초기 데이터는 없어도 API 를 쓸 수 있으므로 어떤 실패도 시작을 막지 않고, 다음 시작 때 다시 시도한다.
+ * existing: true 노드는 만들지 않고 찾기만 하며, 찾지 못하면 그 노드에 걸린 관계만 건너뛰고 파일은 적용한다.
  */
 @Component
 class SeedLoader(
@@ -73,8 +74,13 @@ class SeedLoader(
         file.nodes.forEach { node ->
             // 이름이 없으면 기존 노드에 묶지 않고 생성 검증이 실패하게 둔다
             val name = node.properties[ontology.requireNodeType(node.type).labelProperty]?.toString()
-            ids[node.ref] = name?.let { findExisting(node.type, it) }
-                ?: nodes.create(CreateNodeRequest(node.type, node.properties), BootstrapAdmin.SYSTEM_ACTOR).id
+            val found = name?.let { findExisting(node.type, it) }
+            when {
+                found != null -> ids[node.ref] = found
+                // 보관되거나 이름이 바뀐 노드를 되살리지 않고, 파일도 실패시키지 않는다(영원히 재시도하게 된다)
+                node.existing -> log.warn("초기 데이터 {} 의 {} 는 기존 노드를 찾지 못해 그 관계를 건너뛴다", file.key, node.ref)
+                else -> ids[node.ref] = nodes.create(CreateNodeRequest(node.type, node.properties), BootstrapAdmin.SYSTEM_ACTOR).id
+            }
         }
         file.relationships.forEach { rel ->
             val fromId = ids[rel.from]
@@ -147,7 +153,7 @@ class SeedLoader(
 
 data class SeedFile(val key: String, val nodes: List<SeedNode> = emptyList(), val relationships: List<SeedRelationship> = emptyList())
 
-/** ref 는 이 파일 안에서만 쓰는 이름이다 */
-data class SeedNode(val ref: String, val type: String, val properties: Map<String, Any?> = emptyMap())
+/** ref 는 이 파일 안에서만 쓰는 이름이다. existing 이면 만들지 않고 앞 파일의 노드를 이름으로 찾기만 한다 */
+data class SeedNode(val ref: String, val type: String, val properties: Map<String, Any?> = emptyMap(), val existing: Boolean = false)
 
 data class SeedRelationship(val type: String, val from: String, val to: String)

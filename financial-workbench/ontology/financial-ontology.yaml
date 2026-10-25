@@ -391,6 +391,12 @@ relationshipTypes:
     from: [Change, Bottleneck, Valuation]
     to: [Document]
     createPicker: { label: 이 자료가 근거인 항목, description: "이 자료가 근거인 변화, 병목, 밸류에이션을 고른다. 몰라도 비워 둘 수 있다" }
+  USES_CONCEPT:
+    label: 쓰는 개념
+    sentence: "{from}은(는) {to} 개념을 쓴다"
+    description: 투자 온톨로지 항목이 판단에 쓴 투자 개념이다. 근거가 필요 없는 식별 관계다.
+    from: [Change, Bottleneck, Company, Valuation, Scenario, Decision]
+    to: [Concept]
 
 # Claim 과 대상 노드를 잇는 관계다. Claim API 가 만들고 일반 관계 API 로는 만들 수 없다.
 claimRelationships:

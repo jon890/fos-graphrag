@@ -115,6 +115,60 @@ class SeedLoaderIntegrationTest : IntegrationTest() {
     }
 
     @Test
+    fun `시작할 때 개념 초기 데이터가 앞 파일의 밸류에이션을 만들지 않고 개념에 잇는다`() {
+        assertThat(count("MATCH (s:SeedRun {key: 'learning-concepts-2026-10'}) RETURN count(s) AS c")).isEqualTo(1)
+        assertThat(
+            count(
+                "MATCH (:Knowledge:Valuation {title: 'FLNC 간이 DCF (Valley AI 화면)', archived: false})-[r:USES_CONCEPT]->(:Knowledge:Concept {name: 'DCF', archived: false}) " +
+                    "WHERE r.archived = false RETURN count(r) AS c",
+            ),
+        ).describedAs("FLNC 간이 DCF 가 DCF 개념을 쓰는 관계").isEqualTo(1)
+        assertThat(count("MATCH (n:Knowledge:Valuation {title: 'FLNC 간이 DCF (Valley AI 화면)'}) RETURN count(n) AS c"))
+            .describedAs("existing 노드는 새로 만들지 않는다").isEqualTo(1)
+    }
+
+    @Test
+    fun `existing 노드를 찾지 못하면 만들지 않고 그 관계만 건너뛴 채 적용한다`() {
+        val suffix = UUID.randomUUID().toString().take(8)
+        val key = "test-existing-$suffix"
+        val file = SeedFile(
+            key = key,
+            nodes = listOf(
+                SeedNode("x", "Concept", mapOf("name" to "없는개념-$suffix"), existing = true),
+                SeedNode("y", "Concept", mapOf("name" to "새개념-$suffix", "summary" to "테스트")),
+            ),
+            relationships = listOf(SeedRelationship("RELATED_TO", "x", "y")),
+        )
+
+        seeds.applyInTransaction(file)
+
+        assertThat(count("MATCH (s:SeedRun {key: '$key'}) RETURN count(s) AS c")).describedAs("적용 기록").isEqualTo(1)
+        assertThat(count("MATCH (n:Knowledge {name: '없는개념-$suffix'}) RETURN count(n) AS c")).describedAs("찾지 못한 existing 노드").isZero()
+        assertThat(count("MATCH (n:Knowledge {name: '새개념-$suffix'}) RETURN count(n) AS c")).describedAs("existing 이 아닌 노드").isEqualTo(1)
+        assertThat(count("MATCH ()-[r:RELATED_TO]->(:Knowledge {name: '새개념-$suffix'}) RETURN count(r) AS c")).describedAs("건너뛴 관계").isZero()
+    }
+
+    @Test
+    fun `최신 버전에 없는 관계 종류를 쓰는 파일은 먼저 만든 개념까지 롤백된다`() {
+        val suffix = UUID.randomUUID().toString().take(8)
+        val key = "test-unknown-rel-$suffix"
+        val file = SeedFile(
+            key = key,
+            nodes = listOf(
+                SeedNode("a", "Concept", mapOf("name" to "관계없음A-$suffix", "summary" to "테스트")),
+                SeedNode("b", "Concept", mapOf("name" to "관계없음B-$suffix", "summary" to "테스트")),
+            ),
+            relationships = listOf(SeedRelationship("NO_SUCH_REL", "a", "b")),
+        )
+
+        assertThrows<OntologyViolationException> { seeds.applyInTransaction(file) }
+
+        assertThat(count("MATCH (s:SeedRun {key: '$key'}) RETURN count(s) AS c")).describedAs("적용 기록").isZero()
+        assertThat(count("MATCH (n:Knowledge) WHERE n.name IN ['관계없음A-$suffix', '관계없음B-$suffix'] RETURN count(n) AS c"))
+            .describedAs("롤백된 개념").isZero()
+    }
+
+    @Test
     fun `같은 이름이 이미 있으면 그 노드를 쓴다`() {
         val alice = loggedIn(ALICE)
         val suffix = Fixtures(alice).suffix
