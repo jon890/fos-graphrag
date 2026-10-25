@@ -243,7 +243,7 @@ revision 은 그대로이고 ChangeEvent 도 만들지 않는다. `expectedRevis
   "claim": "ClaimView 또는 null. 노드가 Claim 일 때만 있다",
   "relationships": ["RelationshipView. ISSUES 처럼 일반 관계만. 보관된 관계 포함"],
   "claims": ["ClaimView. 이 노드가 SUBJECT, OBJECT, SUPPORTED_BY 의 끝인 Claim. 보관된 Claim 제외"],
-  "concepts": ["ConceptRef. 이 노드에서 Concept 으로 나가는 보관되지 않은 관계의 끝. 보관된 개념 제외"],
+  "concepts": ["ConceptRef. 이 노드에서 Concept 으로 나가는 보관되지 않은 일반 관계의 끝. 주장 관계(SUBJECT, OBJECT, SUPPORTED_BY)와 보관된 개념은 뺀다"],
   "relationshipsTruncated": false,
   "claimsTruncated": false,
   "limits": { "maxRelationships": 100, "maxClaims": 50 }
@@ -256,6 +256,7 @@ revision 은 그대로이고 ChangeEvent 도 만들지 않는다. `expectedRevis
 { "id": "uuid", "label": "DCF", "summary": "앞으로 벌어들일 현금흐름을 할인율로 지금 가치로 바꿔 더하는 평가 방법", "relationshipType": "USES_CONCEPT" }
 ```
 
+- 주장의 대상이 개념이어도(`ADVOCATES` 주장의 `OBJECT`) 그 주장의 `concepts` 에는 담지 않는다. 주장과 개념의 연결은 주장 카드가 보인다.
 - `summary` 는 개념의 한 줄 정의(`summary` 속성)다. 값이 없으면 `null` 이다.
 - `relationshipType` 은 이 노드와 개념을 잇는 관계 종류다. 같은 개념이 두 관계로 이어져 있으면 먼저 만든 관계 하나로 담는다.
 - 개념 노드 자신의 상세에도 `concepts` 가 있다(`RELATED_TO` 로 나가는 개념). 화면은 개념 상세에서는 칩 대신 「관련 개념」 절로 보인다.
