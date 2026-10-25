@@ -103,7 +103,7 @@ flow 「제안」 의 화면이다. testid 는 `TESTIDS.md` 「제안 화면」 
 - `components/proposals/ProposalsTab.test.tsx`(신규): `renderToStaticMarkup(withApp(<ProposalCard … />))` 로 `CREATE_NODE` 대기 카드에 `proposal-summary`, `proposal-prop`, `proposal-accept`, `proposal-edit-open`, `proposal-reject-open` 이 있다. 열람자(`withApp` 의 `user` 를 VIEWER 로)에게는 `proposal-editor-required` 가 있고 `proposal-accept` 가 `disabled` 다. `lastError` 가 있는 카드에 `proposal-last-error` 와 그 문장이 있다. 결정한 카드에는 승인 단추가 없고 `proposal-decided` 가 있다.
 - `components/tokens/TokensTab.test.tsx`(수정): `scopeLabel('READ_WRITE')` 가 「조회와 기록」 이다.
 - `routes.test.ts`(수정): `moreItems` 세 역할의 기대 목록 끝에 `proposals` 가 있고, `tabOfPath('/proposals')`, `parseProposalsQuery('?status=REJECTED&page=2')`, 모르는 `status` 는 `PENDING`.
-- `components/tabs.test.tsx`(수정, 더보기 메뉴를 렌더링하는 테스트가 있으면): `pendingCount = 3` 이면 `more-pending-badge` 의 `data-count="3"`, `0` 이면 없다.
+- `components/header/MoreMenu.test.tsx`(신규): `renderToStaticMarkup(withApp(<MoreMenu role="EDITOR" activeTab={null} onOpen={() => {}} pendingCount={3} />))` 의 트리거에 `data-testid="more-pending-badge"` 와 `data-count="3"` 이 있고, `pendingCount` 가 `0` 이나 `null` 이면 없다. 메뉴 내용(`DropdownMenuContent`)은 닫힌 상태라 정적 렌더에 나오지 않으므로 `more-item-proposals-badge` 는 phase 06 의 브라우저 테스트가 확인한다.
 - `financial-workbench/api/src/test/kotlin/dev/fos/workbench/web/SpaRouteIntegrationTest.kt`(수정): `/proposals` 가 `index.html` 이다.
 
 ## 검증
@@ -123,7 +123,7 @@ cd financial-workbench/api && ./gradlew test --rerun --tests 'dev.fos.workbench.
 | `financial-workbench/web/src/routes.test.ts` | 수정 |
 | `financial-workbench/web/src/App.tsx` | 수정 |
 | `financial-workbench/web/src/components/header/MoreMenu.tsx` | 수정 |
-| `financial-workbench/web/src/components/tabs.test.tsx` | 수정 |
+| `financial-workbench/web/src/components/header/MoreMenu.test.tsx` | 신규 |
 | `financial-workbench/web/src/components/tokens/TokensTab.tsx` | 수정 |
 | `financial-workbench/web/src/components/tokens/TokensTab.test.tsx` | 수정 |
 | `financial-workbench/web/src/components/proposals/ProposalCountProvider.tsx` | 신규 |

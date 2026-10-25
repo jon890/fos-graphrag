@@ -17,13 +17,13 @@
 - 연동 토큰: `agent/IntegrationTokenRepository.kt`(`IntegrationTokenView`, `IssueTokenRequest`, `ActiveToken`, `create`, `findActiveByHash`), `agent/IntegrationTokenService.kt`(`issue`, `authenticate`), `agent/AgentPrincipal.kt`.
 - 사용자 잠금 패턴: `IntegrationTokenRepository.countActiveLocked` 가 `MATCH (u:User {id}) SET u._lock = true` 로 잠그고 `create` 가 `REMOVE u._lock` 한다. 체결 저장도 같은 패턴이다.
 - 시장 변환: `agent/v1/SecurityLookupService.kt` 의 companion `MARKETS`, `MARKET_MESSAGE`, `MAX_TICKER`(private). 체결이 같은 규칙을 쓰므로 공용 객체로 옮긴다.
-- 제약 조건: `config/Neo4jSchemaInitializer.kt` 의 `CONSTRAINTS` 목록(`IF NOT EXISTS` 문자열).
+- 제약 조건: `config/Neo4jSchemaInitializer.kt` 의 `STATEMENTS` 목록(`IF NOT EXISTS` 문자열).
 - 예약 이름: `ontology/OntologyLoader.kt` 의 `RESERVED_PROPERTIES` 와 그 일관성 검사(156행 근처 `add("... 시스템 속성 이름을 ...")`). 같은 자리에 노드 타입과 관계 종류 검사를 더한다.
 - 시각: `config/Timestamps.kt`(`now()`, `system(Instant)`). 사용자가 넣는 `datetime` 은 초까지 고정 자릿수 UTC 다(`OntologyValidator` 의 `datetime` 처리를 참고한다).
 - 오류: `web/ApiError.kt` 의 `ValidationFailedException`, `NotFoundException`. 페이지: `web/Paging.kt` 의 `PageQuery.of`, `Page`.
 - 세션 주인: 컨트롤러는 `@AuthenticationPrincipal user: WorkbenchPrincipal` 의 `user.id` 만 쓴다(`agent/IntegrationTokenController.kt`). `/api/me/**` 는 이미 `hasRole("VIEWER")` 다(`config/SecurityConfig.kt`).
 - 노드 표현: `knowledge/Dtos.kt` 의 `NodeRef(id, type, label, archived)`. 이름은 `OntologyHolder.current().labelOf(type, props)`.
-- 테스트 기반: `support/IntegrationTest.kt`(`loggedIn(email)`, `newUser(role)`, `ALICE`, `BOB`, `ADMIN`, `VIEWER`), `support/Fixtures.kt`(`security(name, ticker)`, `node(...)`, `race(...)`), `support/ApiClient.kt`.
+- 테스트 기반: `support/IntegrationTest.kt`(`loggedIn(email)`, `newUser(role)`, `ALICE`, `BOB`, `ADMIN`, `VIEWER`), `support/Fixtures.kt`(`node(type, properties)`, `security(name, ticker)` 는 시장이 `KRX_KOSPI` 로 고정, `race(vararg calls: () -> ApiClient.Response)` 는 HTTP 호출만 받는다), `support/ApiClient.kt`.
 
 ## 의도 메모
 
@@ -108,8 +108,6 @@ class TradeRepository(private val client: Neo4jClient) {
     fun views(ownerId: String, ids: List<String>): List<TradeView>       // 요청한 순서
     fun page(ownerId: String, filter: TradeFilter, page: PageQuery): Page<TradeView>
     fun delete(ownerId: String, tradeId: String): Boolean               // DETACH DELETE
-    fun ownedIds(ownerId: String, ids: Collection<String>): Set<String> // phase 02 가 쓴다
-    fun linkDecision(ownerId: String, tradeIds: List<String>, decisionId: String, proposalId: String) // MERGE EXECUTES. phase 02 가 쓴다
 }
 
 data class TradeFilter(val securityId: String? = null, val decisionId: String? = null, val ticker: String? = null,
@@ -144,7 +142,7 @@ class TradeService(...) {
 
 ### 8. `config/Neo4jSchemaInitializer.kt`
 
-`CONSTRAINTS` 에 더한다.
+`STATEMENTS` 에 더한다.
 
 ```
 CREATE CONSTRAINT trade_id_unique IF NOT EXISTS FOR (t:Trade) REQUIRE t.id IS UNIQUE
@@ -164,11 +162,13 @@ CREATE INDEX proposal_owner_status IF NOT EXISTS FOR (p:Proposal) ON (p.ownerId,
 `trade/TradeIntegrationTest.kt`(신규, `IntegrationTest` 상속). `TradeService` 를 주입받아 저장하고 세션 API 로 확인한다.
 
 - 멱등: 같은 `(TOSS, "e1")` 를 두 번 `save` 하면 첫 결과 `created`, 두 번째 `existing`, `MATCH (t:Trade {ownerId}) RETURN count(t)` 가 1. 두 번째에 보낸 다른 `price` 는 저장되지 않는다. 한 요청 안의 같은 체결 둘은 `created`, `existing`.
-- 동시: `race` 로 두 스레드가 같은 체결을 동시에 `save` 하면 체결은 하나다.
-- 종목: `Fixtures.security(...)`(시장 `NASDAQ`, ticker `T<suffix>`) 를 만든 뒤 `market = "US"`, 같은 ticker 소문자로 저장하면 `security.id` 가 그 종목이다. 종목 없이 저장한 체결은 `security = null` 이고, 종목을 만든 뒤 같은 체결을 다시 보내면 이어진다.
+- 동시: `support/Fixtures.kt` 에 더한 `raceAll` 로 두 스레드가 같은 체결을 동시에 `save` 하면 체결은 하나다. 두 호출 모두 예외 없이 끝나고 결과는 `created` 하나와 `existing` 하나다.
+- 종목: `fixtures.node("Security", mapOf("market" to "NASDAQ", "ticker" to "T${fixtures.suffix}".uppercase(), "name" to "미국 종목-${fixtures.suffix}", "securityType" to "COMMON"))` 로 나스닥 종목을 만든 뒤 `market = "US"`, 같은 ticker 소문자로 저장하면 `security.id` 가 그 종목이다. 종목 없이 저장한 체결은 `security = null` 이고, 종목을 만든 뒤 같은 체결을 다시 보내면 이어진다.
 - 세션 API: ALICE 의 `GET /api/me/trades` 는 자기 체결만, `securityId` 로 좁힌 결과가 맞다. BOB 과 ADMIN 의 `GET /api/me/trades` 에는 ALICE 의 체결이 없다. BOB 의 `DELETE /api/me/trades/{ALICE 체결}` 은 `404`, ALICE 는 `204` 이고 다시 읽으면 없다.
 - 지식 조회에서 빠짐: ALICE 가 체결을 저장한 뒤 BOB 세션으로 `GET /api/nodes?q=<ticker>`, `GET /api/nodes/counts`(저장 전후 같은 값), `GET /api/nodes/{securityId}`(`relationships` 에 `OF_SECURITY` 없음), `GET /api/graph/neighborhood?id={securityId}&hops=2`(노드 수와 id 목록이 저장 전과 같음), `GET /api/nodes/{securityId}/trace`, `GET /api/changes?targetId={securityId}`(새 이력 없음) 를 확인한다. 응답 본문에 체결의 `externalId` 문자열이 들어 있지 않다.
 - 사용자 삭제: `data-schema.md` 「사용자를 지울 때」 의 Cypher 를 테스트용 사용자(`newUser`)에 실행하면 그 사용자의 `:Trade` 가 0 이고 ALICE 의 체결은 남는다.
+
+`support/Fixtures.kt`(수정): `race` 옆에 같은 방식(`CountDownLatch` 로 함께 출발, 60초 제한)의 `fun <T> raceAll(vararg calls: () -> T): List<T>` 를 더한다. 기존 `race` 는 그대로 둔다.
 
 `agent/IntegrationTokenIntegrationTest.kt`(수정): 범위 없이 발급하면 `scope = "READ"`, `READ_WRITE` 로 발급하면 목록에도 `READ_WRITE`, `scope = "ADMIN"` 은 `400`(`fieldErrors.scope`). 테스트에서 `scope` 속성을 지운 토큰(`REMOVE t.scope`)도 목록에 `READ` 로 나온다.
 
@@ -203,3 +203,4 @@ cd financial-workbench/api && ./gradlew test --rerun
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/trade/TradeIntegrationTest.kt` | 신규 |
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/ontology/OntologyLoaderReservedTest.kt` | 신규 |
 | `financial-workbench/api/src/test/kotlin/dev/fos/workbench/agent/IntegrationTokenIntegrationTest.kt` | 수정 |
+| `financial-workbench/api/src/test/kotlin/dev/fos/workbench/support/Fixtures.kt` | 수정 |

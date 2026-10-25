@@ -43,10 +43,24 @@
 export function TradeList({ filter, testId, onOpenNode }: { filter: { securityId?: string; decisionId?: string }; testId: 'detail-trades' | 'trace-step-trades'; onOpenNode: (id: string) => void }): JSX.Element | null
 ```
 
-- 앞 20건을 읽어 줄마다 `trade-list-item`(날짜, 매수·매도, 수량, 금액)을 그린다. `totalItems > 20` 이면 `trade-list-more`(`/trades?ticker=…` 로 이동).
+```tsx
+/** 받은 쪽에서 보일 줄과 「모두 보기」 여부, 「모두 보기」 가 넣을 ticker(첫 체결의 ticker) */
+export function visibleTrades(page: Page<TradeView>): { items: TradeView[]; more: boolean; ticker: string | null }
+/** 읽기와 무관하게 줄을 그린다. items 가 비면 null */
+export function TradeListView({ view, title, testId, onOpenNode, onMore }: { view: ReturnType<typeof visibleTrades>; title: string; testId: string; onOpenNode: (id: string) => void; onMore: (ticker: string) => void }): JSX.Element | null
+```
+
+- `TradeList` 는 `api.trades.list({ ...filter, size: 20 })` 로 읽고 `TradeListView` 를 그린다. 줄마다 `trade-list-item`(날짜, 매수·매도, 수량, 금액)이다. `more` 는 `totalItems > 20` 이다.
+- `trade-list-more` 는 `/trades?ticker=<첫 체결의 ticker>` 로 옮긴다. 한 결정에 여러 종목의 체결이 이어졌으면 첫 체결의 종목만 좁혀 보인다. 이 한계는 화면 문구로 따로 알리지 않는다.
 - 0건이면 `null`. 읽지 못하면 그 자리에 작은 오류 문장.
 
 ### 4. `components/trades/TradesTab.tsx`(신규)
+
+```tsx
+export function TradesTab({ onOpenNode }: { onOpenNode: (id: string) => void }): JSX.Element
+/** 표의 한 행. 좁은 화면에서는 같은 내용을 카드로 그린다(variant) */
+export function TradeRow({ trade, variant, onOpenNode, onDelete }: { trade: TradeView; variant: 'row' | 'card'; onOpenNode: (id: string) => void; onDelete: (t: TradeView) => void }): JSX.Element
+```
 
 flow 「내 체결」 의 화면이다. 안내, 종목 코드 칸(입력 뒤 주소 `ticker` 를 replace), 넓은 화면은 표, 좁은 화면은 카드 목록, `Pager`, 지우기 확인 창, 처리 결과, 빈 상태, 오류. 종목 링크와 결정 링크는 `onOpenNode`.
 
@@ -60,7 +74,7 @@ flow 「내 체결」 의 화면이다. 안내, 종목 코드 칸(입력 뒤 주
 ### 6. 이 phase 를 검증하는 테스트
 
 - `components/trades/TradesTab.test.tsx`(신규): `renderToStaticMarkup(withApp(<TradesTab … />))` 의 첫 렌더에 `trades-tab`, `trades-guide`, `trades-ticker` 가 있고 안내 문장에 「다른 사용자에게는 보이지 않습니다」 가 있다. 행 부품(`TradeRow`)을 체결 하나로 그리면 `trade-row` 의 `data-side="BUY"`, 금액이 `formatMoney` 결과, 이은 결정 이름 링크가 있다. 종목이 없는 체결은 증권사 이름과 종목 코드를 보인다.
-- `components/trades/TradeList.test.tsx`(신규): 내보낸 순수 함수 `visibleTrades(page)` 가 20건을 넘으면 `more: true` 다. 0건이면 렌더 결과가 빈 문자열이다(`TradeListView` 에 빈 목록을 넘겨 확인한다).
+- `components/trades/TradeList.test.tsx`(신규): `visibleTrades` 에 `totalItems = 21` 인 쪽을 넘기면 `more: true` 이고 `ticker` 가 첫 체결의 값이다. `totalItems = 20` 이면 `more: false`. `TradeListView` 에 빈 `items` 를 넘긴 렌더 결과는 빈 문자열이고, 체결 하나면 `trade-list-item` 이 하나다.
 - `routes.test.ts`(수정): `moreItems` 끝이 `proposals`, `trades` 다. `parseTradesQuery('?ticker=FLNC&page=1')`.
 - `financial-workbench/api/src/test/kotlin/dev/fos/workbench/web/SpaRouteIntegrationTest.kt`(수정): `/trades` 가 `index.html` 이다.
 

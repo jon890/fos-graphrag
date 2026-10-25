@@ -40,12 +40,12 @@
   2. 「조회만」 토큰의 `POST /api/v1/trades` 는 `403`, 본문 `code = INSUFFICIENT_SCOPE`.
   3. 기록 토큰으로 FLNC 매수 체결 하나(`market: 'US'`, `ticker: 'flnc'`)를 두 번 보내면 `created`, `existing` 이고 `security.label` 이 FLNC 종목 이름이다.
   4. 기록 토큰으로 제안 둘을 올린다. 하나는 `CREATE_NODE`(`Decision`, `title: 'e2e 추가 매수 …'`, `action: 'ADD'`, `links: [{ type: 'HAS_DECISION', fromId: FLNC 종목 id }]`, `tradeIds: [체결 id]`), 하나는 `STUDY_NOTE`(FLNC 종목, `UNSURE`, 메모).
-  5. A 의 화면을 새로 고치면 `more-pending-badge` 의 `data-count` 가 2 이상이다. `openScreen(pageA, 'proposals')` → `proposal-card` 두 장, 항목 만들기 카드의 `proposal-summary` 에 결정 이름, `proposal-rationale` 이 있다. `shot(pageA, 'proposals-wide')`.
+  5. A 의 화면을 새로 고치면 `more-pending-badge` 의 `data-count` 가 2 이상이다. `more-open` 을 열면 `more-item-proposals-badge` 의 `data-count` 가 `more-pending-badge` 와 같다. `openScreen(pageA, 'proposals')` → `proposal-card` 두 장, 항목 만들기 카드의 `proposal-summary` 에 결정 이름, `proposal-rationale` 이 있다. `shot(pageA, 'proposals-wide')`.
   6. 항목 만들기 카드에서 「고쳐서 승인」 → 제목 칸을 `e2e 추가 매수(고침) …` 로 바꾸고 「이대로 승인」 → `proposals-message` 성공, 배지 수가 1 줄어든다. 공부 메모 카드는 「거절」 → 이유를 적어 거절한다.
   7. 「승인함」 칩에 승인한 카드와 `proposal-result-open` 이 있다. 누르면 작업 공간에서 새 결정의 상세가 열리고 `detail-trades` 에 체결 한 줄이 있다. 같은 결정의 근거 따라가기(`node-trace`)에 `trace-step-trades` 가 있다.
   8. 기록 토큰의 `GET /api/v1/proposals?status=REJECTED` 에 거절 이유가 있다.
   9. `openScreen(pageA, 'trades')` → `trade-row` 하나(`data-ticker="FLNC"`), `trade-decisions` 에 고친 결정 이름. `shot(pageA, 'trades-wide')`. FLNC 종목 상세에 `detail-trades` 가 있다.
-  10. B 와 관리자 화면: `openScreen(pageB, 'trades')` 에 그 체결이 없고(`trades-empty` 나 행 없음), B 의 FLNC 종목 상세와 새 결정 상세에 `detail-trades` 가 없다. B 의 「제안」 에 A 의 제안이 없고 배지가 없다. `pageAdmin` 의 `fetch('/api/me/trades')` 결과에 그 체결 id 가 없다. `shot(pageB, 'trades-other-user-wide')`.
+  10. B 와 관리자 화면: `openScreen(pageB, 'trades')` 에 그 체결이 없고(`trades-empty` 나 행 없음), B 의 FLNC 종목 상세와 새 결정 상세에 `detail-trades` 가 없다. B 의 「제안」 에 A 의 제안이 없고, B 의 `more-pending-badge` 와 메뉴를 연 뒤의 `more-item-proposals-badge` 가 없다. `pageAdmin` 의 `fetch('/api/me/trades')` 결과에 그 체결 id 가 없다. `shot(pageB, 'trades-other-user-wide')`.
   11. 열람자: `pageViewer` 가 기록 토큰을 발급해 `CREATE_RELATIONSHIP` 제안을 올리면 자기 「제안」 화면에서 `proposal-editor-required` 가 보이고 `proposal-accept` 가 꺼져 있다. 거절하고 끝낸다.
   12. 정리: A 가 「내 체결」 에서 그 체결을 「지우기」 하면 행이 사라진다. `finally` 에서 발급한 토큰을 `revokeTokensExcept` 로 폐기한다. 승인으로 만든 결정은 상세의 「보관」 으로 보관한다.
 
