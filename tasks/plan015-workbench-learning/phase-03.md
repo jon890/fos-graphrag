@@ -85,7 +85,7 @@ data class DecisionUnderstanding(val total: Long, val understood: Long)
 - 열람자로 병목을 `UNSURE` 로 표시하면 열람자의 trace 에서 병목 `knowledge.level` 이 `UNSURE` 이고, 편집자의 trace 에서는 `null` 이다.
 - 기업의 trace 의 `dependents` 에 종목과 밸류에이션이 있다.
 - 단계 한도: 병목 하나에 변화 60개를 `CREATES` 로 이으면(지금 항목 포함 61단계) 병목의 trace 가 `truncated = true` 이고 `steps` 가 60개다. 투자 온톨로지의 관계 방향으로는 깊이 6 을 넘는 사슬을 만들 수 없어 깊이 한도는 단위로 따로 검사하지 않는다.
-- `GET /api/me/knowledge/summary`: 결정의 모든 단계를 열람자가 `KNOWN` 으로 표시하기 전에는 `understood` 가 이 결정을 세지 않고, 표시한 뒤에는 센다(`understood` 가 1 늘어난다). 다른 테스트가 만든 결정이 섞이므로 전후 차이로 단언한다. `counts` 에 세 키가 있다.
+- `GET /api/me/knowledge/summary`: 결정의 모든 단계를 열람자가 `KNOWN` 으로 표시하기 전에는 `understood` 가 이 결정을 세지 않고, 표시한 뒤에는 센다(`understood` 가 1 늘어난다). 다른 테스트가 만든 결정이 섞이므로 전후 차이로 단언한다. `counts` 에 세 키가 있다. 열람자가 표시를 남긴 뒤에도 편집자의 `summary` 의 `counts` 와 `understood` 는 표시 전과 같다(두 사용자의 표시가 섞이지 않는다).
 
 ### 7. `financial-workbench/api/src/test/kotlin/dev/fos/workbench/web/SpaRouteIntegrationTest.kt`
 
