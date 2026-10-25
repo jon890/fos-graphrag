@@ -25,6 +25,11 @@ export function maskedLast4(last4: string): string {
   return `…${last4}`
 }
 
+/** 발급 요청을 보내는 동안에는 창을 닫지 않는다. 응답 전에 닫히면 목록에 없는 토큰이 생긴다 */
+export function canCloseIssue(issuing: boolean): boolean {
+  return !issuing
+}
+
 /** 서버가 상한을 알리면 화면의 상한 안내와 같은 문장을 보인다 */
 function issueErrorText(e: unknown): string {
   return e instanceof ApiError && e.code === 'TOKEN_LIMIT' ? LIMIT_TEXT : errorMessage(e)
@@ -41,7 +46,7 @@ export function TokensTab() {
   const [name, setName] = useState('Hermes')
   const [issuing, setIssuing] = useState(false)
   const [issueError, setIssueError] = useState<string | null>(null)
-  // 토큰 원문은 이 상태에만 둔다. 창을 닫으면 지운다.
+  // 토큰 원문은 이 상태에만 둔다. 창의 닫힘 애니메이션이 끝나면 지운다.
   const [issuedToken, setIssuedToken] = useState<string | null>(null)
   const [copyResult, setCopyResult] = useState<'done' | 'fallback' | null>(null)
   const valueRef = useRef<HTMLInputElement>(null)
@@ -76,13 +81,17 @@ export function TokensTab() {
     setIssueOpen(true)
   }
 
+  // 닫는 순간에는 창만 닫는다. 내용을 바로 지우면 닫히는 동안 입력 화면으로 바뀌어 보인다.
   const closeIssue = () => {
-    const wasIssued = issuedToken !== null
+    if (!canCloseIssue(issuing)) return
     setIssueOpen(false)
+    if (issuedToken !== null) void load()
+  }
+
+  const clearIssue = () => {
     setIssuedToken(null)
     setCopyResult(null)
     setIssueError(null)
-    if (wasIssued) void load()
   }
 
   const issue = async (e: FormEvent) => {
@@ -212,7 +221,7 @@ export function TokensTab() {
       )}
 
       <Dialog open={issueOpen} onOpenChange={(open) => !open && closeIssue()}>
-        <DialogContent data-testid="tokens-issue-dialog">
+        <DialogContent data-testid="tokens-issue-dialog" onCloseAutoFocus={clearIssue}>
           {issuedToken === null ? (
             <form className="grid gap-4" onSubmit={(e) => void issue(e)}>
               <DialogHeader>
@@ -227,7 +236,7 @@ export function TokensTab() {
               )}
               <DialogFooter>
                 <DialogClose asChild>
-                  <Button type="button" variant="outline" data-testid="tokens-issue-cancel">
+                  <Button type="button" variant="outline" data-testid="tokens-issue-cancel" disabled={issuing}>
                     취소
                   </Button>
                 </DialogClose>

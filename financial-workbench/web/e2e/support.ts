@@ -115,3 +115,42 @@ export async function newPage(browser: Browser): Promise<{ context: BrowserConte
   const context = await browser.newContext()
   return { context, page: await context.newPage() }
 }
+
+/** 이 페이지의 사용자가 지금 가진(폐기하지 않은) 연동 토큰 id */
+export async function tokenIds(page: Page): Promise<string[]> {
+  return page.evaluate(async () => {
+    const list: { id: string }[] = await (await fetch('/api/me/tokens')).json()
+    return list.map((t) => t.id)
+  })
+}
+
+/**
+ * 이 페이지의 사용자 세션으로 `keep` 에 없는 연동 토큰을 모두 폐기한다.
+ * 테스트가 중간에 실패해도 발급한 토큰이 남지 않게 finally 에서 부른다. 이미 폐기된 토큰의 404 는 무시한다.
+ * 정리 실패가 테스트의 원래 실패를 덮지 않게, 실패는 던지지 않고 로그로만 남긴다.
+ */
+export async function revokeTokensExcept(page: Page, keep: string[]): Promise<void> {
+  try {
+    const failed = await page.evaluate(async (kept) => {
+      await fetch('/api/auth/csrf', { headers: { Accept: 'application/json' } })
+      const xsrf = document.cookie
+        .split(';')
+        .map((c) => c.trim())
+        .find((c) => c.startsWith('XSRF-TOKEN='))
+        ?.slice('XSRF-TOKEN='.length)
+      const list: { id: string }[] = await (await fetch('/api/me/tokens')).json()
+      const errors: string[] = []
+      for (const { id } of list.filter((t) => !kept.includes(t.id))) {
+        const res = await fetch(`/api/me/tokens/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: { 'X-XSRF-TOKEN': decodeURIComponent(xsrf ?? '') },
+        })
+        if (!res.ok && res.status !== 404) errors.push(`${id}: ${res.status}`)
+      }
+      return errors
+    }, keep)
+    if (failed.length > 0) console.warn(`연동 토큰 정리 실패: ${failed.join(', ')}`)
+  } catch (e) {
+    console.warn('연동 토큰 정리 실패', e)
+  }
+}

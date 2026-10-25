@@ -81,8 +81,8 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `graph` | 주변 그래프 조회와 한도 적용 |
 | `learning` | 근거 따라가기와 내 이해 표시의 서비스와 컨트롤러. 계약은 [API 계약](api-contract.md) 의 「근거 따라가기」, 「내 이해 표시」 다. `knowledge` 의 읽기 도우미로 노드 표현을 만든다 |
 | `history` | ChangeEvent 기록(`ChangeEventRecorder`)과 이력 조회 |
-| `agent` | 연동 토큰의 저장(`IntegrationTokenRepository`), 발급과 폐기(`IntegrationTokenService`, `/api/me/tokens` 의 `IntegrationTokenController`), Bearer 인증 필터(`BearerTokenFilter`), 토큰마다의 요청 한도(`RateLimiter`). 결정은 [ADR-012](adr/012-agent-integration-token.md) 다 |
-| `agent.v1` | 에이전트 API(`/api/v1`)의 컨트롤러, v1 응답 DTO, 화면용 조회 서비스를 불러 v1 으로 옮기는 `AgentQueryService` 와 `V1Mapper`, 종목 찾기(`SecurityLookupService`). 계약은 [API 계약](api-contract.md) 의 「에이전트 API(`/api/v1`)」 다 |
+| `agent` | 연동 토큰의 저장, 발급과 폐기, `/api/v1` 의 Bearer 인증과 토큰마다의 요청 한도. 결정은 [ADR-012](adr/012-agent-integration-token.md) 다 |
+| `agent.v1` | 에이전트 API(`/api/v1`)의 입출력과 v1 응답. 화면용 조회 서비스의 결과를 v1 으로 옮긴다. 계약은 [API 계약](api-contract.md) 의 「에이전트 API」 절이다 |
 | `web` | 오류 형식(`ApiError`), 예외 처리기, health, 화면 경로(`/workspace` 등)의 GET 을 `index.html` 로 넘기는 `SpaRouteController` |
 
 호출 방향은 `컨트롤러 → 서비스 → Neo4jClient` 다. 서비스가 트랜잭션 경계다.
@@ -164,7 +164,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `web/src/components/map/` | 개념 지도 화면 |
 | `web/src/components/add/` | 전역 「＋ 추가」 메뉴와 만들기 창 |
 | `web/src/components/learning/` | 근거 따라가기, 공부 탭, 이해 표시, 개념 칩과 개념 상세 화면. 화면 규칙은 [흐름](flow.md) 의 「근거 따라가기」, 「공부」, 「개념 설명」 이 소유하고, 순수 규칙은 `web/src/lib/trace.ts` 에 있다 |
-| `web/src/components/tokens/` | 더보기 메뉴의 「연동 토큰」 화면. 목록, 발급 창(원문 한 번 보이기와 복사), 폐기 확인 창. 화면 규칙은 [흐름](flow.md) 의 「연동 토큰」 이 소유한다 |
+| `web/src/components/tokens/` | 더보기 메뉴의 「연동 토큰」 화면. 화면 규칙은 [흐름](flow.md) 의 「연동 토큰」 이 소유한다 |
 | `web/src/components/ontology/` | 온톨로지 상세 화면의 보기, 폼 편집기, YAML 편집기, 미리보기, 버전 기록. 초안은 `App` 이 들고 있어 화면을 옮겨도 남는다. YAML 은 서버의 미리보기 응답으로 바꾸고 웹에 YAML 라이브러리를 들이지 않는다. `form/` 은 폼 편집기의 부품이다 |
 | `web/src/components/guide/` | 첫 접속 가이드. 단계 정의, 진행 상태(`localStorage` 의 `workbench.guide`), 말풍선. 만들기 폼과 주장 폼은 가이드가 넘긴 미리 채울 값을 props 로 받고, 만들기에 성공하면 가이드에 알린다 |
 | `web/src/routes.ts` | 화면 경로 목록과 query 를 읽고 쓰는 순수 함수(기본값 생략, 옛 `/?node=` 넘기기, 로그인 뒤 돌아갈 주소 검사). 경로와 query 의 뜻은 [흐름](flow.md) 의 「주소와 뒤로가기」 가 소유한다 |

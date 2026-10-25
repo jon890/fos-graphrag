@@ -26,7 +26,11 @@ class IntegrationTokenService(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    private val readOnly = TransactionTemplate(transactionManager).apply { isReadOnly = true }
+    // 인증은 모든 /api/v1 요청 앞에서 돈다. Neo4j 가 느려도 요청 스레드가 무기한 묶이지 않게 시간 제한을 건다.
+    private val readOnly = TransactionTemplate(transactionManager).apply {
+        isReadOnly = true
+        timeout = Limits.WRITE_TIMEOUT_SECONDS
+    }
 
     private val write = TransactionTemplate(transactionManager).apply { timeout = Limits.WRITE_TIMEOUT_SECONDS }
 
