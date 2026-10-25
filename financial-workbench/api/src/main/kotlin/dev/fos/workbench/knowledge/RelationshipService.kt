@@ -31,8 +31,9 @@ class RelationshipService(
     private val users: UserRepository,
 ) {
 
+    /** note 는 변경 이력의 메모다. 제안 승인이 「에이전트 제안을 승인했다」 를 넘긴다 */
     @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
-    fun create(request: CreateRelationshipRequest, actorId: String): RelationshipView {
+    fun create(request: CreateRelationshipRequest, actorId: String, note: String? = null): RelationshipView {
         val ontology = holder.current()
         val def = ontology.requireRelationshipType(request.type)
         // 중복 관계와 보관 경합을 막으려고 양 끝 노드를 ID 순서로 잠근다
@@ -62,7 +63,7 @@ class RelationshipService(
         recorder.record(
             ChangeEventDraft(
                 actorId, ChangeAction.CREATE, id, TargetKind.RELATIONSHIP, request.type, label(from, to), 1L,
-                mapOf("fromId" to FieldChange(null, request.fromId), "toId" to FieldChange(null, request.toId)),
+                mapOf("fromId" to FieldChange(null, request.fromId), "toId" to FieldChange(null, request.toId)), note,
             ),
         )
         return view(ontology, id)

@@ -71,3 +71,14 @@ class OntologyImpactUnconfirmedException(impacts: List<OntologyImpact>) :
 
 class TokenLimitException(max: Int) :
     ApiException(HttpStatus.CONFLICT, "TOKEN_LIMIT", "토큰은 ${max}개까지 만들 수 있습니다. 쓰지 않는 토큰을 폐기하세요.", mapOf("max" to max))
+
+class ProposalLimitException(max: Int, pending: Long) :
+    ApiException(
+        HttpStatus.CONFLICT, "PROPOSAL_LIMIT", "대기 중인 제안이 ${max}개를 넘습니다. 제안을 승인하거나 거절한 뒤 다시 올리세요.",
+        mapOf("max" to max, "pending" to pending),
+    )
+
+class ProposalNotPendingException(status: String) :
+    ApiException(HttpStatus.CONFLICT, "PROPOSAL_NOT_PENDING", "이미 처리한 제안입니다.", mapOf("status" to status))
+
+class ForbiddenException(message: String) : ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", message)

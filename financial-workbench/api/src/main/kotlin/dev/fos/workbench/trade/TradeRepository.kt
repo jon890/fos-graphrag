@@ -84,6 +84,30 @@ class TradeRepository(private val client: Neo4jClient, private val holder: Ontol
         ).bindAll(params("ownerId" to ownerId, "tradeId" to tradeId, "markets" to markets, "ticker" to ticker.uppercase())).run()
     }
 
+    /** ids 가운데 내 체결의 id */
+    fun ownedIds(ownerId: String, ids: Collection<String>): Set<String> {
+        if (ids.isEmpty()) return emptySet()
+        return client.query("MATCH (:User {id: \$ownerId})-[:OWNS]->(t:Trade) WHERE t.id IN \$ids RETURN t.id AS id")
+            .bindAll(params("ownerId" to ownerId, "ids" to ids.distinct())).fetch().all().map { it["id"] as String }.toSet()
+    }
+
+    /** 내 체결마다 결정과 `EXECUTES` 를 MERGE 한다. 이미 이어져 있으면 그대로 두고, 새로 이을 때만 createdAt, proposalId 를 쓴다 */
+    fun linkDecision(ownerId: String, tradeIds: List<String>, decisionId: String, proposalId: String) {
+        client.query(
+            """
+            MATCH (:User {id: ${'$'}ownerId})-[:OWNS]->(t:Trade) WHERE t.id IN ${'$'}tradeIds
+            MATCH (d:Knowledge {id: ${'$'}decisionId})
+            MERGE (t)-[e:EXECUTES]->(d)
+            ON CREATE SET e.createdAt = ${'$'}now, e.proposalId = ${'$'}proposalId
+            """,
+        ).bindAll(
+            params(
+                "ownerId" to ownerId, "tradeIds" to tradeIds.distinct(), "decisionId" to decisionId,
+                "now" to Timestamps.now(), "proposalId" to proposalId,
+            ),
+        ).run()
+    }
+
     /** 요청한 순서로 돌려준다. 내 체결이 아닌 id 는 빠진다 */
     @Suppress("UNCHECKED_CAST")
     fun views(ownerId: String, ids: List<String>): List<TradeView> {

@@ -30,8 +30,9 @@ class NodeService(
     private val reader: KnowledgeReader,
 ) {
 
+    /** note 는 변경 이력의 메모다. 제안 승인이 「에이전트 제안을 승인했다」 를 넘긴다 */
     @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
-    fun create(request: CreateNodeRequest, actorId: String): NodeView {
+    fun create(request: CreateNodeRequest, actorId: String, note: String? = null): NodeView {
         val ontology = holder.current()
         val def = ontology.requireNodeType(request.type)
         if (def.managedBy == CLAIMS) {
@@ -51,7 +52,7 @@ class NodeService(
         recorder.record(
             ChangeEventDraft(
                 actorId, ChangeAction.CREATE, id, TargetKind.NODE, request.type, ontology.labelOf(request.type, properties), 1L,
-                properties.mapValues { (_, v) -> FieldChange(null, v) },
+                properties.mapValues { (_, v) -> FieldChange(null, v) }, note,
             ),
         )
         return reader.node(id)
