@@ -22,7 +22,7 @@ class SpaRouteIntegrationTest : IntegrationTest() {
 
     @Test
     fun `화면 경로는 로그인 없이 index html 을 돌려준다`() {
-        for (path in listOf("/changes?target=x", "/users", "/workspace?node=a&pane=detail", "/list", "/review", "/ontology", "/map?type=Bottleneck")) {
+        for (path in listOf("/changes?target=x", "/users", "/workspace?node=a&pane=detail", "/list", "/review", "/ontology", "/map?type=Bottleneck", "/study", "/trace?node=x")) {
             val response = getHtml(path)
             assertThat(response.statusCode()).describedAs(path).isEqualTo(200)
             assertThat(response.body()).describedAs(path).contains("workbench-test-index")

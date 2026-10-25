@@ -28,6 +28,9 @@ class KnowledgeMarkController(private val marks: KnowledgeMarkService) {
         @AuthenticationPrincipal user: WorkbenchPrincipal,
     ): Page<StudyItem> = marks.list(user.id, level, PageQuery.of(page, size))
 
+    @GetMapping("/summary")
+    fun summary(@AuthenticationPrincipal user: WorkbenchPrincipal): KnowledgeSummary = marks.summary(user.id)
+
     @GetMapping("/{nodeId}")
     fun get(@PathVariable nodeId: String, @AuthenticationPrincipal user: WorkbenchPrincipal): KnowledgeMark =
         marks.get(user.id, nodeId)

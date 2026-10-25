@@ -22,6 +22,7 @@ class KnowledgeMarkService(
     private val client: Neo4jClient,
     private val holder: OntologyHolder,
     private val reader: KnowledgeReader,
+    private val traces: TraceService,
 ) {
 
     @Transactional(readOnly = true)
@@ -119,6 +120,32 @@ class KnowledgeMarkService(
     }
 
     /**
+     * 표시 수와 내 능력 범위. 근거 따라가기와 같은 읽기 트랜잭션(`workbench.graph.timeout`) 하나에서 돈다.
+     * 결정마다 근거 따라가기의 단계 집합을 다시 모으므로 쿼리는 결정 수에 비례한다.
+     */
+    fun summary(userId: String): KnowledgeSummary = traces.read {
+        val counts = LEVELS.associateWith { 0L }.toMutableMap()
+        client.query("MATCH (:User {id: \$userId})-[k:KNOWS]->(:Knowledge) RETURN k.level AS level, count(k) AS n")
+            .bind(userId).to("userId").fetch().all()
+            .forEach { row -> (row["level"] as String?)?.takeIf { it in LEVELS }?.let { counts[it] = (row["n"] as Number).toLong() } }
+        val decisionIds = if (LearningRules.DECISION in holder.current().nodeTypes) {
+            client.query(
+                """
+                MATCH (n:Knowledge) WHERE n.type = ${'$'}type AND n.archived = false
+                RETURN n.id AS id ORDER BY n.createdAt, n.id LIMIT ${'$'}limit
+                """,
+            ).bindAll(mapOf("type" to LearningRules.DECISION, "limit" to MAX_DECISIONS + 1L)).fetch().all().map { it["id"] as String }
+        } else {
+            emptyList()
+        }
+        val counted = decisionIds.take(MAX_DECISIONS)
+        val known = client.query("MATCH (:User {id: \$userId})-[k:KNOWS]->(n:Knowledge) WHERE k.level = 'KNOWN' RETURN n.id AS id")
+            .bind(userId).to("userId").fetch().all().map { it["id"] as String }.toSet()
+        val understood = counted.count { known.containsAll(traces.nodeSet(it).first) }
+        KnowledgeSummary(counts, DecisionUnderstanding(counted.size.toLong(), understood.toLong()), decisionIds.size > MAX_DECISIONS)
+    }
+
+    /**
      * 항목에서 따라가는 관계만 정방향으로 0~[LearningRules.MAX_DEPTH] 홉 따라 닿는 보관되지 않은 결정.
      * 경로 위 모든 노드와 관계는 보관되지 않아야 한다. 결정마다 가장 짧은 길이를 depth 로 두고 가까운 순서로 [MAX_CONTEXTS] 개까지.
      */
@@ -149,6 +176,7 @@ class KnowledgeMarkService(
         const val MAX_CONTEXTS = 3
         const val MAX_DOCUMENTS = 5
         const val MAX_CONCEPTS = 10
+        const val MAX_DECISIONS = 200
         private const val LEVEL_MESSAGE = "KNOWN, UNSURE, LEARNING 가운데 하나여야 합니다."
     }
 }
