@@ -31,6 +31,7 @@
 
 세션 쿠키는 `WORKBENCH_SESSION`(HttpOnly, SameSite=Lax, 운영에서 Secure)이다.
 아래 표의 공개 경로와 정적 파일, OAuth 경로를 뺀 모든 `/api` 경로는 로그인이 필요하다. 조회도 같다.
+`/api/v1/**` 는 예외다. 세션과 CSRF 를 쓰지 않고 연동 토큰(`Authorization: Bearer`)만 받는다. 규칙은 아래 「에이전트 API」 절이다. 반대로 `/api/v1` 밖의 경로는 연동 토큰을 받지 않는다. 결정과 근거는 [ADR-012](adr/012-agent-integration-token.md) 다.
 서버는 요청마다 사용자 상태와 역할을 다시 읽는다. 비활성화된 사용자의 세션은 다음 요청에서 끊기고 `401 UNAUTHENTICATED` 를 받는다.
 
 상태를 바꾸는 요청(`POST`, `PATCH`, `PUT`, `DELETE`)은 CSRF 토큰이 필요하다.
@@ -59,7 +60,7 @@
 
 | 역할 | 할 수 있는 일 |
 | --- | --- |
-| `VIEWER` | 모든 `GET` 조회(검색, 상세, 주변 그래프, 근거 따라가기, 목록, 변경 이력, 온톨로지)와 `/api/me/knowledge` 의 내 이해 표시 쓰기 |
+| `VIEWER` | 모든 `GET` 조회(검색, 상세, 주변 그래프, 근거 따라가기, 목록, 변경 이력, 온톨로지), `/api/me/knowledge` 의 내 이해 표시 쓰기, `/api/me/tokens` 의 내 연동 토큰 발급과 폐기 |
 | `EDITOR` | VIEWER 권한과 노드, 관계, Claim 의 생성, 수정, 검토, 보관, 복원 |
 | `ADMIN` | EDITOR 권한과 `/api/users` 의 사용자 관리, `/api/ontology` 아래의 온톨로지 편집(버전 목록, 내보내기, 미리보기, 저장, 되돌리기) |
 
@@ -83,22 +84,25 @@
 | 400 | `VALIDATION_FAILED` | 본문 형식, 필수 값, 길이, 날짜 형식이 틀렸다. `details.fieldErrors` 에 `{필드: 사유}` 가 있다 |
 | 400 | `ONTOLOGY_VIOLATION` | 온톨로지에 없는 타입, 속성, 관계, predicate 이거나 시작·끝 노드 타입이 맞지 않는다. `details.rule` 에 위반한 규칙 이름이 있다 |
 | 400 | `ONTOLOGY_INVALID` | 저장하려는 온톨로지 정의가 일관성 검사를 통과하지 못했다. `details.errors` 에 오류 문장 목록이 있다 |
-| 401 | `UNAUTHENTICATED` | 세션이 없다 |
+| 401 | `UNAUTHENTICATED` | 세션이 없다. `/api/v1` 에서는 연동 토큰이 없거나 올바르지 않다 |
 | 403 | `CSRF_REJECTED` | CSRF 토큰이 없거나 틀렸다 |
 | 403 | `FORBIDDEN` | 역할이 모자라다 |
 | 411 | `LENGTH_REQUIRED` | 본문이 있는 `/api` 요청에 Content-Length 가 없다(chunked 전송) |
 | 413 | `PAYLOAD_TOO_LARGE` | 요청 본문이 64KiB 를 넘는다. 온톨로지 미리보기, 저장, 되돌리기는 512KiB 다 |
 | 403 | `SELF_REVIEW_FORBIDDEN` | 자기가 작성한 Claim 을 검토하려 했다 |
-| 404 | `NOT_FOUND` | 그 ID 의 노드나 관계가 없다. 온톨로지 버전 조회와 되돌리기에서는 그 버전 번호가 없다 |
+| 404 | `NOT_FOUND` | 그 ID 의 노드나 관계가 없다. 온톨로지 버전 조회와 되돌리기에서는 그 버전 번호가 없다. 없는 `/api` 경로도 같다 |
+| 405 | `METHOD_NOT_ALLOWED` | 경로는 있지만 그 메서드를 받지 않는다. `/api/v1` 의 `POST`, `PUT`, `PATCH`, `DELETE` 가 여기 해당한다 |
 | 409 | `REVISION_CONFLICT` | `expectedRevision` 이 현재 revision 과 다르다. `details` 에 두 값이 있다 |
 | 409 | `ARCHIVED` | 보관된 대상을 수정하려 했다. 먼저 복원한다 |
 | 409 | `NOT_ARCHIVED` | 보관되지 않은 대상을 복원하려 했다 |
 | 409 | `DUPLICATE` | 같은 시장과 종목 코드의 Security, 같은 이메일의 사용자처럼 유일해야 하는 값이 이미 있다 |
 | 409 | `LAST_ADMIN` | 마지막 활성 ADMIN 을 강등하거나 비활성화하려 했다 |
+| 409 | `TOKEN_LIMIT` | 폐기하지 않은 연동 토큰이 이미 상한(5개)만큼 있다. `details.max` 에 상한이 있다 |
 | 409 | `LAST_EVIDENCE` | 어떤 활성 Claim 의 유일한 활성 근거 Document 를 보관하려 했다. `details.claimIds` 에 그 Claim 이 있다 |
 | 409 | `NO_ACTIVE_EVIDENCE` | 활성 근거 문서가 없는 Claim 을 복원하거나 `REVIEWED` 로 검토하려 했다 |
 | 409 | `TRANSIENT_CONFLICT` | 동시에 처리 중인 다른 요청과 잠금이 겹쳤다. Neo4j 오류 코드가 `DeadlockDetected`, `LockAcquisitionTimeout` 일 때만이다. 최신 내용을 다시 읽고 다시 시도한다 |
 | 409 | `ONTOLOGY_IMPACT_UNCONFIRMED` | 기존 데이터와 어긋나는 온톨로지 변경을 `confirm: true` 없이 저장하려 했다. `details.impacts` 에 영향 목록이 있다 |
+| 429 | `RATE_LIMITED` | 연동 토큰 하나로 1분에 60번을 넘게 불렀다. `Retry-After` 헤더와 `details.retryAfterSeconds` 에 다시 부를 수 있을 때까지의 초가 있다 |
 | 500 | `INTERNAL_ERROR` | 그 밖의 서버 오류. 내부 메시지는 응답에 담지 않는다 |
 | 503 | `QUERY_TIMEOUT` | 트랜잭션이 시간 제한을 넘었다. 그래프 조회는 5초, 쓰기는 8초다 |
 | 503 | `DATABASE_UNAVAILABLE` | Neo4j 에 연결할 수 없다. 백업 중이거나 재시작 중이다. 연결 끊김은 Spring 이 일시 예외로 감싸도 이 코드다 |
@@ -187,6 +191,8 @@ Neo4j 예외는 시간 초과(`QUERY_TIMEOUT`), 연결 불가(`DATABASE_UNAVAILA
 | 노드 상세의 `concepts` | 20개 | 만든 순서로 앞 20개만 담는다 |
 | 근거 따라가기의 깊이, 단계 수, 아래쪽 항목 | 6, 60개(지금 항목 포함), 50개 | 한도까지만 담고 `truncated`, `dependentsTruncated` 를 `true` 로 둔다 |
 | 내 이해 표시의 메모 `note` | 1000자 | `400 VALIDATION_FAILED` |
+| 연동 토큰 이름 `name`, 사용자당 폐기하지 않은 토큰 | 50자, 5개 | `400 VALIDATION_FAILED`, `409 TOKEN_LIMIT` |
+| `/api/v1` 의 요청 수, 페이지 크기, 응답 항목 | 「에이전트 API(`/api/v1`)」 의 「요청 한도와 응답 크기」 | 그 절의 표 |
 | 쓰기 트랜잭션 | 8초 | `503 QUERY_TIMEOUT` |
 | 잠금 대기(Neo4j `db.lock.acquisition.timeout`) | 5초 | `409 TRANSIENT_CONFLICT` |
 | Neo4j 서버 트랜잭션(`db.transaction.timeout`) | 10초 | `503 QUERY_TIMEOUT` |
@@ -555,6 +561,346 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 - 이메일은 바꿀 수 없다. 잘못 넣었으면 비활성화하고 새로 추가한다.
 - 추가, 역할 변경, 비활성화, 다시 활성화는 ChangeEvent(`targetKind = USER`)로 같은 트랜잭션에 남는다.
 
+## 연동 토큰
+
+사용자가 외부 에이전트(Hermes)에 넣을 개인 연동 토큰을 발급하고 폐기한다. 세션 API 라서 쓰기는 CSRF 토큰이 필요하다. 모든 역할(VIEWER 포함)이 자기 토큰만 다룬다. 다른 사람의 토큰을 읽거나 폐기하는 API 는 없다. 결정은 [ADR-012](adr/012-agent-integration-token.md), 저장 모델은 [데이터 스키마](data-schema.md) 의 「연동 토큰」 이다.
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| GET | `/api/me/tokens` | 내 토큰 목록. 폐기하지 않은 것만 만든 순서(오래된 것부터)로 준다. 응답 `IntegrationTokenView[]` |
+| POST | `/api/me/tokens` | 발급. 본문 `{"name"}`. 응답 `201 IssuedIntegrationToken` |
+| DELETE | `/api/me/tokens/{id}` | 폐기. 응답 `204`. 내 토큰이 아니거나, 없거나, 이미 폐기했으면 `404 NOT_FOUND` |
+
+`IntegrationTokenView`
+
+```json
+{ "id": "uuid", "name": "Hermes", "last4": "x9Qa", "createdAt": "2026-10-25T03:15:00.123456Z", "lastUsedAt": null }
+```
+
+`IssuedIntegrationToken`: `IntegrationTokenView` 의 모든 필드에 `token` 을 더한다.
+
+```json
+{ "id": "uuid", "name": "Hermes", "last4": "x9Qa", "createdAt": "2026-10-25T03:15:00.123456Z", "lastUsedAt": null, "token": "fwb_3q2K…x9Qa" }
+```
+
+- `token` 은 `fwb_` 뒤에 무작위 32바이트를 base64url(채움 문자 없음)로 쓴 43자를 붙인 47자다. 원문은 이 응답에만 실린다. 서버는 해시만 저장하므로 다시 보여 줄 수 없다.
+- `name` 은 앞뒤 공백을 지운 1자 이상 50자 이하다. 어기면 `400 VALIDATION_FAILED`(`details.fieldErrors.name`)다. 같은 이름의 토큰도 만들 수 있다.
+- 폐기하지 않은 토큰이 이미 5개면 `409 TOKEN_LIMIT`(`details.max`)다. 사용자 노드를 잠근 뒤 세므로 동시에 발급해도 5개를 넘지 않는다.
+- `last4` 는 원문의 끝 네 글자다. 화면은 `…x9Qa` 로 보인다.
+- `lastUsedAt` 은 그 토큰으로 `/api/v1` 인증에 마지막으로 성공한 시각이다. 서버는 1분에 한 번만 고쳐 쓰므로 최대 1분 늦다. 한 번도 쓰지 않았으면 `null` 이다.
+- 발급과 폐기는 변경 이력(ChangeEvent)에 남지 않는다.
+
+## 에이전트 API(`/api/v1`)
+
+외부 에이전트가 워크벤치를 조회하는 API 다. fos-assistant 의 Hermes 커넥터는 이 절만 읽고 구현한다. 결정과 근거는 [ADR-012](adr/012-agent-integration-token.md) 다.
+이 절이 쓰는 노드 타입과 관계는 [데이터 스키마](data-schema.md) 의 「노드」, 「관계」, 「투자 온톨로지」 가 소유한다. 이 절의 응답 필드는 화면용 응답(`NodeView` 등)과 따로 유지한다.
+
+### 인증
+
+- 모든 요청에 `Authorization: Bearer <연동 토큰>` 을 담는다. 토큰은 사용자가 웹의 더보기 메뉴 「연동 토큰」 에서 발급한다(「연동 토큰」).
+- 세션 쿠키는 읽지 않고, CSRF 토큰도 요구하지 않는다. 쿠키만 담은 요청은 `401` 이다.
+- 토큰은 발급한 사용자로 인증된다. 그 사용자의 역할을 따르지만 `/api/v1` 에는 조회만 있어 모든 역할이 모든 경로를 부른다.
+- 아래 가운데 하나면 `401 UNAUTHENTICATED`(「연동 토큰이 없거나 올바르지 않습니다.」)다. 어느 경우인지는 응답에 드러내지 않는다.
+  - `Authorization` 헤더가 없거나 `Bearer ` 로 시작하지 않는다.
+  - 토큰이 `fwb_` 로 시작하는 47자가 아니다.
+  - 그런 토큰이 없거나 폐기됐다.
+  - 토큰 주인이 비활성화됐거나 허용 목록에서 빠졌다.
+- 연동 토큰은 `/api/v1` 밖의 경로(`/api/nodes` 등)에서 받지 않는다. 그 경로에 토큰만 담아 부르면 세션이 없으므로 `401` 이다.
+
+### 공통 규칙
+
+- 메서드는 `GET` 만 있다. 있는 경로에 다른 메서드를 쓰면 `405 METHOD_NOT_ALLOWED`, 없는 경로는 `404 NOT_FOUND` 다.
+- 오류 본문은 이 문서의 「오류 형식」 과 같은 `{code, message, details}` 다.
+- 시각과 날짜 형식은 문서 첫머리의 규칙과 같다. 응답의 `X-Ontology-Version` 헤더는 다른 `/api` 응답과 같다.
+- 보관한 노드와 관계는 모든 응답에서 빠진다. 보관한 노드의 상세, 근거 따라가기, 주변 그래프는 `404 NOT_FOUND` 다.
+- `typeLabel`, `label`, `valueLabel`, 관계와 주장의 `label` 은 지금 온톨로지의 표시 이름이다. 표시 이름이 없으면 키를 그대로 담는다.
+- 관계 문장(`sentence`)은 관계 종류의 문장 틀(온톨로지 `sentence`)의 `{from}`, `{to}` 를 두 끝의 이름으로 바꾼 것이다. 조사는 고르지 않고 틀의 「은(는)」 같은 표기를 그대로 둔다. 틀이 없으면 `{from} -[{관계 표시 이름}]-> {to}` 다.
+- 응답에 사용자 이메일은 담지 않는다. 사람은 표시 이름으로만 나온다.
+
+### 요청 한도와 응답 크기
+
+| 항목 | 상한 | 넘으면 |
+| --- | --- | --- |
+| 토큰 하나의 요청 수 | 1분에 60번. 그 토큰의 첫 요청부터 60초 단위로 센다. 인증에 실패한 요청은 세지 않는다 | `429 RATE_LIMITED`, `Retry-After` 헤더(초), `details.retryAfterSeconds` |
+| 검색어 `q` | 100자 | `400 VALIDATION_FAILED` |
+| 페이지 크기 `size` | 기본 20, 최대 50 | `400 VALIDATION_FAILED` |
+| 노드 상세의 `relations`, `claims`, `documents`, `concepts` | 100개, 20개, 20개, 20개 | 잘라 내고 `relationsTruncated`, `claimsTruncated` 를 `true` 로 둔다. `documents`, `concepts` 는 앞에서부터 담는다 |
+| 상세 밖에 끼워 넣은 긴 글(주장의 `description`, `evidenceText`, 결정의 `reason`, 시나리오의 `assumptions`) | 500자 | 500자에서 자르고 끝에 `…` 를 붙인다. 전체는 그 항목의 상세(`GET /api/v1/nodes/{id}`)로 읽는다 |
+| 근거 따라가기 | 깊이 6, 단계 60개, 아래쪽 항목 50개, 후보 5개 | 「근거 따라가기」 와 같다 |
+| 주변 그래프 | 홉 2, 노드 150개, 관계 300개 | `hops` 가 1, 2 밖이면 `400`. 노드와 관계는 잘라 내고 `truncated` 를 `true` 로 둔다 |
+| 종목 찾기 | 맞는 종목 10개, 종목마다 결정 20개, 밸류에이션 10개, 밸류에이션마다 시나리오 10개 | 잘라 내고 `...Truncated` 를 `true` 로 둔다 |
+
+요청 한도는 API 프로세스 메모리에 있어 API 를 다시 시작하면 처음부터 센다.
+
+### 공통 표현
+
+`V1NodeRef`
+
+```json
+{ "id": "uuid", "type": "Decision", "typeLabel": "투자 결정", "label": "FLNC 첫 매수" }
+```
+
+`V1Document`
+
+```json
+{ "id": "uuid", "title": "Fluence 2025 10-K", "url": "https://example.com/10k", "publisher": "Fluence Energy", "documentType": "FILING", "publishedAt": "2025-11-25", "collectedAt": "2026-10-24T03:00:00Z" }
+```
+
+`publisher`, `documentType`, `publishedAt` 은 없으면 `null` 이다.
+
+`V1Concept`
+
+```json
+{ "id": "uuid", "label": "DCF", "summary": "앞으로 벌어들일 현금흐름을 할인율로 지금 가치로 바꿔 더하는 기업 가치 평가 방법" }
+```
+
+`V1Claim`
+
+```json
+{
+  "id": "uuid",
+  "label": "Fluence Energy → 에너지 저장(ESS) 속한다",
+  "predicate": "BELONGS_TO_SECTOR",
+  "predicateLabel": "속한다",
+  "reviewStatus": "REVIEWED",
+  "subject": "V1NodeRef 또는 null",
+  "object": "V1NodeRef 또는 null",
+  "description": "Fluence 는 에너지 저장 시스템을 만든다.",
+  "evidenceText": "Fluence is a global market leader in energy storage products…",
+  "validFrom": null,
+  "validTo": null,
+  "documents": ["V1Document"]
+}
+```
+
+- `reviewStatus` 는 `DRAFT`(검토 전), `REVIEWED`(검토 완료), `REJECTED`(반려)다. 근거로 쓸 때는 `REVIEWED` 를 앞에 둔다.
+- `subject`, `object` 가 보관됐거나 없으면 `null` 이다. `documents` 는 보관하지 않은 근거 문서다.
+
+### 경로
+
+| 경로 | 쿼리 | 응답 |
+| --- | --- | --- |
+| `/api/v1/me` | 없음 | `V1Me`. 연결 확인용 |
+| `/api/v1/ontology` | 없음 | `V1Ontology` |
+| `/api/v1/nodes` | `q`, `types`, `page`, `size` | `Page<V1NodeSummary>` |
+| `/api/v1/nodes/{id}` | 없음 | `V1NodeDetail` |
+| `/api/v1/nodes/{id}/trace` | 없음 | `V1Trace` |
+| `/api/v1/graph/neighborhood` | `id`(필수), `hops`(기본 1) | `V1Graph` |
+| `/api/v1/securities/lookup` | `ticker`(필수), `market` | `V1SecurityLookup` |
+| `/api/v1/me/knowledge` | `level`, `page`, `size` | `Page<V1StudyItem>` |
+
+`Page` 는 이 문서의 「페이지네이션」 과 같은 모양이다.
+
+#### `GET /api/v1/me`
+
+```json
+{ "user": { "id": "uuid", "displayName": "Alice", "role": "EDITOR" }, "token": { "id": "uuid", "name": "Hermes", "last4": "x9Qa" }, "rateLimitPerMinute": 60 }
+```
+
+토큰을 넣은 뒤 연결이 되는지 확인할 때 부른다.
+
+#### `GET /api/v1/ontology`
+
+지금 온톨로지에서 에이전트가 타입과 관계를 고르는 데 필요한 것만 담는다. 화면용 값(색, 모양, 만들기 폼 정보, 예전 값 별칭)은 담지 않는다.
+
+```json
+{
+  "version": 7,
+  "nodeTypes": [
+    {
+      "key": "Decision", "label": "투자 결정", "description": "종목에 대해 내린 투자 행동의 기록이다.", "labelProperty": "title",
+      "properties": [
+        { "key": "action", "label": "행동", "type": "enum", "required": true, "description": "…", "values": [{ "value": "WATCH", "label": "관심 등록" }, { "value": "BUY", "label": "매수" }] },
+        { "key": "decidedAt", "label": "결정일", "type": "date", "required": false, "description": "모르면 비워 둔다", "values": null }
+      ]
+    }
+  ],
+  "relationshipTypes": [
+    { "key": "HAS_DECISION", "label": "결정", "description": "종목에 투자 결정이 있다.", "from": ["Security"], "to": ["Decision"], "sentence": "{to}은(는) {from}에 대한 결정이다" }
+  ],
+  "claimPredicates": [
+    { "key": "BELONGS_TO_SECTOR", "label": "속한다", "description": "…", "subjectTypes": ["Company", "Security"], "objectTypes": ["Sector"], "sentence": "{subject}이(가) {object}에 속한다" }
+  ]
+}
+```
+
+- 순서는 온톨로지 정의의 순서다. `type` 은 `string`, `text`, `url`, `enum`, `date`, `datetime`, `number`, `integer`, `boolean` 가운데 하나다.
+- `values` 는 `enum` 일 때만 있고 그 밖에는 `null` 이다. `sentence` 는 틀이 없으면 `null` 이다.
+
+#### `GET /api/v1/nodes`
+
+보관하지 않은 노드를 검색한다. 검색 규칙은 「노드」 의 `GET /api/nodes` 와 같다(`q` 는 이름, Security 의 `ticker`, 그 타입의 `searchProperties` 에서 대소문자를 무시하고 부분 일치, 이름 오름차순).
+
+| 쿼리 | 기본값 | 설명 |
+| --- | --- | --- |
+| `q` | 전체 | 100자까지 |
+| `types` | 전체 | 쉼표로 구분한 타입 키. 예: `Decision,Valuation` |
+| `page`, `size` | 0, 20 | `size` 는 50까지 |
+
+`V1NodeSummary`
+
+```json
+{ "id": "uuid", "type": "Decision", "typeLabel": "투자 결정", "label": "FLNC 첫 매수", "reviewStatus": null, "revision": 3, "updatedAt": "2026-10-24T03:15:00.123456Z" }
+```
+
+`reviewStatus` 는 주장(Claim)일 때만 값이 있다. 속성은 담지 않으므로 상세로 읽는다.
+
+#### `GET /api/v1/nodes/{id}`
+
+```json
+{
+  "node": {
+    "id": "uuid", "type": "Decision", "typeLabel": "투자 결정", "label": "FLNC 첫 매수", "revision": 3,
+    "createdAt": "…", "createdBy": "Alice", "updatedAt": "…", "updatedBy": "Alice"
+  },
+  "properties": [
+    { "key": "action", "label": "행동", "type": "enum", "value": "BUY", "valueLabel": "매수" },
+    { "key": "decidedAt", "label": "결정일", "type": "date", "value": "2026-09-14", "valueLabel": null }
+  ],
+  "relations": [
+    {
+      "relationshipId": "uuid", "type": "HAS_DECISION", "label": "결정", "direction": "IN",
+      "sentence": "FLNC 첫 매수은(는) Fluence Energy 보통주에 대한 결정이다",
+      "other": { "id": "uuid", "type": "Security", "typeLabel": "종목", "label": "Fluence Energy 보통주" }
+    }
+  ],
+  "claim": null,
+  "claims": ["V1Claim"],
+  "documents": ["V1Document"],
+  "concepts": ["V1Concept"],
+  "relationsTruncated": false,
+  "claimsTruncated": false
+}
+```
+
+| 필드 | 뜻 |
+| --- | --- |
+| `node.createdBy`, `node.updatedBy` | 사용자의 표시 이름. 서버가 만든 항목(초기 데이터 등)이나 찾지 못한 사용자는 `null` 이다 |
+| `properties` | 온톨로지에 정의된 속성 가운데 값이 있는 것. 정의 순서다. 글을 자르지 않는다. `valueLabel` 은 `enum` 값의 표시 이름이고 그 밖에는 `null` 이다. 정의에서 빠진 타입의 노드는 저장된 값을 모두 담고 `label` 은 키, `type` 은 `null` 이다 |
+| `relations` | 이 노드에 걸린 보관하지 않은 일반 관계(온톨로지 `relationshipTypes`). 상대 노드가 보관됐으면 뺀다. `direction` 은 이 노드가 시작이면 `OUT`, 끝이면 `IN` 이다. 만든 순서로 100개까지 |
+| `claim` | 이 노드가 주장(Claim)이면 그 주장의 `V1Claim`, 아니면 `null` |
+| `claims` | 이 노드가 주체, 대상, 근거 문서인 보관하지 않은 주장. 만든 순서로 20개까지. 글은 500자에서 자른다 |
+| `documents` | 근거 관계(끝 타입에 Document 가 있는 관계, 예: `EVIDENCED_BY`)로 이어진 보관하지 않은 근거 문서. 20개까지 |
+| `concepts` | 이 노드에서 개념으로 나가는 관계의 끝. 노드 상세의 `concepts` 와 같은 규칙으로 20개까지 |
+
+#### `GET /api/v1/nodes/{id}/trace`
+
+「근거 따라가기」 의 결과를 에이전트용으로 옮긴다. 따라가는 규칙, 한도, 상태 판정은 그 절과 같다.
+
+```json
+{
+  "root": "V1NodeRef",
+  "steps": [
+    {
+      "node": "V1NodeRef",
+      "depth": 1,
+      "via": { "relationshipId": "uuid", "relationshipType": "HAS_DECISION", "childId": "uuid", "sentence": "FLNC 첫 매수은(는) Fluence Energy 보통주에 대한 결정이다" },
+      "status": "SUPPORTED",
+      "documents": ["V1Document"],
+      "claims": [{ "id": "uuid", "label": "Fluence Energy → 에너지 저장(ESS) 속한다", "predicate": "BELONGS_TO_SECTOR", "reviewStatus": "REVIEWED" }],
+      "concepts": ["V1Concept"],
+      "missing": [{ "relationshipType": "BASED_ON", "label": "결정의 근거", "candidates": ["V1NodeRef"] }],
+      "myKnowledge": { "level": "UNSURE", "note": "왜 이 가정이 낙관인지 모르겠다", "updatedAt": "2026-10-25T03:15:00.123456Z" }
+    }
+  ],
+  "dependents": [{ "node": "V1NodeRef", "relationshipType": "HAS_DECISION", "sentence": "…" }],
+  "truncated": false,
+  "dependentsTruncated": false
+}
+```
+
+- 첫 단계가 지금 항목(`depth = 0`)이고 `via` 는 `null` 이다. 다른 단계의 `via` 는 이 단계에서 한 단계 아래(지금 항목 쪽, `childId`)로 가는 관계다.
+- `status` 는 `SUPPORTED`(근거 문서가 있거나 검토 완료 주장이 있다), `PARTIAL`(근거 문서 없이 검토 전 주장만 있다), `MISSING`(둘 다 없다)다.
+- `missing` 은 아직 잇지 않은 관계 종류와 이을 만한 후보다. 「근거 따라가기」 의 `missing` 과 같다.
+- `myKnowledge` 는 토큰 주인의 이해 표시다. 없으면 `null` 이다. 다른 사람의 표시는 담지 않는다.
+
+#### `GET /api/v1/graph/neighborhood`
+
+```json
+{
+  "center": "V1NodeRef",
+  "hops": 1,
+  "nodes": [{ "id": "uuid", "type": "Company", "typeLabel": "기업", "label": "Fluence Energy", "reviewStatus": null }],
+  "edges": [{ "id": "uuid", "type": "ISSUES", "from": "uuid", "to": "uuid", "sentence": "Fluence Energy이(가) Fluence Energy 보통주을(를) 발행한다" }],
+  "truncated": false
+}
+```
+
+- 규칙과 한도는 「주변 그래프」 와 같다. 타입과 검토 상태 필터는 없다.
+- `nodes` 는 중심을 포함한다. 주장(Claim)은 노드로 담고 `reviewStatus` 가 있다. 주장 관계(`SUBJECT`, `OBJECT`, `SUPPORTED_BY`) 선의 `sentence` 는 `null` 이다.
+
+#### `GET /api/v1/securities/lookup`
+
+시장과 종목 코드로 종목을 찾고, 그 종목에 걸린 투자 결정과 발행 기업의 밸류에이션을 함께 준다. 토스증권 커넥터의 종목 코드를 그대로 넣는다.
+
+| 쿼리 | 설명 |
+| --- | --- |
+| `ticker` | 필수. 국내 6자리 종목 코드(`005930`, `0101N0`)나 미국 티커(`FLNC`, `BRK.B`). 앞뒤 공백을 지우고 대소문자를 무시해 저장된 `ticker` 와 같은지 본다. 32자까지 |
+| `market` | 선택. 없으면 모든 시장에서 찾는다. 아래 값만 받고 대소문자를 무시한다. 그 밖이면 `400 VALIDATION_FAILED`(`details.fieldErrors.market`) |
+
+| `market` | 찾는 워크벤치 시장 |
+| --- | --- |
+| `KR` | `KRX_KOSPI`, `KRX_KOSDAQ`, `OTHER` |
+| `US` | `NASDAQ`, `NYSE`, `OTHER` |
+| `KOSPI`, `KOSDAQ`, `NASDAQ`, `NYSE` | 각각 `KRX_KOSPI`, `KRX_KOSDAQ`, `NASDAQ`, `NYSE` |
+| `AMEX`, `KR_ETC`, `US_ETC` | `OTHER` |
+| `KRX_KOSPI`, `KRX_KOSDAQ`, `OTHER` | 그 값 그대로 |
+
+```json
+{
+  "market": "US",
+  "ticker": "FLNC",
+  "matches": [
+    {
+      "security": { "id": "uuid", "type": "Security", "typeLabel": "종목", "label": "Fluence Energy 보통주", "market": "NASDAQ", "marketLabel": "나스닥", "ticker": "FLNC", "currency": "USD" },
+      "issuer": "V1NodeRef 또는 null",
+      "decisions": [
+        { "node": "V1NodeRef", "action": "BUY", "actionLabel": "매수", "decidedAt": "2026-09-14", "reason": "…", "basedOn": ["V1NodeRef"] }
+      ],
+      "valuations": [
+        {
+          "node": "V1NodeRef", "asOf": "2026-09-14", "currentPrice": 12.3, "currency": "USD", "method": "DCF",
+          "scenarios": [{ "node": "V1NodeRef", "kind": "BEAR", "valuePerShare": 8.0, "assumptions": "…" }],
+          "scenariosTruncated": false
+        }
+      ],
+      "decisionsTruncated": false,
+      "valuationsTruncated": false
+    }
+  ],
+  "matchesTruncated": false
+}
+```
+
+- 맞는 종목이 없으면 `matches` 가 빈 배열인 `200` 이다. `market` 은 받은 값을 대문자로 바꿔 돌려주고, 없었으면 `null` 이다.
+- `issuer` 는 `ISSUES` 로 이 종목을 발행한 보관하지 않은 기업이다. 여럿이면 먼저 이은 하나다.
+- `decisions` 는 `HAS_DECISION` 으로 이 종목에 걸린 결정이다. `decidedAt` 이 늦은 순서이고 `decidedAt` 이 없으면 뒤에 둔다. `basedOn` 은 `BASED_ON` 으로 그 결정에 이어진 밸류에이션이다.
+- `valuations` 는 발행 기업에 `HAS_VALUATION` 으로 이어진 밸류에이션이다. `asOf` 가 늦은 순서이고 없으면 뒤에 둔다. `scenarios` 는 `HAS_SCENARIO` 로 이어진 시나리오다. 비관(`BEAR`), 기준(`BASE`), 낙관(`BULL`) 순서다.
+- 같은 순서 안에서는 만든 시각, 그다음 `id` 로 순서를 고정한다. 값이 없는 속성은 `null` 이다.
+
+#### `GET /api/v1/me/knowledge`
+
+토큰 주인의 공부 목록이다. 규칙은 「내 이해 표시」 의 `GET /api/me/knowledge` 와 같고, 보관한 항목의 표시는 뺀다.
+
+| 쿼리 | 기본값 | 설명 |
+| --- | --- | --- |
+| `level` | 전체 | 쉼표로 구분한 `KNOWN`, `UNSURE`, `LEARNING`. 그 밖이면 `400 VALIDATION_FAILED` |
+| `page`, `size` | 0, 20 | `size` 는 50까지 |
+
+`V1StudyItem`
+
+```json
+{
+  "node": "V1NodeRef",
+  "level": "UNSURE",
+  "note": "계통 접속이 왜 막히는지 모르겠다",
+  "updatedAt": "2026-10-25T03:15:00.123456Z",
+  "contexts": [{ "decision": "V1NodeRef", "depth": 4 }],
+  "documents": ["V1Document"],
+  "concepts": ["V1Concept"]
+}
+```
+
 ## 후속 도구가 쓸 필드
 
 FOS 의 `search_financial_knowledge`, `get_company_context`, `get_evidence` 는 이 API 의 조회 응답을 그대로 쓸 수 있게 했다.
@@ -566,4 +912,4 @@ FOS 의 `search_financial_knowledge`, `get_company_context`, `get_evidence` 는 
 | `get_evidence` | `GET /api/claims/{id}` | `properties.evidenceText`, `documents[].url`, `documents[].publishedAt`, `documents[].collectedAt`, `reviewedBy`, `reviewedAt`, `revision` |
 
 도구는 `revision` 과 `updatedAt` 을 답변에 함께 남겨 어느 시점의 지식을 근거로 삼았는지 추적한다.
-도구 쪽 인증 방식(서비스 계정이나 읽기 전용 토큰)은 연동할 때 정한다. 이 API 는 아직 Google 로그인 세션만 받는다.
+이 표의 세션 API 는 Google 로그인 세션만 받는다. 에이전트는 연동 토큰으로 「에이전트 API(`/api/v1`)」 를 부른다.

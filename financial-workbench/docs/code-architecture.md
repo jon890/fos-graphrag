@@ -21,6 +21,7 @@ financial-workbench/
 ```mermaid
 flowchart LR
   B[브라우저] -->|HTTPS| P[TLS 를 끝내는 reverse proxy]
+  H[Hermes 커넥터] -->|HTTPS, Bearer 연동 토큰, /api/v1| P
   P -->|HTTP, loopback 포트| A[API 컨테이너<br/>정적 웹 파일 + /api]
   B -.Google 로그인.-> G[Google OIDC]
   A -.code 교환.-> G
@@ -80,10 +81,12 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `graph` | 주변 그래프 조회와 한도 적용 |
 | `learning` | 근거 따라가기와 내 이해 표시의 서비스와 컨트롤러. 계약은 [API 계약](api-contract.md) 의 「근거 따라가기」, 「내 이해 표시」 다. `knowledge` 의 읽기 도우미로 노드 표현을 만든다 |
 | `history` | ChangeEvent 기록(`ChangeEventRecorder`)과 이력 조회 |
+| `agent` | 연동 토큰의 저장(`IntegrationTokenRepository`), 발급과 폐기(`IntegrationTokenService`, `/api/me/tokens` 의 `IntegrationTokenController`), Bearer 인증 필터(`BearerTokenFilter`), 토큰마다의 요청 한도(`RateLimiter`). 결정은 [ADR-012](adr/012-agent-integration-token.md) 다 |
+| `agent.v1` | 에이전트 API(`/api/v1`)의 컨트롤러, v1 응답 DTO, 화면용 표현을 v1 로 옮기는 `V1Mapper`, 종목 찾기(`SecurityLookupService`). 계약은 [API 계약](api-contract.md) 의 「에이전트 API(`/api/v1`)」 다 |
 | `web` | 오류 형식(`ApiError`), 예외 처리기, health, 화면 경로(`/workspace` 등)의 GET 을 `index.html` 로 넘기는 `SpaRouteController` |
 
 호출 방향은 `컨트롤러 → 서비스 → Neo4jClient` 다. 서비스가 트랜잭션 경계다.
-`knowledge` 서비스는 `ontology` 의 검증기와 `history` 의 기록기를 부른다. `learning` 은 `knowledge` 의 읽기 도우미를 부르고, `knowledge` 는 `learning` 을 부르지 않는다. 노드 상세의 `concepts` 는 `knowledge` 가 직접 읽는다. 반대 방향 호출은 없다.
+`knowledge` 서비스는 `ontology` 의 검증기와 `history` 의 기록기를 부른다. `agent.v1` 은 `knowledge`, `learning`, `graph` 의 조회 서비스를 부르고 그 결과를 v1 DTO 로 옮긴다. 어느 패키지도 `agent` 를 부르지 않는다. 보안 설정(`config.SecurityConfig`)만 `agent` 의 필터를 건다. `learning` 은 `knowledge` 의 읽기 도우미를 부르고, `knowledge` 는 `learning` 을 부르지 않는다. 노드 상세의 `concepts` 는 `knowledge` 가 직접 읽는다. 반대 방향 호출은 없다.
 
 온톨로지를 쓰는 코드는 `Ontology` 를 주입받지 않고 `OntologyHolder.current()` 로 최신 버전을 받는다. 서비스는 메서드 처음에 한 번 받아 끝까지 그 값을 쓴다. 검증기와 읽기 도우미는 따로 받으므로, 요청 도중에 저장이 끼면 한 요청이 두 버전을 읽을 수 있다. 결과는 대부분 거절 쪽이라 받아들인다.
 `OntologyHolder` 는 최신 버전을 메모리에 두고, 저장 트랜잭션이 커밋된 뒤 새 버전으로 바꾼다. 번호가 지금보다 클 때만 바꾼다. API 는 프로세스 하나로만 돈다. 여러 개로 늘리면 요청마다 `OntologyHead` 의 번호를 읽어 비교하도록 바꿔야 한다.
@@ -115,6 +118,8 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `workbench.detail.max-relationships`, `max-claims` | | 100, 50 | 노드 상세 목록 상한 |
 | `workbench.seeds.enabled` | `WORKBENCH_SEEDS_ENABLED` | `true` | 시작할 때 `ontology/seeds/*.yaml` 을 적용한다. `docs/data-schema.md` 「초기 데이터」 |
 | `workbench.bootstrap.admin-email` | `WORKBENCH_BOOTSTRAP_ADMIN_EMAIL` | 없음 | 사용자가 없을 때 만들 첫 ADMIN |
+| `workbench.agent.rate-limit-per-minute` | | 60 | 연동 토큰 하나가 1분에 부를 수 있는 `/api/v1` 요청 수 |
+| `workbench.agent.max-tokens-per-user` | | 5 | 사용자마다 폐기하지 않은 연동 토큰 수 |
 | `spring.security.oauth2.client.registration.google.client-id`, `client-secret` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 없음 | 운영 프로필에서 비어 있으면 시작에 실패한다 |
 
 프로필은 아래와 같다.
@@ -137,6 +142,8 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | 항목 | 값 |
 | --- | --- |
 | 인증 없이 열린 경로 | `/api/health`(`status` 만), `/api/auth/csrf`, OAuth 경로, 정적 파일 |
+| 보안 필터 체인 | 둘이다. `/api/v1/**` 를 맡는 `agentFilterChain`(먼저 돈다)은 세션을 만들지도 읽지도 않고(`RequestAttributeSecurityContextRepository`), CSRF 를 끄고, `BearerTokenFilter` 로만 인증한다. 그 밖의 경로를 맡는 `filterChain` 은 Google 로그인 세션과 쿠키 CSRF 다. 한 요청은 두 체인 가운데 하나만 탄다 |
+| 연동 토큰 | 원문은 저장하지 않고 SHA-256 만 둔다. 로그에 `Authorization` 헤더와 원문을 남기지 않는다. 인증 실패 응답은 이유를 가르지 않는다 |
 | 응답 헤더 | `Content-Security-Policy`(같은 origin 의 스크립트, 스타일, API 만), `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`, `X-Frame-Options: DENY`, `frame-ancestors 'none'` |
 | CSP 와 화면 부품 | `style-src 'self'` 를 유지한다. Tailwind 는 빌드한 CSS 파일 하나라 이 정책 안에서 동작한다. shadcn 의 Dialog, Sheet 가 여는 스크롤 잠금은 실행 중에 `<style>` 을 넣어 막힌다. 창은 그대로 열리고 닫히며, 뒤 화면이 스크롤되고 콘솔에 CSP 위반이 남는다 |
 | 오류 응답 | 문서화한 `{code, message, details}` 만. 스택 트레이스, 경로, Neo4j 오류 원문을 담지 않는다 |
@@ -157,6 +164,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `web/src/components/map/` | 개념 지도 화면 |
 | `web/src/components/add/` | 전역 「＋ 추가」 메뉴와 만들기 창 |
 | `web/src/components/learning/` | 근거 따라가기, 공부 탭, 이해 표시, 개념 칩과 개념 상세 화면. 화면 규칙은 [흐름](flow.md) 의 「근거 따라가기」, 「공부」, 「개념 설명」 이 소유하고, 순수 규칙은 `web/src/lib/trace.ts` 에 있다 |
+| `web/src/components/tokens/` | 더보기 메뉴의 「연동 토큰」 화면. 목록, 발급 창(원문 한 번 보이기와 복사), 폐기 확인 창. 화면 규칙은 [흐름](flow.md) 의 「연동 토큰」 이 소유한다 |
 | `web/src/components/ontology/` | 온톨로지 상세 화면의 보기, 폼 편집기, YAML 편집기, 미리보기, 버전 기록. 초안은 `App` 이 들고 있어 화면을 옮겨도 남는다. YAML 은 서버의 미리보기 응답으로 바꾸고 웹에 YAML 라이브러리를 들이지 않는다. `form/` 은 폼 편집기의 부품이다 |
 | `web/src/components/guide/` | 첫 접속 가이드. 단계 정의, 진행 상태(`localStorage` 의 `workbench.guide`), 말풍선. 만들기 폼과 주장 폼은 가이드가 넘긴 미리 채울 값을 props 로 받고, 만들기에 성공하면 가이드에 알린다 |
 | `web/src/routes.ts` | 화면 경로 목록과 query 를 읽고 쓰는 순수 함수(기본값 생략, 옛 `/?node=` 넘기기, 로그인 뒤 돌아갈 주소 검사). 경로와 query 의 뜻은 [흐름](flow.md) 의 「주소와 뒤로가기」 가 소유한다 |
@@ -205,6 +213,7 @@ mock 으로 Neo4j 를 대신한 테스트는 없다. 트랜잭션 일관성 테�
 | [009](adr/009-investment-logic-chain.md) | 온톨로지를 변화, 병목, 산업, 기업, 밸류에이션, 결정을 잇는 투자 온톨로지로 바꾸고 기업 사이의 관계를 뺀다 |
 | [010](adr/010-concept-map-first-screen.md) | 첫 화면을 개념 지도로 두고, 상단 탭 셋과 더보기 메뉴, 읽기 우선 상세, 전역 「＋ 추가」 로 화면 구조를 바꾼다. 탭 수는 011 이 넷으로 바꿨다 |
 | [011](adr/011-learning-marks-and-trace.md) | 사용자별 이해 표시를 `KNOWS` 관계로 두고 이력에 남기지 않는다. 근거 따라가기를 서버 API 로 계산한다 |
+| [012](adr/012-agent-integration-token.md) | 에이전트는 개인 연동 토큰으로 Bearer 전용 `/api/v1` 조회 API 를 부른다. 세션 API 와 경로를 나누고 Hermes 내부망을 공유하지 않는다 |
 
 대체된 ADR 은 `adr/superseded/` 에 있다. 당시 맥락을 읽을 때만 본다.
 
@@ -242,6 +251,10 @@ ADR 로 남기지 않은 작은 결정은 다음과 같다.
 - 내 능력 범위(결정마다 근거를 다 이해했는지)는 서버의 `GET /api/me/knowledge/summary` 가 센다(2026-10-25). 웹이 결정마다 근거 따라가기를 부르면 요청이 결정 수만큼 늘어난다.
 - 초기 데이터 파일이 앞 파일의 노드를 가리킬 때는 `existing: true` 를 둔다(2026-10-25). 사람이 보관하거나 이름을 바꾼 노드를 새 파일이 되살리지 않게 하려는 것이다.
 - 개념 지도 글자는 화면 맞춤 배율로 나눠 화면에 그려지는 크기를 지킨다(2026-10-25). Cytoscape 의 `min-zoomed-font-size` 는 작아진 글자를 숨기기만 해서 버렸다.
+- `/api/v1` 의 요청 한도는 API 프로세스 메모리의 고정 창(토큰마다 60초 창 하나와 셈)으로 센다(2026-10-25). API 는 프로세스 하나로만 돌고 두 사람이 쓰는 도구라 Redis 같은 공유 저장소를 들이지 않는다. 창이 끝난 토큰의 항목은 다음 요청에서 덮어써 메모리가 토큰 수만큼만 쓰인다. 인스턴스를 늘리면 공유 저장소로 옮긴다.
+- 연동 토큰의 마지막 사용 시각은 인증 필터가 1분에 한 번만 따로 쓴다(2026-10-25). 조회 요청마다 쓰기 트랜잭션을 만들지 않으려는 것이다. 쓰기가 실패하면 `warn` 로그만 남기고 조회는 계속한다.
+- v1 응답은 화면용 조회 서비스(`NodeQueryService`, `TraceService`, `GraphService`, `KnowledgeMarkService`)의 결과를 옮겨 만든다(2026-10-25). v1 전용 Cypher 를 따로 쓰면 보관, 한도, 상태 판정 규칙이 두 벌이 된다. 종목 찾기만 화면에 같은 조회가 없어 `SecurityLookupService` 가 자기 쿼리를 쓴다.
+- v1 의 관계 문장은 서버가 온톨로지 문장 틀의 `{from}`, `{to}` 만 바꿔 만든다. 조사 고르기(화면의 `lib`)는 서버로 옮기지 않았다. 읽는 쪽이 언어 모델이라 「은(는)」 표기를 그대로 읽는다.
 - 반응형 경계는 1024px 하나다. 768px 에 두 칸 배치를 더하는 안은 검사할 배치가 늘어나는 데 비해 두 사람이 쓰는 도구에서 얻는 것이 작아 버렸다.
 
 - 작성자와 마지막으로 내용을 고친 사람은 그 Claim 을 검토할 수 없다. 다른 사람이 확인하는 것이 검토의 목적이다.

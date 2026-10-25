@@ -33,6 +33,7 @@ flowchart LR
 - 앞단에서 요청 본문 크기를 제한한다(예: Traefik `buffering.maxRequestBodyBytes` 를 1MiB). app 도 `/api` 요청 본문을 64KiB 로 막지만 앞단에서 먼저 막는 편이 자원을 덜 쓴다.
 - 세션 쿠키와 CSRF 쿠키는 `WORKBENCH_SECURE_COOKIE=true`(운영 기본값)로 Secure 다. HTTPS 가 없는 로컬 확인에서만 끈다.
 - HSTS 는 앞단이 붙이는 것을 기본으로 한다. 앞단이 붙이지 않으면 `WORKBENCH_HSTS=true` 로 앱이 붙인다.
+- 에이전트 API(`/api/v1/**`)는 같은 공개 주소로 들어온다. 앞단은 `Authorization` 헤더를 지우지 않고 그대로 넘기고, 접근 로그에 이 헤더를 남기지 않는다. 앞단에서 경로를 따로 막지 않는다. 앱이 연동 토큰으로 인증하고 토큰마다 1분에 60번으로 막는다([ADR-012](adr/012-agent-integration-token.md)).
 - 실제 홈서버 주소, 도메인, 계정, 키, 경로는 이 저장소에 넣지 않는다. 홈서버의 `.env` 에만 둔다.
 
 이번 작업에서는 홈서버에 배포하지 않았다. 아래 절차는 로컬 Compose 에서 확인했다(2026-10-20, macOS, Colima).
@@ -111,6 +112,20 @@ action 은 commit SHA 로 고정하고 버전 주석을 단다.
 
 운영 배포는 `scripts/deploy-prod.sh` 한 명령으로 한다. main 의 이미지 workflow 를 돌려 성공을 기다리고, 홈서버의 `scripts/deploy/host-deploy-service.sh financial-workbench`(fos-home-infra)로 배포한 뒤 공개 주소의 health 를 본다.
 PR 을 머지 큐(`merge-with-finish.py`)로 머지하면 `.claude/orch-finish.json` 의 머지 뒤 명령이 이 스크립트를 부른다. 문서만 머지했으면 배포하지 않는다.
+
+## 에이전트 연동 확인
+
+연동 토큰과 `/api/v1` 을 처음 배포한 뒤 한 번 확인한다. 토큰 원문은 터미널 기록에 남지 않게 환경 변수로 넘기고, 확인이 끝나면 화면에서 폐기한다.
+
+```bash
+# 웹의 더보기 → 연동 토큰에서 「확인용」 토큰을 발급해 복사한 뒤
+read -rs WORKBENCH_TOKEN && export WORKBENCH_TOKEN
+curl -sS -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $WORKBENCH_TOKEN" https://<공개 origin>/api/v1/ontology   # 200
+curl -sS -o /dev/null -w '%{http_code}\n' https://<공개 origin>/api/v1/ontology                                                # 401
+unset WORKBENCH_TOKEN
+```
+
+Hermes 에 넣는 토큰은 확인용과 따로 발급한다. 커넥터 설정 방법은 fos-assistant 의 커넥터 문서가 소유한다.
 
 ## 자원 설정
 
