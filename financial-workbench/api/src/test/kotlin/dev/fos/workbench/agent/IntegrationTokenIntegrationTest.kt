@@ -68,6 +68,44 @@ class IntegrationTokenIntegrationTest : IntegrationTest() {
     }
 
     @Test
+    fun `범위 없이 발급하면 조회만이고 조회와 기록으로 발급하면 목록에도 그 범위가 보인다`() {
+        val viewer = loggedIn(newUser(Role.VIEWER))
+
+        val plain = issue(viewer)
+        assertThat(plain.status).describedAs(plain.body.toString()).isEqualTo(201)
+        assertThat(plain.body["scope"].asString()).isEqualTo("READ")
+        assertThat(storedProps(plain.body["id"].asString())["scope"]).isEqualTo("READ")
+
+        val write = viewer.post(tokensPath, mapOf("name" to "기록", "scope" to "READ_WRITE"))
+        assertThat(write.status).describedAs(write.body.toString()).isEqualTo(201)
+        assertThat(write.body["scope"].asString()).isEqualTo("READ_WRITE")
+
+        val listed = viewer.get(tokensPath).body.toList().associate { it["id"].asString() to it["scope"].asString() }
+        assertThat(listed).containsEntry(plain.body["id"].asString(), "READ").containsEntry(write.body["id"].asString(), "READ_WRITE")
+    }
+
+    @Test
+    fun `두 범위 밖의 값으로는 발급하지 않는다`() {
+        val viewer = loggedIn(newUser(Role.VIEWER))
+
+        val response = viewer.post(tokensPath, mapOf("name" to "관리", "scope" to "ADMIN"))
+        assertThat(response.status).describedAs(response.body.toString()).isEqualTo(400)
+        assertThat(response.code).isEqualTo("VALIDATION_FAILED")
+        assertThat(response.body["details"]["fieldErrors"].has("scope")).isTrue()
+        assertThat(listIds(viewer)).isEmpty()
+    }
+
+    @Test
+    fun `범위 속성이 없는 예전 토큰은 조회만으로 보인다`() {
+        val viewer = loggedIn(newUser(Role.VIEWER))
+        val id = issued(viewer)
+        neo4j.query("MATCH (t:IntegrationToken {id: \$id}) REMOVE t.scope").bind(id).to("id").run()
+
+        val item = viewer.get(tokensPath).body.toList().single { it["id"].asString() == id }
+        assertThat(item["scope"].asString()).isEqualTo("READ")
+    }
+
+    @Test
     fun `다른 사용자의 토큰은 보이지 않고 폐기할 수 없다`() {
         val owner = loggedIn(newUser(Role.EDITOR))
         val id = issued(owner)

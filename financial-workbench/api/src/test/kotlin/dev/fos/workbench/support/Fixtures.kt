@@ -54,3 +54,16 @@ fun race(vararg calls: () -> ApiClient.Response): List<ApiClient.Response> {
         pool.shutdown()
     }
 }
+
+/** 호출 여러 개를 동시에 출발시키고 결과를 호출 순서대로 돌려준다. 서비스를 직접 부르는 경합에 쓴다 */
+fun <T> raceAll(vararg calls: () -> T): List<T> {
+    val start = java.util.concurrent.CountDownLatch(1)
+    val pool = java.util.concurrent.Executors.newFixedThreadPool(calls.size)
+    try {
+        val futures = calls.map { call -> pool.submit<T> { start.await(); call() } }
+        start.countDown()
+        return futures.map { it.get(60, java.util.concurrent.TimeUnit.SECONDS) }
+    } finally {
+        pool.shutdown()
+    }
+}

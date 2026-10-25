@@ -10,11 +10,20 @@ import org.springframework.stereotype.Repository
 import java.util.UUID
 
 @JsonInclude(JsonInclude.Include.ALWAYS)
-data class IntegrationTokenView(val id: String, val name: String, val last4: String, val createdAt: String, val lastUsedAt: String?) {
+data class IntegrationTokenView(
+    val id: String,
+    val name: String,
+    val scope: String,
+    val last4: String,
+    val createdAt: String,
+    val lastUsedAt: String?,
+) {
     companion object {
         fun from(t: Map<String, Any?>) = IntegrationTokenView(
             id = t["id"] as String,
             name = t["name"] as String,
+            // 범위를 두기 전에 발급한 토큰에는 속성이 없다
+            scope = t["scope"] as String? ?: TokenScope.READ.name,
             last4 = t["last4"] as String,
             createdAt = t["createdAt"] as String,
             lastUsedAt = t["lastUsedAt"] as String?,
@@ -26,12 +35,13 @@ data class IntegrationTokenView(val id: String, val name: String, val last4: Str
 @JsonInclude(JsonInclude.Include.ALWAYS)
 data class IssuedIntegrationToken(@get:JsonUnwrapped val view: IntegrationTokenView, val token: String)
 
-data class IssueTokenRequest(val name: String? = null)
+data class IssueTokenRequest(val name: String? = null, val scope: String? = null)
 
 /** 인증에 쓰는 토큰과 주인. 폐기했거나 주인이 비활성이면 찾지 않는다 */
 data class ActiveToken(
     val tokenId: String,
     val tokenName: String,
+    val scope: TokenScope,
     val last4: String,
     val lastUsedAt: String?,
     val userId: String,
@@ -68,9 +78,10 @@ class IntegrationTokenRepository(private val client: Neo4jClient) {
         ).bind(userId).to("userId").fetch().one().map { (it["n"] as Number).toLong() }.orElse(null)
 
     @Suppress("UNCHECKED_CAST")
-    fun create(userId: String, name: String, hash: String, last4: String): IntegrationTokenView {
+    fun create(userId: String, name: String, scope: TokenScope, hash: String, last4: String): IntegrationTokenView {
         val props = mapOf(
-            "id" to UUID.randomUUID().toString(), "name" to name, "hash" to hash, "last4" to last4, "createdAt" to Timestamps.now(),
+            "id" to UUID.randomUUID().toString(), "name" to name, "scope" to scope.name, "hash" to hash, "last4" to last4,
+            "createdAt" to Timestamps.now(),
         )
         return client.query(
             """
@@ -100,7 +111,7 @@ class IntegrationTokenRepository(private val client: Neo4jClient) {
             """
             MATCH (u:User)-[:OWNS]->(t:IntegrationToken {hash: ${'$'}hash})
             WHERE t.revokedAt IS NULL AND u.enabled = true AND u.email IS NOT NULL
-            RETURN t.id AS tokenId, t.name AS tokenName, t.last4 AS last4, t.lastUsedAt AS lastUsedAt,
+            RETURN t.id AS tokenId, t.name AS tokenName, coalesce(t.scope, 'READ') AS scope, t.last4 AS last4, t.lastUsedAt AS lastUsedAt,
                    u.id AS userId, u.displayName AS displayName, u.role AS role
             LIMIT 1
             """,
@@ -108,6 +119,8 @@ class IntegrationTokenRepository(private val client: Neo4jClient) {
             ActiveToken(
                 tokenId = it["tokenId"] as String,
                 tokenName = it["tokenName"] as String,
+                // 모르는 값은 조회만 하는 쪽으로 읽는다
+                scope = TokenScope.parse(it["scope"] as String?) ?: TokenScope.READ,
                 last4 = it["last4"] as String,
                 lastUsedAt = it["lastUsedAt"] as String?,
                 userId = it["userId"] as String,

@@ -4,6 +4,7 @@ import dev.fos.workbench.config.WorkbenchProperties
 import dev.fos.workbench.config.params
 import dev.fos.workbench.ontology.Ontology
 import dev.fos.workbench.ontology.OntologyHolder
+import dev.fos.workbench.trade.SecurityMarkets
 import dev.fos.workbench.web.ValidationFailedException
 import org.springframework.data.neo4j.core.Neo4jClient
 import org.springframework.stereotype.Service
@@ -31,11 +32,13 @@ class SecurityLookupService(
     /** 종목 코드는 대소문자만 무시해 비교하고 다른 변환은 하지 않는다. 맞는 종목이 없으면 빈 matches 다 */
     fun lookup(market: String?, ticker: String?): V1SecurityLookup {
         val trimmed = ticker?.trim().orEmpty()
-        if (trimmed.isEmpty() || trimmed.length > MAX_TICKER) {
-            throw ValidationFailedException(mapOf("ticker" to "1자 이상 ${MAX_TICKER}자 이하여야 합니다."))
+        if (trimmed.isEmpty() || trimmed.length > SecurityMarkets.MAX_TICKER) {
+            throw ValidationFailedException(mapOf("ticker" to "1자 이상 ${SecurityMarkets.MAX_TICKER}자 이하여야 합니다."))
         }
         val marketKey = market?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
-        val markets = marketKey?.let { MARKETS[it] ?: throw ValidationFailedException(mapOf("market" to MARKET_MESSAGE)) }
+        val markets = marketKey?.let {
+            SecurityMarkets.workbenchMarkets(it) ?: throw ValidationFailedException(mapOf("market" to SecurityMarkets.MESSAGE))
+        }
         return readOnly.execute { load(holder.current(), marketKey, trimmed, markets) }
     }
 
@@ -201,28 +204,9 @@ class SecurityLookupService(
     }
 
     companion object {
-        const val MAX_TICKER = 32
         const val MAX_MATCHES = 10
         const val MAX_DECISIONS = 20
         const val MAX_VALUATIONS = 10
         const val MAX_SCENARIOS = 10
-
-        /** 토스증권 커넥터의 시장 값과 워크벤치 시장 값을 모두 받아 찾을 워크벤치 시장으로 바꾼다 */
-        private val MARKETS = mapOf(
-            "KR" to listOf("KRX_KOSPI", "KRX_KOSDAQ", "OTHER"),
-            "US" to listOf("NASDAQ", "NYSE", "OTHER"),
-            "KOSPI" to listOf("KRX_KOSPI"),
-            "KRX_KOSPI" to listOf("KRX_KOSPI"),
-            "KOSDAQ" to listOf("KRX_KOSDAQ"),
-            "KRX_KOSDAQ" to listOf("KRX_KOSDAQ"),
-            "NASDAQ" to listOf("NASDAQ"),
-            "NYSE" to listOf("NYSE"),
-            "AMEX" to listOf("OTHER"),
-            "KR_ETC" to listOf("OTHER"),
-            "US_ETC" to listOf("OTHER"),
-            "OTHER" to listOf("OTHER"),
-        )
-        private const val MARKET_MESSAGE =
-            "KR, US, KOSPI, KOSDAQ, NASDAQ, NYSE, AMEX, KR_ETC, US_ETC, KRX_KOSPI, KRX_KOSDAQ, OTHER 가운데 하나여야 합니다."
     }
 }

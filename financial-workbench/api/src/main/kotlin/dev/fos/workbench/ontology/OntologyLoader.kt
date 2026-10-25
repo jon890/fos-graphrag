@@ -36,6 +36,14 @@ object OntologyLoader {
         "searchText", "reviewStatus", "reviewedBy", "reviewedAt", "reviewNote", "contentUpdatedBy",
     )
 
+    /** 서버 코드가 지식 그래프 밖의 저장에 쓰는 노드 label(docs/data-schema.md 「코드가 소유하는 이름」) */
+    val RESERVED_NODE_TYPES = setOf(
+        "Knowledge", "User", "IntegrationToken", "Trade", "Proposal", "ChangeEvent", "OntologyVersion", "OntologyHead", "SeedRun",
+    )
+
+    /** 서버 코드가 지식 그래프 밖의 저장에 쓰는 관계 종류 */
+    val RESERVED_RELATIONSHIP_TYPES = setOf("OWNS", "KNOWS", "OF_SECURITY", "EXECUTES")
+
     /**
      * 알 수 없는 키는 시작을 막는다. YAML 흐름 표기에서 쉼표로 잘린 값(`{ description: 예 GICS, KSIC }` 의 `KSIC`)이나
      * 키 오타가 조용히 사라져 화면에 잘린 설명이 나가는 것을 시작 때 잡기 위해서다.
@@ -151,6 +159,8 @@ object OntologyLoader {
             o.claimPredicates.values.flatMap { it.subjectTypes + it.objectTypes }
         val unknown = referenced.filterNot { it in types }
         if (unknown.isNotEmpty()) add("온톨로지가 정의하지 않은 타입을 가리킨다: $unknown")
+        types.filter { it in RESERVED_NODE_TYPES }.forEach { add("$it 은 서버 코드가 쓰는 이름이라 노드 타입으로 쓸 수 없다") }
+        o.allRelationshipTypes.filter { it in RESERVED_RELATIONSHIP_TYPES }.forEach { add("$it 은 서버 코드가 쓰는 이름이라 관계 종류로 쓸 수 없다") }
         o.nodeTypes.forEach { (name, def) ->
             if (def.labelProperty !in def.properties) add("$name 의 labelProperty 가 속성에 없다")
             val reserved = def.properties.keys.filter { it in RESERVED_PROPERTIES || it.startsWith("_") }

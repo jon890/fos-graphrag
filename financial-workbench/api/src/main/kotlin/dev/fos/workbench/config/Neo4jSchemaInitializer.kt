@@ -72,9 +72,15 @@ class Neo4jSchemaInitializer(
             "CREATE CONSTRAINT ontology_head_key_unique IF NOT EXISTS FOR (h:OntologyHead) REQUIRE h.key IS UNIQUE",
             "CREATE CONSTRAINT integration_token_id_unique IF NOT EXISTS FOR (t:IntegrationToken) REQUIRE t.id IS UNIQUE",
             "CREATE CONSTRAINT integration_token_hash_unique IF NOT EXISTS FOR (t:IntegrationToken) REQUIRE t.hash IS UNIQUE",
+            "CREATE CONSTRAINT trade_id_unique IF NOT EXISTS FOR (t:Trade) REQUIRE t.id IS UNIQUE",
+            "CREATE CONSTRAINT trade_owner_external_unique IF NOT EXISTS FOR (t:Trade) REQUIRE (t.ownerId, t.broker, t.externalId) IS UNIQUE",
+            "CREATE CONSTRAINT proposal_id_unique IF NOT EXISTS FOR (p:Proposal) REQUIRE p.id IS UNIQUE",
+            "CREATE CONSTRAINT proposal_owner_dedupe_unique IF NOT EXISTS FOR (p:Proposal) REQUIRE (p.ownerId, p.dedupeKey) IS UNIQUE",
             "CREATE CONSTRAINT seed_run_key_unique IF NOT EXISTS FOR (s:SeedRun) REQUIRE s.key IS UNIQUE",
             "CREATE INDEX change_event_target IF NOT EXISTS FOR (e:ChangeEvent) ON (e.targetId)",
             "CREATE INDEX change_event_at IF NOT EXISTS FOR (e:ChangeEvent) ON (e.at)",
+            "CREATE INDEX trade_owner_executed IF NOT EXISTS FOR (t:Trade) ON (t.ownerId, t.executedAt)",
+            "CREATE INDEX proposal_owner_status IF NOT EXISTS FOR (p:Proposal) ON (p.ownerId, p.status)",
             "CREATE TEXT INDEX $SEARCH_INDEX IF NOT EXISTS FOR (n:Knowledge) ON (n.searchText)",
         )
     }
