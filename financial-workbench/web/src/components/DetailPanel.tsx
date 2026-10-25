@@ -15,6 +15,7 @@ import { ClaimEditForm, ReviewControls } from './ClaimEditor'
 import { CopyLinkResult, useCopyLink } from './CopyLinkButton'
 import { useGuide, type GuidePrefill } from './guide/GuideProvider'
 import { ConceptChips } from './learning/ConceptChips'
+import { ConceptSections } from './learning/ConceptSections'
 import { KnowledgeMarkControls } from './learning/KnowledgeMarkControls'
 import { NodeEditForm } from './NodeEditForm'
 import { NodeReadCard } from './NodeReadCard'
@@ -355,6 +356,8 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
         </div>
       )}
       <NodeLearningRow node={node} concepts={detail.concepts} onOpenConcept={onSelect} />
+      {/* 개념 노드는 칩 줄 대신 강조, 비판, 관련 개념, 쓴 곳 절을 보인다 */}
+      {node.type === CONCEPT_TYPE && <ConceptSections detail={detail} onSelect={onSelect} />}
 
       <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
         <DialogContent data-testid="node-archive-dialog">

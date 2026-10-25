@@ -13,9 +13,11 @@ import {
   parseMapQuery,
   parseOntologyQuery,
   parseReviewQuery,
+  parseStudyQuery,
   parseTraceQuery,
   parseWorkspaceQuery,
   reviewSearch,
+  studySearch,
   tabOfPath,
   TOP_TABS,
   traceSearch,
@@ -167,5 +169,24 @@ describe('근거 따라가기 주소', () => {
   it('로그인 뒤 돌아갈 주소로 받는다', () => {
     expect(isSafeReturnTo('/trace?node=a')).toBe(true)
     expect(isSafeReturnTo('/tracefoo?node=a')).toBe(false)
+  })
+})
+
+describe('공부 주소', () => {
+  it('level 과 page 를 쓰고 읽으면 처음 값으로 돌아온다', () => {
+    expect(studySearch({ level: 'LEARNING', page: 2 })).toBe('?level=LEARNING&page=2')
+    expect(parseStudyQuery('?level=LEARNING&page=2')).toEqual({ level: 'LEARNING', page: 2 })
+  })
+
+  it('기본값이면 query 를 쓰지 않고 모르는 level 은 null 이다', () => {
+    expect(studySearch({ level: null, page: 0 })).toBe('')
+    expect(parseStudyQuery('')).toEqual({ level: null, page: 0 })
+    expect(parseStudyQuery('?level=WRONG')).toEqual({ level: null, page: 0 })
+  })
+
+  it('상단 탭의 끝이 공부이고 경로는 /study 다', () => {
+    expect(TOP_TABS[TOP_TABS.length - 1]).toBe('study')
+    expect(tabOfPath('/study')).toBe('study')
+    expect(isSafeReturnTo('/study?level=UNSURE')).toBe(true)
   })
 })

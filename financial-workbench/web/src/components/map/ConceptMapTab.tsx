@@ -6,6 +6,7 @@ import type { Ontology } from '../../api/types'
 import { useApp, useLabels } from '../../context'
 import { typeColor, typeShape } from '../../lib/graph'
 import { relationshipLabel, typeLabel, withJosa } from '../../lib/labels'
+import { MAP_EDGE_FONT, MAP_NODE_FONT, readableFontSize } from '../../lib/mapFont'
 import { managedTypes, orderedTypes, rootTypes } from '../../lib/typeOrder'
 import { mapSearch, parseMapQuery, TAB_PATHS } from '../../routes'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -13,44 +14,47 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { TypeBadge } from '../TypeBadge'
 import { TypePanel } from './TypePanel'
 
-const STYLE: cytoscape.StylesheetJson = [
-  {
-    selector: 'node',
-    style: {
-      'background-color': 'data(color)',
-      shape: (ele: cytoscape.NodeSingular) => ele.data('shape') as cytoscape.Css.NodeShape,
-      label: 'data(label)',
-      color: '#1f2937',
-      'font-size': 12,
-      'text-valign': 'bottom',
-      'text-margin-y': 4,
-      width: 34,
-      height: 34,
-      'border-width': 0,
+/** 지도 스타일. 글자 크기만 배율에 따라 바뀌므로 인자로 받는다 */
+function mapStyle(nodeFont: number, edgeFont: number): cytoscape.StylesheetJson {
+  return [
+    {
+      selector: 'node',
+      style: {
+        'background-color': 'data(color)',
+        shape: (ele: cytoscape.NodeSingular) => ele.data('shape') as cytoscape.Css.NodeShape,
+        label: 'data(label)',
+        color: '#1f2937',
+        'font-size': nodeFont,
+        'text-valign': 'bottom',
+        'text-margin-y': 4,
+        width: 34,
+        height: 34,
+        'border-width': 0,
+      },
     },
-  },
-  { selector: 'node.selected', style: { 'border-width': 4, 'border-style': 'solid', 'border-color': '#111827', 'font-weight': 'bold' } },
-  {
-    selector: 'edge',
-    style: {
-      width: 1.5,
-      'line-color': '#94a3b8',
-      'target-arrow-color': '#94a3b8',
-      'target-arrow-shape': 'triangle',
-      'curve-style': 'bezier',
-      label: 'data(label)',
-      'font-size': 10,
-      color: '#475569',
-      'text-rotation': 'autorotate',
-      'text-background-color': '#ffffff',
-      'text-background-opacity': 1,
-      'text-background-padding': '3px',
-      'text-background-shape': 'roundrectangle',
+    { selector: 'node.selected', style: { 'border-width': 4, 'border-style': 'solid', 'border-color': '#111827', 'font-weight': 'bold' } },
+    {
+      selector: 'edge',
+      style: {
+        width: 1.5,
+        'line-color': '#94a3b8',
+        'target-arrow-color': '#94a3b8',
+        'target-arrow-shape': 'triangle',
+        'curve-style': 'bezier',
+        label: 'data(label)',
+        'font-size': edgeFont,
+        color: '#475569',
+        'text-rotation': 'autorotate',
+        'text-background-color': '#ffffff',
+        'text-background-opacity': 1,
+        'text-background-padding': '3px',
+        'text-background-shape': 'roundrectangle',
+      },
     },
-  },
-  // 좁은 화면에서는 선 글자가 서로 겹친다. 관계는 타입 칸의 문장으로 읽는다
-  { selector: 'edge.no-label', style: { label: '' } },
-]
+    // 좁은 화면에서는 선 글자가 서로 겹친다. 관계는 타입 칸의 문장으로 읽는다
+    { selector: 'edge.no-label', style: { label: '' } },
+  ]
+}
 
 /** 타입 노드의 글자. 개수를 모르면 타입 이름만 */
 function nodeLabel(o: Ontology, type: string, counts: Record<string, number> | null): string {
@@ -84,6 +88,23 @@ function limitZoom(cy: Core): void {
   }
 }
 
+/** 배율 1 의 글자 크기. 배치가 끝나기 전에 쓴다 */
+const INITIAL_NODE_FONT = readableFontSize(MAP_NODE_FONT.base, MAP_NODE_FONT.minPx, 1)
+const INITIAL_EDGE_FONT = readableFontSize(MAP_EDGE_FONT.base, MAP_EDGE_FONT.minPx, 1)
+
+/**
+ * 배율에 맞춰 노드와 선의 글자 크기를 다시 둔다. 스타일시트만 바꾸고 요소는 다시 놓지 않는다.
+ * selector() 로 규칙을 덧붙이면 확대할 때마다 스타일시트가 길어지므로 fromJson 으로 통째로 바꾼다.
+ * 화면에 그려지는 노드 글자 크기(px)를 돌려준다.
+ */
+function applyReadableFont(cy: Core): number {
+  const zoom = cy.zoom()
+  const node = readableFontSize(MAP_NODE_FONT.base, MAP_NODE_FONT.minPx, zoom)
+  const edge = readableFontSize(MAP_EDGE_FONT.base, MAP_EDGE_FONT.minPx, zoom)
+  cy.style().fromJson(mapStyle(node, edge)).update()
+  return Math.round(node * zoom)
+}
+
 /** 첫 화면. 온톨로지의 타입과 관계를 그리고 타입마다 항목 수를 붙인다. 동작은 docs/flow.md 「개념 지도」 */
 export function ConceptMapTab({ onOpenNode, onTrace }: { onOpenNode: (id: string) => void; onTrace: (id: string) => void }) {
   const { ontology, canEdit } = useApp()
@@ -97,6 +118,7 @@ export function ConceptMapTab({ onOpenNode, onTrace }: { onOpenNode: (id: string
   const [counts, setCounts] = useState<Record<string, number> | null>(null)
   const [countsError, setCountsError] = useState<string | null>(null)
   const [layoutDone, setLayoutDone] = useState(false)
+  const [nodeFontPx, setNodeFontPx] = useState(Math.round(INITIAL_NODE_FONT))
   const containerRef = useRef<HTMLDivElement>(null)
   const cyRef = useRef<Core | null>(null)
 
@@ -121,8 +143,17 @@ export function ConceptMapTab({ onOpenNode, onTrace }: { onOpenNode: (id: string
 
   useEffect(() => {
     if (!containerRef.current) return
-    const cy = cytoscape({ container: containerRef.current, style: STYLE, elements: [], minZoom: 0.2, maxZoom: 3, autoungrabify: true })
+    const cy = cytoscape({
+      container: containerRef.current,
+      style: mapStyle(INITIAL_NODE_FONT, INITIAL_EDGE_FONT),
+      elements: [],
+      minZoom: 0.2,
+      maxZoom: 3,
+      autoungrabify: true,
+    })
     cy.on('tap', 'node', (evt) => selectRef.current(evt.target.id()))
+    // 확대와 축소, fit 이 모두 zoom 을 낸다. 글자가 최소 화면 크기 아래로 작아지지 않게 다시 둔다
+    cy.on('zoom', () => setNodeFontPx(applyReadableFont(cy)))
     cyRef.current = cy
     return () => {
       cy.destroy()
@@ -147,6 +178,7 @@ export function ConceptMapTab({ onOpenNode, onTrace }: { onOpenNode: (id: string
     const layout = cy.elements().not(cy.edges('[?self]')).layout({ name: 'breadthfirst', directed: true, roots, spacingFactor: 1.6, padding: 24 })
     layout.one('layoutstop', () => {
       limitZoom(cy)
+      setNodeFontPx(applyReadableFont(cy))
       setLayoutDone(true)
     })
     layout.run()
@@ -212,13 +244,14 @@ export function ConceptMapTab({ onOpenNode, onTrace }: { onOpenNode: (id: string
               </AlertDescription>
             </Alert>
           )}
-          <div className="relative h-[360px] rounded-md border bg-white lg:h-[520px]">
+          <div className="relative h-[360px] rounded-md border bg-white lg:h-[600px]">
             <div
               ref={containerRef}
               className="absolute inset-0"
               data-testid="concept-map-canvas"
               data-node-count={types.length}
               data-layout-done={String(layoutDone)}
+              data-node-font-px={nodeFontPx}
             />
           </div>
           {managed.length > 0 && (

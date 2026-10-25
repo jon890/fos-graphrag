@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { KnowledgeLevel, NodeView, TraceStatus, TraceStep, TraceView } from '../api/types'
-import { stepCards, stepRole, traceSummary, withStepKnowledge } from './trace'
+import type { KnowledgeLevel, KnowledgeSummary, NodeRef, NodeView, StudyItem, TraceStatus, TraceStep, TraceView } from '../api/types'
+import { competenceText, stepCards, stepRole, studyContextText, studyTodos, traceSummary, withStepKnowledge } from './trace'
 
 const nodeView = (id: string): NodeView => ({
   id,
@@ -87,5 +87,78 @@ describe('withStepKnowledge', () => {
     expect(next.steps.find((s) => s.node.id === 'root')?.knowledge?.level).toBe('KNOWN')
     expect(next.steps.find((s) => s.node.id === 'd1-second')?.knowledge?.level).toBe('UNSURE')
     expect(traceSummary(next).unsure).toBe(1)
+  })
+})
+
+const ref = (id: string, type: string, label: string): NodeRef => ({ id, type, label, archived: false })
+
+const study = (over: Partial<StudyItem> = {}): StudyItem => ({
+  node: ref('v1', 'Valuation', '밸류에이션'),
+  level: 'UNSURE',
+  note: null,
+  updatedAt: '2026-10-25T03:15:00Z',
+  contexts: [],
+  documents: [],
+  concepts: [],
+  ...over,
+})
+
+describe('studyContextText', () => {
+  it('결정 둘이면 「{결정 이름}의 {N}단계 위」 를 쉼표로 잇는다', () => {
+    const item = study({
+      contexts: [
+        { decision: ref('d1', 'Decision', '전력 매수'), depth: 2 },
+        { decision: ref('d2', 'Decision', '변압기 보유'), depth: 4 },
+      ],
+    })
+    expect(studyContextText(item)).toBe('전력 매수의 2단계 위, 변압기 보유의 4단계 위')
+  })
+
+  it('항목이 결정 자신이면 「투자 결정」 이다', () => {
+    const item = study({ node: ref('d1', 'Decision', '전력 매수'), contexts: [{ decision: ref('d1', 'Decision', '전력 매수'), depth: 0 }] })
+    expect(studyContextText(item)).toBe('투자 결정')
+  })
+
+  it('이어진 결정이 없으면 그렇다고 알린다', () => {
+    expect(studyContextText(study())).toBe('이어진 투자 결정이 없습니다')
+  })
+})
+
+describe('studyTodos', () => {
+  it('문서마다 읽기, 개념마다 설명 읽기를 문서 다음에 둔다', () => {
+    const doc = (id: string, title: string) => ({ id, title, url: `https://example.com/${id}`, collectedAt: null, archived: false })
+    const item = study({
+      documents: [doc('doc1', '전력망 보고서'), doc('doc2', '변압기 공급')],
+      concepts: [{ id: 'c1', label: '병목', summary: null, relationshipType: 'USES_CONCEPT' }],
+    })
+    expect(studyTodos(item)).toEqual([
+      { kind: 'document', label: '「전력망 보고서」 읽기', url: 'https://example.com/doc1', id: 'doc1' },
+      { kind: 'document', label: '「변압기 공급」 읽기', url: 'https://example.com/doc2', id: 'doc2' },
+      { kind: 'concept', label: '개념 「병목」 설명 읽기', id: 'c1' },
+    ])
+  })
+
+  it('문서가 없으면 근거를 붙이라는 할 일 하나다', () => {
+    expect(studyTodos(study())).toEqual([{ kind: 'attach', label: '근거 문서가 없습니다. 공부한 자료를 근거로 붙여 주세요' }])
+  })
+})
+
+describe('competenceText', () => {
+  const summary = (total: number, understood: number, decisionsTruncated = false): KnowledgeSummary => ({
+    counts: { KNOWN: 0, UNSURE: 0, LEARNING: 0 },
+    decisions: { total, understood },
+    decisionsTruncated,
+  })
+
+  it('결정 수와 다 이해한 결정 수를 보인다', () => {
+    expect(competenceText(summary(4, 1))).toBe('투자 결정 4개 가운데 1개는 근거를 다 이해함')
+  })
+
+  it('결정이 0 개면 아직 없다고 알린다', () => {
+    expect(competenceText(summary(0, 0))).toBe('아직 투자 결정이 없습니다.')
+  })
+
+  it('잘린 요약이면 앞 200개만 셌다고 붙인다', () => {
+    expect(competenceText(summary(200, 3, true))).toBe('투자 결정 200개 가운데 3개는 근거를 다 이해함 (앞 200개만 셌습니다)')
   })
 })

@@ -32,6 +32,7 @@ import { OntologyTab } from './components/ontology/OntologyTab'
 import { UsersTab } from './components/UsersTab'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ConceptMapTab } from './components/map/ConceptMapTab'
+import { StudyTab } from './components/learning/StudyTab'
 import { TracePage } from './components/learning/TracePage'
 import { MoreMenu } from './components/header/MoreMenu'
 import { TopTabs } from './components/header/TopTabs'
@@ -321,6 +322,7 @@ export default function App() {
           )}
           {activeTab === 'trace' && <TracePage nodeId={parseTraceQuery(location.search).node} onOpenNode={focusNode} onTrace={openTrace} />}
           {activeTab === 'list' && <ListTab onOpen={focusNode} />}
+          {activeTab === 'study' && <StudyTab onOpenNode={focusNode} onTrace={openTrace} />}
           {activeTab === 'review' && <ReviewTab onOpen={focusNode} />}
           {activeTab === 'changes' && (
             <ChangesTab

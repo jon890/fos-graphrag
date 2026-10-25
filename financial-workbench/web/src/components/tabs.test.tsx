@@ -6,8 +6,10 @@ import { LoginView } from './LoginView'
 import { ChangesTab } from './ChangesTab'
 import { OntologyTab } from './ontology/OntologyTab'
 import { Pager } from './Pager'
+import { TopTabs } from './header/TopTabs'
 import { ReviewRow, ReviewTab } from './ReviewTab'
 import { UsersTab } from './UsersTab'
+import { TOP_TABS } from '../routes'
 import { testOntology, withApp } from './testSupport'
 
 describe('머리글 밖 탭의 첫 렌더', () => {
@@ -151,5 +153,14 @@ describe('주소의 조건', () => {
     const html = renderToStaticMarkup(withApp(<ListTab onOpen={() => {}} />, testOntology, undefined, '/list'))
     expect(html).toContain('<option value="" selected="">모든 종류</option>')
     expect(html).not.toMatch(/data-testid="list-include-archived"[^>]*checked/)
+  })
+})
+
+describe('머리글 탭', () => {
+  it('상단 탭은 TOP_TABS 순서로 그리고 끝에 「공부」 가 있다', () => {
+    const html = renderToStaticMarkup(<TopTabs activeTab="study" onOpen={() => {}} />)
+    const ids = [...html.matchAll(/data-testid="tab-([a-z]+)"/g)].map((m) => m[1])
+    expect(ids).toEqual(TOP_TABS)
+    expect(html).toMatch(/<button[^>]*aria-selected="true"[^>]*data-testid="tab-study"[^>]*>공부<\/button>/)
   })
 })

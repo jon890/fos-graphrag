@@ -1,11 +1,12 @@
 /** 화면 경로와 query 를 읽고 쓰는 순수 함수. 경로와 query 이름은 docs/flow.md 「주소와 뒤로가기」 의 표와 같다 */
 
-export type TabKey = 'map' | 'workspace' | 'list' | 'trace' | 'review' | 'changes' | 'ontology' | 'users'
+export type TabKey = 'map' | 'workspace' | 'list' | 'study' | 'trace' | 'review' | 'changes' | 'ontology' | 'users'
 
 export const TAB_PATHS: Record<TabKey, string> = {
   map: '/map',
   workspace: '/workspace',
   list: '/list',
+  study: '/study',
   /** 근거 따라가기. 탭과 더보기 메뉴에는 없고 상세, 개념 지도, 공부 목록에서 연다 */
   trace: '/trace',
   review: '/review',
@@ -18,7 +19,7 @@ export const TAB_PATHS: Record<TabKey, string> = {
 export const LANDING_PATH = TAB_PATHS.map
 
 /** 머리글에 탭으로 늘 보이는 화면 */
-export const TOP_TABS: TabKey[] = ['map', 'workspace', 'list']
+export const TOP_TABS: TabKey[] = ['map', 'workspace', 'list', 'study']
 
 /** 「더보기」 메뉴의 화면. 검토 대기는 EDITOR 와 ADMIN, 사용자는 ADMIN 에게만 보인다 */
 export function moreItems(role: string): TabKey[] {
@@ -68,6 +69,14 @@ export interface ListQuery {
   type: string
   q: string
   archived: boolean
+  page: number
+}
+
+/** 공부 목록에서 보이는 표시. null 이면 UNSURE 와 LEARNING 둘 다다 */
+export type StudyLevel = 'UNSURE' | 'LEARNING'
+
+export interface StudyQuery {
+  level: StudyLevel | null
   page: number
 }
 
@@ -156,6 +165,22 @@ export function parseTraceQuery(search: string): TraceQuery {
 
 export function traceSearch(q: TraceQuery): string {
   return build([['node', q.node || null]])
+}
+
+const STUDY_LEVELS: StudyLevel[] = ['UNSURE', 'LEARNING']
+
+/** 모르는 level 은 null(둘 다)이다 */
+export function parseStudyQuery(search: string): StudyQuery {
+  const p = new URLSearchParams(search)
+  const level = p.get('level')
+  return { level: STUDY_LEVELS.find((x) => x === level) ?? null, page: pageOf(p, 'page') }
+}
+
+export function studySearch(q: StudyQuery): string {
+  return build([
+    ['level', q.level],
+    ['page', q.page > 0 ? String(q.page) : null],
+  ])
 }
 
 export function parseListQuery(search: string): ListQuery {

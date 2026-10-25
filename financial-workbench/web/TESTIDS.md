@@ -12,7 +12,7 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `login-google` | 「Google 로 로그인」. `/oauth2/authorization/google` 로 브라우저가 이동한다 |
 | `login-denied` | `/?login=denied` 로 돌아왔을 때 「접근 권한이 없습니다」 안내. `login-google` 도 함께 보인다 |
 | `login-notice` | 세션이 끊겨 돌아왔을 때의 안내 |
-| `tab-map`, `tab-workspace`, `tab-list` | 상단 탭(개념 지도, 작업 공간, 목록). `role=tab`, 고른 탭은 `aria-selected="true"` |
+| `tab-map`, `tab-workspace`, `tab-list`, `tab-study` | 상단 탭(개념 지도, 작업 공간, 목록, 공부). `role=tab`, 고른 탭은 `aria-selected="true"` |
 | `more-open` | 「더보기」 메뉴 단추. 메뉴의 화면(변경 이력, 온톨로지 상세, 검토 대기, 사용자)이 열려 있으면 `data-active="true"` |
 | `more-item-<key>` | 더보기 메뉴 항목. `key` 는 `changes`, `ontology`, `review`(EDITOR, ADMIN), `users`(ADMIN). 열람자가 주소로 연 `/review` 도 `more-open` 이 `data-active="true"` 다 |
 | `current-user-name`, `current-user-email` | 로그인 사용자의 표시 이름, 이메일 |
@@ -78,7 +78,7 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `map-intro` | 지도 위 소개(「투자 온톨로지」) |
 | `map-counts-error` | 항목 수(`GET /api/nodes/counts`)를 받지 못했을 때의 안내와 이유 |
 | `map-empty` | 모든 타입의 항목 수가 0 일 때의 안내 |
-| `concept-map-canvas` | Cytoscape 컨테이너. `data-node-count` 는 그린 타입 노드 수, `data-layout-done` 은 배치가 끝나면 `"true"` |
+| `concept-map-canvas` | Cytoscape 컨테이너. `data-node-count` 는 그린 타입 노드 수, `data-layout-done` 은 배치가 끝나면 `"true"`, `data-node-font-px` 는 화면에 그려지는 노드 글자 크기(글자 크기 × 배율을 반올림한 정수) |
 | `map-claim-note` | 지도 아래 「주장은 어느 항목에나 붙일 수 있습니다」 와 주장 수. 주장 타입이 온톨로지에 없으면 없다 |
 | `map-type-list` | 타입 목록 |
 | `map-type` * | 타입 단추. `data-type`, 고른 타입은 `aria-pressed="true"`. 순서는 타입 순서다 |
@@ -234,6 +234,41 @@ VIEWER 에게는 `node-edit`, `node-edit-form`, `edit-prop-*`, `node-save`, `nod
 | `concept-chip` * | 「개념 · {이름}」 칩. `data-concept-id`. 넓은 화면은 마우스를 올리거나 초점이 가면 한 줄 정의를 보이고 누르면 개념 상세를 연다. 좁은 화면은 누르면 한 줄 정의와 `concept-open` 을 보인다 |
 | `concept-summary` * | 한 줄 정의. 없으면 「한 줄 정의가 없습니다.」 |
 | `concept-open` * | 좁은 화면의 「개념 설명 전체 보기」 |
+
+## 공부
+
+공부 탭은 `/study` 화면이다. 주소의 `level`(`UNSURE`, `LEARNING`)과 `page` 로 목록을 좁힌다.
+
+| testid | 요소 |
+| --- | --- |
+| `study-tab` | 화면 |
+| `study-counts` | 개수 줄 「잘 모름 N」, 「공부 중 N」, 「이해함 N」. `data-known`, `data-unsure`, `data-learning` |
+| `study-competence` | 능력 범위 줄. `data-total`, `data-understood` |
+| `study-filter` * | 「잘 모름」, 「공부 중」 칩. `data-level`, `aria-pressed`. 처음에는 둘 다 눌려 있다 |
+| `study-item` * | 항목 카드. `data-node-id`, `data-level`, 보관된 항목이면 `data-archived="true"` |
+| `study-item-name` * | 이름 단추. 작업 공간에서 그 항목의 상세를 연다 |
+| `study-item-context` * | 단계 맥락 「{결정 이름}의 {N}단계 위」, 「투자 결정」, 「이어진 투자 결정이 없습니다」 |
+| `study-item-note` * | 「내 메모: …」 |
+| `study-todo` * | 할 일 한 줄. `data-kind` 가 `document`(문서 주소를 새 창으로 연다), `concept`(개념 상세를 연다), `attach`(근거 문서가 없다는 안내) |
+| `study-trace` * | 「근거 따라가기에서 보기」. 보관된 항목에는 없다 |
+| `study-learning` * | 「공부 중」. `LEARNING` 항목에는 없다 |
+| `study-known` * | 「이해했어요」. `KNOWN` 으로 쓰고 다시 읽으면 목록에서 빠진다 |
+| `study-note-open` * | 「메모 남기기」 |
+| `study-note-input`, `study-note-save`, `study-note-cancel` * | 카드 안의 메모 입력칸(1000자)과 「저장」, 「취소」. 저장은 카드의 `level` 을 그대로 쓴다 |
+| `study-page-prev`, `study-page-next`, `study-page-info` | 쪽 넘기기 |
+| `study-empty` | 빈 상태 안내 |
+| `study-error`, `study-retry` | 목록이나 요약을 받지 못했을 때의 이유와 「다시 시도」 |
+
+## 개념 상세
+
+개념 노드의 상세에서 `node-learning-row` 아래에 나온다. 개념 칩 줄은 나오지 않는다.
+
+| testid | 요소 |
+| --- | --- |
+| `concept-sections` | 절 묶음 |
+| `concept-section` * | 절. `data-section` 이 `advocates`(강조한 사람), `criticizes`(비판한 사람), `related`(관련 개념), `used-by`(이 개념을 쓴 곳), 그 밖의 주장 종류는 `predicate-<키>` |
+| `concept-section-item` * | 절의 항목 한 줄. `data-node-id`. 이름을 누르면 그 항목의 상세를 연다(상세만 바꾸는 열기) |
+| `concept-section-empty` * | 빈 절의 「아직 없습니다」 |
 
 ## Claim 카드와 Claim 노드 상세
 

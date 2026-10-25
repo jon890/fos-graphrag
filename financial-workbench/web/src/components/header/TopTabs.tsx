@@ -1,6 +1,6 @@
 import { TOP_TABS, type TabKey } from '../../routes'
 
-const TOP_TAB_LABEL: Partial<Record<TabKey, string>> = { map: '개념 지도', workspace: '작업 공간', list: '목록' }
+const TOP_TAB_LABEL: Partial<Record<TabKey, string>> = { map: '개념 지도', workspace: '작업 공간', list: '목록', study: '공부' }
 
 /** 머리글 탭과 「더보기」 단추가 함께 쓰는 모양. 선택되면 파란 밑줄이 생긴다 */
 export const HEADER_TAB_CLASS =
@@ -11,7 +11,7 @@ interface Props {
   onOpen: (key: TabKey) => void
 }
 
-/** 머리글의 탭 셋. 나머지 화면은 MoreMenu 에 있다 */
+/** 머리글의 탭 넷. 나머지 화면은 MoreMenu 에 있다 */
 export function TopTabs({ activeTab, onOpen }: Props) {
   return (
     <div className="flex min-w-0 flex-nowrap" role="tablist">
