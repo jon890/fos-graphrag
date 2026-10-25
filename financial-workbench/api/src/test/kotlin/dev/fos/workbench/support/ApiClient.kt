@@ -26,21 +26,36 @@ class ApiClient(private val baseUrl: String, private val mapper: JsonMapper) {
     private val http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).cookieHandler(cookies)
         .followRedirects(HttpClient.Redirect.NEVER).connectTimeout(Duration.ofSeconds(5)).build()
 
+    /** 쿠키 저장소가 없는 클라이언트. Bearer 요청에 세션 쿠키가 실리지 않게 한다 */
+    private val cookieless = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+        .followRedirects(HttpClient.Redirect.NEVER).connectTimeout(Duration.ofSeconds(5)).build()
+
     fun get(path: String): Response = send("GET", path, null)
 
     fun post(path: String, body: Any? = null): Response = send("POST", path, body)
 
     fun patch(path: String, body: Any): Response = send("PATCH", path, body)
 
-    fun send(method: String, path: String, body: Any?, withCsrf: Boolean = true): Response {
+    fun send(method: String, path: String, body: Any?, withCsrf: Boolean = true, headers: Map<String, String> = emptyMap()): Response =
+        sendWith(http, method, path, body, withCsrf, headers)
+
+    /**
+     * 쿠키 없이 `Authorization: Bearer <token>` 만 담아 보낸다. 에이전트 API 를 부르는 커넥터와 같다.
+     * token 이 null 이면 Authorization 헤더를 넣지 않는다.
+     */
+    fun bearer(method: String, path: String, token: String?, body: Any? = null): Response =
+        sendWith(cookieless, method, path, body, withCsrf = false, headers = token?.let { mapOf("Authorization" to "Bearer $it") }.orEmpty())
+
+    private fun sendWith(client: HttpClient, method: String, path: String, body: Any?, withCsrf: Boolean, headers: Map<String, String>): Response {
         val builder = HttpRequest.newBuilder(URI.create(baseUrl + path)).timeout(Duration.ofSeconds(30))
             .header("Accept", "application/json")
         if (body != null) builder.header("Content-Type", "application/json")
         val token = xsrfToken()
         if (withCsrf && method != "GET" && token != null) builder.header("X-XSRF-TOKEN", token)
+        headers.forEach { (k, v) -> builder.header(k, v) }
         val publisher = if (body == null) HttpRequest.BodyPublishers.noBody()
         else HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body))
-        val response = http.send(builder.method(method, publisher).build(), HttpResponse.BodyHandlers.ofString())
+        val response = client.send(builder.method(method, publisher).build(), HttpResponse.BodyHandlers.ofString())
         val text = response.body()
         val json = runCatching { if (text.isNullOrBlank()) null else mapper.readTree(text) }.getOrNull() ?: mapper.createObjectNode()
         return Response(response.statusCode(), json, response.headers().map())

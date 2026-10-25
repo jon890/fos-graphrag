@@ -2,6 +2,7 @@ package dev.fos.workbench.agent
 
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonUnwrapped
+import dev.fos.workbench.auth.Role
 import dev.fos.workbench.config.Timestamps
 import dev.fos.workbench.config.params
 import org.springframework.data.neo4j.core.Neo4jClient
@@ -26,6 +27,17 @@ data class IntegrationTokenView(val id: String, val name: String, val last4: Str
 data class IssuedIntegrationToken(@get:JsonUnwrapped val view: IntegrationTokenView, val token: String)
 
 data class IssueTokenRequest(val name: String? = null)
+
+/** 인증에 쓰는 토큰과 주인. 폐기했거나 주인이 비활성이면 찾지 않는다 */
+data class ActiveToken(
+    val tokenId: String,
+    val tokenName: String,
+    val last4: String,
+    val lastUsedAt: String?,
+    val userId: String,
+    val displayName: String,
+    val role: Role,
+)
 
 /** `(:User)-[:OWNS]->(:IntegrationToken)`. 원문은 저장하지 않고 해시와 끝 네 글자만 둔다 */
 @Repository
@@ -82,4 +94,30 @@ class IntegrationTokenRepository(private val client: Neo4jClient) {
             RETURN t.id AS id
             """,
         ).bindAll(params("userId" to userId, "tokenId" to tokenId, "now" to Timestamps.now())).fetch().one().isPresent
+
+    fun findActiveByHash(hash: String): ActiveToken? =
+        client.query(
+            """
+            MATCH (u:User)-[:OWNS]->(t:IntegrationToken {hash: ${'$'}hash})
+            WHERE t.revokedAt IS NULL AND u.enabled = true AND u.email IS NOT NULL
+            RETURN t.id AS tokenId, t.name AS tokenName, t.last4 AS last4, t.lastUsedAt AS lastUsedAt,
+                   u.id AS userId, u.displayName AS displayName, u.role AS role
+            LIMIT 1
+            """,
+        ).bind(hash).to("hash").fetch().one().map {
+            ActiveToken(
+                tokenId = it["tokenId"] as String,
+                tokenName = it["tokenName"] as String,
+                last4 = it["last4"] as String,
+                lastUsedAt = it["lastUsedAt"] as String?,
+                userId = it["userId"] as String,
+                displayName = it["displayName"] as String,
+                role = Role.parse(it["role"] as String?) ?: Role.VIEWER,
+            )
+        }.orElse(null)
+
+    fun touchLastUsed(tokenId: String, now: String) {
+        client.query("MATCH (t:IntegrationToken {id: ${'$'}tokenId}) SET t.lastUsedAt = ${'$'}now")
+            .bindAll(params("tokenId" to tokenId, "now" to now)).run()
+    }
 }
