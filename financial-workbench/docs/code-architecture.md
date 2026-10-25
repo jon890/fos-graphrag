@@ -78,11 +78,12 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `users` | ADMIN 의 허용 사용자 관리 API |
 | `knowledge` | 노드, 관계, Claim 의 서비스와 컨트롤러. revision 잠금과 갱신. 시작할 때 목록 밖 enum 값을 고치는 `LegacyValueCleanup`, 초기 데이터를 넣는 `SeedLoader` |
 | `graph` | 주변 그래프 조회와 한도 적용 |
+| `learning` | 근거 따라가기(`TraceService`, `GET /api/nodes/{id}/trace`)와 내 이해 표시(`KnowledgeMarkService`, `/api/me/knowledge`). `knowledge` 의 `KnowledgeReader` 로 노드 표현을 만든다 |
 | `history` | ChangeEvent 기록(`ChangeEventRecorder`)과 이력 조회 |
 | `web` | 오류 형식(`ApiError`), 예외 처리기, health, 화면 경로(`/workspace` 등)의 GET 을 `index.html` 로 넘기는 `SpaRouteController` |
 
 호출 방향은 `컨트롤러 → 서비스 → Neo4jClient` 다. 서비스가 트랜잭션 경계다.
-`knowledge` 서비스는 `ontology` 의 검증기와 `history` 의 기록기를 부른다. 반대 방향 호출은 없다.
+`knowledge` 서비스는 `ontology` 의 검증기와 `history` 의 기록기를 부른다. `learning` 은 `knowledge` 의 읽기 도우미를 부르고, `knowledge` 는 `learning` 을 부르지 않는다. 노드 상세의 `concepts` 는 `knowledge` 가 직접 읽는다. 반대 방향 호출은 없다.
 
 온톨로지를 쓰는 코드는 `Ontology` 를 주입받지 않고 `OntologyHolder.current()` 로 최신 버전을 받는다. 서비스는 메서드 처음에 한 번 받아 끝까지 그 값을 쓴다. 검증기와 읽기 도우미는 따로 받으므로, 요청 도중에 저장이 끼면 한 요청이 두 버전을 읽을 수 있다. 결과는 대부분 거절 쪽이라 받아들인다.
 `OntologyHolder` 는 최신 버전을 메모리에 두고, 저장 트랜잭션이 커밋된 뒤 새 버전으로 바꾼다. 번호가 지금보다 클 때만 바꾼다. API 는 프로세스 하나로만 돈다. 여러 개로 늘리면 요청마다 `OntologyHead` 의 번호를 읽어 비교하도록 바꿔야 한다.
@@ -155,6 +156,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `web/src/components/header/` | 머리글의 상단 탭과 「더보기」 메뉴 |
 | `web/src/components/map/` | 개념 지도 화면 |
 | `web/src/components/add/` | 전역 「＋ 추가」 메뉴와 만들기 창 |
+| `web/src/components/learning/` | 근거 따라가기 화면(`TracePage`), 공부 탭(`StudyTab`), 이해 표시 토글과 메모(`KnowledgeMarkControls`), 개념 칩(`ConceptChips`), 개념 상세 절(`ConceptSections`). 단계 정렬, 상태별 개수, 할 일 목록 같은 규칙은 `web/src/lib/trace.ts` 의 순수 함수다 |
 | `web/src/components/ontology/` | 온톨로지 상세 화면의 보기, 폼 편집기, YAML 편집기, 미리보기, 버전 기록. 초안은 `App` 이 들고 있어 화면을 옮겨도 남는다. YAML 은 서버의 미리보기 응답으로 바꾸고 웹에 YAML 라이브러리를 들이지 않는다. `form/` 은 폼 편집기의 부품이다 |
 | `web/src/components/guide/` | 첫 접속 가이드. 단계 정의, 진행 상태(`localStorage` 의 `workbench.guide`), 말풍선. 만들기 폼과 주장 폼은 가이드가 넘긴 미리 채울 값을 props 로 받고, 만들기에 성공하면 가이드에 알린다 |
 | `web/src/routes.ts` | 화면 경로 목록과 query 를 읽고 쓰는 순수 함수(기본값 생략, 옛 `/?node=` 넘기기, 로그인 뒤 돌아갈 주소 검사). 경로와 query 의 뜻은 [흐름](flow.md) 의 「주소와 뒤로가기」 가 소유한다 |
@@ -201,7 +203,8 @@ mock 으로 Neo4j 를 대신한 테스트는 없다. 트랜잭션 일관성 테�
 | [007](adr/007-routes-in-url.md) | 화면 상태를 경로와 query 로 주소에 두고 React Router 로 다룬다. 서버는 화면 경로를 `index.html` 로 돌려준다 |
 | [008](adr/008-ontology-versions-in-db.md) | 온톨로지를 DB 에 버전으로 쌓고 ADMIN 이 웹에서 편집한다. 서버 코드와 맞물린 부분은 저장소 YAML 이 소유한다 |
 | [009](adr/009-investment-logic-chain.md) | 온톨로지를 변화, 병목, 산업, 기업, 밸류에이션, 결정을 잇는 투자 온톨로지로 바꾸고 기업 사이의 관계를 뺀다 |
-| [010](adr/010-concept-map-first-screen.md) | 첫 화면을 개념 지도로 두고, 상단 탭 셋과 더보기 메뉴, 읽기 우선 상세, 전역 「＋ 추가」 로 화면 구조를 바꾼다 |
+| [010](adr/010-concept-map-first-screen.md) | 첫 화면을 개념 지도로 두고, 상단 탭 셋과 더보기 메뉴, 읽기 우선 상세, 전역 「＋ 추가」 로 화면 구조를 바꾼다. 탭 수는 011 이 넷으로 바꿨다 |
+| [011](adr/011-learning-marks-and-trace.md) | 사용자별 이해 표시를 `KNOWS` 관계로 두고 이력에 남기지 않는다. 근거 따라가기를 서버 API 로 계산한다 |
 
 대체된 ADR 은 `adr/superseded/` 에 있다. 당시 맥락을 읽을 때만 본다.
 
@@ -235,6 +238,10 @@ ADR 로 남기지 않은 작은 결정은 다음과 같다.
 - 거장의 생각은 새 인용 타입 없이 Claim 과 Document 로 담는다(2026-10-23 사용자 결정). 인용을 따로 두면 검토, 근거, 이력, 그래프 접기를 다시 만들어야 한다.
 - 노드 타입의 색과 모양(`display`), 검색에 넣을 속성(`searchProperties`)을 온톨로지 YAML 이 소유한다. 타입이 늘어도 웹 코드에 타입 이름을 적지 않기 위해서다. 다음에 온톨로지를 웹에서 편집하게 되면 이 값도 함께 편집된다.
 - 초기 데이터는 `ontology/seeds/*.yaml` 을 시작 때 `system` 작업자로 한 번만 적용한다. 로그인이 Google 로만 되어 바깥 스크립트가 API 를 부를 수 없고, 이력 없이 데이터를 넣지 않기 위해서다.
+- 근거 따라가기에서 빼는 관계는 이름 목록이 아니라 온톨로지의 끝 타입으로 정한다(2026-10-25). 끝에 `Document` 가 있으면 근거 관계, `Concept` 가 있으면 개념 관계다. 관계 종류가 늘어도 코드에 관계 이름을 적지 않기 위해서다.
+- 내 능력 범위(결정마다 근거를 다 이해했는지)는 서버의 `GET /api/me/knowledge/summary` 가 센다(2026-10-25). 웹이 결정마다 근거 따라가기를 부르면 요청이 결정 수만큼 늘어난다.
+- 초기 데이터 파일이 앞 파일의 노드를 가리킬 때는 `existing: true` 를 둔다(2026-10-25). 사람이 보관하거나 이름을 바꾼 노드를 새 파일이 되살리지 않게 하려는 것이다.
+- 개념 지도 글자는 화면 맞춤 배율로 나눠 화면에 그려지는 크기를 지킨다(2026-10-25). Cytoscape 의 `min-zoomed-font-size` 는 작아진 글자를 숨기기만 해서 버렸다.
 - 반응형 경계는 1024px 하나다. 768px 에 두 칸 배치를 더하는 안은 검사할 배치가 늘어나는 데 비해 두 사람이 쓰는 도구에서 얻는 것이 작아 버렸다.
 
 - 작성자와 마지막으로 내용을 고친 사람은 그 Claim 을 검토할 수 없다. 다른 사람이 확인하는 것이 검토의 목적이다.

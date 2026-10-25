@@ -59,7 +59,7 @@
 
 | 역할 | 할 수 있는 일 |
 | --- | --- |
-| `VIEWER` | 모든 `GET` 조회(검색, 상세, 주변 그래프, 목록, 변경 이력, 온톨로지) |
+| `VIEWER` | 모든 `GET` 조회(검색, 상세, 주변 그래프, 근거 따라가기, 목록, 변경 이력, 온톨로지)와 `/api/me/knowledge` 의 내 이해 표시 쓰기 |
 | `EDITOR` | VIEWER 권한과 노드, 관계, Claim 의 생성, 수정, 검토, 보관, 복원 |
 | `ADMIN` | EDITOR 권한과 `/api/users` 의 사용자 관리, `/api/ontology` 아래의 온톨로지 편집(버전 목록, 내보내기, 미리보기, 저장, 되돌리기) |
 
@@ -184,6 +184,9 @@ Neo4j 예외는 시간 초과(`QUERY_TIMEOUT`), 연결 불가(`DATABASE_UNAVAILA
 | Claim 의 `documentIds` | 20개 | `400 VALIDATION_FAILED` |
 | 페이지 크기 `size` | 100 | `400 VALIDATION_FAILED` |
 | 노드 상세의 `relationships`, `claims` | 100개, 50개 | 잘라 내고 `relationshipsTruncated`, `claimsTruncated` 를 `true` 로 둔다 |
+| 노드 상세의 `concepts` | 20개 | 만든 순서로 앞 20개만 담는다 |
+| 근거 따라가기의 깊이, 단계 수, 아래쪽 항목 | 6, 60개(지금 항목 포함), 50개 | 한도까지만 담고 `truncated`, `dependentsTruncated` 를 `true` 로 둔다 |
+| 내 이해 표시의 메모 `note` | 1000자 | `400 VALIDATION_FAILED` |
 | 쓰기 트랜잭션 | 8초 | `503 QUERY_TIMEOUT` |
 | 잠금 대기(Neo4j `db.lock.acquisition.timeout`) | 5초 | `409 TRANSIENT_CONFLICT` |
 | Neo4j 서버 트랜잭션(`db.transaction.timeout`) | 10초 | `503 QUERY_TIMEOUT` |
@@ -215,6 +218,7 @@ revision 은 그대로이고 ChangeEvent 도 만들지 않는다. `expectedRevis
 | GET | `/api/nodes` | 검색. 쿼리: `q`, `types`(쉼표 구분), `reviewStatus`, `includeArchived`(기본 `false`), `sort`(`label` 이 기본, `recent`), `page`, `size`. 응답 `Page<NodeView>`. `label` 은 대소문자를 무시한 `label` 오름차순(Security 는 그 뒤에 `ticker`), `recent` 는 만든 시각(`createdAt`)이 늦은 순서다 |
 | GET | `/api/nodes/counts` | 타입별 항목 수. 응답 `200 {"counts": {"<타입 키>": <정수>}}`. 로그인한 모든 역할이 읽는다 |
 | GET | `/api/nodes/{id}` | 상세. 응답 `NodeDetail` |
+| GET | `/api/nodes/{id}/trace` | 근거 따라가기. 응답 `TraceView`(아래 「근거 따라가기」) |
 | POST | `/api/nodes` | 생성. 본문 `{"type","properties"}`. 응답 `201 NodeView` |
 | PATCH | `/api/nodes/{id}` | 속성 수정. 본문 `{"expectedRevision", "properties": {키: 값 또는 null}}`. `null` 은 그 속성을 지운다. 응답 `NodeView` |
 | POST | `/api/nodes/{id}/archive` | 보관. 본문 `{"expectedRevision","reason"}`. `reason` 은 선택. 응답 `NodeView` |
@@ -239,11 +243,22 @@ revision 은 그대로이고 ChangeEvent 도 만들지 않는다. `expectedRevis
   "claim": "ClaimView 또는 null. 노드가 Claim 일 때만 있다",
   "relationships": ["RelationshipView. ISSUES 처럼 일반 관계만. 보관된 관계 포함"],
   "claims": ["ClaimView. 이 노드가 SUBJECT, OBJECT, SUPPORTED_BY 의 끝인 Claim. 보관된 Claim 제외"],
+  "concepts": ["ConceptRef. 이 노드에서 Concept 으로 나가는 보관되지 않은 관계의 끝. 보관된 개념 제외"],
   "relationshipsTruncated": false,
   "claimsTruncated": false,
   "limits": { "maxRelationships": 100, "maxClaims": 50 }
 }
 ```
+
+`ConceptRef`
+
+```json
+{ "id": "uuid", "label": "DCF", "summary": "앞으로 벌어들일 현금흐름을 할인율로 지금 가치로 바꿔 더하는 평가 방법", "relationshipType": "USES_CONCEPT" }
+```
+
+- `summary` 는 개념의 한 줄 정의(`summary` 속성)다. 값이 없으면 `null` 이다.
+- `relationshipType` 은 이 노드와 개념을 잇는 관계 종류다. 같은 개념이 두 관계로 이어져 있으면 먼저 만든 관계 하나로 담는다.
+- 개념 노드 자신의 상세에도 `concepts` 가 있다(`RELATED_TO` 로 나가는 개념). 화면은 개념 상세에서는 칩 대신 「관련 개념」 절로 보인다.
 
 ## 관계
 
@@ -299,6 +314,111 @@ Claim 에 딸린 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 는 이 API 로 만들 수 
 Claim 작성자와 마지막으로 내용을 고친 사람은 그 Claim 을 검토할 수 없다(`403 SELF_REVIEW_FORBIDDEN`).
 활성 근거 문서가 없는 Claim 은 `REVIEWED` 로 검토할 수 없다(`409 NO_ACTIVE_EVIDENCE`). `REJECTED` 와 `DRAFT` 는 할 수 있다. 두 사람이 모두 손댄 Claim 은 제3자가 검토한다. 보관된 Claim 은 검토할 수 없다(`409 ARCHIVED`).
 Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 한다.
+
+## 근거 따라가기
+
+`GET /api/nodes/{id}/trace` 는 지금 항목에서 들어오는 관계를 거꾸로 따라 올라가 모은 조상과, 이 항목에 기대는 아래쪽 항목을 한 단계 돌려준다. 결정과 근거는 [ADR-011](adr/011-learning-marks-and-trace.md), 화면은 [흐름](flow.md) 의 「근거 따라가기」 다.
+
+따라가는 규칙은 아래와 같다.
+
+- 단계 `n` 의 위 단계는 `(p:Knowledge)-[r]->(n)` 인 `p` 다. `r` 은 지금 온톨로지의 `relationshipTypes` 에 있고, 보관되지 않았고, 근거 관계도 개념 관계도 아니어야 한다. `p` 도 보관되지 않아야 한다.
+- 근거 관계는 온톨로지에서 끝(`to`) 타입에 `Document` 가 있는 관계 종류다(`EVIDENCED_BY`, `AUTHORED`). 개념 관계는 끝 타입에 `Concept` 가 있는 관계 종류다(`RELATED_TO`, `USES_CONCEPT`). 둘은 따라가지 않고 단계의 `documents`, `concepts` 로 붙인다. 주장 관계(`SUBJECT`, `OBJECT`, `SUPPORTED_BY`)와 `:User` 의 `KNOWS` 도 따라가지 않는다.
+- 너비 우선으로 깊이 6 까지, 단계 60개(지금 항목 포함)까지 모은다. 이미 모은 항목은 다시 펼치지 않는다. 한도를 넘으면 그 앞까지만 담고 `truncated` 를 `true` 로 둔다.
+- 지금 항목이 없거나 보관됐으면 `404 NOT_FOUND` 다. 주장(Claim)도 따라갈 수 있지만 일반 관계가 없어 지금 항목 한 단계만 돌아온다.
+- 조회 트랜잭션은 주변 그래프와 같은 `workbench.graph.timeout`(기본 5초)이고, 넘으면 `503 QUERY_TIMEOUT` 이다.
+
+`TraceView`
+
+```json
+{
+  "rootId": "uuid",
+  "steps": [
+    {
+      "node": "NodeView",
+      "depth": 0,
+      "childId": null,
+      "relationshipId": null,
+      "relationshipType": null,
+      "status": "MISSING",
+      "documents": ["DocumentRef"],
+      "claims": [{ "id": "uuid", "label": "Fluence Energy → 에너지 저장(ESS) 속한다", "predicate": "BELONGS_TO_SECTOR", "reviewStatus": "REVIEWED" }],
+      "concepts": ["ConceptRef"],
+      "missing": [{ "relationshipType": "BASED_ON", "candidates": ["NodeRef"] }],
+      "knowledge": { "nodeId": "uuid", "level": "UNSURE", "note": "왜 이 가정이 낙관인지 모르겠다", "updatedAt": "2026-10-25T03:15:00.123456Z" }
+    }
+  ],
+  "dependents": [{ "node": "NodeRef", "relationshipId": "uuid", "relationshipType": "HAS_DECISION" }],
+  "truncated": false,
+  "dependentsTruncated": false,
+  "limits": { "maxDepth": 6, "maxSteps": 60, "maxDependents": 50, "maxCandidates": 5 }
+}
+```
+
+| 필드 | 뜻 |
+| --- | --- |
+| `steps` | 깊이 순서, 같은 깊이에서는 만든 순서다. 첫 단계가 지금 항목(`depth = 0`)이다 |
+| `childId`, `relationshipId`, `relationshipType` | 이 단계에서 한 단계 아래(지금 항목 쪽) 단계로 가는 관계. 처음 찾은 길 하나다. 지금 항목은 `null` 이다. 관계 문장은 화면이 온톨로지의 `sentence` 로 만든다 |
+| `documents` | 이 단계에서 근거 관계로 이어진 보관되지 않은 근거 문서. 20개까지 |
+| `claims` | 이 단계가 주체나 대상인 보관되지 않은 주장. 20개까지, 만든 순서 |
+| `concepts` | 노드 상세의 `concepts` 와 같다 |
+| `status` | `SUPPORTED`(근거 문서가 있거나 검토 완료 주장이 있다), `PARTIAL`(근거 문서 없이 초안 주장만 있다), `MISSING`(둘 다 없다). 반려된 주장은 세지 않는다. 설명 글(「원문 대조 대기」 등)은 해석하지 않는다 |
+| `missing` | 아직 잇지 않은 관계. 아래 규칙 |
+| `knowledge` | 요청한 사람의 이해 표시(「내 이해 표시」 의 `KnowledgeMark`). 없으면 `null` 이다. 다른 사람의 표시는 담지 않는다 |
+| `dependents` | 지금 항목에서 나가는 관계(따라가는 관계와 같은 규칙)의 끝. 이 항목에 기대는 것이다. 한 단계만, 50개까지, 만든 순서 |
+
+`missing` 은 단계마다 이렇게 만든다.
+
+- 따라가는 관계 종류 가운데 끝 타입에 이 단계의 타입이 있는 것마다, 보관되지 않은 노드에서 들어오는 보관되지 않은 관계가 하나도 없으면 항목 하나다. 예: 결정에 `BASED_ON` 이 없으면 `{"relationshipType": "BASED_ON"}` 이다.
+- `candidates` 는 그 관계의 시작 타입인 보관되지 않은 노드 가운데, 이 단계에서 따라가는 관계(방향 무시)로 3홉 안에 닿는 것이다. 가까운 순서, 같으면 늦게 만든 순서로 5개까지다. 결정이면 같은 종목을 발행한 기업의 밸류에이션이 여기 든다(결정, 종목, 기업, 밸류에이션). 없으면 빈 목록이다.
+
+## 내 이해 표시
+
+요청한 사람 본인의 이해 표시만 읽고 쓴다. 다른 사람의 표시를 읽는 API 는 없다. 모든 역할(VIEWER 포함)이 부르고, 쓰기는 다른 쓰기와 같이 CSRF 토큰이 필요하다. 저장 모델은 [데이터 스키마](data-schema.md) 의 「이해 표시」 다.
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| GET | `/api/me/knowledge` | 공부 목록. 쿼리: `level`(쉼표 구분, `KNOWN`, `UNSURE`, `LEARNING`. 없으면 전체), `page`, `size`. 바꾼 시각이 늦은 순서, 같으면 노드 id 순서. 응답 `Page<StudyItem>` |
+| GET | `/api/me/knowledge/summary` | 개수와 내 능력 범위. 응답 `KnowledgeSummary` |
+| GET | `/api/me/knowledge/{nodeId}` | 한 항목의 내 표시. 응답 `KnowledgeMark`. 표시가 없으면 `level`, `note`, `updatedAt` 이 `null` 이다 |
+| PUT | `/api/me/knowledge/{nodeId}` | 표시를 쓴다. 본문 `{"level", "note"}`. `note` 는 선택이고 비우거나 `null` 이면 메모를 지운다. 응답 `KnowledgeMark` |
+| DELETE | `/api/me/knowledge/{nodeId}` | 표시를 지운다. 표시가 없어도 `204` 다 |
+
+- `level` 이 세 값 밖이거나 없으면 `400 VALIDATION_FAILED`(`details.fieldErrors.level`)다. `note` 가 1000자를 넘으면 `400 VALIDATION_FAILED`(`details.fieldErrors.note`)다. 쿼리의 `level` 이 세 값 밖이면 `400 VALIDATION_FAILED` 다.
+- 그 id 의 지식 노드가 없으면 `404 NOT_FOUND` 다. 보관된 노드에도 쓰고 지울 수 있다.
+- revision 이 없고 `expectedRevision` 을 받지 않는다. 나중 쓰기가 남는다. 변경 이력을 남기지 않는다.
+
+`KnowledgeMark`
+
+```json
+{ "nodeId": "uuid", "level": "UNSURE", "note": "계통 접속이 왜 막히는지 모르겠다", "updatedAt": "2026-10-25T03:15:00.123456Z" }
+```
+
+`StudyItem`
+
+```json
+{
+  "node": "NodeRef",
+  "level": "UNSURE",
+  "note": "계통 접속이 왜 막히는지 모르겠다",
+  "updatedAt": "2026-10-25T03:15:00.123456Z",
+  "contexts": [{ "decision": "NodeRef", "depth": 4 }],
+  "documents": ["DocumentRef"],
+  "concepts": ["ConceptRef"]
+}
+```
+
+- `contexts` 는 이 항목을 근거 따라가기의 단계로 가지는 투자 결정(Decision)이다. 이 항목에서 따라가는 관계를 정방향으로 6홉 안에 닿는 보관되지 않은 결정을 가까운 순서로 3개까지 담는다. `depth` 는 결정에서 이 항목까지의 단계 수이고, 항목이 결정이면 `0` 이다. 보관된 항목은 빈 목록이다.
+- `documents` 는 근거 따라가기 단계의 `documents` 와 같은 규칙으로 5개까지, `concepts` 는 노드 상세의 `concepts` 와 같은 규칙으로 10개까지다.
+
+`KnowledgeSummary`
+
+```json
+{ "counts": { "KNOWN": 5, "UNSURE": 2, "LEARNING": 1 }, "decisions": { "total": 4, "understood": 1 }, "decisionsTruncated": false }
+```
+
+- `counts` 는 표시 수다. 보관된 항목의 표시도 센다. 표시가 없는 값은 `0` 이다.
+- `decisions.total` 은 보관되지 않은 투자 결정 수, `understood` 는 그 가운데 근거 따라가기의 모든 단계(결정 자신 포함, 같은 한도)를 내가 `KNOWN` 으로 표시한 결정 수다. 결정은 만든 순서로 200개까지 세고, 넘으면 `decisionsTruncated` 가 `true` 다.
+- 결정 타입은 이름(`Decision`)으로 읽는다. 온톨로지에 이 타입이 없으면 `total` 은 `0` 이다.
 
 ## 주변 그래프
 

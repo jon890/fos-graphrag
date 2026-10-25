@@ -178,6 +178,15 @@ PR 을 머지 큐(`merge-with-finish.py`)로 머지하면 `.claude/orch-finish.j
 
 폼 편집기로 같은 값을 하나씩 고쳐도 된다. 어느 쪽이든 새 버전이 쌓이므로 되돌릴 수 있다.
 
+## 개념 설명을 운영에 반영할 때
+
+관계 종류 `USES_CONCEPT`(「쓰는 개념」)와 개념 초기 데이터(`learning-concepts-2026-10`)는 이미지를 바꾸는 것만으로는 운영에 들어가지 않는다. 운영 온톨로지는 DB 의 버전이고, 초기 데이터는 그 관계 종류가 온톨로지에 있어야 적용된다([데이터 스키마](data-schema.md) 의 「초기 데이터」).
+
+1. 이미지를 배포한다. 시작 로그에 `초기 데이터 learning-concepts-2026-10 를 적용하지 못했다` 가 `warn` 으로 남는다. 파일 전체가 롤백되어 개념도 만들어지지 않고 `SeedRun` 도 남지 않는다. 저장소 YAML 에만 있는 관계 종류라는 `warn` 로그(`USES_CONCEPT`)도 함께 남는다.
+2. ADMIN 이 더보기 「온톨로지 상세」 의 「YAML 로 편집」 에 저장소 `ontology/financial-ontology.yaml` 의 `USES_CONCEPT` 정의를 `relationshipTypes` 아래에 더한다. 「저장 전에 확인」 의 바뀐 점이 `relationshipTypes.USES_CONCEPT` 더함 하나이고 영향 목록이 비어 있는지 본 뒤, 메모(「쓰는 개념 관계 추가」)를 적고 저장한다.
+3. API 를 다시 시작한다(`docker compose restart app`). 시작할 때 `SeedRun` 이 없는 초기 데이터 파일을 다시 시도하므로 이번에는 적용되고 `초기 데이터 적용: 1개 파일` 이 남는다. 다시 시작하면 로그인 세션이 사라진다.
+4. 개념 지도의 개념 개수가 0 이 아닌지, 「FLNC 간이 DCF (Valley AI 화면)」 상세에 개념 칩(DCF 등)이 보이는지, FLNC 첫 매수의 근거 따라가기와 공부 탭이 열리는지 확인한다.
+
 ## 백업
 
 Neo4j Community 에디션은 온라인 백업(`neo4j-admin database backup`)을 지원하지 않는다.
