@@ -9,13 +9,13 @@ import com.fasterxml.jackson.annotation.JsonInclude
 data class V1NodeRef(val id: String, val type: String, val typeLabel: String, val label: String)
 
 @JsonInclude(JsonInclude.Include.ALWAYS)
-data class V1Me(val user: V1MeUser, val token: V1MeToken, val rateLimitPerMinute: Int)
+data class V1Me(val user: V1MeUser, val token: V1MeToken, val rateLimitPerMinute: Int, val writeRateLimitPerMinute: Int)
 
 @JsonInclude(JsonInclude.Include.ALWAYS)
 data class V1MeUser(val id: String, val displayName: String, val role: String)
 
 @JsonInclude(JsonInclude.Include.ALWAYS)
-data class V1MeToken(val id: String, val name: String, val last4: String)
+data class V1MeToken(val id: String, val name: String, val last4: String, val scope: String)
 
 @JsonInclude(JsonInclude.Include.ALWAYS)
 data class V1Ontology(
@@ -280,3 +280,54 @@ data class V1StudyItem(
     val documents: List<V1Document>,
     val concepts: List<V1Concept>,
 )
+
+/** 토큰 주인의 체결. `security` 와 `decisions` 에서 보관된 노드는 뺀다 */
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1Trade(
+    val id: String,
+    val broker: String,
+    val externalId: String,
+    val side: String,
+    val market: String,
+    val ticker: String,
+    val name: String?,
+    val quantity: Double,
+    val price: Double,
+    val currency: String,
+    val amount: Double,
+    val fee: Double?,
+    val executedAt: String,
+    val createdAt: String,
+    val security: V1NodeRef?,
+    val decisions: List<V1NodeRef>,
+)
+
+/** `status` 는 `created`(새로 저장) 또는 `existing`(이미 있음)이다 */
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1TradeResult(val index: Int, val status: String, val trade: V1Trade)
+
+/** 화면용 `ProposalView` 에서 `refs`, `token`, `requiresEditor`, `createdVia` 를 뺀 것이다 */
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1Proposal(
+    val id: String,
+    val kind: String,
+    val status: String,
+    val payload: Map<String, Any?>,
+    val rationale: String,
+    val evidence: Map<String, Any?>,
+    val dedupeKey: String?,
+    val createdAt: String,
+    val decidedAt: String?,
+    val decisionNote: String?,
+    val result: Map<String, Any?>?,
+    val lastError: V1ProposalError?,
+)
+
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1ProposalError(val code: String, val message: String, val at: String)
+
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1ProposalResult(val index: Int, val status: String, val proposal: V1Proposal)
+
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1Results<T>(val results: List<T>)

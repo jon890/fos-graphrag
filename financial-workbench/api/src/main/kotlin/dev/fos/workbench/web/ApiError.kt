@@ -81,4 +81,7 @@ class ProposalLimitException(max: Int, pending: Long) :
 class ProposalNotPendingException(status: String) :
     ApiException(HttpStatus.CONFLICT, "PROPOSAL_NOT_PENDING", "이미 처리한 제안입니다.", mapOf("status" to status))
 
+class InsufficientScopeException :
+    ApiException(HttpStatus.FORBIDDEN, "INSUFFICIENT_SCOPE", "이 토큰은 조회만 할 수 있습니다. 「조회와 기록」 토큰을 새로 발급하세요.")
+
 class ForbiddenException(message: String) : ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", message)

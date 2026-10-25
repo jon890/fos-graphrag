@@ -7,6 +7,8 @@ import dev.fos.workbench.knowledge.NodeRef
 import dev.fos.workbench.knowledge.NodeView
 import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.ontology.PropertyType
+import dev.fos.workbench.proposal.StoredProposal
+import dev.fos.workbench.trade.TradeView
 import dev.fos.workbench.web.PageQuery
 import dev.fos.workbench.web.ValidationFailedException
 import org.springframework.stereotype.Component
@@ -59,6 +61,41 @@ class V1Mapper(private val holder: OntologyHolder) {
             documents = c.documents.filterNot { it.archived }.map(::document),
         )
     }
+
+    /** 보관된 종목과 결정은 뺀다 */
+    fun trade(t: TradeView): V1Trade = V1Trade(
+        id = t.id,
+        broker = t.broker,
+        externalId = t.externalId,
+        side = t.side,
+        market = t.market,
+        ticker = t.ticker,
+        name = t.name,
+        quantity = t.quantity,
+        price = t.price,
+        currency = t.currency,
+        amount = t.amount,
+        fee = t.fee,
+        executedAt = t.executedAt,
+        createdAt = t.createdAt,
+        security = t.security?.takeUnless { it.archived }?.let(::ref),
+        decisions = t.decisions.filterNot { it.archived }.map(::ref),
+    )
+
+    fun proposal(p: StoredProposal): V1Proposal = V1Proposal(
+        id = p.id,
+        kind = p.kind.name,
+        status = p.status,
+        payload = p.payload,
+        rationale = p.rationale,
+        evidence = p.evidence,
+        dedupeKey = p.dedupeKey,
+        createdAt = p.createdAt,
+        decidedAt = p.decidedAt,
+        decisionNote = p.decisionNote,
+        result = p.result,
+        lastError = p.lastError?.let { V1ProposalError(it.code, it.message, it.at) },
+    )
 
     fun summary(n: NodeView): V1NodeSummary =
         V1NodeSummary(n.id, n.type, typeLabel(n.type), n.label, n.reviewStatus, n.revision, n.updatedAt)

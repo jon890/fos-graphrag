@@ -46,6 +46,8 @@ data class WorkbenchProperties(
     data class Agent(
         /** 연동 토큰 하나가 1분에 부를 수 있는 /api/v1 요청 수 */
         val rateLimitPerMinute: Int = 60,
+        /** 연동 토큰 하나가 1분에 부를 수 있는 /api/v1 쓰기 요청 수. 전체 한도에도 함께 센다 */
+        val writeRateLimitPerMinute: Int = 10,
         /** 사용자마다 폐기하지 않은 연동 토큰 수 */
         val maxTokensPerUser: Int = 5,
     )

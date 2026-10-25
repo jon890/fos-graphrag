@@ -14,11 +14,12 @@ import tools.jackson.databind.json.JsonMapper
 /**
  * `/api/v1` 요청의 `Authorization: Bearer` 연동 토큰으로 인증한다. 빈이 아니고 `SecurityConfig` 가 만들어 건다.
  * 인증에 실패하면 인증을 넣지 않고 넘겨, 뒤의 권한 검사가 401 을 쓴다. 실패 이유는 응답으로 가르지 않는다.
- * 요청 한도는 인증에 성공한 요청만 센다. 헤더 값과 토큰 원문은 로그에 남기지 않는다.
+ * 요청 한도는 인증에 성공한 요청만 센다. 쓰기 메서드는 전체 한도를 통과한 뒤 쓰기 한도에도 센다. 헤더 값과 토큰 원문은 로그에 남기지 않는다.
  */
 class BearerTokenFilter(
     private val tokens: IntegrationTokenService,
     private val limiter: RateLimiter,
+    private val writeLimiter: RateLimiter,
     private val mapper: JsonMapper,
 ) : OncePerRequestFilter() {
 
@@ -35,17 +36,16 @@ class BearerTokenFilter(
         }
         val decision = limiter.tryAcquire(principal.tokenId)
         if (!decision.allowed) {
-            val seconds = decision.retryAfterSeconds
-            response.status = 429
-            response.setHeader(HttpHeaders.RETRY_AFTER, seconds.toString())
-            response.contentType = MediaType.APPLICATION_JSON_VALUE
-            response.characterEncoding = "UTF-8"
-            response.writer.write(
-                mapper.writeValueAsString(
-                    ApiError("RATE_LIMITED", "요청이 너무 많습니다. 잠시 뒤 다시 시도하세요.", mapOf("retryAfterSeconds" to seconds)),
-                ),
-            )
+            respondRateLimited(response, decision.retryAfterSeconds)
             return
+        }
+        // 범위 확인은 컨트롤러가 하므로 「조회만」 토큰의 쓰기 요청도 여기서 센다
+        if (request.method !in READ_METHODS) {
+            val write = writeLimiter.tryAcquire(principal.tokenId)
+            if (!write.allowed) {
+                respondRateLimited(response, write.retryAfterSeconds)
+                return
+            }
         }
         val context = SecurityContextHolder.createEmptyContext()
         context.authentication = UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.role.authorities())
@@ -53,7 +53,20 @@ class BearerTokenFilter(
         chain.doFilter(request, response)
     }
 
+    private fun respondRateLimited(response: HttpServletResponse, seconds: Long) {
+        response.status = 429
+        response.setHeader(HttpHeaders.RETRY_AFTER, seconds.toString())
+        response.contentType = MediaType.APPLICATION_JSON_VALUE
+        response.characterEncoding = "UTF-8"
+        response.writer.write(
+            mapper.writeValueAsString(
+                ApiError("RATE_LIMITED", "요청이 너무 많습니다. 잠시 뒤 다시 시도하세요.", mapOf("retryAfterSeconds" to seconds)),
+            ),
+        )
+    }
+
     companion object {
         private const val PREFIX = "Bearer "
+        private val READ_METHODS = setOf("GET", "HEAD", "OPTIONS")
     }
 }
