@@ -271,6 +271,7 @@ test('휴대폰 폭에서 근거 따라가기와 공부 탭이 가로 스크롤 
   await openScreen(page, 'study')
   const item = page.locator(`[data-testid="study-item"][data-node-id="${stepId}"]`)
   await expect(item).toBeVisible()
+  await expect(page.getByTestId('study-counts')).toBeVisible()
   await expectNoHorizontalOverflow(page)
   await shot(page, 'study-mobile')
 
