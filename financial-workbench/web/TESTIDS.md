@@ -12,7 +12,7 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `login-google` | 「Google 로 로그인」. `/oauth2/authorization/google` 로 브라우저가 이동한다 |
 | `login-denied` | `/?login=denied` 로 돌아왔을 때 「접근 권한이 없습니다」 안내. `login-google` 도 함께 보인다 |
 | `login-notice` | 세션이 끊겨 돌아왔을 때의 안내 |
-| `tab-map`, `tab-workspace`, `tab-list` | 상단 탭(개념 지도, 작업 공간, 목록). `role=tab`, 고른 탭은 `aria-selected="true"` |
+| `tab-map`, `tab-workspace`, `tab-list`, `tab-study` | 상단 탭(개념 지도, 작업 공간, 목록, 공부). `role=tab`, 고른 탭은 `aria-selected="true"` |
 | `more-open` | 「더보기」 메뉴 단추. 메뉴의 화면(변경 이력, 온톨로지 상세, 검토 대기, 사용자)이 열려 있으면 `data-active="true"` |
 | `more-item-<key>` | 더보기 메뉴 항목. `key` 는 `changes`, `ontology`, `review`(EDITOR, ADMIN), `users`(ADMIN). 열람자가 주소로 연 `/review` 도 `more-open` 이 `data-active="true"` 다 |
 | `current-user-name`, `current-user-email` | 로그인 사용자의 표시 이름, 이메일 |
@@ -78,7 +78,7 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `map-intro` | 지도 위 소개(「투자 온톨로지」) |
 | `map-counts-error` | 항목 수(`GET /api/nodes/counts`)를 받지 못했을 때의 안내와 이유 |
 | `map-empty` | 모든 타입의 항목 수가 0 일 때의 안내 |
-| `concept-map-canvas` | Cytoscape 컨테이너. `data-node-count` 는 그린 타입 노드 수, `data-layout-done` 은 배치가 끝나면 `"true"` |
+| `concept-map-canvas` | Cytoscape 컨테이너. `data-node-count` 는 그린 타입 노드 수, `data-layout-done` 은 배치가 끝나면 `"true"`, `data-node-font-px` 는 화면에 그려지는 노드 글자 크기(글자 크기 × 배율을 반올림한 정수) |
 | `map-claim-note` | 지도 아래 「주장은 어느 항목에나 붙일 수 있습니다」 와 주장 수. 주장 타입이 온톨로지에 없으면 없다 |
 | `map-type-list` | 타입 목록 |
 | `map-type` * | 타입 단추. `data-type`, 고른 타입은 `aria-pressed="true"`. 순서는 타입 순서다 |
@@ -86,6 +86,7 @@ e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec
 | `map-type-panel` | 고른 타입의 칸. `data-type`. 주소의 `type` 이 지도에 있는 타입일 때만 나온다 |
 | `map-type-description` | 타입 설명 |
 | `map-recent-item` * | 최근 항목 한 줄. `data-node-id`. 누르면 작업 공간에서 그 항목의 상세를 연다 |
+| `map-recent-trace` * | 최근 항목 줄의 「근거 따라가기」. `data-node-id`. 누르면 `/trace?node=<id>` 를 연다 |
 | `map-recent-empty`, `map-recent-error` | 최근 항목이 없음, 받지 못한 오류 |
 | `map-relation` * | 관계 문장 한 줄. `data-relationship` |
 | `map-open-list`, `map-open-workspace` | 「목록에서 보기」, 「작업 공간에서 보기」 |
@@ -149,10 +150,12 @@ VIEWER 에게는 `node-edit`, `node-edit-form`, `edit-prop-*`, `node-save`, `nod
 | `node-created-line` | 머리 아래 「{작성자}이(가) {날짜}에 등록」 한 줄 |
 | `detail-notice` | 저장, 보관 결과 안내. `data-kind` 가 `success`, `conflict`(409 REVISION_CONFLICT), `error` |
 | `viewer-hint` | VIEWER 에게 보이는 「조회만 할 수 있습니다」 안내 |
-| `node-actions` | 버튼 줄(「편집」, 「그래프 중심으로」, 「⋯」) |
+| `node-actions` | 버튼 줄(「편집」, 「그래프 중심으로」, 「근거 따라가기」, 「⋯」) |
 | `node-edit` | 「편집」. 편집 권한이 있고 보관되지 않은 노드에만 나온다. 누르면 속성 수정 폼이나 Claim 내용 수정 폼이 열린다 |
 | `node-edit-cancel` | 편집 폼 옆의 「취소」. 읽기 카드로 돌아간다 |
 | `node-center-graph` | 이 노드를 그래프 중심으로 |
+| `node-trace` | 「근거 따라가기」. 보관된 노드에는 없다. 누르면 `/trace?node=<id>` 를 연다 |
+| `node-learning-row` | 버튼 줄 아래의 내 이해 표시(`knowledge-controls`)와 개념 칩(`concept-chips`). 개념 노드에는 칩이 없다. 아래 「근거 따라가기와 이해 표시」 |
 | `node-more` | 「⋯」(`aria-label="더 보기"`). 아래 메뉴 항목을 연다 |
 | `node-copy-link` | 메뉴의 「링크 복사」. 열람자에게도 보인다 |
 | `node-copy-link-done`, `node-copy-link-fallback` | 버튼 줄 아래의 복사했다는 안내, 클립보드를 못 쓸 때 주소를 보이는 읽기 전용 입력칸. 메뉴가 닫혀도 남는다 |
@@ -190,6 +193,83 @@ VIEWER 에게는 `node-edit`, `node-edit-form`, `edit-prop-*`, `node-save`, `nod
 | `claim-description`, `claim-evidence` | 설명, 근거 문장 |
 | `claim-valid-from-input`, `claim-valid-to-input` | 유효기간(선택) |
 | `claim-add-submit`, `claim-add-cancel`, `claim-add-error` | 만들기, 취소, 오류 |
+
+## 근거 따라가기와 이해 표시
+
+근거 따라가기는 `/trace?node=<id>` 화면이다. 열람자에게는 `trace-candidate-link`, `trace-missing-open`, `trace-step-attach` 가 나오지 않는다.
+이해 표시 토글과 개념 칩은 상세(`node-learning-row`)와 근거 따라가기 단계 카드에 함께 쓴다.
+
+| testid | 요소 |
+| --- | --- |
+| `trace-page` | 화면. `data-node-id` 는 주소의 `node` |
+| `trace-empty` | `node` 가 없을 때의 안내. 안에 「작업 공간으로」(`trace-open-workspace`)가 있다 |
+| `trace-not-found` | 「이 항목을 찾을 수 없거나 보관되었습니다.」(404) |
+| `trace-error`, `trace-retry` | 그 밖의 오류 이유와 「다시 시도」 |
+| `trace-title` | 제목 「{이름}: 이 판단은 어디서 왔나」 |
+| `trace-open-workspace` | 머리의 「작업 공간에서 보기」. 지금 항목의 상세를 연다 |
+| `trace-summary` | 요약 줄. `data-steps`, `data-supported`, `data-partial`, `data-missing`, `data-unsure` 가 단계 수와 상태별 개수, 「잘 모르겠어요」 단계 수다 |
+| `trace-truncated` | 한도에 걸려 잘렸다는 안내 |
+| `trace-step` * | 단계 카드. 깊은 단계가 위다. `data-node-id`, `data-depth`, `data-status`(`SUPPORTED`, `PARTIAL`, `MISSING`), `data-role`(`origin` 출발점, `middle`, `root` 지금 항목) |
+| `trace-step-name` * | 단계 이름 단추. 누르면 그 항목을 기준으로 다시 따라간다 |
+| `trace-step-sentence` * | 아래 단계와의 관계 문장. 이 단계 이름이 굵다. 지금 항목 카드에는 없다 |
+| `trace-step-description` * | 설명 칸(`description`, 결정은 `reason`)의 글. 그 속성이 비었거나 온톨로지에 없으면 없다 |
+| `trace-step-document` * | 근거 문서 제목 링크(새 창). `data-document-id` |
+| `trace-step-claim` * | 주장 한 줄. `data-review-status` |
+| `trace-step-no-evidence` * | 근거 문서도 주장도 없을 때 「근거 문서가 아직 없습니다.」 |
+| `trace-step-attach` * | 「＋ 근거 문서 붙이기」. 누르면 작업 공간에서 그 항목의 상세를 연다 |
+| `trace-missing` * | 「아직 이어지지 않은 {관계}」. `data-relationship` |
+| `trace-candidate-link` * | 「{후보} 잇기」. `data-candidate-id`. 누르면 관계를 만들고 다시 읽는다 |
+| `trace-missing-open` * | 후보가 없을 때의 「＋ 잇기」. 작업 공간에서 그 항목의 상세를 연다 |
+| `trace-missing-error` * | 잇기 실패 이유. 그 카드 안에 나온다 |
+| `trace-dependents` | 「이 항목에 기대는 것」 절. 없으면 「지금은 이 항목을 근거로 삼은 항목이 없습니다.」 |
+| `trace-dependent` * | 기대는 항목 한 줄(관계 문장). `data-node-id`. 이름을 누르면 그 항목을 기준으로 따라간다 |
+| `knowledge-controls` * | 이해 표시 묶음. `data-level` 이 `KNOWN`, `UNSURE`, `LEARNING`, `none` |
+| `knowledge-known`, `knowledge-unsure` * | 「알아요」, 「잘 모르겠어요」 토글. `aria-pressed`. 눌린 쪽을 다시 누르면 표시를 지운다. 쓰는 동안 꺼진다 |
+| `knowledge-learning-badge` * | 「공부 중」 글자. `LEARNING` 일 때만 나온다 |
+| `knowledge-note-open` * | 「메모 남기기」 |
+| `knowledge-note-input`, `knowledge-note-save`, `knowledge-note-cancel` | 메모 입력칸(1000자)과 「저장」, 「취소」 |
+| `knowledge-note` * | 「내 메모: …」 |
+| `knowledge-error` * | 읽기나 쓰기 실패 이유 |
+| `concept-chips` * | 개념 칩 목록. 개념이 없으면 없다 |
+| `concept-chip` * | 「개념 · {이름}」 칩. `data-concept-id`. 넓은 화면은 마우스를 올리거나 초점이 가면 한 줄 정의를 보이고 누르면 개념 상세를 연다. 좁은 화면은 누르면 한 줄 정의와 `concept-open` 을 보인다 |
+| `concept-summary` * | 한 줄 정의. 없으면 「한 줄 정의가 없습니다.」 |
+| `concept-open` * | 좁은 화면의 「개념 설명 전체 보기」 |
+
+## 공부
+
+공부 탭은 `/study` 화면이다. 주소의 `level`(`UNSURE`, `LEARNING`)과 `page` 로 목록을 좁힌다.
+
+| testid | 요소 |
+| --- | --- |
+| `study-tab` | 화면 |
+| `study-counts` | 개수 줄 「잘 모름 N」, 「공부 중 N」, 「이해함 N」. `data-known`, `data-unsure`, `data-learning` |
+| `study-competence` | 능력 범위 줄. `data-total`, `data-understood` |
+| `study-filter` * | 「잘 모름」, 「공부 중」 칩. `data-level`, `aria-pressed`. 처음에는 둘 다 눌려 있다 |
+| `study-item` * | 항목 카드. `data-node-id`, `data-level`, 보관된 항목이면 `data-archived="true"` |
+| `study-item-name` * | 이름 단추. 작업 공간에서 그 항목의 상세를 연다 |
+| `study-item-context` * | 단계 맥락 「{결정 이름}의 {N}단계 위」, 「투자 결정」, 「이어진 투자 결정이 없습니다」 |
+| `study-item-note` * | 「내 메모: …」 |
+| `study-todo` * | 할 일 한 줄. `data-kind` 가 `document`(문서 주소를 새 창으로 연다), `concept`(개념 상세를 연다), `attach`(근거 문서가 없다는 안내) |
+| `study-trace` * | 「근거 따라가기에서 보기」. 보관된 항목에는 없다 |
+| `study-learning` * | 「공부 중」. `LEARNING` 항목에는 없다 |
+| `study-known` * | 「이해했어요」. `KNOWN` 으로 쓰고 다시 읽으면 목록에서 빠진다 |
+| `study-note-open` * | 「메모 남기기」 |
+| `study-note-input`, `study-note-save`, `study-note-cancel` * | 카드 안의 메모 입력칸(1000자)과 「저장」, 「취소」. 저장은 카드의 `level` 을 그대로 쓴다 |
+| `study-page-prev`, `study-page-next`, `study-page-info` | 쪽 넘기기 |
+| `study-empty` | 빈 상태 안내 |
+| `study-error`, `study-retry` | 목록을 받지 못했을 때의 이유와 「다시 시도」 |
+| `study-summary-error`, `study-summary-retry` | 위쪽 요약을 받지 못했을 때의 이유와 「다시 시도」 |
+
+## 개념 상세
+
+개념 노드의 상세에서 `node-learning-row` 아래에 나온다. 개념 칩 줄은 나오지 않는다.
+
+| testid | 요소 |
+| --- | --- |
+| `concept-sections` | 절 묶음 |
+| `concept-section` * | 절. `data-section` 이 `advocates`(강조한 사람), `criticizes`(비판한 사람), `related`(관련 개념), `used-by`(이 개념을 쓴 곳), 그 밖의 주장 종류는 `predicate-<키>` |
+| `concept-section-item` * | 절의 항목 한 줄. `data-node-id`. 이름을 누르면 그 항목의 상세를 연다(상세만 바꾸는 열기) |
+| `concept-section-empty` * | 빈 절의 「아직 없습니다」 |
 
 ## Claim 카드와 Claim 노드 상세
 

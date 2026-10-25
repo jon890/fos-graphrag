@@ -50,6 +50,7 @@ class NodeQueryService(
             claim = if (node.type == ClaimService.CLAIM) reader.claim(id) else null,
             relationships = relationships.views(relationshipRows.take(limits.maxRelationships)),
             claims = reader.claims(claimIds.take(limits.maxClaims)),
+            concepts = reader.concepts(listOf(id), MAX_CONCEPTS)[id].orEmpty(),
             relationshipsTruncated = relationshipRows.size > limits.maxRelationships,
             claimsTruncated = claimIds.size > limits.maxClaims,
             limits = DetailLimits(limits.maxRelationships, limits.maxClaims),
@@ -125,6 +126,11 @@ class NodeQueryService(
         val ids = client.query("MATCH (c:Knowledge:Claim) $where RETURN c.id AS id ORDER BY c.createdAt, c.id SKIP ${'$'}skip LIMIT ${'$'}limit")
             .bindAll(params).fetch().all().map { it["id"] as String }
         return page.of(reader.claims(ids), total)
+    }
+
+    companion object {
+        /** 노드 상세의 concepts 상한(docs/api-contract.md 「상한」) */
+        const val MAX_CONCEPTS = 20
     }
 
     private fun requireReviewStatus(value: String?): String? {

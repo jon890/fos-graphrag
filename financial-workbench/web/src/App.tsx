@@ -15,8 +15,10 @@ import {
   changesSearch,
   legacyRedirect,
   parseChangesQuery,
+  parseTraceQuery,
   parseWorkspaceQuery,
   tabOfPath,
+  traceSearch,
   workspaceSearch,
   type TabKey,
 } from './routes'
@@ -30,6 +32,8 @@ import { OntologyTab } from './components/ontology/OntologyTab'
 import { UsersTab } from './components/UsersTab'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ConceptMapTab } from './components/map/ConceptMapTab'
+import { StudyTab } from './components/learning/StudyTab'
+import { TracePage } from './components/learning/TracePage'
 import { MoreMenu } from './components/header/MoreMenu'
 import { TopTabs } from './components/header/TopTabs'
 import { GuideMessage, GuideOpenButton, GuideProvider } from './components/guide/GuideProvider'
@@ -196,6 +200,9 @@ export default function App() {
     [focusNode],
   )
 
+  /** 그 항목의 근거 따라가기를 연다. 상세, 개념 지도, 근거 따라가기 안에서 같은 주소를 쌓는다 */
+  const openTrace = useCallback((id: string) => go(TAB_PATHS.trace + traceSearch({ node: id })), [go])
+
   const openHistory = useCallback(
     (id: string) => go(TAB_PATHS.changes + changesSearch({ target: id, actor: '', page: 0 })),
     [go],
@@ -300,7 +307,7 @@ export default function App() {
       {!ontology && !ontologyError && <div className="p-12 text-center text-muted-foreground">온톨로지를 불러오는 중…</div>}
       {ontology && (
         <ErrorBoundary resetKey={activeTab ?? undefined}>
-          {activeTab === 'map' && <ConceptMapTab onOpenNode={focusNode} />}
+          {activeTab === 'map' && <ConceptMapTab onOpenNode={focusNode} onTrace={openTrace} />}
           {activeTab === 'workspace' && (
             <Workspace
               centerId={workspaceQuery.center ?? workspaceQuery.node}
@@ -310,9 +317,12 @@ export default function App() {
               onFocus={focusNode}
               onSelect={selectNode}
               onOpenHistory={openHistory}
+              onTrace={openTrace}
             />
           )}
+          {activeTab === 'trace' && <TracePage nodeId={parseTraceQuery(location.search).node} onOpenNode={focusNode} onTrace={openTrace} />}
           {activeTab === 'list' && <ListTab onOpen={focusNode} />}
+          {activeTab === 'study' && <StudyTab onOpenNode={focusNode} onTrace={openTrace} />}
           {activeTab === 'review' && <ReviewTab onOpen={focusNode} />}
           {activeTab === 'changes' && (
             <ChangesTab

@@ -49,6 +49,8 @@ class SecurityConfig {
                 it.requestMatchers("/api/health", "/api/auth/csrf").permitAll()
                     .requestMatchers("/api/users", "/api/users/**").hasRole("ADMIN")
                     .requestMatchers("/api/ontology/versions", "/api/ontology/versions/**", "/api/ontology/export", "/api/ontology/preview").hasRole("ADMIN")
+                    // 내 이해 표시는 열람자도 쓴다(docs/adr/011-learning-marks-and-trace.md)
+                    .requestMatchers("/api/me/**").hasRole("VIEWER")
                     .requestMatchers(HttpMethod.GET, "/api/**").hasRole("VIEWER")
                     .requestMatchers("/api/auth/logout").authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/auth/me/guide-done").authenticated()

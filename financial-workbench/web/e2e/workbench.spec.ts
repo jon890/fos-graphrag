@@ -103,6 +103,17 @@ async function archiveFromDetail(page: Page, reason?: string): Promise<void> {
   await expect(dialog).toHaveCount(0)
 }
 
+/** 초기 데이터가 만든 항목 이름 */
+const seedDecision = 'FLNC 첫 매수'
+const seedBottleneck = '데이터센터 전력 접속과 ESS 공급'
+const seedChange = '데이터센터가 늘면서 전력 공급과 계통 접속이 막히고, 전력을 저장하고 운영하는 ESS 수요가 커진다'
+const seedValuation = 'FLNC 간이 DCF (Valley AI 화면)'
+
+/** 근거 따라가기 화면에서 이름이 같은 단계 카드 */
+function traceStep(page: Page, name: string): Locator {
+  return page.getByTestId('trace-step').filter({ has: page.getByTestId('trace-step-name').filter({ hasText: exact(name) }) })
+}
+
 function searchResult(page: Page, label: string): Locator {
   return page.getByTestId('search-result').filter({ has: page.locator('.result-label', { hasText: exact(label) }) })
 }
@@ -1137,6 +1148,112 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
     await expect(pageAdmin).toHaveURL(/\/changes(\?|$)/)
     await expect(pageAdmin.getByTestId('more-open')).toHaveAttribute('data-active', 'true')
     await expect(pageAdmin.getByTestId('tab-map')).toHaveAttribute('aria-selected', 'false')
+  })
+
+  test('7c) 결정의 근거 따라가기가 변화까지 단계를 보이고, 후보 밸류에이션을 이으면 그 단계가 생긴다', async () => {
+    await searchAndOpen(pageA, seedDecision)
+    await pageA.getByTestId('node-trace').click()
+    await expect(pageA).toHaveURL(/\/trace\?node=/)
+    await expect(pageA.getByTestId('trace-step').first()).toBeVisible()
+
+    const steps = pageA.getByTestId('trace-step')
+    // 결정에서 종목, 기업, 병목, 변화까지 이어진다. 가장 깊은 단계(변화와 산업)가 출발점이다.
+    await expect(pageA.locator('[data-testid="trace-step"][data-role="root"]')).toHaveCount(1)
+    await expect(steps.filter({ hasText: 'FLNC' }).first()).toBeVisible()
+    await expect(steps.filter({ hasText: 'Fluence Energy' }).first()).toBeVisible()
+    await expect(traceStep(pageA, seedChange)).toHaveAttribute('data-role', 'origin')
+    const root = pageA.locator('[data-testid="trace-step"][data-role="root"]')
+    await expect(root.getByTestId('trace-step-name')).toHaveText(exact(seedDecision))
+    await expect(traceStep(pageA, seedBottleneck)).toHaveAttribute('data-status', 'SUPPORTED')
+    await expect(traceStep(pageA, seedChange).getByTestId('trace-step-description')).toContainText('원문 대조 대기')
+
+    const summary = pageA.getByTestId('trace-summary')
+    const stepsBefore = Number(await summary.getAttribute('data-steps'))
+    expect(stepsBefore).toBeGreaterThanOrEqual(5)
+    const missing = root.locator('[data-testid="trace-missing"][data-relationship="BASED_ON"]')
+    await expect(missing).toBeVisible()
+    await missing.getByTestId('trace-candidate-link').filter({ hasText: seedValuation }).click()
+
+    await expect(summary).toHaveAttribute('data-steps', String(stepsBefore + 1))
+    const valuation = traceStep(pageA, seedValuation)
+    await expect(valuation).toBeVisible()
+    await expect(valuation.getByTestId('concept-chip').filter({ hasText: exact('개념 · DCF') })).toBeVisible()
+    await shot(pageA, 'trace-wide')
+  })
+
+  test('7d) 이해 표시는 본인에게만 보이고 공부 탭에 단계 맥락과 함께 모인다', async () => {
+    const note = '계통 접속이 왜 막히는지 모르겠다'
+    const bottleneck = traceStep(pageA, seedBottleneck)
+    const bottleneckId = (await bottleneck.getAttribute('data-node-id')) ?? ''
+    expect(bottleneckId).not.toBe('')
+    await bottleneck.getByTestId('knowledge-unsure').click()
+    await expect(bottleneck.getByTestId('knowledge-unsure')).toHaveAttribute('aria-pressed', 'true')
+    await bottleneck.getByTestId('knowledge-note-open').click()
+    await bottleneck.getByTestId('knowledge-note-input').fill(note)
+    await bottleneck.getByTestId('knowledge-note-save').click()
+    await expect(bottleneck.getByTestId('knowledge-note')).toContainText(note)
+    await expect(pageA.getByTestId('trace-summary')).toHaveAttribute('data-unsure', '1')
+
+    // 공부 탭에 단계 맥락과 메모가 함께 모인다.
+    await openScreen(pageA, 'study')
+    const item = pageA.locator(`[data-testid="study-item"][data-node-id="${bottleneckId}"]`)
+    await expect(item).toBeVisible()
+    await expect(item.getByTestId('study-item-name')).toHaveText(seedBottleneck)
+    await expect(item.getByTestId('study-item-context')).toContainText(seedDecision)
+    await expect(item.getByTestId('study-item-note')).toContainText(note)
+    await shot(pageA, 'study-wide')
+
+    // 편집자 B 의 공부 탭과 API 에는 그 표시가 없다.
+    await openScreen(pageB, 'study')
+    await expect(pageB.getByTestId('study-counts')).toBeVisible()
+    await expect(pageB.locator(`[data-testid="study-item"][data-node-id="${bottleneckId}"]`)).toHaveCount(0)
+    const baseB = new URL(pageB.url()).origin
+    const others = await pageB.request.get(`${baseB}/api/me/knowledge/${encodeURIComponent(bottleneckId)}`)
+    expect(others.status()).toBe(200)
+    expect((await others.json()).level).toBeNull()
+
+    // 「이해했어요」 를 누르면 카드가 사라지고 이해함 개수가 하나 늘어난다.
+    const counts = pageA.getByTestId('study-counts')
+    const knownBefore = Number(await counts.getAttribute('data-known'))
+    await item.getByTestId('study-known').click()
+    await expect(item).toHaveCount(0)
+    await expect(counts).toHaveAttribute('data-known', String(knownBefore + 1))
+
+    // 열람자의 표시는 저장되고 새로고침 뒤에도 남지만 A 의 개수는 그대로다.
+    const unsureBefore = await counts.getAttribute('data-unsure')
+    const knownAfter = await counts.getAttribute('data-known')
+    await searchAndOpen(pageViewer, seedBottleneck)
+    const viewerUnsure = pageViewer.getByTestId('detail-panel').getByTestId('knowledge-unsure')
+    await viewerUnsure.click()
+    await expect(viewerUnsure).toHaveAttribute('aria-pressed', 'true')
+    await pageViewer.reload()
+    await expect(pageViewer.getByTestId('detail-panel').getByTestId('knowledge-unsure')).toHaveAttribute('aria-pressed', 'true')
+
+    await pageA.reload()
+    await expect(pageA.getByTestId('study-counts')).toHaveAttribute('data-unsure', unsureBefore ?? '')
+    await expect(pageA.getByTestId('study-counts')).toHaveAttribute('data-known', knownAfter ?? '')
+  })
+
+  test('7e) 개념 칩은 한 줄 정의를 보이고 개념 상세는 쓴 곳을 보인다', async () => {
+    await searchAndOpen(pageA, seedValuation)
+    const chip = pageA.getByTestId('detail-panel').getByTestId('concept-chip').filter({ hasText: exact('개념 · DCF') })
+    await chip.hover()
+    await expect(pageA.getByTestId('concept-summary')).toContainText('현금흐름')
+    await chip.click()
+    await expect(pageA.getByTestId('detail-label')).toHaveText(exact('DCF'))
+    const usedBy = pageA.locator('[data-testid="concept-section"][data-section="used-by"]')
+    await expect(usedBy.getByTestId('concept-section-item').filter({ hasText: seedValuation })).toBeVisible()
+    await shot(pageA, 'concept-wide')
+  })
+
+  test('7f) 넓은 화면 개념 지도의 노드 글자는 13px 이상이다', async () => {
+    await openScreen(pageA, 'map')
+    const canvas = pageA.getByTestId('concept-map-canvas')
+    await expect(canvas).toHaveAttribute('data-layout-done', 'true')
+    await expect
+      .poll(async () => Number(await canvas.getAttribute('data-node-font-px')), { message: '개념 지도 노드 글자 크기(px)' })
+      .toBeGreaterThanOrEqual(13)
+    await shot(pageA, 'map-wide')
   })
 
   test('8) 관리자가 열람자를 비활성화하면 열람자의 기존 세션이 끊긴다', async () => {

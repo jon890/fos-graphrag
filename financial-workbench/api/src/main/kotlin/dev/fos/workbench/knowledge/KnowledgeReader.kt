@@ -116,6 +116,53 @@ class KnowledgeReader(
         }
     }
 
+    /**
+     * 노드 id 마다 개념으로 나가는 보관되지 않은 관계의 끝 개념. 주장 관계(Claim 의 SUBJECT, OBJECT 등)는 빼고, 그 밖의 관계 종류로는 좁히지 않는다.
+     * 관계를 만든 순서이고, 같은 개념이 두 관계로 이어져 있으면 먼저 만든 관계 하나로 담는다. 개념이 없는 id 는 빠진다.
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun concepts(nodeIds: Collection<String>, limit: Int): Map<String, List<ConceptRef>> {
+        if (nodeIds.isEmpty()) return emptyMap()
+        val ontology = holder.current()
+        return client.query(
+            """
+            UNWIND ${'$'}ids AS nodeId
+            MATCH (:Knowledge {id: nodeId})-[r]->(c:Knowledge:Concept)
+            WHERE r.archived = false AND c.archived = false AND NOT type(r) IN ${'$'}claimRelationships
+            WITH nodeId, c, r ORDER BY r.createdAt, r.id
+            WITH nodeId, c, collect(r)[0] AS first
+            WITH nodeId, c, first ORDER BY first.createdAt, first.id
+            RETURN nodeId, collect({c: properties(c), type: type(first)})[0..${'$'}limit] AS concepts
+            """,
+        ).bindAll(
+            mapOf("ids" to nodeIds.toList(), "claimRelationships" to ontology.claimRelationships.keys.toList(), "limit" to limit.toLong()),
+        ).fetch().all().associate { row ->
+            row["nodeId"] as String to (row["concepts"] as List<Map<String, Any?>>).map {
+                val c = it["c"] as Map<String, Any?>
+                ConceptRef(c["id"] as String, ontology.labelOf(c["type"] as String, c), c["summary"] as String?, it["type"] as String)
+            }
+        }
+    }
+
+    /** 노드 id 마다 types 관계로 이어진 보관되지 않은 근거 문서. 관계를 만든 순서이고 같은 문서는 한 번만 담는다. 문서가 없는 id 는 빠진다 */
+    @Suppress("UNCHECKED_CAST")
+    fun evidenceDocuments(nodeIds: Collection<String>, types: List<String>, limit: Int): Map<String, List<DocumentRef>> {
+        if (nodeIds.isEmpty() || types.isEmpty()) return emptyMap()
+        return client.query(
+            """
+            UNWIND ${'$'}ids AS nodeId
+            MATCH (:Knowledge {id: nodeId})-[r]->(d:Knowledge:Document)
+            WHERE type(r) IN ${'$'}types AND r.archived = false AND d.archived = false
+            WITH nodeId, d, r ORDER BY r.createdAt, r.id
+            WITH nodeId, d, collect(r)[0] AS first
+            WITH nodeId, d, first ORDER BY first.createdAt, first.id
+            RETURN nodeId, collect(properties(d))[0..${'$'}limit] AS documents
+            """,
+        ).bindAll(mapOf("ids" to nodeIds.toList(), "types" to types, "limit" to limit.toLong())).fetch().all().associate { row ->
+            row["nodeId"] as String to (row["documents"] as List<Map<String, Any?>>).map(::document)
+        }
+    }
+
     private fun document(d: Map<String, Any?>) = DocumentRef(
         id = d["id"] as String,
         title = d["title"] as String,

@@ -89,9 +89,9 @@ export async function loginAs(
   await expect(bubble).toHaveCount(0)
 }
 
-export type ScreenKey = 'map' | 'workspace' | 'list' | 'changes' | 'ontology' | 'review' | 'users'
+export type ScreenKey = 'map' | 'workspace' | 'list' | 'study' | 'changes' | 'ontology' | 'review' | 'users'
 
-const TOP_SCREENS: ScreenKey[] = ['map', 'workspace', 'list']
+const TOP_SCREENS: ScreenKey[] = ['map', 'workspace', 'list', 'study']
 
 /** 주소가 열리는 화면. `/` 는 개념 지도이고, 옛 `/?node=` 링크는 작업 공간이다 */
 function screenOfPath(startPath: string): ScreenKey {

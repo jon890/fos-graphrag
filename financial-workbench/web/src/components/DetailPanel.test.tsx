@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { NodeView, RelationshipView } from '../api/types'
 import { relationSentence } from '../lib/relationSentence'
-import { hasClaimPredicateForNode } from './DetailPanel'
+import { hasClaimPredicateForNode, NodeActions, NodeLearningRow } from './DetailPanel'
 import { NodeReadCard } from './NodeReadCard'
 import { RelationshipSection } from './RelationshipSection'
 import { testOntology, withApp } from './testSupport'
@@ -138,5 +138,42 @@ describe('연결 절의 관계 문장', () => {
     )
     expect(html).toContain('아직 연결된 항목이 없습니다.')
     expect(html).toContain('＋ 연결 추가')
+  })
+})
+
+describe('버튼 줄의 근거 따라가기', () => {
+  const render = (n: NodeView) =>
+    renderToStaticMarkup(
+      withApp(<NodeActions node={n} canEdit editing={false} onEdit={() => {}} onFocus={() => {}} onTrace={() => {}} menu={<span data-testid="menu" />} />),
+    )
+
+  it('보관되지 않은 항목은 그래프 중심으로 다음에 근거 따라가기가 있다', () => {
+    const html = render(node({}))
+    expect(html).toMatch(/data-testid="node-center-graph"[^>]*>그래프 중심으로<\/button><button[^>]*data-testid="node-trace"[^>]*>근거 따라가기</)
+    expect(html).toContain('data-testid="menu"')
+  })
+
+  it('보관된 항목에는 근거 따라가기가 없다', () => {
+    expect(render(node({ archived: true }))).not.toContain('data-testid="node-trace"')
+  })
+})
+
+describe('상세의 이해 표시와 개념 칩', () => {
+  const concepts = [
+    { id: 'k1', label: '안전마진', summary: '가치보다 싸게 산다', relationshipType: 'USES_CONCEPT' },
+    { id: 'k2', label: '경제적 해자', summary: null, relationshipType: 'USES_CONCEPT' },
+  ]
+  const render = (n: NodeView) => renderToStaticMarkup(withApp(<NodeLearningRow node={n} concepts={concepts} onOpenConcept={() => {}} />))
+
+  it('개념이 둘이면 칩이 둘이고 이해 표시 토글이 있다', () => {
+    const html = render(node({}))
+    expect([...html.matchAll(/data-testid="concept-chip"/g)]).toHaveLength(2)
+    expect(html).toContain('data-testid="knowledge-controls"')
+  })
+
+  it('개념 노드에는 칩을 그리지 않는다', () => {
+    const html = render(node({ type: 'Concept' }))
+    expect(html).not.toContain('data-testid="concept-chip"')
+    expect(html).toContain('data-testid="knowledge-controls"')
   })
 })

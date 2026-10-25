@@ -99,7 +99,7 @@ describe('온톨로지에 새로 더한 타입', () => {
 
 describe('첫 화면 안내', () => {
   it('개념 지도 위에서 앱을 한 줄로 소개한다', () => {
-    const html = renderToStaticMarkup(withApp(<ConceptMapTab onOpenNode={() => {}} />, testOntology, undefined, '/map'))
+    const html = renderToStaticMarkup(withApp(<ConceptMapTab onOpenNode={() => {}} onTrace={() => {}} />, testOntology, undefined, '/map'))
     expect(html).toMatch(/data-testid="map-intro"[^>]*>.*투자 온톨로지/)
     expect(html).toContain('투자 판단을 근거와 함께 쌓는 온톨로지입니다. 상자를 누르면 그 종류의 항목을 보고 바로 추가할 수 있습니다.')
   })
@@ -195,7 +195,7 @@ describe('주소의 검색 조건', () => {
   it('작업 공간은 주소의 q 와 archived 로 검색 입력칸과 보관 포함을 채운다', () => {
     const html = renderToStaticMarkup(
       withApp(
-        <Workspace centerId={null} focusSeq={0} selectedId={null} flash={null} onFocus={() => {}} onSelect={() => {}} onOpenHistory={() => {}} />,
+        <Workspace centerId={null} focusSeq={0} selectedId={null} flash={null} onFocus={() => {}} onSelect={() => {}} onOpenHistory={() => {}} onTrace={() => {}} />,
         testOntology,
         undefined,
         '/workspace?q=abc&archived=1',

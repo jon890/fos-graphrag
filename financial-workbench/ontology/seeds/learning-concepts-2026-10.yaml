@@ -1,0 +1,84 @@
+# 기본 투자 개념과, 그 개념을 investment-logic-2026-10 의 항목에 잇는 관계. API 가 시작할 때 한 번만 적용한다(docs/data-schema.md 「초기 데이터」).
+# 같은 key 는 다시 적용하지 않는다. 내용을 바꾸려면 새 key 의 파일을 더한다.
+# existing: true 노드는 만들지 않고 앞 파일의 노드를 이름으로 찾기만 한다. 그래서 이 파일 이름은 investment-logic-2026-10.yaml 뒤에 와야 한다.
+# 개념의 한 줄 정의는 일반적인 교과서 정의만 쓴다. 수치, 인용, 인물, 주장은 넣지 않는다.
+# 이 파일은 USES_CONCEPT 를 쓴다. 최신 온톨로지 버전에 그 관계 종류가 없으면 파일 전체가 롤백되고 다음 시작 때 다시 시도한다.
+key: learning-concepts-2026-10
+nodes:
+  - ref: margin-of-safety
+    type: Concept
+    properties: { name: 안전마진, englishName: Margin of Safety, category: VALUATION, summary: 내재가치보다 충분히 낮은 값에 사서 판단 착오에 대비하는 여유 }
+  - ref: economic-moat
+    type: Concept
+    properties: { name: 경제적 해자, englishName: Economic Moat, category: BUSINESS, summary: 경쟁자가 따라오기 어렵게 하는 기업의 오래가는 경쟁 우위 }
+  - ref: intrinsic-value
+    type: Concept
+    properties: { name: 내재가치, englishName: Intrinsic Value, category: VALUATION, summary: 기업이 앞으로 벌어들일 현금을 지금 가치로 할인한 값 }
+  - ref: mr-market
+    type: Concept
+    properties: { name: 미스터 마켓, englishName: "Mr. Market", category: BEHAVIOR, summary: 날마다 감정에 따라 값을 부르는 거래 상대에 시장을 빗댄 비유 }
+  - ref: circle-of-competence
+    type: Concept
+    properties: { name: 능력 범위, englishName: Circle of Competence, category: STRATEGY, summary: 자신이 잘 이해하는 사업에만 투자하라는 원칙 }
+  - ref: dcf
+    type: Concept
+    properties: { name: DCF, englishName: Discounted Cash Flow, category: VALUATION, summary: 앞으로 벌어들일 현금흐름을 할인율로 지금 가치로 바꿔 더하는 기업 가치 평가 방법 }
+  - ref: gross-margin
+    type: Concept
+    properties: { name: 매출총이익률, englishName: Gross Margin, category: BUSINESS, summary: 매출에서 매출원가를 뺀 매출총이익이 매출에서 차지하는 비율 }
+  - ref: backlog
+    type: Concept
+    properties: { name: 수주 잔고, englishName: Backlog, category: BUSINESS, summary: 계약은 맺었지만 아직 매출로 인식하지 않은 주문의 합계 }
+  - ref: supply-constraint
+    type: Concept
+    properties: { name: 공급 제약, englishName: Supply Constraint, category: BUSINESS, summary: "수요가 늘어도 생산 능력, 원재료, 인증 같은 이유로 공급을 빨리 늘리지 못하는 상태" }
+  # 아래는 investment-logic-2026-10 의 노드다. 이름은 그 파일의 값과 글자까지 같아야 한다
+  - ref: va-flnc-valley
+    type: Valuation
+    existing: true
+    properties: { title: "FLNC 간이 DCF (Valley AI 화면)" }
+  - ref: va-flnc-20260914
+    type: Valuation
+    existing: true
+    properties: { title: "FLNC 2026-09-14 가치 판단" }
+  - ref: sc-flnc-valley-bear
+    type: Scenario
+    existing: true
+    properties: { title: "FLNC 비관 (Valley)" }
+  - ref: sc-flnc-valley-base
+    type: Scenario
+    existing: true
+    properties: { title: "FLNC 기준 (Valley)" }
+  - ref: sc-flnc-valley-bull
+    type: Scenario
+    existing: true
+    properties: { title: "FLNC 낙관 (Valley)" }
+  - ref: bn-grid-ess
+    type: Bottleneck
+    existing: true
+    properties: { title: 데이터센터 전력 접속과 ESS 공급 }
+  - ref: bn-hbm
+    type: Bottleneck
+    existing: true
+    properties: { title: HBM 생산과 고적층 패키징 }
+  - ref: bn-commodity-dram
+    type: Bottleneck
+    existing: true
+    properties: { title: HBM 과 서버 DRAM 우선 배정에 따른 범용 DRAM 공급 부족 }
+relationships:
+  - { type: RELATED_TO, from: margin-of-safety, to: intrinsic-value }
+  - { type: RELATED_TO, from: mr-market, to: margin-of-safety }
+  - { type: RELATED_TO, from: economic-moat, to: intrinsic-value }
+  - { type: RELATED_TO, from: dcf, to: intrinsic-value }
+  - { type: RELATED_TO, from: gross-margin, to: dcf }
+  - { type: USES_CONCEPT, from: va-flnc-valley, to: dcf }
+  - { type: USES_CONCEPT, from: va-flnc-valley, to: gross-margin }
+  - { type: USES_CONCEPT, from: va-flnc-valley, to: intrinsic-value }
+  - { type: USES_CONCEPT, from: va-flnc-20260914, to: gross-margin }
+  - { type: USES_CONCEPT, from: sc-flnc-valley-bear, to: gross-margin }
+  - { type: USES_CONCEPT, from: sc-flnc-valley-base, to: gross-margin }
+  - { type: USES_CONCEPT, from: sc-flnc-valley-bull, to: gross-margin }
+  - { type: USES_CONCEPT, from: bn-grid-ess, to: supply-constraint }
+  - { type: USES_CONCEPT, from: bn-grid-ess, to: backlog }
+  - { type: USES_CONCEPT, from: bn-hbm, to: supply-constraint }
+  - { type: USES_CONCEPT, from: bn-commodity-dram, to: supply-constraint }

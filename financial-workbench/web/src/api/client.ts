@@ -5,6 +5,9 @@ import type {
   ClaimView,
   CreateClaimRequest,
   GraphView,
+  KnowledgeLevel,
+  KnowledgeMark,
+  KnowledgeSummary,
   NodeCounts,
   NodeDetail,
   NodeView,
@@ -19,6 +22,8 @@ import type {
   PropertyValue,
   RelationshipView,
   ReviewStatus,
+  StudyItem,
+  TraceView,
   CurrentUser,
   Role,
   UserRef,
@@ -221,6 +226,21 @@ export const api = {
       request<NodeView>('POST', `/api/nodes/${enc(id)}/archive`, { expectedRevision, reason: reason || null }),
     restore: (id: string, expectedRevision: number) =>
       request<NodeView>('POST', `/api/nodes/${enc(id)}/restore`, { expectedRevision }),
+    trace: (id: string) => request<TraceView>('GET', `/api/nodes/${enc(id)}/trace`),
+  },
+  me: {
+    /** 본인의 이해 표시만 읽고 쓴다. 모든 역할이 부른다 */
+    knowledge: {
+      get: (nodeId: string) => request<KnowledgeMark>('GET', `/api/me/knowledge/${enc(nodeId)}`),
+      /** note 를 비우거나 null 로 보내면 메모를 지운다 */
+      put: (nodeId: string, level: KnowledgeLevel, note: string | null) =>
+        request<KnowledgeMark>('PUT', `/api/me/knowledge/${enc(nodeId)}`, { level, note }),
+      /** 표시가 없어도 204 다 */
+      remove: (nodeId: string) => request<void>('DELETE', `/api/me/knowledge/${enc(nodeId)}`),
+      list: (p: { levels?: KnowledgeLevel[]; page?: number; size?: number }) =>
+        request<Page<StudyItem>>('GET', `/api/me/knowledge${buildQuery({ level: p.levels, page: p.page, size: p.size })}`),
+      summary: () => request<KnowledgeSummary>('GET', '/api/me/knowledge/summary'),
+    },
   },
   relationships: {
     create: (type: string, fromId: string, toId: string) =>

@@ -116,7 +116,7 @@ Neo4j 는 온톨로지 규칙을 집행하지 않는다. 아래 제약 조건은
 | `nodeTypes.<타입>` | `searchProperties` | 검색어(`searchText`)에 이름과 함께 넣을 속성. 영문 이름처럼 다른 표기로도 찾게 한다. Security 의 `ticker` 는 지금처럼 늘 들어간다 |
 
 - `hintProperties`, `searchProperties` 는 그 타입의 속성이어야 한다. `display.color` 는 `#` 과 16진수 여섯 자리, `display.shape` 는 위 목록 가운데 하나여야 한다. 로더가 시작할 때 확인한다.
-- `createPicker` 는 저장소 YAML 의 모든 일반 관계에 있다. 관계의 끝이 나중에 만드는 노드가 되게 방향을 정했다. 예를 들어 병목 폼에는 「이 병목을 만든 변화」 와 「병목이 있는 산업」, 결정 폼에는 「결정한 종목」 과 「결정에 쓴 밸류에이션」 칸이 생긴다. 목록은 「관계」 절의 표가 소유한다.
+- `createPicker` 는 저장소 YAML 의 일반 관계 가운데 개념을 잇는 `RELATED_TO`, `USES_CONCEPT` 를 뺀 모두에 있다. 관계의 끝이 나중에 만드는 노드가 되게 방향을 정했다. 예를 들어 병목 폼에는 「이 병목을 만든 변화」 와 「병목이 있는 산업」, 결정 폼에는 「결정한 종목」 과 「결정에 쓴 밸류에이션」 칸이 생긴다. 목록은 「관계」 절의 표가 소유한다.
 - `searchProperties` 를 바꾸면 이미 저장된 노드의 `searchText` 는 그 노드를 다음에 고칠 때 새 규칙으로 바뀐다. 바로 맞추려면 「초기 데이터」 와 같은 시작 작업이 필요하다. 이번에는 새 타입에만 쓰므로 기존 노드에 영향이 없다.
 
 ### 예전 값 정리
@@ -206,6 +206,7 @@ Claim 의 `validFrom`, `validTo` 가 비어 있으면 관계의 유효 기간을
 자료 공개 시점은 Document 의 `publishedAt`, 수집 시점은 `collectedAt` 이다.
 Document 의 `documentType` 에 책(`BOOK`), 서한(`LETTER`), 강연과 인터뷰(`SPEECH`)가 있다. 책과 서한은 출판사나 원문 페이지 주소를 `url` 에 넣는다.
 Change, Bottleneck, Valuation, Scenario, Decision 은 투자 온톨로지의 타입이다. 뜻과 선택지는 아래 「투자 온톨로지」 가 소유한다.
+개념 칩과 근거 따라가기는 Concept 의 `summary` 를 이름으로 읽는다. 온톨로지에서 이 속성이나 Concept 타입이 빠지면 칩에 한 줄 정의가 없거나 칩이 보이지 않을 뿐 저장은 막지 않으므로 `CodeReadKeys` 에 넣지 않는다.
 Person 은 투자자, 경영자, 학자 같은 인물이다. `role` 은 목록에서 고르고 `birthYear`, `deathYear` 는 정수다. Concept 는 안전마진, 경제적 해자 같은 투자 개념과 원칙이다. `summary` 는 한 줄 정의(300자 이하), `category` 는 목록에서 고른다.
 
 ## 관계
@@ -226,6 +227,7 @@ Person 은 투자자, 경영자, 학자 같은 인물이다. `role` 은 목록�
 | `HAS_DECISION` | Security | Decision | 관계 API |
 | `BASED_ON` | Valuation | Decision | 관계 API |
 | `EVIDENCED_BY` | Change, Bottleneck, Valuation | Document | 관계 API |
+| `USES_CONCEPT` | Change, Bottleneck, Company, Valuation, Scenario, Decision | Concept | 관계 API |
 | `SUBJECT` | Claim | predicate 의 `subjectTypes` | Claim API |
 | `OBJECT` | Claim | predicate 의 `objectTypes` | Claim API |
 | `SUPPORTED_BY` | Claim | Document | Claim API |
@@ -234,6 +236,7 @@ Person 은 투자자, 경영자, 학자 같은 인물이다. `role` 은 목록�
 Claim 노드 하나와 `SUBJECT`, `OBJECT`, `SUPPORTED_BY` 관계로 저장한다. 주장마다 근거와 검토 상태가 붙는다.
 주장 종류는 `BELONGS_TO_SECTOR`(기업이나 종목이 산업에 속한다), `ADVOCATES`, `CRITICIZES` 셋이다. 기업 사이의 관계(공급, 경쟁, 노출)는 담지 않는다([ADR-009](adr/009-investment-logic-chain.md)).
 거장의 생각도 같은 방식이다. 「버핏 → 안전마진 강조한다」 처럼 인물(주체)과 개념(대상)을 잇는 Claim(`ADVOCATES`, `CRITICIZES`)을 만들고, 짧은 인용은 `evidenceText`, 출처인 책이나 서한은 근거 문서다. 저작과 저자는 `AUTHORED` 로 잇는다. `RELATED_TO` 는 개념 사이의 식별 관계라 근거가 필요 없다.
+`USES_CONCEPT`(「쓰는 개념」)는 투자 온톨로지 항목이 판단에 쓴 개념을 가리킨다. 「FLNC 간이 DCF 는 DCF 개념을 쓴다」 처럼 잇는다. 근거 검토가 없는 일반 관계이고, 화면은 이 관계를 항목 상세와 근거 따라가기의 개념 칩으로 보인다([흐름](flow.md) 의 「개념 설명」). 만들기 폼의 고르기 칸(`createPicker`)은 두지 않는다. 항목을 만든 뒤 상세의 「＋ 연결 추가」 로 잇는다.
 
 ### 투자 온톨로지
 
@@ -271,11 +274,16 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 
 - 파일마다 `key` 가 있고, 적용하면 `(:SeedRun {key, appliedAt})` 를 남긴다. 같은 `key` 는 다시 적용하지 않는다. 그래서 초기 데이터로 만든 노드를 사람이 보관하거나 이름을 바꿔도 되살아나지 않는다.
 - 노드는 `NodeService` 와 같은 검증과 이력으로 만든다. 작업자는 `system` 이다. 같은 타입에 같은 이름(앞뒤 공백과 대소문자를 무시하고 비교)의 보관되지 않은 노드가 이미 있으면 만들지 않고 그 노드를 쓴다.
+- 노드에 `existing: true` 를 두면 그 노드는 만들지 않고 같은 타입, 같은 이름의 보관되지 않은 노드를 찾기만 한다. 찾지 못하면 그 노드에 걸린 관계를 건너뛰고 `warn` 로그를 남긴다. 앞 파일의 노드를 가리킬 때 쓴다. 사람이 그 노드를 보관하거나 이름을 바꿨으면 되살리지 않기 위해서다. 이름 칸(`labelProperty`) 밖의 속성은 적지 않아도 된다.
+- 파일은 파일 이름 순서로 적용한다. 앞 파일의 노드를 `existing: true` 로 가리키는 파일은 이름이 그 파일보다 뒤에 와야 한다. 앞에 오면 빈 DB 에서 그 노드를 찾지 못해 관계를 건너뛴 채 `SeedRun` 이 남는다.
 - 관계는 파일 안의 `ref` 로 끝을 찾는다. 끝을 찾지 못하거나 같은 타입, 같은 끝의 보관되지 않은 관계가 이미 있으면 만들지 않고 넘어간다. 그래서 새 파일이 앞 파일의 노드와 관계를 다시 적어도 된다.
 - 파일을 읽지 못하면(문법 오류, 알 수 없는 키) 그 파일만 건너뛰고 파일 이름으로 `warn` 로그를 남긴다. 같은 `key` 가 여러 파일에 있으면 파일 이름 순서로 처음 것만 적용하고 나머지는 `warn` 로그로 남긴다.
 - 한 파일은 트랜잭션 하나로 적용한다. 실패하면 그 파일 전체가 롤백되고 `SeedRun` 도 남지 않아 다음 시작 때 다시 시도한다. 실패해도 API 는 시작한다. 초기 데이터는 없어도 쓸 수 있기 때문이다.
 - 끄려면 `workbench.seeds.enabled=false` 다. 기본은 켜짐이다.
-- 지금 파일은 `investment-logic-2026-10` 하나다. 친구가 Obsidian 에 정리한 투자 기록에서 옮긴 투자 온톨로지 항목이다. 메모리(HBM, 범용 DRAM), 데이터센터 전력과 에너지 저장, 칩 사이 광 연결의 변화와 병목, 그 산업과 기업과 종목, 공개 근거 자료, FLNC 의 밸류에이션 둘과 시나리오, 세 종목(SK하이닉스, FLNC, POET)의 결정 넷을 담는다. 원문과 대조하지 못한 값은 노드의 `description` 이나 `reason` 에 「원문 대조 대기」 라고 적었다. 친구의 실제 매매 날짜와 밸류에이션이 들어 있고 이 저장소는 공개다(사용자 결정 2026-10-24).
+- 지금 파일은 `investment-logic-2026-10` 과 `learning-concepts-2026-10` 둘이다.
+- `investment-logic-2026-10` 은 친구가 Obsidian 에 정리한 투자 기록에서 옮긴 투자 온톨로지 항목이다. 메모리(HBM, 범용 DRAM), 데이터센터 전력과 에너지 저장, 칩 사이 광 연결의 변화와 병목, 그 산업과 기업과 종목, 공개 근거 자료, FLNC 의 밸류에이션 둘과 시나리오, 세 종목(SK하이닉스, FLNC, POET)의 결정 넷을 담는다. 원문과 대조하지 못한 값은 노드의 `description` 이나 `reason` 에 「원문 대조 대기」 라고 적었다. 친구의 실제 매매 날짜와 밸류에이션이 들어 있고 이 저장소는 공개다(사용자 결정 2026-10-24).
+- `learning-concepts-2026-10` 은 투자 개념(안전마진, 경제적 해자, 내재가치, 미스터 마켓, 능력 범위, DCF, 매출총이익률, 수주 잔고, 공급 제약)과 개념 사이의 `RELATED_TO`, 그리고 `investment-logic-2026-10` 의 밸류에이션, 시나리오, 병목을 `existing: true` 로 가리켜 잇는 `USES_CONCEPT` 를 담는다. 개념의 한 줄 정의는 일반적인 교과서 정의만 쓰고, 출처가 필요한 수치나 인용은 넣지 않는다. 인물과 주장은 넣지 않는다.
+- 이 파일은 `USES_CONCEPT` 를 쓴다. 최신 온톨로지 버전에 그 관계 종류가 없으면 관계를 만들다 `ONTOLOGY_VIOLATION` 으로 실패하고, 파일 전체(먼저 만든 개념 포함)가 롤백되어 `SeedRun` 이 남지 않는다. 로그는 `초기 데이터 learning-concepts-2026-10 를 적용하지 못했다` 다. ADMIN 이 온톨로지에 `USES_CONCEPT` 를 더한 뒤 API 를 다시 시작하면 그때 적용된다(`SeedLoader.run` 이 시작할 때마다 `SeedRun` 이 없는 파일을 다시 시도한다). 운영 순서는 [배포](deployment.md) 의 「개념 설명을 운영에 반영할 때」 다.
 - 시드는 주장(Claim)을 만들지 못한다. 기업이나 종목의 산업 소속 주장은 사람이 근거를 붙여 만든다.
 
 ## 사용자
@@ -291,6 +299,24 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 - `:User` 는 `:Knowledge` label 이 없어 검색과 그래프에 나오지 않는다.
 - `guideDoneAt` 은 첫 접속 가이드를 끝내거나 건너뛴 시각이다. 없으면 로그인할 때 가이드가 열린다([흐름](flow.md) 의 「첫 접속 가이드」). 화면 상태라 `revision`, `updatedAt`, `updatedBy` 를 바꾸지 않고 ChangeEvent 도 남기지 않는다. 한 번 쓰면 지우지 않는다.
 - 사용자 관리 변경도 ChangeEvent(`targetKind = USER`)로 남는다. 첫 관리자를 만든 이벤트의 actor 는 `system` 이다.
+
+## 이해 표시
+
+`(:User)-[:KNOWS {level, note, updatedAt}]->(:Knowledge)` 가 사용자 한 사람이 항목 하나에 남긴 이해 표시다. 결정과 근거는 [ADR-011](adr/011-learning-marks-and-trace.md) 이다.
+
+| 속성 | 타입 | 뜻 |
+| --- | --- | --- |
+| `level` | String | `KNOWN`(알아요), `UNSURE`(잘 모르겠어요), `LEARNING`(공부 중) 가운데 하나 |
+| `note` | String | 내 메모. 1000자까지. 비우면 속성을 지운다 |
+| `updatedAt` | String | 마지막으로 바꾼 시각. 서버가 기록하는 시각 형식이다 |
+
+- 한 사용자와 한 항목 사이에는 관계가 하나만 있다. 쓰기는 그 사용자 노드에 쓰기 잠금(`_lock`)을 건 뒤 `MERGE` 한다. 같은 사람이 두 탭에서 동시에 써도 관계가 둘로 늘지 않고 나중 쓰기가 남는다.
+- 본인만 읽고 쓴다. API 는 세션의 사용자 id 로만 관계를 찾으므로 다른 사람의 표시는 어느 응답에도 나오지 않는다.
+- 지식 데이터가 아니라 개인 기록이다. 항목과 사용자의 `revision`, `updatedAt`, `updatedBy` 를 바꾸지 않고 ChangeEvent 도 남기지 않는다.
+- 열람자(VIEWER)도 쓴다.
+- 항목을 보관해도 표시는 남는다. 공부 목록은 그 항목을 「보관됨」 으로 보인다. 보관된 항목에도 표시를 쓰고 지울 수 있다.
+- 사용자를 비활성화해도 표시는 남는다. 사용자 노드를 지우면(`DETACH DELETE`) 함께 사라진다. 지금은 사용자를 지우는 API 가 없다.
+- `:User` 는 `:Knowledge` 가 아니다. 상세의 관계와 근거 따라가기는 양 끝을 `:Knowledge` 로 묶어 이 관계를 타지 않는다. 주변 그래프의 여러 단계 경로는 경로 위 관계와 노드에 거는 `archived = false` 조건 때문에 `KNOWS` 와 `:User` 를 지나지 않는다. 그래서 `KNOWS` 와 `:User` 에 `archived` 속성을 두지 않는다. 관계 id, revision 이 없고 `rel_<타입>_id` 인덱스도 만들지 않는다.
 
 ## 변경 이력
 

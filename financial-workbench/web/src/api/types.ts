@@ -101,15 +101,109 @@ export interface RelationshipView {
   createdBy: UserRef | null
 }
 
+/** 노드가 쓰는 개념 하나. 노드에서 Concept 으로 나가는 보관되지 않은 관계의 끝이다 */
+export interface ConceptRef {
+  id: string
+  label: string
+  /** 개념의 한 줄 정의. 없으면 null */
+  summary: string | null
+  relationshipType: string
+}
+
 export interface NodeDetail {
   node: NodeView
   claim: ClaimView | null
   relationships: RelationshipView[]
   claims: ClaimView[]
+  concepts: ConceptRef[]
   /** 서버 상한을 넘어 목록을 잘랐는지 */
   relationshipsTruncated: boolean
   claimsTruncated: boolean
   limits: { maxRelationships: number; maxClaims: number }
+}
+
+export type KnowledgeLevel = 'KNOWN' | 'UNSURE' | 'LEARNING'
+
+/** 요청한 사람의 이해 표시 하나. 표시가 없으면 level, note, updatedAt 이 null 이다 */
+export interface KnowledgeMark {
+  nodeId: string
+  level: KnowledgeLevel | null
+  note: string | null
+  updatedAt: string | null
+}
+
+/** 근거 따라가기 단계에 붙는 주장. label 은 「주체 → 대상 관계」 이름이다 */
+export interface TraceClaim {
+  id: string
+  label: string
+  predicate: string
+  reviewStatus: ReviewStatus | null
+}
+
+/** 이 단계로 들어오는 관계가 하나도 없는 관계 종류와, 이을 만한 가까운 시작 노드 */
+export interface TraceMissing {
+  relationshipType: string
+  candidates: NodeRef[]
+}
+
+export type TraceStatus = 'SUPPORTED' | 'PARTIAL' | 'MISSING'
+
+/** 근거 따라가기의 한 단계. childId, relationshipId, relationshipType 은 한 단계 아래로 가는 처음 찾은 길이고 지금 항목은 null 이다 */
+export interface TraceStep {
+  node: NodeView
+  depth: number
+  childId: string | null
+  relationshipId: string | null
+  relationshipType: string | null
+  status: TraceStatus
+  documents: DocumentSummary[]
+  claims: TraceClaim[]
+  concepts: ConceptRef[]
+  missing: TraceMissing[]
+  /** 내 이해 표시. 없으면 null */
+  knowledge: KnowledgeMark | null
+}
+
+/** 지금 항목에서 나가는 관계의 끝. 이 항목에 기대는 아래쪽 항목이다 */
+export interface TraceDependent {
+  node: NodeRef
+  relationshipId: string
+  relationshipType: string
+}
+
+/** GET /api/nodes/{id}/trace */
+export interface TraceView {
+  rootId: string
+  steps: TraceStep[]
+  dependents: TraceDependent[]
+  truncated: boolean
+  dependentsTruncated: boolean
+  limits: { maxDepth: number; maxSteps: number; maxDependents: number; maxCandidates: number }
+}
+
+/** 공부 항목을 근거 단계로 가지는 투자 결정. depth 는 결정에서 이 항목까지의 단계 수다 */
+export interface StudyContext {
+  decision: NodeRef
+  depth: number
+}
+
+/** GET /api/me/knowledge 의 한 행 */
+export interface StudyItem {
+  node: NodeRef
+  level: KnowledgeLevel
+  note: string | null
+  updatedAt: string
+  contexts: StudyContext[]
+  documents: DocumentSummary[]
+  concepts: ConceptRef[]
+}
+
+/** GET /api/me/knowledge/summary. counts 는 KNOWN, UNSURE, LEARNING 을 모두 담는다 */
+export interface KnowledgeSummary {
+  counts: Record<KnowledgeLevel, number>
+  /** total 은 센 결정 수, understood 는 그 가운데 모든 단계를 KNOWN 으로 표시한 결정 수다 */
+  decisions: { total: number; understood: number }
+  decisionsTruncated: boolean
 }
 
 export interface Page<T> {

@@ -56,11 +56,15 @@ data class RelationshipView(
     val createdBy: UserRef?,
 )
 
+/** 노드에서 개념으로 나가는 관계의 끝. summary 는 개념의 한 줄 정의이고 없으면 null 이다 */
+data class ConceptRef(val id: String, val label: String, val summary: String?, val relationshipType: String)
+
 data class NodeDetail(
     val node: NodeView,
     val claim: ClaimView?,
     val relationships: List<RelationshipView>,
     val claims: List<ClaimView>,
+    val concepts: List<ConceptRef>,
     val relationshipsTruncated: Boolean,
     val claimsTruncated: Boolean,
     val limits: DetailLimits,
