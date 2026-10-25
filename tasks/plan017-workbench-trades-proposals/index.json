@@ -1,0 +1,29 @@
+{
+  "name": "plan017-workbench-trades-proposals",
+  "description": "에이전트가 토스 체결을 주인만 보는 체결 기록으로 바로 저장하고, 모델이 해석한 쓰기는 제안으로 올려 사람이 승인하게 한다. 체결 기록은 주인만 보고, 지식은 지금처럼 모두가 본다",
+  "pr_scope": "연동 토큰 범위, 주인 전용 체결 기록(:Trade)과 제안(:Proposal)의 저장과 세션 API, /api/v1 쓰기 경로(체결, 제안)와 쓰기 요청 한도, 웹의 제안 화면과 대기 배지, 내 체결 화면과 상세·근거 따라가기의 내 체결 절, 브라우저 테스트를 한 PR 로 만든다.",
+  "deferred": [
+    {
+      "what": "웹에서 체결을 직접 입력하거나 고치고, 체결과 결정의 연결을 끊는 화면",
+      "why": "이번 단계는 Hermes 가 넣는 체결과 승인으로 생기는 연결만 다룬다. 사람이 고치는 길을 열면 체결 사실과 사람의 해석이 다시 섞인다",
+      "after": "이 PR 이 머지되고 Hermes 커넥터가 체결과 제안을 실제로 쓴 뒤"
+    },
+    {
+      "what": "한 요청 안의 제안끼리 서로 가리키기(만들 노드를 다른 제안이 가리킴)",
+      "why": "CREATE_NODE 의 links 와 tradeIds 로 주요 흐름(결정을 만들고 종목, 밸류에이션, 체결과 잇기)을 덮는다. 제안 사이 의존은 승인 순서 규칙을 새로 정해야 한다",
+      "after": "이 PR 이 머지되고 제안을 써 본 뒤 필요가 확인되면"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-10-25",
+  "total_phases": 6,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "deep" },
+    { "number": 4, "file": "phase-04.md", "execution_profile": "standard" },
+    { "number": 5, "file": "phase-05.md", "execution_profile": "standard" },
+    { "number": 6, "file": "phase-06.md", "execution_profile": "standard" }
+  ]
+}
