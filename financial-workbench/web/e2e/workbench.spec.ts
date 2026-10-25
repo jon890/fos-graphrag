@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
+import { expect, request, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
 import { admin, exact, loginAs, newPage, openScreen, shot, shotElement, type TestUser } from './support'
 
 // 두 편집자(A, B)와 관리자, 열람자가 같은 서버에서 협업하는 흐름을 순서대로 확인한다.
@@ -1138,9 +1138,15 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       await expect(items).toHaveCount(0)
       return ids
     }
-    expect(await itemsOf(pageAdmin)).toEqual(['more-item-changes', 'more-item-ontology', 'more-item-review', 'more-item-users'])
-    expect(await itemsOf(pageA)).toEqual(['more-item-changes', 'more-item-ontology', 'more-item-review'])
-    expect(await itemsOf(pageViewer)).toEqual(['more-item-changes', 'more-item-ontology'])
+    expect(await itemsOf(pageAdmin)).toEqual([
+      'more-item-changes',
+      'more-item-ontology',
+      'more-item-review',
+      'more-item-users',
+      'more-item-tokens',
+    ])
+    expect(await itemsOf(pageA)).toEqual(['more-item-changes', 'more-item-ontology', 'more-item-review', 'more-item-tokens'])
+    expect(await itemsOf(pageViewer)).toEqual(['more-item-changes', 'more-item-ontology', 'more-item-tokens'])
 
     await openScreen(pageAdmin, 'map')
     await expect(pageAdmin.getByTestId('more-open')).toHaveAttribute('data-active', 'false')
@@ -1254,6 +1260,75 @@ test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
       .poll(async () => Number(await canvas.getAttribute('data-node-font-px')), { message: '개념 지도 노드 글자 크기(px)' })
       .toBeGreaterThanOrEqual(13)
     await shot(pageA, 'map-wide')
+  })
+
+  test('7g) 연동 토큰을 발급해 복사하고 그 토큰으로 에이전트 API 를 부르며, 폐기하면 막힌다', async () => {
+    const origin = new URL(pageA.url()).origin
+    await pageA.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin })
+    await openScreen(pageA, 'tokens')
+    await expect(pageA).toHaveURL(/\/tokens(\?|$)/)
+    await expect(pageA.getByTestId('more-open')).toHaveAttribute('data-active', 'true')
+    await expect(pageA.getByTestId('tokens-guide')).toContainText('Hermes')
+
+    // 발급하면 원문이 한 번만 보이고, 복사 단추가 클립보드에 그 값을 넣는다.
+    await pageA.getByTestId('tokens-issue-open').click()
+    await pageA.getByTestId('tokens-issue-name').fill('e2e 토큰')
+    await pageA.getByTestId('tokens-issue-submit').click()
+    const issuedValue = pageA.getByTestId('tokens-issued-value')
+    await expect(issuedValue).toHaveValue(/^fwb_[A-Za-z0-9_-]{43}$/)
+    await expect(pageA.getByTestId('tokens-issued-warning')).toBeVisible()
+    const token = await issuedValue.inputValue()
+    await shot(pageA, 'tokens-issued-wide')
+
+    await pageA.getByTestId('tokens-issued-copy').click()
+    await expect(pageA.getByTestId('tokens-issued-copied')).toBeVisible()
+    expect(await pageA.evaluate(() => navigator.clipboard.readText())).toBe(token)
+
+    // 닫으면 목록에는 끝 네 자리만 남고 원문은 화면 어디에도 없다.
+    await pageA.getByTestId('tokens-issued-close').click()
+    const row = pageA.locator('[data-testid="tokens-row"][data-name="e2e 토큰"]')
+    await expect(row).toHaveCount(1)
+    await expect(row.getByTestId('tokens-row-last4')).toHaveText(`…${token.slice(-4)}`)
+    await expect(row.getByTestId('tokens-row-last-used')).toContainText('아직 쓰지 않음')
+    expect(await pageA.content()).not.toContain(token)
+    await shot(pageA, 'tokens-list-wide')
+    const tokenId = (await row.getAttribute('data-id')) ?? ''
+    expect(tokenId).not.toBe('')
+
+    // 쿠키 없는 요청에 토큰만 담으면 열리고, 토큰이 없거나 쿠키뿐이면 막힌다.
+    const bare = await request.newContext({ baseURL: origin })
+    try {
+      const ok = await bare.get('/api/v1/ontology', { headers: { Authorization: `Bearer ${token}` } })
+      expect(ok.status()).toBe(200)
+      expect(Array.isArray((await ok.json()).nodeTypes)).toBe(true)
+      expect((await bare.get('/api/v1/ontology')).status()).toBe(401)
+      expect(await pageA.evaluate(async () => (await fetch('/api/v1/ontology')).status)).toBe(401)
+
+      // 쓴 뒤에는 마지막 사용 시각이 생긴다.
+      await pageA.reload()
+      await expect(row.getByTestId('tokens-row-last-used')).not.toContainText('아직 쓰지 않음')
+
+      // 다른 사용자(편집자 B)에게는 이 토큰이 목록에도 API 응답에도 없다.
+      await openScreen(pageB, 'tokens')
+      await expect(pageB.getByTestId('tokens-tab')).toBeVisible()
+      await expect(pageB.locator('[data-testid="tokens-row"][data-name="e2e 토큰"]')).toHaveCount(0)
+      const idsOfB = await pageB.evaluate(async () => {
+        const list: { id: string }[] = await (await fetch('/api/me/tokens')).json()
+        return list.map((t) => t.id)
+      })
+      expect(idsOfB).not.toContain(tokenId)
+
+      // 폐기하면 행이 사라지고 같은 토큰은 401 이다.
+      await row.getByTestId('tokens-row-revoke').click()
+      await expect(pageA.getByTestId('tokens-revoke-dialog')).toContainText('e2e 토큰')
+      await pageA.getByTestId('tokens-revoke-confirm').click()
+      await expect(row).toHaveCount(0)
+      await expect(pageA.getByTestId('tokens-message')).toHaveAttribute('data-kind', 'success')
+      const revoked = await bare.get('/api/v1/ontology', { headers: { Authorization: `Bearer ${token}` } })
+      expect(revoked.status()).toBe(401)
+    } finally {
+      await bare.dispose()
+    }
   })
 
   test('8) 관리자가 열람자를 비활성화하면 열람자의 기존 세션이 끊긴다', async () => {

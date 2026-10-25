@@ -89,7 +89,7 @@ export async function loginAs(
   await expect(bubble).toHaveCount(0)
 }
 
-export type ScreenKey = 'map' | 'workspace' | 'list' | 'study' | 'changes' | 'ontology' | 'review' | 'users'
+export type ScreenKey = 'map' | 'workspace' | 'list' | 'study' | 'changes' | 'ontology' | 'review' | 'users' | 'tokens'
 
 const TOP_SCREENS: ScreenKey[] = ['map', 'workspace', 'list', 'study']
 
