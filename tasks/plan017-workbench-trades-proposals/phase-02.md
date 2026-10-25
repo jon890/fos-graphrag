@@ -96,7 +96,7 @@ class ProposalRepository(private val client: Neo4jClient) {
     fun unlockOwner(ownerId: String)
     fun findByDedupeKey(ownerId: String, key: String): Map<String, Any?>?
     fun create(ownerId: String, props: Map<String, Any?>): String
-    fun deleteDecidedBefore(ownerId: String, before: String): Long
+    fun deleteDecidedBefore(ownerId: String, before: String, exceptIds: Collection<String>): Long  // 이번 요청이 돌려준 제안은 남긴다
     fun lock(ownerId: String, id: String): Map<String, Any?>?        // SET p._lock = true, properties(p)
     fun finish(ownerId: String, id: String, props: Map<String, Any?>)                  // status, decidedAt, payload, result, decisionNote, REMOVE p._lock, lastError* 지우기
     fun recordError(ownerId: String, id: String, code: String, message: String, at: String)
@@ -124,7 +124,7 @@ class ProposalService(...) {
 }
 ```
 
-- `submit`(쓰기 트랜잭션 하나): 입력 모양 검사(키 목록, `kind`, `rationale` 은 1자 이상 2000자 이하, `evidence` 의 개수와 주소 형식, `dedupeKey` 는 1자 이상 100자 이하, 항목은 1건 이상 20건 이하) → `ProposalPayloads.check` → `evidence.nodeIds` 존재와 `tradeIds` 소유 확인 → `lockOwnerAndCountPending` → 항목마다 `dedupeKey` 로 기존을 찾거나(같은 요청의 앞 항목 포함) 만든다 → 새로 만드는 수를 더한 대기 수가 `Limits.MAX_PENDING_PROPOSALS` 를 넘으면 `ProposalLimitException`(아무것도 만들지 않는다. 만들기 전에 센다) → `deleteDecidedBefore(now - 90일)` → `unlockOwner`. 오류 키는 `proposals[i].칸`.
+- `submit`(쓰기 트랜잭션 하나): 입력 모양 검사(키 목록, `kind`, `rationale` 은 1자 이상 2000자 이하, `evidence` 의 개수와 주소 형식, `dedupeKey` 는 1자 이상 100자 이하, 항목은 1건 이상 20건 이하) → `lockOwnerAndCountPending` → 항목마다 `dedupeKey` 로 기존 제안을 찾는다(같은 요청의 앞 항목 포함). 기존 제안이 있는 항목은 `payload` 의 모양과 내용을 다시 검사하지 않고 `existing` 으로 돌려준다 → 새로 만들 항목만 `ProposalPayloads.check` 와 `evidence.nodeIds` 존재, `tradeIds` 소유를 확인한다 → 새로 만드는 수를 더한 대기 수가 `Limits.MAX_PENDING_PROPOSALS` 를 넘으면 `ProposalLimitException`(아무것도 만들지 않는다. 만들기 전에 센다) → 만든다 → `deleteDecidedBefore(now - 90일, exceptIds = 이번 요청이 existing 으로 돌려준 id)` → `unlockOwner`. 오류 키는 `proposals[i].칸`.
   - 항목 i 의 검사에서 `ValidationFailedException` 이 나면 `fieldErrors` 의 각 키 앞에 `proposals[i].payload.` 를 붙여 다시 던진다. `validator.validateCreate` 의 속성 오류 키는 속성 이름 그대로라 `proposals[i].payload.properties.<속성>` 이 된다. `ProposalPayloads.check` 는 승인에서도 같은 규칙으로 `payload.properties.<속성>` 을 쓴다.
   - 항목 i 의 검사에서 그 밖의 `ApiException`(`ONTOLOGY_VIOLATION`, `NOT_FOUND`, `ARCHIVED`)이 나면 같은 `status`, `code`, `message` 와 `details + ("index" to i)` 로 새 `ApiException` 을 만들어 던진다. `ApiException` 은 `open class` 이고 `details` 가 `val` 이라 새로 만든다.
 - `accept`: 위 「의도 메모」 의 두 트랜잭션. 실행 트랜잭션 안에서 `lock` → 없으면 `NotFoundException`, `PENDING` 이 아니면 `ProposalNotPendingException` → `kind.requiresEditor` 인데 `role` 이 `EDITOR`, `ADMIN` 이 아니면 `ForbiddenException("편집 권한이 있어야 승인할 수 있습니다.")` → `editedPayload ?: 저장된 payload` 를 `check(prefix = "payload")` → 실행 → `finish(ACCEPTED, decidedAt, payload, result)`.
