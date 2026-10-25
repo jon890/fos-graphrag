@@ -1,11 +1,13 @@
 /** 화면 경로와 query 를 읽고 쓰는 순수 함수. 경로와 query 이름은 docs/flow.md 「주소와 뒤로가기」 의 표와 같다 */
 
-export type TabKey = 'map' | 'workspace' | 'list' | 'review' | 'changes' | 'ontology' | 'users'
+export type TabKey = 'map' | 'workspace' | 'list' | 'trace' | 'review' | 'changes' | 'ontology' | 'users'
 
 export const TAB_PATHS: Record<TabKey, string> = {
   map: '/map',
   workspace: '/workspace',
   list: '/list',
+  /** 근거 따라가기. 탭과 더보기 메뉴에는 없고 상세, 개념 지도, 공부 목록에서 연다 */
+  trace: '/trace',
   review: '/review',
   changes: '/changes',
   ontology: '/ontology',
@@ -67,6 +69,10 @@ export interface ListQuery {
   q: string
   archived: boolean
   page: number
+}
+
+export interface TraceQuery {
+  node: string | null
 }
 
 export interface ReviewQuery {
@@ -142,6 +148,14 @@ export function parseMapQuery(search: string): MapQuery {
 
 export function mapSearch(q: MapQuery): string {
   return build([['type', q.type || null]])
+}
+
+export function parseTraceQuery(search: string): TraceQuery {
+  return { node: nonEmpty(new URLSearchParams(search), 'node') }
+}
+
+export function traceSearch(q: TraceQuery): string {
+  return build([['node', q.node || null]])
 }
 
 export function parseListQuery(search: string): ListQuery {

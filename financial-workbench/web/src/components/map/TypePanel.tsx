@@ -14,10 +14,46 @@ interface Props {
   /** 개수를 받지 못했으면 undefined */
   count: number | undefined
   onOpenNode: (id: string) => void
+  /** 그 항목의 근거 따라가기를 연다 */
+  onTrace: (id: string) => void
+}
+
+/** 최근 항목 줄. 이름은 작업 공간에서 상세를 열고, 「근거 따라가기」 는 그 항목의 근거 따라가기를 연다 */
+export function RecentItems({ items, onOpenNode, onTrace }: { items: NodeView[]; onOpenNode: (id: string) => void; onTrace: (id: string) => void }) {
+  const labels = useLabels()
+  return (
+    <ul className="mt-1 grid gap-1">
+      {items.map((n) => (
+        <li key={n.id} className="flex min-w-0 flex-wrap items-center gap-x-2">
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-auto min-w-0 px-0 py-0 text-left whitespace-normal"
+            data-testid="map-recent-item"
+            data-node-id={n.id}
+            onClick={() => onOpenNode(n.id)}
+          >
+            {labels.node(n)}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            data-testid="map-recent-trace"
+            data-node-id={n.id}
+            onClick={() => onTrace(n.id)}
+          >
+            근거 따라가기
+          </Button>
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 /** 개념 지도에서 고른 타입의 칸. 설명, 최근 항목, 관계 문장, 만들기 창과 다른 화면으로 가는 단추가 있다 */
-export function TypePanel({ type, count, onOpenNode }: Props) {
+export function TypePanel({ type, count, onOpenNode, onTrace }: Props) {
   const { ontology, canEdit } = useApp()
   const labels = useLabels()
   const navigate = useNavigate()
@@ -62,23 +98,7 @@ export function TypePanel({ type, count, onOpenNode }: Props) {
         </p>
       )}
       {recent !== null && recent.length > 0 && (
-        <ul className="mt-1 grid gap-1">
-          {recent.map((n) => (
-            <li key={n.id}>
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                className="h-auto px-0 py-0 text-left whitespace-normal"
-                data-testid="map-recent-item"
-                data-node-id={n.id}
-                onClick={() => onOpenNode(n.id)}
-              >
-                {labels.node(n)}
-              </Button>
-            </li>
-          ))}
-        </ul>
+        <RecentItems items={recent} onOpenNode={onOpenNode} onTrace={onTrace} />
       )}
 
       {sentences.length > 0 && (

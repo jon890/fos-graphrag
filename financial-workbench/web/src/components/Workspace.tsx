@@ -37,9 +37,11 @@ interface Props {
   /** 상세만 바꾼다. 그래프는 그대로 둔다 */
   onSelect: (id: string) => void
   onOpenHistory: (id: string) => void
+  /** 그 항목의 근거 따라가기를 연다 */
+  onTrace: (id: string) => void
 }
 
-export function Workspace({ centerId, focusSeq, selectedId, flash, onFocus, onSelect, onOpenHistory }: Props) {
+export function Workspace({ centerId, focusSeq, selectedId, flash, onFocus, onSelect, onOpenHistory, onTrace }: Props) {
   // 타입 목록은 온톨로지에서 온다. 타입이 늘어도 이 화면은 그대로다.
   const labels = useLabels()
   const allTypes = labels.types
@@ -172,6 +174,7 @@ export function Workspace({ centerId, focusSeq, selectedId, flash, onFocus, onSe
       onFocus={onFocus}
       onSelect={onSelect}
       onOpenHistory={onOpenHistory}
+      onTrace={onTrace}
     />
   )
 

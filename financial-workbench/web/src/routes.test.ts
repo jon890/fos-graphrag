@@ -13,9 +13,12 @@ import {
   parseMapQuery,
   parseOntologyQuery,
   parseReviewQuery,
+  parseTraceQuery,
   parseWorkspaceQuery,
   reviewSearch,
   tabOfPath,
+  TOP_TABS,
+  traceSearch,
   workspaceSearch,
 } from './routes'
 
@@ -142,5 +145,27 @@ describe('개념 지도와 더보기', () => {
 
   it('옛 /?node 링크는 지도가 첫 화면이어도 작업 공간 상세로 연다', () => {
     expect(legacyRedirect('/', '?node=a')).toBe('/workspace?node=a&pane=detail')
+  })
+})
+
+describe('근거 따라가기 주소', () => {
+  it('node 를 쓰고 읽으면 처음 값으로 돌아오고 없으면 query 를 쓰지 않는다', () => {
+    expect(traceSearch({ node: 'a' })).toBe('?node=a')
+    expect(parseTraceQuery('?node=a')).toEqual({ node: 'a' })
+    expect(parseTraceQuery(traceSearch({ node: 'a b' }))).toEqual({ node: 'a b' })
+    expect(traceSearch({ node: null })).toBe('')
+    expect(parseTraceQuery('')).toEqual({ node: null })
+    expect(parseTraceQuery('?node=')).toEqual({ node: null })
+  })
+
+  it('경로는 trace 탭이고 상단 탭과 더보기 메뉴에는 없다', () => {
+    expect(tabOfPath('/trace')).toBe('trace')
+    expect(TOP_TABS).not.toContain('trace')
+    expect(moreItems('ADMIN')).not.toContain('trace')
+  })
+
+  it('로그인 뒤 돌아갈 주소로 받는다', () => {
+    expect(isSafeReturnTo('/trace?node=a')).toBe(true)
+    expect(isSafeReturnTo('/tracefoo?node=a')).toBe(false)
   })
 })

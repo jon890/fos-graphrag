@@ -85,7 +85,7 @@ function limitZoom(cy: Core): void {
 }
 
 /** 첫 화면. 온톨로지의 타입과 관계를 그리고 타입마다 항목 수를 붙인다. 동작은 docs/flow.md 「개념 지도」 */
-export function ConceptMapTab({ onOpenNode }: { onOpenNode: (id: string) => void }) {
+export function ConceptMapTab({ onOpenNode, onTrace }: { onOpenNode: (id: string) => void; onTrace: (id: string) => void }) {
   const { ontology, canEdit } = useApp()
   const labels = useLabels()
   const location = useLocation()
@@ -249,7 +249,7 @@ export function ConceptMapTab({ onOpenNode }: { onOpenNode: (id: string) => void
             ))}
           </ul>
         </div>
-        {panelType && <TypePanel key={panelType} type={panelType} count={counts?.[panelType]} onOpenNode={onOpenNode} />}
+        {panelType && <TypePanel key={panelType} type={panelType} count={counts?.[panelType]} onOpenNode={onOpenNode} onTrace={onTrace} />}
       </div>
     </div>
   )

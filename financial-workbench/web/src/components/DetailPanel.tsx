@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { api, ApiError, errorMessage } from '../api/client'
-import type { NodeDetail, NodeView } from '../api/types'
+import type { ConceptRef, NodeDetail, NodeView } from '../api/types'
 import { useApp, useLabels } from '../context'
 import type { EditDraft } from '../lib/conflict'
 import { formatDate, formatDateTime, userName } from '../lib/format'
@@ -14,6 +14,8 @@ import { ClaimCreateForm } from './ClaimCreateForm'
 import { ClaimEditForm, ReviewControls } from './ClaimEditor'
 import { CopyLinkResult, useCopyLink } from './CopyLinkButton'
 import { useGuide, type GuidePrefill } from './guide/GuideProvider'
+import { ConceptChips } from './learning/ConceptChips'
+import { KnowledgeMarkControls } from './learning/KnowledgeMarkControls'
 import { NodeEditForm } from './NodeEditForm'
 import { NodeReadCard } from './NodeReadCard'
 import { RelationshipSection } from './RelationshipSection'
@@ -31,6 +33,55 @@ interface Props {
   onFocus: (id: string) => void
   onSelect: (id: string) => void
   onOpenHistory: (id: string) => void
+  /** 그 항목의 근거 따라가기를 연다 */
+  onTrace: (id: string) => void
+}
+
+/** 개념 노드 타입. 개념 노드의 상세는 개념 칩 줄을 그리지 않는다. 서버 LearningRules 의 개념 타입 이름과 같다 */
+const CONCEPT_TYPE = 'Concept'
+
+interface NodeActionsProps {
+  node: NodeView
+  /** 「편집」 을 보일지. 편집 권한이 있고 보관되지 않았고 타입이 정의돼 있을 때다 */
+  canEdit: boolean
+  editing: boolean
+  onEdit: () => void
+  onFocus: (id: string) => void
+  onTrace: (id: string) => void
+  /** 「⋯」 메뉴 */
+  menu: ReactNode
+}
+
+/** 상세의 버튼 줄. 「편집」, 「그래프 중심으로」, 「근거 따라가기」(보관되지 않았을 때), 「⋯」 메뉴 순서다 */
+export function NodeActions({ node, canEdit, editing, onEdit, onFocus, onTrace, menu }: NodeActionsProps) {
+  return (
+    <div className="row actions" data-testid="node-actions">
+      {canEdit && (
+        <Button type="button" size="sm" data-testid="node-edit" disabled={editing} onClick={onEdit}>
+          편집
+        </Button>
+      )}
+      <Button type="button" size="sm" variant="outline" data-testid="node-center-graph" onClick={() => onFocus(node.id)}>
+        그래프 중심으로
+      </Button>
+      {!node.archived && (
+        <Button type="button" size="sm" variant="outline" data-testid="node-trace" onClick={() => onTrace(node.id)}>
+          근거 따라가기
+        </Button>
+      )}
+      {menu}
+    </div>
+  )
+}
+
+/** 머리 아래의 내 이해 표시와 개념 칩. 개념 노드는 칩 줄을 그리지 않는다 */
+export function NodeLearningRow({ node, concepts, onOpenConcept }: { node: NodeView; concepts: ConceptRef[]; onOpenConcept: (id: string) => void }) {
+  return (
+    <div className="grid gap-2" data-testid="node-learning-row">
+      <KnowledgeMarkControls key={node.id} nodeId={node.id} mark={undefined} />
+      {node.type !== CONCEPT_TYPE && <ConceptChips concepts={concepts} onOpen={onOpenConcept} />}
+    </div>
+  )
 }
 
 type Notice = { kind: 'success' | 'conflict' | 'error'; text: string; actions?: { label: string; onClick: () => void }[] }
@@ -43,7 +94,7 @@ export function hasClaimPredicateForNode(ontology: ReturnType<typeof useApp>['on
   )
 }
 
-export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus, onSelect, onOpenHistory }: Props) {
+export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus, onSelect, onOpenHistory, onTrace }: Props) {
   const { ontology, canEdit } = useApp()
   const labels = useLabels()
   const [detail, setDetail] = useState<NodeDetail | null>(null)
@@ -240,67 +291,70 @@ export function DetailPanel({ selectedId, refreshKey, onChanged, flash, onFocus,
         </div>
       )}
 
-      <div className="row actions" data-testid="node-actions">
-        {canEditNode && (
-          <Button type="button" size="sm" data-testid="node-edit" disabled={editing} onClick={() => setEditing(true)}>
-            편집
-          </Button>
-        )}
-        <Button type="button" size="sm" variant="outline" data-testid="node-center-graph" onClick={() => onFocus(node.id)}>
-          그래프 중심으로
-        </Button>
-        {/* 모달 메뉴는 스크롤을 잠그려고 <style> 을 넣어 CSP(style-src 'self')에 막히므로 modal={false} 로 연다 */}
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button type="button" size="sm" variant="outline" data-testid="node-more" aria-label="더 보기">
-              ⋯
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            onCloseAutoFocus={(event) => {
-              if (menuPickedRef.current) event.preventDefault()
-              menuPickedRef.current = false
-            }}
-          >
-            <DropdownMenuItem
-              data-testid="node-copy-link"
-              onSelect={() => {
-                menuPickedRef.current = true
-                void copyLink.copy()
-              }}
-            >
-              링크 복사
-            </DropdownMenuItem>
-            <DropdownMenuItem data-testid="node-history-link" onSelect={() => onOpenHistory(node.id)}>
-              변경 이력
-            </DropdownMenuItem>
-            {canEdit &&
-              (node.archived ? (
-                <DropdownMenuItem data-testid="node-restore-button" onSelect={() => void restore()}>
-                  복원
-                </DropdownMenuItem>
-              ) : (
+      <NodeActions
+        node={node}
+        canEdit={canEditNode}
+        editing={editing}
+        onEdit={() => setEditing(true)}
+        onFocus={onFocus}
+        onTrace={onTrace}
+        menu={
+          <>
+            {/* 모달 메뉴는 스크롤을 잠그려고 <style> 을 넣어 CSP(style-src 'self')에 막히므로 modal={false} 로 연다 */}
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" size="sm" variant="outline" data-testid="node-more" aria-label="더 보기">
+                  ⋯
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                onCloseAutoFocus={(event) => {
+                  if (menuPickedRef.current) event.preventDefault()
+                  menuPickedRef.current = false
+                }}
+              >
                 <DropdownMenuItem
-                  variant="destructive"
-                  data-testid="node-archive-button"
+                  data-testid="node-copy-link"
                   onSelect={() => {
                     menuPickedRef.current = true
-                    setArchiveOpen(true)
+                    void copyLink.copy()
                   }}
                 >
-                  보관
+                  링크 복사
                 </DropdownMenuItem>
-              ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+                <DropdownMenuItem data-testid="node-history-link" onSelect={() => onOpenHistory(node.id)}>
+                  변경 이력
+                </DropdownMenuItem>
+                {canEdit &&
+                  (node.archived ? (
+                    <DropdownMenuItem data-testid="node-restore-button" onSelect={() => void restore()}>
+                      복원
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      data-testid="node-archive-button"
+                      onSelect={() => {
+                        menuPickedRef.current = true
+                        setArchiveOpen(true)
+                      }}
+                    >
+                      보관
+                    </DropdownMenuItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        }
+      />
       {/* 메뉴가 닫혀도 남도록 복사 결과는 메뉴 밖에 그린다 */}
       {copyLink.result && (
         <div className="actions">
           <CopyLinkResult testId="node-copy-link" url={copyLink.url} result={copyLink.result} inputRef={copyLink.inputRef} />
         </div>
       )}
+      <NodeLearningRow node={node} concepts={detail.concepts} onOpenConcept={onSelect} />
 
       <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
         <DialogContent data-testid="node-archive-dialog">

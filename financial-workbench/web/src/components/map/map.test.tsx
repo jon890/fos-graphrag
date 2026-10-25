@@ -2,10 +2,12 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { orderedTypes } from '../../lib/typeOrder'
 import { testOntology, withApp } from '../testSupport'
+import type { NodeView } from '../../api/types'
 import { ConceptMapTab } from './ConceptMapTab'
+import { RecentItems } from './TypePanel'
 
 function render(path: string): string {
-  return renderToStaticMarkup(withApp(<ConceptMapTab onOpenNode={() => {}} />, testOntology, undefined, path))
+  return renderToStaticMarkup(withApp(<ConceptMapTab onOpenNode={() => {}} onTrace={() => {}} />, testOntology, undefined, path))
 }
 
 /** 타입 목록 단추의 data-type 을 그린 순서대로 */
@@ -34,5 +36,29 @@ describe('개념 지도', () => {
   it('주소의 type 이 주장 타입이거나 없는 타입이면 타입 칸을 열지 않는다', () => {
     expect(render('/map?type=Claim')).not.toContain('data-testid="map-type-panel"')
     expect(render('/map?type=Nope')).not.toContain('data-testid="map-type-panel"')
+  })
+})
+
+describe('타입 칸의 최근 항목', () => {
+  const item = (id: string, name: string): NodeView => ({
+    id,
+    type: 'Company',
+    label: name,
+    properties: { name },
+    revision: 1,
+    archived: false,
+    archivedAt: null,
+    createdAt: '2026-10-20T03:15:00Z',
+    createdBy: null,
+    updatedAt: '2026-10-20T03:15:00Z',
+    updatedBy: null,
+    reviewStatus: null,
+  })
+
+  it('줄마다 이름과 근거 따라가기가 있고 둘 다 그 항목 id 를 갖는다', () => {
+    const html = renderToStaticMarkup(withApp(<RecentItems items={[item('a', '가나전자'), item('b', '다라전자')]} onOpenNode={() => {}} onTrace={() => {}} />))
+    const ids = (testId: string) => [...html.matchAll(new RegExp(`data-testid="${testId}" data-node-id="([^"]+)"`, 'g'))].map((m) => m[1])
+    expect(ids('map-recent-item')).toEqual(['a', 'b'])
+    expect(ids('map-recent-trace')).toEqual(['a', 'b'])
   })
 })
