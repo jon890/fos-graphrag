@@ -70,6 +70,8 @@ class Neo4jSchemaInitializer(
             "CREATE CONSTRAINT change_event_id_unique IF NOT EXISTS FOR (e:ChangeEvent) REQUIRE e.id IS UNIQUE",
             "CREATE CONSTRAINT ontology_version_unique IF NOT EXISTS FOR (v:OntologyVersion) REQUIRE v.version IS UNIQUE",
             "CREATE CONSTRAINT ontology_head_key_unique IF NOT EXISTS FOR (h:OntologyHead) REQUIRE h.key IS UNIQUE",
+            "CREATE CONSTRAINT integration_token_id_unique IF NOT EXISTS FOR (t:IntegrationToken) REQUIRE t.id IS UNIQUE",
+            "CREATE CONSTRAINT integration_token_hash_unique IF NOT EXISTS FOR (t:IntegrationToken) REQUIRE t.hash IS UNIQUE",
             "CREATE CONSTRAINT seed_run_key_unique IF NOT EXISTS FOR (s:SeedRun) REQUIRE s.key IS UNIQUE",
             "CREATE INDEX change_event_target IF NOT EXISTS FOR (e:ChangeEvent) ON (e.targetId)",
             "CREATE INDEX change_event_at IF NOT EXISTS FOR (e:ChangeEvent) ON (e.at)",

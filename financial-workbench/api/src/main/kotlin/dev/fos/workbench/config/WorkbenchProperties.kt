@@ -10,6 +10,7 @@ data class WorkbenchProperties(
     val security: Security = Security(),
     val bootstrap: Bootstrap = Bootstrap(),
     val seeds: Seeds = Seeds(),
+    val agent: Agent = Agent(),
 ) {
     data class Graph(
         val maxHops: Int = 2,
@@ -40,5 +41,12 @@ data class WorkbenchProperties(
     data class Seeds(
         /** 시작할 때 초기 데이터(ontology/seeds 폴더의 YAML)를 적용할지 */
         val enabled: Boolean = true,
+    )
+
+    data class Agent(
+        /** 연동 토큰 하나가 1분에 부를 수 있는 /api/v1 요청 수 */
+        val rateLimitPerMinute: Int = 60,
+        /** 사용자마다 폐기하지 않은 연동 토큰 수 */
+        val maxTokensPerUser: Int = 5,
     )
 }

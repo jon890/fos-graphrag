@@ -12,6 +12,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import tools.jackson.databind.json.JsonMapper
+import java.util.UUID
 
 /**
  * 실제 서버 포트, 실제 Neo4j, 가짜 OIDC 공급자로 도는 통합 테스트의 공통 설정.
@@ -46,6 +47,13 @@ abstract class IntegrationTest {
     }
 
     fun subOf(email: String) = "sub-$email"
+
+    /** 실행마다 다른 이메일의 허용 사용자를 만들고 그 이메일을 돌려준다 */
+    fun newUser(role: Role, name: String = "새사용자"): String {
+        val email = "u-${UUID.randomUUID().toString().take(8)}@example.com"
+        users.create(email, name, role, "system")
+        return email
+    }
 
     companion object {
         const val ALICE = "alice@example.com"
