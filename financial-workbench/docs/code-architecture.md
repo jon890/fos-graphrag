@@ -82,7 +82,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `learning` | 근거 따라가기와 내 이해 표시의 서비스와 컨트롤러. 계약은 [API 계약](api-contract.md) 의 「근거 따라가기」, 「내 이해 표시」 다. `knowledge` 의 읽기 도우미로 노드 표현을 만든다 |
 | `history` | ChangeEvent 기록(`ChangeEventRecorder`)과 이력 조회 |
 | `agent` | 연동 토큰의 저장(`IntegrationTokenRepository`), 발급과 폐기(`IntegrationTokenService`, `/api/me/tokens` 의 `IntegrationTokenController`), Bearer 인증 필터(`BearerTokenFilter`), 토큰마다의 요청 한도(`RateLimiter`). 결정은 [ADR-012](adr/012-agent-integration-token.md) 다 |
-| `agent.v1` | 에이전트 API(`/api/v1`)의 컨트롤러, v1 응답 DTO, 화면용 표현을 v1 로 옮기는 `V1Mapper`, 종목 찾기(`SecurityLookupService`). 계약은 [API 계약](api-contract.md) 의 「에이전트 API(`/api/v1`)」 다 |
+| `agent.v1` | 에이전트 API(`/api/v1`)의 컨트롤러, v1 응답 DTO, 화면용 조회 서비스를 불러 v1 으로 옮기는 `AgentQueryService` 와 `V1Mapper`, 종목 찾기(`SecurityLookupService`). 계약은 [API 계약](api-contract.md) 의 「에이전트 API(`/api/v1`)」 다 |
 | `web` | 오류 형식(`ApiError`), 예외 처리기, health, 화면 경로(`/workspace` 등)의 GET 을 `index.html` 로 넘기는 `SpaRouteController` |
 
 호출 방향은 `컨트롤러 → 서비스 → Neo4jClient` 다. 서비스가 트랜잭션 경계다.
@@ -253,7 +253,7 @@ ADR 로 남기지 않은 작은 결정은 다음과 같다.
 - 개념 지도 글자는 화면 맞춤 배율로 나눠 화면에 그려지는 크기를 지킨다(2026-10-25). Cytoscape 의 `min-zoomed-font-size` 는 작아진 글자를 숨기기만 해서 버렸다.
 - `/api/v1` 의 요청 한도는 API 프로세스 메모리의 고정 창(토큰마다 60초 창 하나와 셈)으로 센다(2026-10-25). API 는 프로세스 하나로만 돌고 두 사람이 쓰는 도구라 Redis 같은 공유 저장소를 들이지 않는다. 창이 끝난 토큰의 항목은 다음 요청에서 덮어써 메모리가 토큰 수만큼만 쓰인다. 인스턴스를 늘리면 공유 저장소로 옮긴다.
 - 연동 토큰의 마지막 사용 시각은 인증 필터가 1분에 한 번만 따로 쓴다(2026-10-25). 조회 요청마다 쓰기 트랜잭션을 만들지 않으려는 것이다. 쓰기가 실패하면 `warn` 로그만 남기고 조회는 계속한다.
-- v1 응답은 화면용 조회 서비스(`NodeQueryService`, `TraceService`, `GraphService`, `KnowledgeMarkService`)의 결과를 옮겨 만든다(2026-10-25). v1 전용 Cypher 를 따로 쓰면 보관, 한도, 상태 판정 규칙이 두 벌이 된다. 종목 찾기만 화면에 같은 조회가 없어 `SecurityLookupService` 가 자기 쿼리를 쓴다.
+- v1 응답은 화면용 조회 서비스(`NodeQueryService`, `TraceService`, `GraphService`, `KnowledgeMarkService`)의 결과를 옮겨 만든다(2026-10-25). v1 전용 Cypher 를 따로 쓰면 보관, 한도, 상태 판정 규칙이 두 벌이 된다. 종목 찾기만 화면에 같은 조회가 없어 `SecurityLookupService` 가 자기 쿼리를 쓴다. `AgentQueryService` 는 클래스 단위 트랜잭션을 두지 않는다. 주변 그래프와 근거 따라가기의 시간 제한은 그 서비스가 스스로 연 트랜잭션에만 걸려, 바깥 트랜잭션에 합류하면 제한이 사라지기 때문이다.
 - v1 의 관계 문장은 서버가 온톨로지 문장 틀의 `{from}`, `{to}` 만 바꿔 만든다. 조사 고르기(화면의 `lib`)는 서버로 옮기지 않았다. 읽는 쪽이 언어 모델이라 「은(는)」 표기를 그대로 읽는다.
 - 반응형 경계는 1024px 하나다. 768px 에 두 칸 배치를 더하는 안은 검사할 배치가 늘어나는 데 비해 두 사람이 쓰는 도구에서 얻는 것이 작아 버렸다.
 

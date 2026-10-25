@@ -37,14 +37,15 @@
 - `const val MAX_PAGE_SIZE = 50`, `MAX_RELATIONS = 100`, `MAX_CLAIMS = 20`, `MAX_DOCUMENTS = 20`, `MAX_CONCEPTS = 20`, `MAX_TEXT = 500`.
 - `page(page: Int?, size: Int?): PageQuery`: `size` 가 1~50 밖이면 `ValidationFailedException(mapOf("size" to "1 이상 50 이하여야 합니다."))`, 나머지는 `PageQuery.of`.
 - `cut(text: String?): String?`: 500자를 넘으면 앞 500자 뒤에 `…`.
-- `ref(NodeRef)`, `ref(NodeView)`, `document(DocumentRef)`, `concept(ConceptRef)`, `claim(ClaimView, cutText: Boolean)`(보관된 `subject`, `object` 는 `null`, 보관된 문서는 뺀다, `predicateLabel` 은 온톨로지 표시 이름), `summary(NodeView)`, `properties(NodeView)`(정의된 타입이면 정의 순서로 `label`, `type.yaml`, enum 이면 `valueLabels[value]`. 정의에서 빠진 타입이면 `label = key`, `type = null`).
+- `ref(NodeRef)`, `ref(NodeView)`, `document(DocumentRef)`, `concept(ConceptRef)`, `claim(ClaimView, cutText: Boolean)`(`cutText` 면 `description`, `evidenceText` 를 `cut` 한다, 보관된 `subject`, `object` 는 `null`, 보관된 문서는 뺀다, `predicateLabel` 은 온톨로지 표시 이름), `summary(NodeView)`, `properties(NodeView)`(정의된 타입이면 정의 순서로 `label`, `type.yaml`, enum 이면 `valueLabels[value]`. 정의에서 빠진 타입이면 `label = key`, `type = null`).
 
 ### 3. `agent/v1/AgentV1Controller.kt` 에 경로를 더한다
 
 - `GET /api/v1/nodes`(`q`, `types: List<String>?`, `page`, `size`): `queries.search(q, types, null, false, null, mapper.page(page, size))` 를 `Page<V1NodeSummary>` 로 옮긴다.
 - `GET /api/v1/nodes/{id}`: `queries.detail(id)`. 보관한 노드면 `NotFoundException`. `relations` 는 보관하지 않은 관계 가운데 상대 끝이 보관되지 않은 것만, 만든 순서 그대로 100개까지. `direction` 은 `from.id == id` 면 `OUT`. `sentence` 는 `mapper.sentence(type, from.label, to.label)`. `relationsTruncated` 는 보관한 것을 뺀 뒤 100개를 넘었거나 `detail.relationshipsTruncated` 다. `claims` 는 앞 20개를 `cutText = true` 로, `claimsTruncated` 는 21개 이상이었거나 `detail.claimsTruncated`. `claim` 은 `detail.claim` 을 `cutText = false` 로. `documents` 는 `reader.evidenceDocuments(listOf(id), LearningRules.evidenceTypes(holder.current()), 20)`. `concepts` 는 `detail.concepts` 앞 20개.
 - `GET /api/v1/graph/neighborhood`(`id` 필수, `hops` 기본 1): `graph.neighborhood(id, hops, null, null)`. `center` 는 `nodes` 의 첫 항목. 선의 `sentence` 는 관계 종류가 온톨로지 `relationshipTypes` 에 있을 때만 두 끝의 `label` 로 만들고, 주장 관계는 `null`.
-- 읽기 서비스 호출을 컨트롤러에 길게 쓰지 않도록 옮기기는 `V1Mapper` 나 같은 패키지의 `AgentQueryService`(`@Service`, `@Transactional(readOnly = true)`)에 둔다. 어느 쪽에 두든 컨트롤러는 한 줄 호출이다.
+- 읽기 서비스를 부르고 v1 으로 옮기는 일은 `agent/v1/AgentQueryService.kt`(`@Service`, 신규)에 둔다. 컨트롤러는 한 줄 호출이다.
+- `AgentQueryService` 클래스에는 `@Transactional` 을 붙이지 않는다. `GraphService.neighborhood` 와 `TraceService.trace` 는 스스로 연 `TransactionTemplate` 에만 시간 제한(`workbench.graph.timeout`)이 걸린다. 바깥 트랜잭션이 있으면 그 안에 합류해 제한이 사라진다. 그래서 `neighborhood` 는 서비스 자체 트랜잭션에 맡기고, 상세(`detail`, `evidenceDocuments`)만 메서드 단위 `@Transactional(readOnly = true)` 로 묶는다. 검색(`search`)은 `NodeQueryService` 의 트랜잭션에 맡긴다.
 
 ### 4. 이 phase 를 검증하는 `api/src/test/kotlin/dev/fos/workbench/agent/AgentReadIntegrationTest.kt`
 

@@ -38,6 +38,7 @@
 
 ### 3. `agent/v1/AgentQueryService.kt` 에 근거 따라가기와 공부 목록을 더한다
 
+- `AgentQueryService` 클래스에는 `@Transactional` 을 붙이지 않는다(phase 03 과 같은 이유). `trace` 는 `TraceService` 자체의 시간 제한 트랜잭션에, `knowledge` 는 `KnowledgeMarkService.list` 의 트랜잭션에 맡긴다.
 - `trace(id, userId): V1Trace`: `traces.trace(id, userId)` 를 옮긴다. 단계의 `via` 는 `relationshipId` 가 있을 때만 만들고 `sentence` 는 `mapper.sentence(relationshipType, 이 단계 이름, childId 단계의 이름)` 이다(관계 방향이 이 단계 → 아래 단계다). 문서의 `archived` 는 이미 빠져 있으므로 그대로 옮긴다. `missing[].label` 은 관계 종류의 표시 이름. `dependents[].sentence` 는 `mapper.sentence(type, 지금 항목 이름, 그 항목 이름)`.
 - `knowledge(userId, level: List<String>?, page, size): Page<V1StudyItem>`: `marks.list(userId, level, mapper.page(page, size), includeArchived = false)` 를 옮긴다.
 
@@ -63,10 +64,10 @@ class SecurityLookupService(private val client: Neo4jClient, private val holder:
   | `AMEX`, `KR_ETC`, `US_ETC`, `OTHER` | `OTHER` |
 
 - 쿼리는 읽기 전용 `TransactionTemplate`(시간 제한 `properties.graph.timeout`) 하나에서 돈다. 값은 모두 parameter 다.
-  1. 종목: `MATCH (s:Knowledge:Security) WHERE s.archived = false AND toUpper(s.ticker) = $ticker AND ($markets IS NULL OR s.market IN $markets) RETURN properties(s) AS s ORDER BY s.market, s.createdAt, s.id LIMIT 11`. 10개를 넘으면 `matchesTruncated`.
+  1. 종목: parameter `ticker` 는 trim 한 뒤 `uppercase()` 한 값이다. `MATCH (s:Knowledge:Security) WHERE s.archived = false AND toUpper(s.ticker) = $ticker AND ($markets IS NULL OR s.market IN $markets) RETURN properties(s) AS s ORDER BY s.market, s.createdAt, s.id LIMIT 11`. 10개를 넘으면 `matchesTruncated`.
   2. 발행 기업: 종목마다 `(c:Knowledge:Company)-[r:ISSUES]->(s)` 가운데 `r.archived = false AND c.archived = false` 를 `r.createdAt, r.id` 순서로 첫 하나.
   3. 결정: 종목마다 `(s)-[r:HAS_DECISION]->(d:Knowledge:Decision)`(둘 다 보관 안 됨)를 `d.decidedAt IS NULL, d.decidedAt DESC, d.createdAt, d.id` 순서로 21개. `basedOn` 은 `(v:Knowledge:Valuation)-[b:BASED_ON]->(d)`(둘 다 보관 안 됨)를 `b.createdAt, b.id` 순서로.
-  4. 밸류에이션: 발행 기업마다 `(c)-[r:HAS_VALUATION]->(v:Knowledge:Valuation)` 을 `v.asOf IS NULL, v.asOf DESC, v.createdAt, v.id` 순서로 11개. 시나리오는 `(v)-[h:HAS_SCENARIO]->(sc:Knowledge:Scenario)` 를 `CASE sc.kind WHEN 'BEAR' THEN 0 WHEN 'BASE' THEN 1 WHEN 'BULL' THEN 2 ELSE 3 END, sc.createdAt, sc.id` 순서로 11개.
+  4. 밸류에이션: 발행 기업마다 `(c)-[r:HAS_VALUATION]->(v:Knowledge:Valuation)`(`r.archived = false AND v.archived = false`)을 `v.asOf IS NULL, v.asOf DESC, v.createdAt, v.id` 순서로 11개. 시나리오는 `(v)-[h:HAS_SCENARIO]->(sc:Knowledge:Scenario)`(`h.archived = false AND sc.archived = false`)를 `CASE sc.kind WHEN 'BEAR' THEN 0 WHEN 'BASE' THEN 1 WHEN 'BULL' THEN 2 ELSE 3 END, sc.createdAt, sc.id` 순서로 11개.
 - 옮기기: `marketLabel`, `actionLabel` 은 온톨로지 `valueLabels`(없으면 값). `reason`, `assumptions` 는 `mapper.cut`. 숫자는 저장된 값 그대로(`Number`). 응답의 `market` 은 입력을 대문자로 바꾼 값이고 없으면 `null`, `ticker` 는 trim 한 입력 그대로.
 
 ### 5. `agent/v1/AgentV1Controller.kt` 에 경로를 더한다
@@ -79,10 +80,10 @@ class SecurityLookupService(private val client: Neo4jClient, private val holder:
 
 `IntegrationTest` 를 상속한다. 데이터는 `loggedIn(ALICE)` 가 API(`POST /api/nodes`, `POST /api/relationships`)로 만든다. 이름과 종목 코드에는 `Fixtures(alice).suffix` 를 붙인다. 조회는 `newUser(Role.VIEWER)` 두 명(P, Q)이 각자 발급한 토큰으로 한다.
 
-준비: 기업 C, 종목 S(`market = NASDAQ`, `ticker = "ZQ" + suffix.uppercase()`, `currency = USD`), `ISSUES` C→S, 결정 D(`action = BUY`, `decidedAt = 2026-09-14`, `reason` 600자), `HAS_DECISION` S→D, 밸류에이션 V(`currentPrice = 12.5`, `asOf = 2026-09-14`), `HAS_VALUATION` C→V, 시나리오 낙관(`BULL`)과 비관(`BEAR`)을 그 순서로 만들고 `HAS_SCENARIO` V→각각.
+준비는 테스트마다 새로 만든다(`@BeforeAll` 이나 공유 필드로 나누지 않는다. 종목 찾기 테스트가 `BASED_ON` 을 이어 근거 따라가기의 `missing` 이 달라지기 때문이다). 준비: 기업 C, 종목 S(`market = NASDAQ`, `ticker = "ZQ" + suffix.uppercase()`, `currency = USD`), `ISSUES` C→S, 결정 D(`action = BUY`, `decidedAt = 2026-09-14`, `reason` 600자), `HAS_DECISION` S→D, 밸류에이션 V(`currentPrice = 12.5`, `asOf = 2026-09-14`), `HAS_VALUATION` C→V, 시나리오 낙관(`BULL`)과 비관(`BEAR`)을 그 순서로 만들고 `HAS_SCENARIO` V→각각.
 
 - 근거 따라가기: P 가 세션으로 `PUT /api/me/knowledge/<S id> {"level":"UNSURE","note":"P 메모"}` 한 뒤, P 토큰의 `GET /api/v1/nodes/<D id>/trace` 는 `root.id = D`, 단계에 S(`depth = 1`, `via.relationshipType = "HAS_DECISION"`, `via.childId = D`, `via.sentence` 가 `"<D 이름>은(는) <S 이름>에 대한 결정이다"`, `myKnowledge.level = "UNSURE"`)와 C(`depth = 2`)가 있다. D 단계의 `missing` 에 `relationshipType = "BASED_ON"` 과 `candidates` 에 V 가 있다. Q 토큰의 같은 요청에서 S 단계의 `myKnowledge` 는 `null` 이다. 보관한 항목의 근거 따라가기는 `404`.
-- 종목 찾기: `?market=us&ticker=<ticker 소문자>` 는 `matches` 하나, `security.marketLabel = "나스닥"`, `issuer.id = C`, `decisions[0].actionLabel = "매수"`, `decisions[0].reason` 은 501자이고 `…` 로 끝난다, `valuations[0].scenarios` 의 `kind` 가 `["BEAR", "BULL"]` 순서다. V→D `BASED_ON` 을 이은 뒤 다시 부르면 `decisions[0].basedOn[0].id = V`. `market=KR` 은 `matches` 가 빈 배열인 `200`. `market` 없이도 찾는다. `market=XX` 와 `ticker` 없음은 `400 VALIDATION_FAILED` 이고 `details.fieldErrors` 에 각각 `market`, `ticker` 가 있다.
+- 종목 찾기: `?market=us&ticker=<ticker 소문자>` 는 `matches` 하나, `security.marketLabel = "나스닥"`, `issuer.id = C`, `decisions[0].actionLabel = "매수"`, `decisions[0].reason` 은 501자이고 `…` 로 끝난다, `valuations[0].scenarios` 의 `kind` 가 `["BEAR", "BULL"]` 순서다. V→D `BASED_ON` 을 이은 뒤 다시 부르면 `decisions[0].basedOn[0].id = V`. 비관 시나리오를 보관(`POST /api/nodes/{id}/archive`)하면 `valuations[0].scenarios` 에서 빠진다. `market=KR` 은 `matches` 가 빈 배열인 `200`. `market` 없이도 찾는다. `market=XX` 와 `ticker` 없음은 `400 VALIDATION_FAILED` 이고 `details.fieldErrors` 에 각각 `market`, `ticker` 가 있다.
 - 공부 목록: P 토큰의 `GET /api/v1/me/knowledge` 에 S 가 `level = "UNSURE"`, `note = "P 메모"` 로 있고, Q 토큰의 목록에는 S 가 없다. P 가 표시한 다른 항목을 Alice 가 보관하면 P 의 v1 목록에서 빠지고 세션 `GET /api/me/knowledge` 에는 남는다. `level=BAD` 는 `400`, `size=51` 은 `400`.
 
 `./gradlew test` 는 `src/test/kotlin` 아래 모든 테스트를 돈다. `KnowledgeMarkIntegrationTest` 가 `includeArchived` 기본값의 동작(보관된 항목 포함)을 계속 확인한다. `--tests` 로 이 phase 의 테스트를 먼저 돌린 뒤 전체를 돈다.

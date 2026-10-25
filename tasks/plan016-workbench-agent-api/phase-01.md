@@ -108,7 +108,7 @@ class IntegrationTokenService(private val tokens: IntegrationTokenRepository, pr
 }
 ```
 
-- `issue`: `name` 을 trim 하고 비었거나 50자를 넘으면 `ValidationFailedException(mapOf("name" to "1자 이상 50자 이하여야 합니다."))`. `countActiveLocked` 가 `properties.agent.maxTokensPerUser` 이상이면 `TokenLimitException`. `IntegrationTokens.generate()` 로 원문을 만들고 해시와 끝 네 글자를 저장한다.
+- `issue`: `name` 을 trim 하고 비었거나 50자를 넘으면 `ValidationFailedException(mapOf("name" to "1자 이상 50자 이하여야 합니다."))`. `countActiveLocked` 가 `properties.agent.maxTokensPerUser` 이상이면 `TokenLimitException`. `null`(사용자 노드 없음)이면 `IllegalStateException("사용자를 찾을 수 없다: $userId")` 를 던진다. 세션 필터가 지운 사용자를 이미 막으므로 정상 흐름에서는 나오지 않는다. `IntegrationTokens.generate()` 로 원문을 만들고 해시와 끝 네 글자를 저장한다.
 - `revoke`: `revoke` 가 `false` 면 `NotFoundException(tokenId)`.
 - 클래스 주석에 「원문은 발급 응답에만 싣는다. 이력을 남기지 않는다(docs/data-schema.md 「연동 토큰」)」 를 적는다.
 
@@ -150,7 +150,7 @@ fun newUser(role: Role, name: String = "새사용자"): String {
 - 동시 발급: 토큰 넷을 가진 새 사용자가 `race` 로 발급 두 개를 동시에 보내면 상태가 하나는 `201`, 하나는 `409` 이고 폐기하지 않은 토큰은 5개다.
 - CSRF: `send("POST", "/api/me/tokens", mapOf("name" to "x"), withCsrf = false)` 는 `403 CSRF_REJECTED` 다.
 - 로그인 없이 `GET /api/me/tokens` 는 `401 UNAUTHENTICATED` 다.
-- 발급과 폐기 뒤에 `GET /api/changes?page=0&size=100`(ADMIN 으로) 의 항목에 그 토큰 id 를 `targetId` 로 가진 것이 없다.
+- 발급과 폐기 뒤에 ADMIN 의 `GET /api/changes?targetId=<토큰 id>` 의 `totalItems` 가 0 이다(`ConcurrencyIntegrationTest.kt` 의 이력 조회 패턴).
 
 `./gradlew test` 는 `src/test/kotlin` 아래 모든 테스트를 돈다(`api/build.gradle.kts` 의 기본 `test`). `--tests` 로 이 phase 의 테스트를 먼저 돌린 뒤 전체를 돈다.
 
