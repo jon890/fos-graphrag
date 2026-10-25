@@ -46,7 +46,7 @@
 
 ### 4. `web/src/components/learning/KnowledgeMarkControls.tsx`
 
-Props `{ nodeId: string; mark: KnowledgeMark | null; onChange: (mark: KnowledgeMark) => void }`. `mark` 가 `null` 이면 마운트할 때 `api.me.knowledge.get(nodeId)` 로 읽는다. 동작은 `docs/flow.md` 「내 이해 표시」 대로다. testid:
+Props `{ nodeId: string; mark: KnowledgeMark | null | undefined; onChange?: (mark: KnowledgeMark) => void }`. `undefined` 는 「아직 읽지 않음」 이라 마운트할 때 `api.me.knowledge.get(nodeId)` 로 읽는다. `null` 은 「표시 없음」 이라 읽지 않는다. 근거 따라가기는 응답의 `knowledge`(`null` 포함)를 그대로 넘기므로 단계마다 요청이 나가지 않는다(`docs/flow.md` 「내 이해 표시」). 동작은 `docs/flow.md` 「내 이해 표시」 대로다. testid:
 
 | testid | 요소 |
 | --- | --- |
@@ -96,7 +96,8 @@ Props `{ concepts: ConceptRef[]; onOpen: (id: string) => void }`. 비면 아무�
 ### 8. `web/src/components/DetailPanel.tsx`, `web/src/components/Workspace.tsx`
 
 - `Props` 에 `onTrace: (id: string) => void`. 버튼 줄의 「그래프 중심으로」 다음에 「근거 따라가기」(`data-testid="node-trace"`, 보관된 항목에는 없다).
-- 머리 아래에 `KnowledgeMarkControls`(`mark={null}`, 항목이 바뀌면 `key` 로 다시 그린다), 그 아래에 `ConceptChips`(`detail.concepts`, 개념 노드면 그리지 않는다. 누르면 `onSelect`).
+- 버튼 줄을 `export function NodeActions({ node, canEdit, editing, onEdit, onFocus, onTrace, menu })` 로 떼어 낸다(`menu` 는 지금의 「⋯」 메뉴 요소). 「근거 따라가기」 는 이 부품 안에 있다.
+- 머리 아래의 이해 표시와 개념 칩을 `export function NodeLearningRow({ node, concepts, onOpenConcept })` 로 묶는다. 안에서 `KnowledgeMarkControls`(`mark={undefined}`, `key={node.id}`)와 `ConceptChips`(개념 노드면 그리지 않는다)를 그린다. `DetailPanel` 은 `onOpenConcept` 에 `onSelect` 를 넘긴다.
 - `Workspace` 는 받은 `onTrace` 를 `DetailPanel` 로 넘긴다. `DetailPanel` 을 렌더링하는 다른 곳이 있으면 `git grep -n "<DetailPanel" -- financial-workbench/web/src` 로 찾아 함께 고친다.
 
 ### 9. `web/src/components/map/ConceptMapTab.tsx`, `web/src/components/map/TypePanel.tsx`
@@ -106,7 +107,7 @@ Props `{ concepts: ConceptRef[]; onOpen: (id: string) => void }`. 비면 아무�
 ### 10. 테스트
 
 - `web/src/components/learning/learning.test.tsx`: `TracePage` 에 단계 넷(결정 `MISSING` 과 `missing` 하나·후보 하나, 종목, 기업 `PARTIAL`, 병목 `SUPPORTED`)을 담은 응답을 넘겨 렌더링하는 순수 표시 부품(예: `TraceView` 를 props 로 받는 `TraceBody`)을 만들고, 단계 순서(`data-depth` 가 큰 것부터), 요약 줄 `data-*`, 결정 카드의 `trace-missing` 과 편집자의 `trace-candidate-link`, 열람자에게 `trace-candidate-link` 와 `trace-step-attach` 가 없음을 확인한다. `KnowledgeMarkControls` 가 `UNSURE` 일 때 `knowledge-unsure` 가 `aria-pressed="true"`, `LEARNING` 일 때 `knowledge-learning-badge` 가 있음을 확인한다. `ConceptChips` 가 빈 목록이면 아무것도 그리지 않음을 확인한다.
-- `web/src/components/DetailPanel.test.tsx`: 보관되지 않은 항목의 버튼 줄에 `node-trace` 가 있고 보관된 항목에는 없다. `concepts` 가 있는 상세에 `concept-chip` 이 있다. 기존 렌더링 도우미를 따른다.
+- `web/src/components/DetailPanel.test.tsx`: `DetailPanel` 은 effect 로 상세를 받은 뒤에 버튼 줄을 그려 정적 렌더링에 나오지 않는다. 그래서 떼어 낸 `NodeActions` 를 직접 렌더링해 보관되지 않은 항목에 `node-trace` 가 있고 보관된 항목에는 없음을, `NodeLearningRow` 를 렌더링해 `concepts` 둘이면 `concept-chip` 이 둘이고 개념 노드면 없음을 확인한다.
 - `web/src/components/map/map.test.tsx`: 이 파일의 `render` 는 `renderToStaticMarkup` 이라 effect 로 받는 최근 항목이 그려지지 않는다. `TypePanel.tsx` 의 최근 항목 목록을 `export function RecentItems({ items, onOpenNode, onTrace })` 로 떼어 내고, 항목 둘을 넘겨 `map-recent-item` 과 `map-recent-trace` 가 둘씩 있는지 확인한다. `ConceptMapTab` 에 새 prop `onTrace` 를 넘기도록 기존 `render` 도 고친다.
 
 ### 11. `financial-workbench/web/TESTIDS.md`

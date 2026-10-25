@@ -13,7 +13,7 @@
 **근거 문서**: `financial-workbench/docs/flow.md` 의 「주소와 뒤로가기」(`/study` 줄과 `level`, `page`), 「공부」, 「개념 설명」 의 「개념 상세」, 「개념 지도」(글자 크기와 지도 높이 600px), 「좁은 화면의 작업 공간」(머리글 탭 넷). 계약은 `financial-workbench/docs/api-contract.md` 의 「내 이해 표시」(`StudyItem`, `KnowledgeSummary`). 결정은 `financial-workbench/docs/adr/011-learning-marks-and-trace.md`.
 
 - phase 04 가 만든 것: `web/src/api/types.ts` 의 `StudyItem`, `KnowledgeSummary`, `KnowledgeMark`, `api.me.knowledge.*`, `web/src/routes.ts` 의 `trace` 경로, `web/src/lib/trace.ts`, `web/src/components/learning/KnowledgeMarkControls.tsx`, `ConceptChips.tsx`, `TracePage.tsx`, `App.tsx` 의 `openTrace`, `DetailPanel` 의 `onTrace`.
-- 머리글 탭: `web/src/components/header/TopTabs.tsx` 의 `TOP_TAB_LABEL` 과 `web/src/routes.ts` 의 `TOP_TABS`. 폭 390px 에서 한 줄을 지켜야 한다(`docs/flow.md` 「좁은 화면의 작업 공간」). 기존 탭 단추 클래스 `HEADER_TAB_CLASS` 의 `px-2` 를 그대로 쓰고 넘치면 좁은 화면의 글자 간격만 줄인다.
+- 머리글 탭: `web/src/components/header/TopTabs.tsx` 의 `TOP_TAB_LABEL` 과 `web/src/routes.ts` 의 `TOP_TABS`. 폭 390px 에서 한 줄을 지켜야 한다(`docs/flow.md` 「좁은 화면의 작업 공간」). 기존 탭 단추 클래스 `HEADER_TAB_CLASS` 의 `px-2` 를 그대로 쓴다. 390px 에서 넘치면 좁은 화면의 좌우 여백만 `px-1.5` 로 줄인다(`lg:px-3` 은 그대로).
 - 개념 지도: `web/src/components/map/ConceptMapTab.tsx` 의 `STYLE`(노드 `font-size: 12`, 선 `font-size: 10`), `limitZoom(cy)`, `layoutstop` 처리, 지도 컨테이너 `h-[360px] … lg:h-[520px]`, testid `concept-map-canvas`(`data-node-count`, `data-layout-done`).
 - 개념 상세 데이터는 `GET /api/nodes/{id}` 의 `relationships`(`RelationshipView` 의 `from`, `to` 에 타입이 있다)와 `claims`(`ClaimView` 의 `subject`, `object`, `properties.predicate`, `reviewStatus`)로 만든다.
 
@@ -44,9 +44,9 @@
 
 ### 4. `web/src/lib/mapFont.ts`, `web/src/lib/mapFont.test.ts`
 
-- `readableFontSize(base: number, minPx: number, zoom: number): number` 는 `zoom >= 1` 이면 `base`, 아니면 `Math.max(base, minPx / zoom)` 다.
+- `readableFontSize(base: number, minPx: number, zoom: number): number` 는 배율과 상관없이 `Math.max(base, minPx / zoom)` 다. 그래서 화면 크기(`값 × zoom`)는 언제나 `minPx` 이상이다. `limitZoom` 이 배율을 1.2 까지 허용하므로 배율 1 근처에서도 이 규칙이 필요하다.
 - `MAP_NODE_FONT = { base: 12, minPx: 13 }`, `MAP_EDGE_FONT = { base: 10, minPx: 11 }`.
-- 테스트: 배율 1.2, 1, 0.5, 0.2 에서 값과, 그 값에 배율을 곱한 화면 크기가 `minPx` 이상인지.
+- 테스트: 배율 1.2, 1, 0.5, 0.2 에서 값과, 그 값에 배율을 곱한 화면 크기가 `minPx` 이상인지. 배율 2 에서는 `base` 다.
 
 ### 5. `web/src/components/map/ConceptMapTab.tsx`
 
@@ -68,6 +68,7 @@
 | `study-item-name` *, `study-item-context` *, `study-item-note` * | 이름 단추(작업 공간 상세를 연다), 단계 맥락, 내 메모 |
 | `study-todo` * | 할 일 한 줄. `data-kind` |
 | `study-trace` *, `study-learning` *, `study-known` *, `study-note-open` * | 단추 |
+| `study-note-input` *, `study-note-save` *, `study-note-cancel` * | 카드 안의 메모 입력칸(1000자)과 단추 |
 | `study-empty`, `study-error`, `study-retry` | 빈 상태, 오류와 「다시 시도」 |
 
 ### 7. `web/src/App.tsx`

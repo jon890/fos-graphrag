@@ -12,7 +12,7 @@
 
 **근거 문서**: `financial-workbench/docs/api-contract.md` 의 「근거 따라가기」(`TraceView`, 따라가는 규칙, `missing` 규칙), 「내 이해 표시」(`KnowledgeSummary`), 「상한」, `financial-workbench/docs/flow.md` 의 「주소와 뒤로가기」, `financial-workbench/docs/adr/011-learning-marks-and-trace.md`.
 
-- phase 02 가 만든 것: `learning/LearningRules.kt`(`traversableTypes`, `evidenceTypes`, `conceptTypes`, `DECISION`), `learning/LearningDtos.kt`(`KnowledgeMark`), `learning/KnowledgeMarkService.kt`, `learning/KnowledgeMarkController.kt`, 깊이 6 상수, `KnowledgeReader.concepts(ids, limit)`, `KnowledgeReader.evidenceDocuments(ids, types, limit)`.
+- phase 02 가 만든 것: `learning/LearningRules.kt`(`traversableTypes`, `evidenceTypes`, `conceptTypes`, `DECISION`, `MAX_DEPTH = 6`), `learning/LearningDtos.kt`(`KnowledgeMark`), `learning/KnowledgeMarkService.kt`, `learning/KnowledgeMarkController.kt`, `KnowledgeReader.concepts(ids, limit)`, `KnowledgeReader.evidenceDocuments(ids, types, limit)`.
 - 읽기 트랜잭션 시간 제한은 `graph/GraphService.kt` 의 `readOnly = TransactionTemplate(...).apply { timeout = limits.timeout... }` 를 따른다(`workbench.graph.timeout`). 시간 초과는 기존 예외 처리기가 `503 QUERY_TIMEOUT` 으로 바꾼다.
 - 노드 표현은 `KnowledgeReader.node(id)`(`NodeView`, 없으면 `NotFoundException`), `KnowledgeReader.nodes(rows)`, `KnowledgeReader.ref(p)`, `KnowledgeReader.claimLabels(ids)` 를 쓴다.
 - `web/SpaRouteController.kt` 의 `@GetMapping("/map", "/workspace", "/list", "/review", "/changes", "/ontology", "/users")` 에 `"/study", "/trace"` 를 더한다. 테스트는 `web/SpaRouteIntegrationTest.kt` 의 기존 경로 단언을 따른다.
@@ -47,11 +47,11 @@ data class DecisionUnderstanding(val total: Long, val understood: Long)
 
 ### 2. `learning/TraceService.kt`
 
-상수 `MAX_DEPTH = 6`(phase 02 의 상수를 쓴다), `MAX_STEPS = 60`, `MAX_DEPENDENTS = 50`, `MAX_CANDIDATES = 5`, `MAX_STEP_DOCUMENTS = 20`, `MAX_STEP_CLAIMS = 20`, `MAX_STEP_CONCEPTS = 20`, `CANDIDATE_HOPS = 3`.
+깊이는 `LearningRules.MAX_DEPTH` 를 쓰고, 상수 `MAX_STEPS = 60`, `MAX_DEPENDENTS = 50`, `MAX_CANDIDATES = 5`, `MAX_STEP_DOCUMENTS = 20`, `MAX_STEP_CLAIMS = 20`, `MAX_STEP_CONCEPTS = 20`, `CANDIDATE_HOPS = 3`.
 
 - `trace(id: String, userId: String): TraceView`: 읽기 트랜잭션 하나.
   1. 지금 항목을 읽는다. 없거나 보관됐으면 `NotFoundException(id)`.
-  2. 깊이 1..6 마다 한 쿼리로 다음 단계를 모은다: `MATCH (p:Knowledge)-[r]->(c:Knowledge) WHERE c.id IN $frontier AND type(r) IN $traversable AND r.archived = false AND p.archived = false AND NOT p.id IN $seen RETURN p, r.id, type(r), c.id ORDER BY ...`. `p` 마다 첫 행만 남긴다. 단계 수가 60 을 넘으면 60 까지 남기고 `truncated = true`. 다음 깊이가 비면 멈춘다. 깊이 6 에서 위 단계가 더 있으면 `truncated = true`.
+  2. 깊이 1..6 마다 한 쿼리로 다음 단계를 모은다: `MATCH (p:Knowledge)-[r]->(c:Knowledge) WHERE c.id IN $frontier AND type(r) IN $traversable AND r.archived = false AND p.archived = false AND NOT p.id IN $seen RETURN p, r.id, type(r), c.id`. 정렬은 「frontier 안에서 아래 단계(`c`)의 순서, `r.createdAt`, `r.id`」 다. frontier 순서는 앞 깊이에서 남긴 순서이고 Kotlin 에서 정렬한다. `p` 마다 그 정렬의 첫 행만 남긴다. 단계 수가 60 을 넘으면 그 깊이의 새 노드를 `p.createdAt, p.id` 순서로 놓고 60 까지만 남긴 뒤 `truncated = true`. 다음 깊이가 비면 멈춘다. 깊이 6 에서 위 단계가 더 있으면 `truncated = true`.
   3. 모은 노드 id 로 `documents`(`reader.evidenceDocuments(ids, evidenceTypes, 20)`), `concepts`(`reader.concepts(ids, 20)`), `claims`(보관되지 않은 Claim 이 `SUBJECT` 나 `OBJECT` 로 가리키는 것, 노드마다 `c.createdAt` 순서 20개, 이름은 `reader.claimLabels`), `knowledge`(`MATCH (:User {id: $userId})-[k:KNOWS]->(n:Knowledge) WHERE n.id IN $ids`)를 한 번씩 읽는다.
   4. `status`: `documents` 가 있거나 `REVIEWED` 주장이 있으면 `SUPPORTED`, 아니고 `DRAFT` 주장이 있으면 `PARTIAL`, 아니면 `MISSING`.
   5. `missing`: 단계 노드 타입 `T` 에 대해 `traversable` 가운데 `to` 에 `T` 가 있는 종류마다, 보관되지 않은 시작 노드에서 오는 보관되지 않은 그 종류 관계가 없으면 항목을 만든다. 후보는 그 종류의 `from` 타입인 보관되지 않은 노드 가운데 이 단계에서 `traversable` 관계(방향 무시, 보관되지 않은 관계와 노드만)로 1..3홉에 닿는 것을 거리, `createdAt DESC`, `id` 순서로 5개다. 관계 종류 이름은 parameter 로만 넘긴다(`type(r) IN $types`).
@@ -69,6 +69,7 @@ data class DecisionUnderstanding(val total: Long, val understood: Long)
 
 - `counts`: `KNOWN`, `UNSURE`, `LEARNING` 세 키를 모두 담고 없는 값은 0. 보관된 항목의 표시도 센다.
 - `decisions`: 보관되지 않은 `Decision`(`n.type = 'Decision'`)을 `createdAt, id` 순서로 201개 읽어 200개를 넘으면 `decisionsTruncated = true` 로 두고 200개만 센다. 결정마다 `traceService.nodeSet(id).first` 의 모든 id 에 그 사용자의 `KNOWN` 표시가 있으면 `understood` 로 센다. `total` 은 센 결정 수(최대 200)다.
+- `summary` 전체는 `trace` 와 같은 읽기 트랜잭션 템플릿(`workbench.graph.timeout`) 하나에서 돈다. 넘으면 `503 QUERY_TIMEOUT` 이다. 결정 수만큼 `nodeSet` 을 부르므로 쿼리는 최대 200 × 7 개다. 지금 데이터(결정 넷)에서는 문제가 없다.
 - 컨트롤러에 `@GetMapping("/summary")` 를 `/{nodeId}` 보다 먼저 선언한다(Spring 은 리터럴 경로를 먼저 고르지만 읽는 사람을 위해).
 
 ### 5. `web/SpaRouteController.kt`

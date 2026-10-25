@@ -97,7 +97,6 @@
 ```bash
 cd financial-workbench/api && ./gradlew test --rerun --tests 'dev.fos.workbench.knowledge.SeedLoaderIntegrationTest' --tests 'dev.fos.workbench.ontology.*'
 cd financial-workbench/api && ./gradlew test --rerun
-cd financial-workbench && bash scripts/tests/test_scripts.sh
 ```
 
 ## 변경 파일
