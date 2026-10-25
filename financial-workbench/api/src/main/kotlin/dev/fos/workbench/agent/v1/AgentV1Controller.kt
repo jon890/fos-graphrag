@@ -2,15 +2,22 @@ package dev.fos.workbench.agent.v1
 
 import dev.fos.workbench.agent.AgentPrincipal
 import dev.fos.workbench.config.WorkbenchProperties
+import dev.fos.workbench.web.Page
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 /** 에이전트 API. 조회만 있고 연동 토큰으로만 부른다(docs/api-contract.md 「에이전트 API(`/api/v1`)」) */
 @RestController
 @RequestMapping("/api/v1")
-class AgentV1Controller(private val mapper: V1Mapper, private val properties: WorkbenchProperties) {
+class AgentV1Controller(
+    private val mapper: V1Mapper,
+    private val queries: AgentQueryService,
+    private val properties: WorkbenchProperties,
+) {
 
     /** 토큰을 넣은 뒤 연결이 되는지 확인할 때 부른다 */
     @GetMapping("/me")
@@ -22,4 +29,21 @@ class AgentV1Controller(private val mapper: V1Mapper, private val properties: Wo
 
     @GetMapping("/ontology")
     fun ontology(): V1Ontology = mapper.ontology()
+
+    @GetMapping("/nodes")
+    fun search(
+        @RequestParam(required = false) q: String?,
+        @RequestParam(required = false) types: List<String>?,
+        @RequestParam(required = false) page: Int?,
+        @RequestParam(required = false) size: Int?,
+    ): Page<V1NodeSummary> = queries.search(q, types, page, size)
+
+    @GetMapping("/nodes/{id}")
+    fun detail(@PathVariable id: String): V1NodeDetail = queries.detail(id)
+
+    @GetMapping("/graph/neighborhood")
+    fun neighborhood(
+        @RequestParam id: String,
+        @RequestParam(required = false, defaultValue = "1") hops: Int,
+    ): V1Graph = queries.neighborhood(id, hops)
 }
