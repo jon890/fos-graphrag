@@ -60,8 +60,8 @@
 
 | 역할 | 할 수 있는 일 |
 | --- | --- |
-| `VIEWER` | 모든 `GET` 조회(검색, 상세, 주변 그래프, 근거 따라가기, 목록, 변경 이력, 온톨로지), `/api/me/knowledge` 의 내 이해 표시 쓰기, `/api/me/tokens` 의 내 연동 토큰 발급과 폐기 |
-| `EDITOR` | VIEWER 권한과 노드, 관계, Claim 의 생성, 수정, 검토, 보관, 복원 |
+| `VIEWER` | 모든 `GET` 조회(검색, 상세, 주변 그래프, 근거 따라가기, 목록, 변경 이력, 온톨로지), `/api/me/knowledge` 의 내 이해 표시 쓰기, `/api/me/tokens` 의 내 연동 토큰 발급과 폐기, `/api/me/trades` 의 내 체결 지우기, `/api/me/proposals` 의 내 제안 거절과 개인 기록 제안(`LINK_TRADE_DECISION`, `STUDY_NOTE`)의 승인 |
+| `EDITOR` | VIEWER 권한과 노드, 관계, Claim 의 생성, 수정, 검토, 보관, 복원, 공유 지식을 만드는 제안(`CREATE_NODE`, `CREATE_RELATIONSHIP`)의 승인 |
 | `ADMIN` | EDITOR 권한과 `/api/users` 의 사용자 관리, `/api/ontology` 아래의 온톨로지 편집(버전 목록, 내보내기, 미리보기, 저장, 되돌리기) |
 
 역할이 모자라면 `403 FORBIDDEN` 이다.
@@ -86,23 +86,26 @@
 | 400 | `ONTOLOGY_INVALID` | 저장하려는 온톨로지 정의가 일관성 검사를 통과하지 못했다. `details.errors` 에 오류 문장 목록이 있다 |
 | 401 | `UNAUTHENTICATED` | 세션이 없다. `/api/v1` 에서는 연동 토큰이 없거나 올바르지 않다 |
 | 403 | `CSRF_REJECTED` | CSRF 토큰이 없거나 틀렸다 |
-| 403 | `FORBIDDEN` | 역할이 모자라다 |
+| 403 | `FORBIDDEN` | 역할이 모자라다. 열람자가 공유 지식을 만드는 제안을 승인하려 한 경우도 여기 해당한다 |
+| 403 | `INSUFFICIENT_SCOPE` | 「조회만」 연동 토큰으로 `/api/v1` 의 쓰기 경로를 불렀다 |
 | 411 | `LENGTH_REQUIRED` | 본문이 있는 `/api` 요청에 Content-Length 가 없다(chunked 전송) |
 | 413 | `PAYLOAD_TOO_LARGE` | 요청 본문이 64KiB 를 넘는다. 온톨로지 미리보기, 저장, 되돌리기는 512KiB 다 |
 | 403 | `SELF_REVIEW_FORBIDDEN` | 자기가 작성한 Claim 을 검토하려 했다 |
 | 404 | `NOT_FOUND` | 그 ID 의 노드나 관계가 없다. 온톨로지 버전 조회와 되돌리기에서는 그 버전 번호가 없다. 없는 `/api` 경로도 같다 |
-| 405 | `METHOD_NOT_ALLOWED` | 경로는 있지만 그 메서드를 받지 않는다. `/api/v1` 의 `POST`, `PUT`, `PATCH`, `DELETE` 가 여기 해당한다 |
+| 405 | `METHOD_NOT_ALLOWED` | 경로는 있지만 그 메서드를 받지 않는다. `/api/v1` 에서는 `POST /api/v1/trades`, `POST /api/v1/proposals` 밖의 `POST`, `PUT`, `PATCH`, `DELETE` 가 여기 해당한다 |
 | 409 | `REVISION_CONFLICT` | `expectedRevision` 이 현재 revision 과 다르다. `details` 에 두 값이 있다 |
 | 409 | `ARCHIVED` | 보관된 대상을 수정하려 했다. 먼저 복원한다 |
 | 409 | `NOT_ARCHIVED` | 보관되지 않은 대상을 복원하려 했다 |
 | 409 | `DUPLICATE` | 같은 시장과 종목 코드의 Security, 같은 이메일의 사용자처럼 유일해야 하는 값이 이미 있다 |
 | 409 | `LAST_ADMIN` | 마지막 활성 ADMIN 을 강등하거나 비활성화하려 했다 |
 | 409 | `TOKEN_LIMIT` | 폐기하지 않은 연동 토큰이 이미 상한(5개)만큼 있다. `details.max` 에 상한이 있다 |
+| 409 | `PROPOSAL_LIMIT` | 대기 중인 제안이 상한(200개)을 넘게 된다. `details.max` 에 상한, `details.pending` 에 지금 대기 수가 있다 |
+| 409 | `PROPOSAL_NOT_PENDING` | 이미 승인했거나 거절한 제안을 승인하거나 거절하려 했다. `details.status` 에 지금 상태가 있다 |
 | 409 | `LAST_EVIDENCE` | 어떤 활성 Claim 의 유일한 활성 근거 Document 를 보관하려 했다. `details.claimIds` 에 그 Claim 이 있다 |
 | 409 | `NO_ACTIVE_EVIDENCE` | 활성 근거 문서가 없는 Claim 을 복원하거나 `REVIEWED` 로 검토하려 했다 |
 | 409 | `TRANSIENT_CONFLICT` | 동시에 처리 중인 다른 요청과 잠금이 겹쳤다. Neo4j 오류 코드가 `DeadlockDetected`, `LockAcquisitionTimeout` 일 때만이다. 최신 내용을 다시 읽고 다시 시도한다 |
 | 409 | `ONTOLOGY_IMPACT_UNCONFIRMED` | 기존 데이터와 어긋나는 온톨로지 변경을 `confirm: true` 없이 저장하려 했다. `details.impacts` 에 영향 목록이 있다 |
-| 429 | `RATE_LIMITED` | 연동 토큰 하나로 1분에 60번을 넘게 불렀다. `Retry-After` 헤더와 `details.retryAfterSeconds` 에 다시 부를 수 있을 때까지의 초가 있다 |
+| 429 | `RATE_LIMITED` | 연동 토큰 하나로 1분에 60번을 넘게 불렀거나, 쓰기 경로를 1분에 10번 넘게 불렀다. `Retry-After` 헤더와 `details.retryAfterSeconds` 에 다시 부를 수 있을 때까지의 초가 있다 |
 | 500 | `INTERNAL_ERROR` | 그 밖의 서버 오류. 내부 메시지는 응답에 담지 않는다 |
 | 503 | `QUERY_TIMEOUT` | 트랜잭션이 시간 제한을 넘었다. 그래프 조회는 5초, 쓰기는 8초다 |
 | 503 | `DATABASE_UNAVAILABLE` | Neo4j 에 연결할 수 없다. 백업 중이거나 재시작 중이다. 연결 끊김은 Spring 이 일시 예외로 감싸도 이 코드다 |
@@ -192,6 +195,8 @@ Neo4j 예외는 시간 초과(`QUERY_TIMEOUT`), 연결 불가(`DATABASE_UNAVAILA
 | 근거 따라가기의 깊이, 단계 수, 아래쪽 항목 | 6, 60개(지금 항목 포함), 50개 | 한도까지만 담고 `truncated`, `dependentsTruncated` 를 `true` 로 둔다 |
 | 내 이해 표시의 메모 `note` | 1000자 | `400 VALIDATION_FAILED` |
 | 연동 토큰 이름 `name`, 사용자당 폐기하지 않은 토큰 | 50자, 5개 | `400 VALIDATION_FAILED`, `409 TOKEN_LIMIT` |
+| 사용자당 대기 중인 제안 | 200개 | `409 PROPOSAL_LIMIT` |
+| 제안 거절 이유 `reason` | 1000자 | `400 VALIDATION_FAILED` |
 | `/api/v1` 의 요청 수, 페이지 크기, 응답 항목 | 「에이전트 API(`/api/v1`)」 의 「요청 한도와 응답 크기」 | 그 절의 표 |
 | 쓰기 트랜잭션 | 8초 | `503 QUERY_TIMEOUT` |
 | 잠금 대기(Neo4j `db.lock.acquisition.timeout`) | 5초 | `409 TRANSIENT_CONFLICT` |
@@ -568,38 +573,146 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | GET | `/api/me/tokens` | 내 토큰 목록. 폐기하지 않은 것만 만든 순서(오래된 것부터)로 준다. 응답 `IntegrationTokenView[]` |
-| POST | `/api/me/tokens` | 발급. 본문 `{"name"}`. 응답 `201 IssuedIntegrationToken` |
+| POST | `/api/me/tokens` | 발급. 본문 `{"name", "scope"}`. 응답 `201 IssuedIntegrationToken` |
 | DELETE | `/api/me/tokens/{id}` | 폐기. 응답 `204`. 내 토큰이 아니거나, 없거나, 이미 폐기했으면 `404 NOT_FOUND` |
 
 `IntegrationTokenView`
 
 ```json
-{ "id": "uuid", "name": "Hermes", "last4": "x9Qa", "createdAt": "2026-10-25T03:15:00.123456Z", "lastUsedAt": null }
+{ "id": "uuid", "name": "Hermes", "scope": "READ_WRITE", "last4": "x9Qa", "createdAt": "2026-10-25T03:15:00.123456Z", "lastUsedAt": null }
 ```
 
 `IssuedIntegrationToken`: `IntegrationTokenView` 의 모든 필드에 `token` 을 더한다.
 
 ```json
-{ "id": "uuid", "name": "Hermes", "last4": "x9Qa", "createdAt": "2026-10-25T03:15:00.123456Z", "lastUsedAt": null, "token": "fwb_3q2K…x9Qa" }
+{ "id": "uuid", "name": "Hermes", "scope": "READ_WRITE", "last4": "x9Qa", "createdAt": "2026-10-25T03:15:00.123456Z", "lastUsedAt": null, "token": "fwb_3q2K…x9Qa" }
 ```
 
 - `token` 은 `fwb_` 뒤에 무작위 32바이트를 base64url(채움 문자 없음)로 쓴 43자를 붙인 47자다. 원문은 이 응답에만 실린다. 서버는 해시만 저장하므로 다시 보여 줄 수 없다.
 - `name` 은 앞뒤 공백을 지운 1자 이상 50자 이하다. 어기면 `400 VALIDATION_FAILED`(`details.fieldErrors.name`)다. 같은 이름의 토큰도 만들 수 있다.
+- `scope` 는 `READ`(조회만)나 `READ_WRITE`(조회와 기록)다. 비우거나 `null` 이면 `READ` 다. 그 밖의 값은 `400 VALIDATION_FAILED`(`details.fieldErrors.scope`)다. 발급한 뒤에는 바꿀 수 없다. 범위를 두기 전에 발급한 토큰은 `READ` 로 보인다. 결정은 [ADR-013](adr/013-owner-trades-and-agent-proposals.md) 이다.
 - 폐기하지 않은 토큰이 이미 5개면 `409 TOKEN_LIMIT`(`details.max`)다. 사용자 노드를 잠근 뒤 세므로 동시에 발급해도 5개를 넘지 않는다.
 - `last4` 는 원문의 끝 네 글자다. 화면은 `…x9Qa` 로 보인다.
 - `lastUsedAt` 은 그 토큰으로 `/api/v1` 인증에 마지막으로 성공한 시각이다. 서버는 1분에 한 번만 고쳐 쓰므로 최대 1분 늦다. 한 번도 쓰지 않았으면 `null` 이다.
 - 발급과 폐기는 변경 이력(ChangeEvent)에 남지 않는다.
 
+## 내 체결
+
+요청한 사람 본인의 체결 기록만 읽고 지운다. 다른 사람의 체결을 읽는 API 는 없고, ADMIN 도 같다. 모든 역할(VIEWER 포함)이 부르고, 지우기는 다른 쓰기와 같이 CSRF 토큰이 필요하다. 체결은 에이전트가 「에이전트 API」 의 `POST /api/v1/trades` 로 넣는다. 저장 모델은 [데이터 스키마](data-schema.md) 의 「체결 기록」, 결정은 [ADR-013](adr/013-owner-trades-and-agent-proposals.md) 이다.
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| GET | `/api/me/trades` | 내 체결. 쿼리: `securityId`(그 종목에 이어진 것), `decisionId`(그 결정에 이어진 것), `ticker`(대소문자를 무시하고 같은 것), `page`, `size`. 조건을 여럿 주면 모두 맞는 것이다. 체결 시각이 늦은 순서, 같으면 `id` 순서. 응답 `Page<TradeView>` |
+| DELETE | `/api/me/trades/{id}` | 지운다. 응답 `204`. 내 체결이 아니거나 없으면 `404 NOT_FOUND` |
+
+`TradeView`
+
+```json
+{
+  "id": "uuid",
+  "broker": "TOSS",
+  "externalId": "20261024-000123",
+  "side": "BUY",
+  "market": "US",
+  "ticker": "FLNC",
+  "name": "Fluence Energy",
+  "quantity": 10.0,
+  "price": 12.3,
+  "currency": "USD",
+  "amount": 123.0,
+  "fee": 0.12,
+  "executedAt": "2026-10-24T14:31:05Z",
+  "createdAt": "2026-10-25T03:15:00.123456Z",
+  "createdVia": "AGENT",
+  "security": { "id": "uuid", "type": "Security", "label": "Fluence Energy 보통주", "archived": false },
+  "decisions": [{ "id": "uuid", "type": "Decision", "label": "FLNC 첫 매수", "archived": false }]
+}
+```
+
+- `name`, `fee` 는 없으면 `null` 이다. `security` 는 이어진 종목이 없으면 `null` 이다.
+- `security`, `decisions` 는 보관된 것도 담고 `archived` 로 표시한다. `decisions` 는 이은 순서다.
+- `securityId`, `decisionId` 에 없는 id 를 주면 빈 목록이다.
+
+## 제안
+
+에이전트가 올린 해석(투자 결정 만들기, 관계 잇기, 체결과 결정 잇기, 공부 메모)을 사람이 보고 승인하거나 거절한다. 제안은 올린 연동 토큰의 주인만 본다. 모든 역할이 부르고 쓰기는 CSRF 토큰이 필요하다. 저장 모델은 [데이터 스키마](data-schema.md) 의 「제안」, 결정은 [ADR-013](adr/013-owner-trades-and-agent-proposals.md) 이다.
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| GET | `/api/me/proposals` | 내 제안. 쿼리: `status`(`PENDING`, `ACCEPTED`, `REJECTED` 가운데 하나. 없으면 전체), `page`, `size`. 대기는 오래된 것부터, 그 밖은 결정한 시각이 늦은 것부터. 전체면 대기를 앞에 둔다. 응답 `Page<ProposalView>` |
+| GET | `/api/me/proposals/summary` | 대기 수. 응답 `{"pending": 3}`. 머리글의 배지가 쓴다 |
+| POST | `/api/me/proposals/{id}/accept` | 승인. 본문 `{"payload"}`. `payload` 는 선택이고, 있으면 고친 내용으로 바꿔 실행한다. 응답 `ProposalView`(`ACCEPTED`) |
+| POST | `/api/me/proposals/{id}/reject` | 거절. 본문 `{"reason"}`. `reason` 은 선택이고 1000자까지. 응답 `ProposalView`(`REJECTED`) |
+
+- `status` 가 세 값 밖이면 `400 VALIDATION_FAILED` 다.
+- 내 제안이 아니거나 없으면 `404 NOT_FOUND` 다. 대기가 아니면 `409 PROPOSAL_NOT_PENDING`(`details.status`)이다.
+- `CREATE_NODE`, `CREATE_RELATIONSHIP` 은 공유 지식을 만든다. 승인하는 사람의 역할이 `EDITOR` 이상이 아니면 `403 FORBIDDEN` 이다. 거절은 모든 역할이 한다.
+- 승인은 「제안 내용」 의 종류별 실행을 한 트랜잭션에서 하고 상태를 `ACCEPTED` 로 바꾼다. 실행이 실패하면 그 오류(`400 ONTOLOGY_VIOLATION`, `404 NOT_FOUND`, `409 DUPLICATE`, `409 ARCHIVED` 등)로 답하고 아무것도 바꾸지 않는다. 제안은 `PENDING` 으로 남고 `lastError` 에 그 오류가 남는다.
+- 고친 `payload` 는 그 종류의 모양과 규칙으로 다시 검사한다. 종류는 바꿀 수 없다.
+- 승인으로 만든 노드와 관계는 지금처럼 변경 이력에 남는다. 작업자는 승인한 사람이고 `note` 는 「에이전트 제안을 승인했다」 다. 제안 자체의 승인과 거절은 이력에 남지 않는다.
+
+`ProposalView`
+
+```json
+{
+  "id": "uuid",
+  "kind": "CREATE_NODE",
+  "status": "PENDING",
+  "payload": { "type": "Decision", "properties": { "title": "FLNC 추가 매수", "action": "ADD", "decidedAt": "2026-10-24" }, "links": [{ "type": "HAS_DECISION", "fromId": "uuid" }], "tradeIds": ["uuid"] },
+  "rationale": "10월 24일 FLNC 10주 매수 체결이 있고, 같은 날의 결정이 없다.",
+  "evidence": { "nodeIds": ["uuid"], "tradeIds": ["uuid"], "urls": ["https://example.com/news"] },
+  "createdAt": "2026-10-25T03:15:00.123456Z",
+  "createdVia": "AGENT",
+  "token": { "id": "uuid", "name": "Hermes" },
+  "decidedAt": null,
+  "decisionNote": null,
+  "result": null,
+  "lastError": null,
+  "requiresEditor": true,
+  "refs": {
+    "nodes": { "uuid": { "id": "uuid", "type": "Security", "label": "Fluence Energy 보통주", "archived": false } },
+    "trades": { "uuid": "TradeView" }
+  }
+}
+```
+
+| 필드 | 뜻 |
+| --- | --- |
+| `payload` | 종류별 내용. 「제안 내용」 의 모양이다. 승인할 때 고쳤으면 고친 값이다 |
+| `evidence` | 에이전트가 붙인 근거 참조. 셋 다 빈 배열일 수 있다 |
+| `token` | 올린 연동 토큰의 `id` 와 그때의 이름. 토큰을 폐기해도 남는다 |
+| `result` | 승인으로 생긴 것 `{"nodeIds", "relationshipIds", "tradeIds"}`. 승인 전과 거절은 `null` 이다. 이해 표시는 `nodeIds` 에 그 항목을 담는다 |
+| `lastError` | 마지막 승인 실패 `{"code", "message", "at"}`. 없으면 `null`. 승인에 성공하면 지운다 |
+| `requiresEditor` | `CREATE_NODE`, `CREATE_RELATIONSHIP` 이면 `true` 다. 화면은 열람자에게 승인 단추를 끈다 |
+| `refs` | `payload`, `evidence`, `result` 가 가리키는 노드와 체결을 지금 값으로 담은 맵. 찾지 못한 id 는 빠진다. 노드는 보관된 것도 담는다. 체결은 내 체결만 담는다 |
+
+### 제안 내용
+
+`payload` 는 종류마다 아래 모양이다. 에이전트가 올릴 때(`POST /api/v1/proposals`)와 사람이 고쳐 승인할 때 같은 규칙으로 검사한다.
+
+| `kind` | `payload` | 승인할 때 하는 일 |
+| --- | --- | --- |
+| `CREATE_NODE` | `{"type", "properties", "links", "tradeIds"}` | `POST /api/nodes` 와 같이 노드를 만들고, `links` 마다 `POST /api/relationships` 와 같이 새 노드와 잇는다. `tradeIds` 의 체결을 새 노드에 `EXECUTES` 로 잇는다 |
+| `CREATE_RELATIONSHIP` | `{"type", "fromId", "toId"}` | `POST /api/relationships` 와 같다 |
+| `LINK_TRADE_DECISION` | `{"tradeIds", "decisionId"}` | 체결마다 결정과 `EXECUTES` 로 잇는다. 이미 이어져 있으면 그대로 둔다 |
+| `STUDY_NOTE` | `{"nodeId", "level", "note"}` | `PUT /api/me/knowledge/{nodeId}` 와 같이 승인한 사람의 이해 표시를 쓴다 |
+
+- `CREATE_NODE`: `type` 과 `properties` 는 `POST /api/nodes` 의 규칙(온톨로지 검증, `managedBy` 가 있는 타입 거절, 같은 시장과 종목 코드의 Security 거절)과 같다. `links` 는 선택이고 10개까지다. 항목은 `{"type", "fromId"}` 나 `{"type", "toId"}` 하나다. `fromId` 를 주면 그 노드에서 새 노드로, `toId` 를 주면 새 노드에서 그 노드로 잇는다. 둘 다 주거나 둘 다 없으면 `400 VALIDATION_FAILED` 다. `tradeIds` 는 선택이고 50개까지이며 `type` 이 `Decision` 일 때만 받는다.
+- `CREATE_RELATIONSHIP`: 관계 API 의 규칙(온톨로지의 관계 종류와 양 끝 타입, 보관된 끝 거절, 같은 활성 관계 거절)과 같다.
+- `LINK_TRADE_DECISION`: `tradeIds` 는 1개 이상 50개 이하의 내 체결이다. `decisionId` 는 타입이 `Decision` 인 보관되지 않은 노드다. 타입이 다르면 `400 ONTOLOGY_VIOLATION`(`details.rule = "decision-type"`), 보관됐으면 `409 ARCHIVED` 다.
+- `STUDY_NOTE`: `level` 은 `KNOWN`, `UNSURE`, `LEARNING`, `note` 는 1000자까지다. 「내 이해 표시」 와 같다.
+- 가리키는 노드가 없으면 `404 NOT_FOUND`, 내 체결이 아니거나 없으면 `404 NOT_FOUND` 다. 올릴 때 한 번, 승인할 때 다시 확인한다. 그 사이 노드가 보관되거나 온톨로지가 바뀌면 승인이 실패한다.
+
 ## 에이전트 API(`/api/v1`)
 
-외부 에이전트가 워크벤치를 조회하는 API 다. fos-assistant 의 Hermes 커넥터는 이 절만 읽고 구현한다. 결정과 근거는 [ADR-012](adr/012-agent-integration-token.md) 다.
+외부 에이전트가 워크벤치를 조회하고 체결과 제안을 쓰는 API 다. fos-assistant 의 Hermes 커넥터는 이 절만 읽고 구현한다. 결정과 근거는 [ADR-012](adr/012-agent-integration-token.md) 와 [ADR-013](adr/013-owner-trades-and-agent-proposals.md) 이다.
 이 절이 쓰는 노드 타입과 관계는 [데이터 스키마](data-schema.md) 의 「노드」, 「관계」, 「투자 온톨로지」 가 소유한다. 이 절의 응답 필드는 화면용 응답(`NodeView` 등)과 따로 유지한다.
 
 ### 인증
 
 - 모든 요청에 `Authorization: Bearer <연동 토큰>` 을 담는다. 토큰은 사용자가 웹의 더보기 메뉴 「연동 토큰」 에서 발급한다(「연동 토큰」).
 - 세션 쿠키는 읽지 않고, CSRF 토큰도 요구하지 않는다. 쿠키만 담은 요청은 `401` 이다.
-- 토큰은 발급한 사용자로 인증된다. 그 사용자의 역할을 따르지만 `/api/v1` 에는 조회만 있어 모든 역할이 모든 경로를 부른다.
+- 토큰은 발급한 사용자로 인증된다. 조회 경로는 모든 역할과 범위가 부른다. 쓰기 경로는 「조회와 기록」 범위의 토큰만 부른다(「쓰기」).
 - 아래 가운데 하나면 `401 UNAUTHENTICATED`(「연동 토큰이 없거나 올바르지 않습니다.」)다. 어느 경우인지는 응답에 드러내지 않는다.
   - `Authorization` 헤더가 없거나 `Bearer ` 로 시작하지 않는다.
   - 토큰이 `fwb_` 로 시작하는 47자가 아니다.
@@ -609,7 +722,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 
 ### 공통 규칙
 
-- 메서드는 `GET` 만 있다. 있는 경로에 다른 메서드를 쓰면 `405 METHOD_NOT_ALLOWED`, 없는 경로는 `404 NOT_FOUND` 다.
+- 메서드는 `GET` 과, 「쓰기」 의 두 `POST` 만 있다. 있는 경로에 다른 메서드를 쓰면 `405 METHOD_NOT_ALLOWED`, 없는 경로는 `404 NOT_FOUND` 다.
 - 오류 본문은 이 문서의 「오류 형식」 과 같은 `{code, message, details}` 다.
 - 시각과 날짜 형식은 문서 첫머리의 규칙과 같다. 응답의 `X-Ontology-Version` 헤더는 다른 `/api` 응답과 같다.
 - 보관한 노드와 관계는 모든 응답에서 빠진다. 보관한 노드의 상세, 근거 따라가기, 주변 그래프는 `404 NOT_FOUND` 다.
@@ -622,6 +735,8 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 | 항목 | 상한 | 넘으면 |
 | --- | --- | --- |
 | 토큰 하나의 요청 수 | 1분에 60번. 그 토큰의 첫 요청부터 60초 단위로 센다. 인증에 실패한 요청은 세지 않는다 | `429 RATE_LIMITED`, `Retry-After` 헤더(초), `details.retryAfterSeconds` |
+| 토큰 하나의 쓰기 요청 수 | 1분에 10번. 위 60번과 따로 세고, 쓰기 요청은 둘 다에 센다 | 위와 같다 |
+| 한 요청의 체결, 제안 | 50건, 20건 | `400 VALIDATION_FAILED` |
 | 검색어 `q` | 100자 | `400 VALIDATION_FAILED` |
 | 페이지 크기 `size` | 기본 20, 최대 50 | `400 VALIDATION_FAILED` |
 | 노드 상세의 `relations`, `claims`, `documents`, `concepts` | 100개, 20개, 20개, 20개 | 잘라 내고 `relationsTruncated`, `claimsTruncated` 를 `true` 로 둔다. `documents`, `concepts` 는 앞에서부터 담는다 |
@@ -688,16 +803,18 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 | `/api/v1/graph/neighborhood` | `id`(필수), `hops`(기본 1) | `V1Graph` |
 | `/api/v1/securities/lookup` | `ticker`(필수), `market` | `V1SecurityLookup` |
 | `/api/v1/me/knowledge` | `level`, `page`, `size` | `Page<V1StudyItem>` |
+| `/api/v1/trades` | `ticker`, `from`, `to`, `page`, `size` | `Page<V1Trade>`(「쓰기」) |
+| `/api/v1/proposals` | `status`, `page`, `size` | `Page<V1Proposal>`(「쓰기」) |
 
 `Page` 는 이 문서의 「페이지네이션」 과 같은 모양이다.
 
 #### `GET /api/v1/me`
 
 ```json
-{ "user": { "id": "uuid", "displayName": "Alice", "role": "EDITOR" }, "token": { "id": "uuid", "name": "Hermes", "last4": "x9Qa" }, "rateLimitPerMinute": 60 }
+{ "user": { "id": "uuid", "displayName": "Alice", "role": "EDITOR" }, "token": { "id": "uuid", "name": "Hermes", "last4": "x9Qa", "scope": "READ_WRITE" }, "rateLimitPerMinute": 60, "writeRateLimitPerMinute": 10 }
 ```
 
-토큰을 넣은 뒤 연결이 되는지 확인할 때 부른다.
+토큰을 넣은 뒤 연결이 되는지 확인할 때 부른다. `token.scope` 가 `READ` 면 쓰기 경로를 부르지 않는다.
 
 #### `GET /api/v1/ontology`
 
@@ -900,6 +1017,154 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
   "concepts": ["V1Concept"]
 }
 ```
+
+### 쓰기
+
+에이전트가 체결 사실을 넣고 해석을 제안으로 올리는 경로다. 체결은 바로 저장하고, 해석은 사람이 웹의 「제안」 에서 승인해야 공유 지식이나 이해 표시가 바뀐다. 결정과 근거는 [ADR-013](adr/013-owner-trades-and-agent-proposals.md) 이다.
+
+- 쓰기(`POST`)는 「조회와 기록」 범위(`scope = READ_WRITE`)로 발급한 토큰만 한다. 「조회만」 토큰이면 `403 INSUFFICIENT_SCOPE`(「이 토큰은 조회만 할 수 있습니다. 「조회와 기록」 토큰을 새로 발급하세요.」)다. 범위는 `GET /api/v1/me` 의 `token.scope` 로 확인한다.
+- 두 `GET`(`/api/v1/trades`, `/api/v1/proposals`)은 모든 범위가 부른다.
+- 토큰 주인의 역할과 상관없이 쓴다. 열람자의 토큰도 체결을 넣고 제안을 올린다. 공유 지식을 만드는 제안의 승인만 편집 권한이 필요하다(「제안」).
+- 한 요청은 전부 저장되거나 전부 거절된다. 항목 하나라도 틀리면 아무것도 저장하지 않고 오류로 답한다. `details.fieldErrors` 의 키는 `trades[2].quantity`, `proposals[0].payload.type` 처럼 몇 번째 항목의 어느 칸인지 담는다. 온톨로지 위반은 `400 ONTOLOGY_VIOLATION` 에 `details.index`(몇 번째 항목)를 더한다. 가리키는 노드나 체결이 없으면 `404 NOT_FOUND` 에 `details.index` 를 더한다.
+- 같은 요청을 다시 보내도 된다. 체결은 `(broker, externalId)`, 제안은 `dedupeKey` 로 이미 있는 것을 찾아 새로 만들지 않고 돌려준다. 응답은 항목마다 `created` 나 `existing` 이다.
+- 요청 본문은 64KiB 까지다(`413 PAYLOAD_TOO_LARGE`). 쓰기 경로는 토큰마다 1분에 10번까지다(`429 RATE_LIMITED`). 이 요청도 1분 60번 한도에 함께 센다.
+
+| 메서드 | 경로 | 본문이나 쿼리 | 응답 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/trades` | `{"trades": [V1TradeInput]}`. 1개 이상 50개 이하 | `200 {"results": [V1TradeResult]}` |
+| GET | `/api/v1/trades` | `ticker`, `from`, `to`, `page`, `size` | `Page<V1Trade>` |
+| POST | `/api/v1/proposals` | `{"proposals": [V1ProposalInput]}`. 1개 이상 20개 이하 | `200 {"results": [V1ProposalResult]}` |
+| GET | `/api/v1/proposals` | `status`, `page`, `size` | `Page<V1Proposal>` |
+
+#### `POST /api/v1/trades`
+
+```json
+{
+  "trades": [
+    {
+      "broker": "TOSS",
+      "externalId": "20261024-000123",
+      "side": "BUY",
+      "market": "US",
+      "ticker": "FLNC",
+      "name": "Fluence Energy",
+      "quantity": 10,
+      "price": 12.3,
+      "currency": "USD",
+      "amount": 123.0,
+      "fee": 0.12,
+      "executedAt": "2026-10-24T23:31:05+09:00"
+    }
+  ]
+}
+```
+
+| 필드 | 필수 | 규칙 |
+| --- | --- | --- |
+| `broker` | 예 | `TOSS`, `OTHER` |
+| `externalId` | 예 | 증권사의 체결 식별자. 앞뒤 공백을 지운 1자 이상 100자 이하. 체결 식별자가 없으면 주문 식별자를 넣는다. 같은 `broker` 안에서 같은 체결이면 늘 같은 값이어야 한다 |
+| `side` | 예 | `BUY`, `SELL` |
+| `market` | 예 | 「종목 찾기」 의 `market` 이 받는 값(`KR`, `US`, `KOSPI`, `KOSDAQ`, `NASDAQ`, `NYSE`, `AMEX`, `KR_ETC`, `US_ETC`, `KRX_KOSPI`, `KRX_KOSDAQ`, `OTHER`). 대소문자를 무시한다 |
+| `ticker` | 예 | 1자 이상 32자 이하. 앞뒤 공백을 지우고 대문자로 저장한다 |
+| `name` | 아니오 | 100자까지 |
+| `quantity` | 예 | 0 보다 큰 수. 소수를 받는다 |
+| `price`, `amount` | 예 | 0 이상의 수 |
+| `currency` | 예 | 영문 세 자리. 대문자로 저장한다 |
+| `fee` | 아니오 | 0 이상의 수. 수수료와 세금을 더한 값 |
+| `executedAt` | 예 | 오프셋이 붙은 ISO-8601 시각. UTC 초까지로 바꿔 저장한다 |
+
+- 이 표 밖의 필드(계좌 번호 등)가 있으면 `400 VALIDATION_FAILED` 다. 계좌 정보는 보내지 않는다.
+- 저장할 때 `market` 과 `ticker` 로 「종목 찾기」 와 같은 규칙으로 보관되지 않은 종목을 찾아 잇는다. 여럿이면 먼저 만든 것이다. 없으면 잇지 않고 저장하고 `security` 가 `null` 이다. 종목을 만들고 싶으면 `CREATE_NODE` 제안을 올린다. 같은 체결을 다시 보내면 그때 다시 찾는다.
+- 이미 있는 체결은 저장된 값을 고치지 않는다. 보낸 값이 달라도 저장된 값을 돌려준다.
+
+`V1TradeResult`
+
+```json
+{ "index": 0, "status": "created", "trade": "V1Trade" }
+```
+
+`status` 는 `created`(새로 저장) 또는 `existing`(이미 있음)이다. 같은 요청 안에서 같은 체결이 두 번 나오면 뒤의 것은 `existing` 이다.
+
+`V1Trade`
+
+```json
+{
+  "id": "uuid", "broker": "TOSS", "externalId": "20261024-000123", "side": "BUY", "market": "US", "ticker": "FLNC", "name": "Fluence Energy",
+  "quantity": 10.0, "price": 12.3, "currency": "USD", "amount": 123.0, "fee": 0.12,
+  "executedAt": "2026-10-24T14:31:05Z", "createdAt": "2026-10-25T03:15:00.123456Z",
+  "security": "V1NodeRef 또는 null",
+  "decisions": ["V1NodeRef"]
+}
+```
+
+`security` 와 `decisions` 에서 보관된 노드는 뺀다. `decisions` 는 사람이 승인한 제안으로 이어진 투자 결정이다.
+
+#### `GET /api/v1/trades`
+
+토큰 주인의 체결이다. 체결 시각이 늦은 순서, 같으면 `id` 순서다.
+
+| 쿼리 | 기본값 | 설명 |
+| --- | --- | --- |
+| `ticker` | 전체 | 대소문자를 무시하고 같은 것. 32자까지 |
+| `from`, `to` | 없음 | 오프셋이 붙은 ISO-8601 시각. `from` 이상, `to` 미만의 체결 시각이다. 형식이 틀리면 `400 VALIDATION_FAILED`(`details.fieldErrors.from`) |
+| `page`, `size` | 0, 20 | `size` 는 50까지 |
+
+#### `POST /api/v1/proposals`
+
+```json
+{
+  "proposals": [
+    {
+      "kind": "LINK_TRADE_DECISION",
+      "payload": { "tradeIds": ["uuid"], "decisionId": "uuid" },
+      "rationale": "10월 24일 FLNC 매수 체결은 같은 날 기록한 「FLNC 추가 매수」 결정을 실행한 것이다.",
+      "evidence": { "nodeIds": ["uuid"], "tradeIds": ["uuid"], "urls": [] },
+      "dedupeKey": "link:20261024-000123:uuid"
+    }
+  ]
+}
+```
+
+| 필드 | 필수 | 규칙 |
+| --- | --- | --- |
+| `kind` | 예 | `CREATE_NODE`, `CREATE_RELATIONSHIP`, `LINK_TRADE_DECISION`, `STUDY_NOTE` |
+| `payload` | 예 | 「제안」 의 「제안 내용」 의 모양과 규칙 |
+| `rationale` | 예 | 사람이 승인할지 판단할 까닭. 앞뒤 공백을 지운 1자 이상 2000자 이하 |
+| `evidence` | 아니오 | `{"nodeIds", "tradeIds", "urls"}`. 각각 20개, 50개, 10개까지. `urls` 는 `http`, `https` 절대 주소 2000자까지. `nodeIds` 는 있는 노드, `tradeIds` 는 내 체결이어야 한다 |
+| `dedupeKey` | 아니오 | 1자 이상 100자 이하. 같은 키로 다시 올리면 상태와 상관없이 있던 제안을 돌려준다. 같은 해석을 매번 다시 올리는 에이전트는 키를 붙인다 |
+
+- 올린 뒤 대기 중인 제안이 200개를 넘으면 아무것도 저장하지 않고 `409 PROPOSAL_LIMIT`(`details.max`, `details.pending`)이다. 이미 있는 제안(`existing`)은 세지 않는다.
+- 같은 요청 안에서 같은 `dedupeKey` 가 두 번 나오면 뒤의 것은 `existing` 이다.
+- 한 요청의 제안끼리는 서로 가리킬 수 없다. 만들 노드를 가리키는 관계는 `CREATE_NODE` 의 `links` 에 담는다.
+
+`V1ProposalResult`
+
+```json
+{ "index": 0, "status": "created", "proposal": "V1Proposal" }
+```
+
+`V1Proposal`
+
+```json
+{
+  "id": "uuid", "kind": "LINK_TRADE_DECISION", "status": "PENDING",
+  "payload": { "tradeIds": ["uuid"], "decisionId": "uuid" },
+  "rationale": "…", "evidence": { "nodeIds": ["uuid"], "tradeIds": ["uuid"], "urls": [] }, "dedupeKey": "link:20261024-000123:uuid",
+  "createdAt": "2026-10-25T03:15:00.123456Z", "decidedAt": null, "decisionNote": null,
+  "result": null, "lastError": null
+}
+```
+
+필드의 뜻은 「제안」 의 `ProposalView` 와 같다. `refs`, `token`, `requiresEditor` 는 담지 않는다. 결과의 노드는 `GET /api/v1/nodes/{id}` 로 읽는다.
+
+#### `GET /api/v1/proposals`
+
+토큰 주인의 제안이다. 규칙은 「제안」 의 `GET /api/me/proposals` 와 같다. 에이전트는 이것으로 사람이 승인했는지, 거절했다면 왜인지 읽고 같은 제안을 다시 올리지 않는다.
+
+| 쿼리 | 기본값 | 설명 |
+| --- | --- | --- |
+| `status` | 전체 | `PENDING`, `ACCEPTED`, `REJECTED` 가운데 하나 |
+| `page`, `size` | 0, 20 | `size` 는 50까지 |
 
 ## 후속 도구가 쓸 필드
 

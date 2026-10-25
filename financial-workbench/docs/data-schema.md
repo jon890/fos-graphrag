@@ -266,7 +266,7 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 - `asOf`, `decidedAt`, `since`, `expectedResolution` 이 비어 있으면 모른다는 뜻이다. 미상을 특정 날짜로 바꾸지 않는다.
 - 범위로 받은 가치는 중간값을 `valuePerShare` 에 넣고 범위는 `description` 에 적는다.
 - 하방률, 상방률 같은 계산값은 아직 저장하지도 보이지도 않는다.
-- 이 노드도 다른 노드처럼 로그인한 모든 사용자가 본다. 개인 기록의 열람 제한은 아직 없다.
+- 이 노드도 다른 노드처럼 로그인한 모든 사용자가 본다. 본인만 보는 것은 이해 표시, 체결 기록, 제안이다(「이해 표시」, 「체결 기록」, 「제안」).
 - 에이전트 API 의 종목 찾기(`GET /api/v1/securities/lookup`)는 타입 키 `Security`, `Company`, `Decision`, `Valuation`, `Scenario`, 관계 키 `ISSUES`, `HAS_DECISION`, `BASED_ON`, `HAS_VALUATION`, `HAS_SCENARIO`, 속성 `market`, `ticker`, `currency`, `action`, `decidedAt`, `reason`, `asOf`, `currentPrice`, `method`, `kind`, `valuePerShare`, `assumptions` 를 이름으로 읽는다. 온톨로지에서 빠지면 그 칸이 `null` 이거나 목록이 빌 뿐 저장은 막지 않으므로 `CodeReadKeys` 에 넣지 않는다.
 
 ### 초기 데이터
@@ -297,7 +297,7 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 - `role` 은 `VIEWER`, `EDITOR`, `ADMIN` 가운데 하나다.
 - 비밀번호는 저장하지 않는다. 로그인은 Google OpenID Connect 로만 한다.
 - 개인 계좌 키, 잔고, 주문 내역은 이 모델에 넣지 않는다.
-- 사용자가 발급한 연동 토큰은 `OWNS` 로 이어진 `:IntegrationToken` 이다(「연동 토큰」).
+- 사용자가 발급한 연동 토큰, 사용자의 체결 기록과 제안은 `OWNS` 로 이어진 `:IntegrationToken`, `:Trade`, `:Proposal` 이다(「연동 토큰」, 「체결 기록」, 「제안」).
 - `:User` 는 `:Knowledge` label 이 없어 검색과 그래프에 나오지 않는다.
 - `guideDoneAt` 은 첫 접속 가이드를 끝내거나 건너뛴 시각이다. 없으면 로그인할 때 가이드가 열린다([흐름](flow.md) 의 「첫 접속 가이드」). 화면 상태라 `revision`, `updatedAt`, `updatedBy` 를 바꾸지 않고 ChangeEvent 도 남기지 않는다. 한 번 쓰면 지우지 않는다.
 - 사용자 관리 변경도 ChangeEvent(`targetKind = USER`)로 남는다. 첫 관리자를 만든 이벤트의 actor 는 `system` 이다.
@@ -322,12 +322,13 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 
 ## 연동 토큰
 
-`(:User)-[:OWNS]->(:IntegrationToken {id, name, hash, last4, createdAt, lastUsedAt, revokedAt})` 가 사용자가 외부 에이전트에 넣으려고 발급한 개인 연동 토큰이다. 결정과 근거는 [ADR-012](adr/012-agent-integration-token.md), 계약은 [API 계약](api-contract.md) 의 「연동 토큰」 이다.
+`(:User)-[:OWNS]->(:IntegrationToken {id, name, scope, hash, last4, createdAt, lastUsedAt, revokedAt})` 가 사용자가 외부 에이전트에 넣으려고 발급한 개인 연동 토큰이다. 결정과 근거는 [ADR-012](adr/012-agent-integration-token.md), 계약은 [API 계약](api-contract.md) 의 「연동 토큰」 이다.
 
 | 속성 | 타입 | 뜻 |
 | --- | --- | --- |
 | `id` | String | UUID. 목록과 폐기에 쓰는 식별자 |
 | `name` | String | 사용자가 붙인 이름. 50자까지 |
+| `scope` | String | `READ`(조회만) 또는 `READ_WRITE`(조회와 기록). 속성이 없으면 `READ` 로 읽는다. 기록 범위를 처음 둔 배포 전에 발급한 토큰에는 이 속성이 없다 |
 | `hash` | String | 토큰 원문(`fwb_` 포함 47자)의 SHA-256 을 소문자 16진수 64자로 쓴 값. 원문은 저장하지 않는다 |
 | `last4` | String | 원문의 끝 네 글자. 목록에서 토큰을 구분하는 데 쓴다 |
 | `createdAt` | String | 발급 시각. 서버가 기록하는 시각 형식이다 |
@@ -340,8 +341,94 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 - 사용자마다 폐기하지 않은 토큰은 5개까지다. 발급은 그 사용자 노드에 쓰기 잠금(`_lock`)을 건 뒤 세고 만든다. 같은 사람이 동시에 발급해도 5개를 넘지 않는다.
 - `lastUsedAt` 은 앞 값보다 1분 넘게 지났을 때만 고쳐 쓴다. 요청마다 쓰기를 만들지 않으려는 것이다. 이 쓰기가 실패해도 요청은 처리한다.
 - 토큰은 사용자 노드에만 이어진다. `:IntegrationToken` 은 `:Knowledge` 가 아니어서 검색, 그래프, 근거 따라가기에 나오지 않는다. `OWNS` 와 `:IntegrationToken` 에 `archived` 속성을 두지 않아 주변 그래프의 경로 조건(`archived = false`)에 걸려 지나가지 않는다.
-- 사용자를 비활성화해도 토큰은 남지만 인증은 실패한다. 다시 활성화하면 폐기하지 않은 토큰이 다시 통한다. 사용자 노드를 지우면(`DETACH DELETE`) 그 사용자의 토큰도 함께 지운다. 지금은 사용자를 지우는 API 가 없어 운영자가 Neo4j 에서 지울 때 `MATCH (u:User {id: $id}) OPTIONAL MATCH (u)-[:OWNS]->(t:IntegrationToken) DETACH DELETE u, t` 로 함께 지운다.
+- 사용자를 비활성화해도 토큰은 남지만 인증은 실패한다. 다시 활성화하면 폐기하지 않은 토큰이 다시 통한다. 사용자 노드를 지울 때 함께 지우는 규칙은 「사용자를 지울 때」 다.
+- 범위는 발급할 때 정하고 바꾸지 않는다. 범위를 바꾸려면 새로 발급하고 예전 토큰을 폐기한다.
 - 발급, 폐기, 사용 시각은 변경 이력(ChangeEvent)에 남기지 않는다. 지식 데이터가 아니라 개인 설정이고, 이력 화면은 다른 사용자에게도 보이기 때문이다.
+
+## 체결 기록
+
+`(:User)-[:OWNS]->(:Trade)` 가 증권사에서 확정된 체결 하나다. 주인만 읽고 지운다. 결정과 근거는 [ADR-013](adr/013-owner-trades-and-agent-proposals.md), 계약은 [API 계약](api-contract.md) 의 「내 체결」 과 「에이전트 API(`/api/v1`)」 의 「쓰기」 다.
+
+| 속성 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | String | UUID |
+| `ownerId` | String | 주인 `:User` 의 `id`. 같은 체결 검사의 유일 제약에 쓴다 |
+| `broker` | String | 증권사. `TOSS`(토스증권), `OTHER`(그 밖) |
+| `externalId` | String | 증권사의 체결이나 주문 식별자. 100자까지 |
+| `side` | String | `BUY`(매수), `SELL`(매도) |
+| `market` | String | 받은 시장 값을 대문자로 바꾼 것. 받는 값은 종목 찾기의 `market` 과 같다(`KR`, `US`, `KOSPI`, `KOSDAQ`, `NASDAQ`, `NYSE`, `AMEX`, `KR_ETC`, `US_ETC`, `KRX_KOSPI`, `KRX_KOSDAQ`, `OTHER`) |
+| `ticker` | String | 종목 코드. 앞뒤 공백을 지우고 대문자로 바꾼다. 32자까지 |
+| `name` | String | 증권사가 준 종목 이름. 100자까지. 없으면 속성이 없다 |
+| `quantity` | Float | 체결 수량. 0 보다 크다. 소수 주식을 위해 소수를 받는다 |
+| `price` | Float | 체결 단가. 0 이상 |
+| `currency` | String | 통화. 영문 대문자 세 자리(`KRW`, `USD`) |
+| `amount` | Float | 체결 금액. 0 이상. 증권사가 준 값을 그대로 둔다. 수량과 단가로 다시 계산하지 않는다 |
+| `fee` | Float | 수수료와 세금. 0 이상. 없으면 속성이 없다 |
+| `executedAt` | String | 체결 시각. UTC 초까지 고정 자릿수(`YYYY-MM-DDTHH:MM:SSZ`) |
+| `createdAt` | String | 저장 시각. 서버가 기록하는 시각 형식이다 |
+| `createdVia` | String | `AGENT`(연동 토큰) 또는 `WEB`. 지금은 `AGENT` 만 쓴다 |
+| `tokenId` | String | 저장한 연동 토큰의 `id`. 그 토큰을 폐기해도 남는다 |
+
+- 계좌 번호, 계좌 이름, 잔고는 저장하지 않는다. 요청에 와도 모르는 필드라 `400 VALIDATION_FAILED` 다.
+- 같은 주인 안에서 `(broker, externalId)` 는 하나다. 유일 제약 `trade_owner_external_unique` 가 `(ownerId, broker, externalId)` 에 걸린다. 저장은 주인 사용자 노드에 쓰기 잠금(`_lock`)을 건 뒤 `MERGE` 한다. 같은 체결을 다시 보내거나 동시에 보내도 하나만 남고, 이미 있으면 저장된 값을 고치지 않고 돌려준다.
+- 금액은 Float 로 둔다. 화면과 에이전트가 읽는 기록이고 회계 계산을 하지 않는다.
+- `(:Trade)-[:OF_SECURITY]->(:Knowledge:Security)` 는 체결의 종목이다. 저장할 때 `market` 을 종목 찾기와 같은 규칙으로 워크벤치 시장 목록으로 바꾸고, 그 시장 가운데 `ticker` 가 대소문자를 무시하고 같은 보관되지 않은 Security 를 만든 순서로 하나 찾아 잇는다. 없으면 잇지 않고 저장한다. 같은 체결을 다시 보낼 때 아직 종목이 이어지지 않았으면 그때 다시 찾는다. 나중에 Security 를 만든 경우 다음 저장 요청에서 이어진다.
+- `(:Trade)-[:EXECUTES {createdAt, proposalId}]->(:Knowledge:Decision)` 는 그 체결이 실행한 투자 결정이다. 제안(`LINK_TRADE_DECISION`, 또는 `CREATE_NODE` 의 `tradeIds`)을 승인할 때만 생긴다. 한 체결이 여러 결정에, 한 결정이 여러 체결에 이어질 수 있다. 같은 체결과 결정 사이에는 관계가 하나다(`MERGE`).
+- 체결, `OF_SECURITY`, `EXECUTES` 에는 `id`, `revision`, `archived` 를 두지 않는다. 주변 그래프의 경로 조건(`archived = false`)에 걸려 지나가지 않고, 상세와 근거 따라가기는 양 끝을 `:Knowledge` 로 묶어 이 관계를 타지 않는다. `:Trade` 는 `:Knowledge` 가 아니어서 검색, 개념 지도 개수, 목록에 나오지 않는다.
+- 변경 이력(ChangeEvent)에 남기지 않는다. 이력 화면은 다른 사용자에게도 보이기 때문이다. 이은 Security 나 Decision 의 `revision`, `updatedAt` 도 바꾸지 않는다.
+- 주인이 지우면(`DELETE /api/me/trades/{id}`) 체결과 그 관계(`OWNS`, `OF_SECURITY`, `EXECUTES`)를 함께 지운다(`DETACH DELETE`). 보관은 없다. 지운 체결을 가리키는 대기 중인 제안은 승인할 때 `404 NOT_FOUND` 다.
+- 이은 Security 나 Decision 을 보관해도 관계는 남는다. 화면용 응답은 그 끝을 `archived: true` 로 보이고, 에이전트 응답은 뺀다.
+
+## 제안
+
+`(:User)-[:OWNS]->(:Proposal)` 가 에이전트가 해석해 올린 쓰기 하나다. 사람이 승인하면 기존 서비스로 실행한다. 주인만 읽고 승인하고 거절한다. 결정과 근거는 [ADR-013](adr/013-owner-trades-and-agent-proposals.md), 계약은 [API 계약](api-contract.md) 의 「제안」 이다.
+
+| 속성 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | String | UUID |
+| `ownerId` | String | 주인 `:User` 의 `id`. 토큰의 주인이다 |
+| `kind` | String | `CREATE_NODE`, `CREATE_RELATIONSHIP`, `LINK_TRADE_DECISION`, `STUDY_NOTE` |
+| `status` | String | `PENDING`(대기), `ACCEPTED`(승인), `REJECTED`(거절) |
+| `payload` | String | 종류별 내용을 JSON 문자열로 둔다. 승인할 때 사용자가 고친 값이면 고친 값으로 바꿔 둔다. 모양은 [API 계약](api-contract.md) 의 「제안 내용」 이다 |
+| `rationale` | String | 에이전트가 붙인 까닭. 2000자까지 |
+| `evidence` | String | 근거 참조 `{nodeIds, tradeIds, urls}` 의 JSON 문자열 |
+| `dedupeKey` | String | 에이전트가 붙인 같은 제안 검사 키. 100자까지. 없으면 속성이 없다 |
+| `createdAt` | String | 올린 시각 |
+| `createdVia` | String | `AGENT`. 지금은 연동 토큰으로만 올린다 |
+| `tokenId`, `tokenName` | String | 올린 연동 토큰과 그때의 토큰 이름 |
+| `decidedAt` | String | 승인하거나 거절한 시각 |
+| `decisionNote` | String | 거절 이유. 1000자까지 |
+| `result` | String | 승인으로 생긴 것 `{nodeIds, relationshipIds, tradeIds}` 의 JSON 문자열 |
+| `lastErrorCode`, `lastErrorMessage`, `lastErrorAt` | String | 마지막 승인 실패의 오류 코드, 문장, 시각. 승인하면 지운다 |
+
+- 같은 주인 안에서 `dedupeKey` 는 하나다(유일 제약 `proposal_owner_dedupe_unique`, `(ownerId, dedupeKey)`). 같은 키로 다시 올리면 상태와 상관없이 새로 만들지 않고 있던 제안을 돌려준다. 키가 없는 제안은 검사하지 않는다.
+- 올리기는 주인 사용자 노드에 쓰기 잠금(`_lock`)을 건 뒤 대기 수를 세고 만든다. 대기 중인 제안은 사용자마다 200개까지다. 같은 트랜잭션에서 그 사용자의 결정한 제안 가운데 `decidedAt` 이 90일보다 오래된 것을 지운다. 대기 중인 제안은 저절로 지우지 않는다.
+- 승인과 거절은 그 제안 노드에 쓰기 잠금을 건 뒤 상태를 확인한다. 같은 제안을 두 탭에서 동시에 승인해도 한 번만 실행된다.
+- 승인의 실행은 기존 서비스가 한다. 노드와 관계는 `NodeService`, `RelationshipService` 로 만들어 온톨로지 검증, 같은 종목 검사, 잠금, 변경 이력이 그대로다. 이력의 작업자는 승인한 사용자이고 메모는 「에이전트 제안을 승인했다」 다. 이해 표시는 `KnowledgeMarkService` 로 쓴다(이력 없음). 실행과 상태 변경은 한 트랜잭션이다. 실행이 실패하면 함께 롤백되고, 별도 트랜잭션으로 `lastError*` 만 쓴다. 상태는 `PENDING` 그대로다.
+- 제안은 변경 이력에 남기지 않는다. 승인으로 생긴 노드와 관계의 이력만 남는다.
+- 제안과 `OWNS` 에는 `archived` 를 두지 않는다. 다른 노드와 관계로 잇지 않고, 가리키는 노드와 체결은 `payload` 와 `evidence` 의 id 로만 가진다. 그래서 그래프 조회에 섞이지 않는다.
+
+## 사용자를 지울 때
+
+지금은 사용자를 지우는 API 가 없다. 운영자가 Neo4j 에서 사용자를 지울 때는 그 사용자가 가진 개인 기록을 함께 지운다.
+
+```cypher
+MATCH (u:User {id: $id})
+OPTIONAL MATCH (u)-[:OWNS]->(x)
+DETACH DELETE u, x
+```
+
+- `OWNS` 로 이어진 연동 토큰, 체결 기록, 제안이 함께 지워진다. `DETACH DELETE` 라 이해 표시(`KNOWS`)와 체결의 `OF_SECURITY`, `EXECUTES` 도 사라진다.
+- 그 사용자가 만든 지식 노드와 변경 이력은 남는다. 작업자 id 는 이름을 찾지 못해 화면에 보이지 않는다.
+
+## 코드가 소유하는 이름
+
+아래 이름은 서버 코드가 지식 그래프 밖의 저장에 쓴다. 온톨로지의 노드 타입이나 관계 종류로 쓸 수 없고, 쓰면 로더의 일관성 검사가 오류로 답한다(미리보기 `valid: false`, 저장 `400 ONTOLOGY_INVALID`).
+
+- 노드 label: `Knowledge`, `User`, `IntegrationToken`, `Trade`, `Proposal`, `ChangeEvent`, `OntologyVersion`, `OntologyHead`, `SeedRun`
+- 관계 종류: `OWNS`, `KNOWS`, `OF_SECURITY`, `EXECUTES`
+
+목록은 서버 코드의 상수 한 곳(`OntologyLoader` 의 `RESERVED_NODE_TYPES`, `RESERVED_RELATIONSHIP_TYPES`)이 소유한다. 저장된 온톨로지 버전 가운데 이 이름을 쓰는 것은 없다.
 
 ## 변경 이력
 
@@ -371,6 +458,12 @@ API 가 시작할 때, 웹 서버가 요청을 받기 전에 `IF NOT EXISTS` 로
 | `ontology_head_key_unique` | `(:OntologyHead).key` 유일 | 온톨로지 저장 잠금 노드가 하나만 생기게 한다 |
 | `integration_token_id_unique` | `(:IntegrationToken).id` 유일 | 연동 토큰 ID |
 | `integration_token_hash_unique` | `(:IntegrationToken).hash` 유일 | 인증할 때 해시로 토큰을 바로 찾는다 |
+| `trade_id_unique` | `(:Trade).id` 유일 | 체결 ID |
+| `trade_owner_external_unique` | `(:Trade).(ownerId, broker, externalId)` 유일 | 같은 주인의 같은 체결을 하나로 둔다 |
+| `trade_owner_executed` | `(:Trade).(ownerId, executedAt)` 인덱스 | 내 체결을 최근 것부터 읽는다 |
+| `proposal_id_unique` | `(:Proposal).id` 유일 | 제안 ID |
+| `proposal_owner_dedupe_unique` | `(:Proposal).(ownerId, dedupeKey)` 유일 | 같은 키의 제안을 하나로 둔다. 키가 없는 제안에는 걸리지 않는다 |
+| `proposal_owner_status` | `(:Proposal).(ownerId, status)` 인덱스 | 내 대기 제안 수와 목록 |
 | `seed_run_key_unique` | `(:SeedRun).key` 유일 | 초기 데이터 파일을 한 번만 적용한다. `:SeedRun` 은 `:Knowledge` 가 아니라 검색과 그래프에 나오지 않는다 |
 | `knowledge_search_text` | `(:Knowledge).searchText` TEXT 인덱스 | 검색어 `CONTAINS`. 첫 버전의 RANGE 인덱스가 있으면 시작할 때 지우고 TEXT 로 다시 만든다 |
 | `rel_<타입>_id` | 관계 타입마다 `()-[r:<타입>]-()` 의 `r.id` 인덱스 | 관계 보관, 복원, 조회. 타입은 온톨로지의 관계와 Claim 관계 전부다 |
@@ -379,7 +472,7 @@ API 가 시작할 때, 웹 서버가 요청을 받기 전에 `IF NOT EXISTS` 로
 
 ## 보관과 삭제
 
-데이터를 지우는 API 는 없다. 보관은 `archived = true` 로 표시만 한다.
+지식 데이터를 지우는 API 는 없다. 보관은 `archived = true` 로 표시만 한다. 개인 기록 가운데 체결 기록만 주인이 지운다(「체결 기록」).
 
 - 보관된 노드와 관계는 기본 검색, 주변 그래프, 검토 대기 목록에서 빠진다.
 - 노드를 보관해도 붙은 관계와 Claim 은 바뀌지 않는다. 복원하면 그대로 다시 보인다.

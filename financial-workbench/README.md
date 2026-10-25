@@ -9,7 +9,7 @@
 | --- | --- |
 | `ontology/financial-ontology.yaml` | 온톨로지의 첫 버전과 서버 코드가 소유하는 부분(검토 상태, 이력 이름, 주장 관계, Claim 타입). 그 뒤의 버전은 DB 에 쌓이고 ADMIN 이 웹에서 고친다 |
 | `ontology/seeds/` | 시작할 때 한 번 넣는 초기 데이터. key 마다 한 번만 적용한다 |
-| `api/` | Kotlin, Spring Boot 4.1, Neo4jClient. Google 로그인과 역할, 검증, 변경 이력, 조회 제한, 연동 토큰과 에이전트 조회 API |
+| `api/` | Kotlin, Spring Boot 4.1, Neo4jClient. Google 로그인과 역할, 검증, 변경 이력, 조회 제한, 연동 토큰, 에이전트 API(조회, 체결 기록, 제안) |
 | `web/` | React, TypeScript, Vite, Cytoscape.js |
 | `compose.yml` | 운영 Compose. Neo4j 포트를 호스트에 열지 않는다 |
 | `compose.dev.yml` | 개발용 Neo4j(`127.0.0.1:7476`, `127.0.0.1:7689`)와 가짜 OIDC 공급자(`127.0.0.1:8090`) |
@@ -28,7 +28,7 @@ docker compose up -d --build --wait
 로그인은 Google 계정으로만 한다. 첫 관리자가 오른쪽 위 「더보기」 메뉴의 「사용자」 에서 다른 사람의 Gmail 과 역할(VIEWER, EDITOR, ADMIN)을 추가한다.
 처음 열면 온톨로지의 타입과 관계를 그린 개념 지도가 보인다. 항목은 어느 화면에서나 오른쪽 위 「＋ 추가」 로 만든다.
 항목 상세의 「근거 따라가기」 는 그 항목이 기댄 근거를 변화까지 거슬러 보이고, 「공부」 탭은 내가 「잘 모르겠어요」 로 표시한 항목을 모은다.
-개인 비서 Hermes 가 워크벤치를 조회하게 하려면 「더보기」 의 「연동 토큰」 에서 토큰을 발급해 커넥터에 넣는다. 에이전트는 그 토큰으로 조회 전용 `/api/v1` 을 부른다. 계약은 [API 계약](docs/api-contract.md) 의 「에이전트 API」 절이다.
+개인 비서 Hermes 가 워크벤치를 조회하게 하려면 「더보기」 의 「연동 토큰」 에서 토큰을 발급해 커넥터에 넣는다. 에이전트는 그 토큰으로 `/api/v1` 을 부른다. 「조회와 기록」 으로 발급한 토큰이면 Hermes 가 토스증권 체결을 「내 체결」 에 넣고, 투자 결정 만들기 같은 해석은 「더보기」 의 「제안」 에 올려 내가 승인한다. 체결은 나만 본다. 계약은 [API 계약](docs/api-contract.md) 의 「에이전트 API」 절이다.
 Google OAuth client 만들기, 공개 HTTPS 배포, 백업과 복원, 개발 환경 실행은 [배포 문서](docs/deployment.md)에 있다.
 
 ## 검증
