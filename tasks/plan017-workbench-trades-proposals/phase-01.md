@@ -104,7 +104,7 @@ class TradeRepository(private val client: Neo4jClient) {
     /** MERGE 로 하나 만들거나 찾는다. created 가 true 면 새로 만들었다 */
     fun merge(ownerId: String, input: TradeInput, tokenId: String?, createdVia: String): Pair<String, Boolean>
     /** 종목이 아직 없으면 markets 와 ticker 로 찾아 OF_SECURITY 를 만든다 */
-    fun linkSecurityIfMissing(tradeId: String, markets: List<String>, ticker: String)
+    fun linkSecurityIfMissing(ownerId: String, tradeId: String, markets: List<String>, ticker: String)
     fun views(ownerId: String, ids: List<String>): List<TradeView>       // 요청한 순서
     fun page(ownerId: String, filter: TradeFilter, page: PageQuery): Page<TradeView>
     fun delete(ownerId: String, tradeId: String): Boolean               // DETACH DELETE
@@ -116,7 +116,7 @@ data class TradeFilter(val securityId: String? = null, val decisionId: String? =
 
 - 모든 쿼리는 `MATCH (:User {id: $ownerId})-[:OWNS]->(t:Trade)` 로 시작한다. `ownerId` 속성만으로 찾지 않는다.
 - `merge`: `MATCH (u:User {id: $ownerId}) MERGE (t:Trade {ownerId: $ownerId, broker: $broker, externalId: $externalId}) ON CREATE SET t += $props, t._new = true MERGE (u)-[:OWNS]->(t) WITH t, coalesce(t._new, false) AS created REMOVE t._new RETURN t.id AS id, created`. `props` 에 `id`(UUID), `createdAt = Timestamps.now()`, `createdVia`, `tokenId`(있을 때) 를 넣고 `name`, `fee` 는 `null` 이면 넣지 않는다.
-- `linkSecurityIfMissing`: `MATCH (t:Trade {id}) WHERE NOT (t)-[:OF_SECURITY]->() CALL { MATCH (s:Knowledge:Security) WHERE s.archived = false AND toUpper(s.ticker) = $ticker AND s.market IN $markets RETURN s ORDER BY s.createdAt, s.id LIMIT 1 } MERGE (t)-[:OF_SECURITY]->(s)`.
+- `linkSecurityIfMissing`: `MATCH (:User {id: $ownerId})-[:OWNS]->(t:Trade {id: $tradeId}) WHERE NOT (t)-[:OF_SECURITY]->() MATCH (s:Knowledge:Security) WHERE s.archived = false AND toUpper(s.ticker) = $ticker AND s.market IN $markets WITH t, s ORDER BY s.createdAt, s.id LIMIT 1 MERGE (t)-[:OF_SECURITY]->(s)`. `CALL { }` 서브쿼리 형식은 Neo4j 5.26 에서 deprecated 라 쓰지 않는다.
 - `views`, `page`: 종목은 `OPTIONAL MATCH (t)-[:OF_SECURITY]->(s:Knowledge)`, 결정은 `OPTIONAL MATCH (t)-[e:EXECUTES]->(d:Knowledge)` 를 `e.createdAt` 순서로 모은다. `NodeRef` 의 이름은 `OntologyHolder.current().labelOf`. 정렬은 `t.executedAt DESC, t.id`. `filter.ticker` 는 `toUpper(t.ticker) = toUpper($ticker)`, `from`, `to` 는 `t.executedAt >= $from`, `< $to`(UTC 초 문자열 비교).
 
 ### 6. `trade/TradeService.kt`(신규)

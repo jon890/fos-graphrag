@@ -52,17 +52,17 @@ class ProposalRepository(private val client: Neo4jClient) {
         ).bindAll(params("ownerId" to ownerId, "props" to props)).fetch().one().map { it["id"] as String }
             .orElseThrow { IllegalStateException("제안을 저장하지 못했습니다: 사용자 $ownerId") }
 
-    /** 결정한 제안 가운데 `decidedAt` 이 before 보다 오래된 것을 지운다. 대기 중인 제안은 지우지 않는다 */
-    fun deleteDecidedBefore(ownerId: String, before: String): Long =
+    /** 결정한 제안 가운데 `decidedAt` 이 before 보다 오래된 것을 지운다. 대기 중인 제안과 exceptIds 는 지우지 않는다 */
+    fun deleteDecidedBefore(ownerId: String, before: String, exceptIds: Collection<String> = emptyList()): Long =
         client.query(
             """
             MATCH (:User {id: ${'$'}ownerId})-[:OWNS]->(p:Proposal)
-            WHERE p.status <> 'PENDING' AND p.decidedAt < ${'$'}before
+            WHERE p.status <> 'PENDING' AND p.decidedAt < ${'$'}before AND NOT p.id IN ${'$'}exceptIds
             WITH p, p.id AS id
             DETACH DELETE p
             RETURN count(id) AS n
             """,
-        ).bindAll(params("ownerId" to ownerId, "before" to before)).fetch().one().map { (it["n"] as Number).toLong() }.orElse(0L)
+        ).bindAll(params("ownerId" to ownerId, "before" to before, "exceptIds" to exceptIds.toList())).fetch().one().map { (it["n"] as Number).toLong() }.orElse(0L)
 
     /** 제안 노드에 쓰기 잠금을 건 뒤 속성을 읽는다. 같은 제안의 동시 승인과 거절은 여기서 줄을 선다. 내 제안이 아니거나 없으면 null 이다 */
     @Suppress("UNCHECKED_CAST")

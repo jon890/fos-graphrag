@@ -20,6 +20,7 @@ import dev.fos.workbench.web.PageQuery
 import dev.fos.workbench.web.ProposalLimitException
 import dev.fos.workbench.web.ProposalNotPendingException
 import dev.fos.workbench.web.ValidationFailedException
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
@@ -73,25 +74,21 @@ class ProposalService(
     private val mapper: JsonMapper,
     transactionManager: PlatformTransactionManager,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     // 승인은 실행 트랜잭션과 실패 기록 트랜잭션을 따로 연다. 실패 기록이 실행과 함께 롤백되지 않게 하려는 것이다
     private val write = TransactionTemplate(transactionManager).apply { timeout = Limits.WRITE_TIMEOUT_SECONDS }
     private val errorWrite = TransactionTemplate(transactionManager).apply { timeout = Limits.WRITE_TIMEOUT_SECONDS }
 
     /**
-     * 모든 항목을 먼저 검사하고, 하나라도 틀리면 아무것도 저장하지 않는다.
-     * 주인 노드를 잠근 뒤 대기 수를 세고, 새로 만들 수를 더해 상한을 넘으면 만들기 전에 거절한다.
-     * 같은 dedupeKey 는 같은 요청의 앞 항목을 포함해 있던 제안을 돌려준다. 같은 트랜잭션에서 오래된 결정한 제안을 지운다.
+     * 입력 모양을 먼저 검사하고, 주인 노드를 잠근 뒤 dedupeKey 로 있던 제안을 찾는다. 같은 요청의 앞 항목도 포함한다.
+     * 있던 제안은 내용을 다시 검사하지 않고 existing 으로 돌려준다. 그 사이 대상이 보관되거나 승인으로 같은 관계가 생겨도 같은 결과다.
+     * 새로 만들 항목만 내용을 검사하고, 하나라도 틀리면 아무것도 저장하지 않는다.
+     * 새로 만들 수를 더한 대기 수가 상한을 넘으면 만들기 전에 거절한다. 같은 트랜잭션에서 오래된 결정한 제안을 지우되, 이번에 돌려준 것은 남긴다.
      */
     @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun submit(ownerId: String, tokenId: String?, tokenName: String?, items: List<Map<String, Any?>>?): List<ProposalSaveResult> {
         val inputs = parseInputs(items)
-        val checked = inputs.mapIndexed { i, input ->
-            withIndex(i) {
-                val payload = payloads.check(ownerId, input.kind, input.payload, "proposals[$i].payload")
-                requireEvidence(ownerId, input.evidence)
-                payload
-            }
-        }
         // 토큰 인증이 지운 사용자를 먼저 막으므로 정상 흐름에서는 나오지 않는다
         val pending = proposals.lockOwnerAndCountPending(ownerId) ?: throw IllegalStateException("사용자를 찾을 수 없다: $ownerId")
         val firstIndexByKey = mutableMapOf<String, Int>()
@@ -100,6 +97,14 @@ class ProposalService(
             firstIndexByKey[key]?.let { return@mapIndexed Existing.SameRequest(it) }
             firstIndexByKey[key] = i
             proposals.findByDedupeKey(ownerId, key)?.let { Existing.Stored(it) }
+        }
+        val checked = inputs.mapIndexed { i, input ->
+            if (existing[i] != null) return@mapIndexed null
+            withIndex(i) {
+                val payload = payloads.check(ownerId, input.kind, input.payload, "proposals[$i].payload")
+                requireEvidence(ownerId, input.evidence)
+                payload
+            }
         }
         val toCreate = existing.count { it == null }
         if (pending + toCreate > Limits.MAX_PENDING_PROPOSALS) throw ProposalLimitException(Limits.MAX_PENDING_PROPOSALS, pending)
@@ -111,20 +116,22 @@ class ProposalService(
                 is Existing.Stored -> EXISTING to stored(found.props)
                 is Existing.SameRequest -> EXISTING to saved[found.index]!!.second
                 null -> {
-                    val id = proposals.create(ownerId, newProps(ownerId, tokenId, tokenName, input, checked[i], now))
+                    val id = proposals.create(ownerId, newProps(ownerId, tokenId, tokenName, input, checked[i]!!, now))
                     CREATED to stored(proposals.find(ownerId, id) ?: throw IllegalStateException("저장한 제안을 읽지 못했다: $id"))
                 }
             }
         }
+        val returned = saved.mapNotNull { s -> s?.takeIf { it.first == EXISTING }?.second?.id }.distinct()
         val before = Timestamps.system(Instant.now().minus(Limits.DECIDED_PROPOSAL_RETENTION_DAYS, ChronoUnit.DAYS))
-        proposals.deleteDecidedBefore(ownerId, before)
+        proposals.deleteDecidedBefore(ownerId, before, returned)
         proposals.unlockOwner(ownerId)
         return saved.mapIndexed { i, s -> ProposalSaveResult(i, s!!.first, s.second) }
     }
 
     /**
      * 실행과 상태 변경은 한 트랜잭션이다. 실행 단계(내용 다시 검사부터 서비스 실행까지)가 실패하면 그 트랜잭션을 롤백하고,
-     * 별도 트랜잭션으로 lastError 를 쓴 뒤 같은 오류를 던진다. 존재, 상태, 권한 확인의 오류는 기록하지 않는다.
+     * 별도 트랜잭션으로 lastError 를 쓴 뒤 같은 오류를 던진다. 기록이 실패해도 경고만 남기고 원래 오류를 던진다.
+     * 존재, 상태, 권한 확인의 오류와 ApiException 이 아닌 실패는 기록하지 않는다.
      * 이 메서드에 @Transactional 을 붙이면 실패 기록이 실행과 함께 롤백된다.
      */
     fun accept(ownerId: String, role: Role, id: String, editedPayload: Any?): StoredProposal {
@@ -132,7 +139,11 @@ class ProposalService(
             return write.execute { acceptInTransaction(ownerId, role, id, editedPayload) }!!
         } catch (e: ExecutionFailed) {
             val failure = e.failure
-            errorWrite.executeWithoutResult { proposals.recordError(ownerId, id, failure.code, failure.message, Timestamps.now()) }
+            try {
+                errorWrite.executeWithoutResult { proposals.recordError(ownerId, id, failure.code, failure.message, Timestamps.now()) }
+            } catch (recordFailure: RuntimeException) {
+                log.warn("제안 승인 실패를 기록하지 못했다: 제안 {}, 오류 {}", id, recordFailure.javaClass.simpleName)
+            }
             throw failure
         }
     }
@@ -234,8 +245,6 @@ class ProposalService(
             )
         }
     }
-
-    fun view(ownerId: String, item: StoredProposal): ProposalView = views(ownerId, listOf(item)).single()
 
     private fun lockPending(ownerId: String, id: String): Map<String, Any?> {
         val props = proposals.lock(ownerId, id) ?: throw NotFoundException(id)

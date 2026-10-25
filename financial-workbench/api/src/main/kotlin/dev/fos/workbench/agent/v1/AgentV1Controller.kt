@@ -24,7 +24,8 @@ import java.time.format.DateTimeParseException
 
 /**
  * 에이전트 API. 연동 토큰으로만 부른다(docs/api-contract.md 「에이전트 API(`/api/v1`)」).
- * 쓰기는 체결과 제안의 두 `POST` 뿐이고, 범위 확인은 메서드 처음에 한다. 경로 규칙으로 막으면 오류 코드가 `FORBIDDEN` 이 된다
+ * 쓰기는 체결과 제안의 두 `POST` 뿐이고, 범위 확인은 메서드 처음에 한다. 경로 규칙으로 막으면 오류 코드가 `FORBIDDEN` 이 된다.
+ * 본문은 아무 JSON 값으로 받는다. 객체로 받으면 배열 본문이 범위 확인 전에 `400` 으로 막힌다
  */
 @RestController
 @RequestMapping("/api/v1")
@@ -87,7 +88,7 @@ class AgentV1Controller(
 
     @PostMapping("/trades")
     fun saveTrades(
-        @RequestBody body: Map<String, Any?>,
+        @RequestBody(required = false) body: Any?,
         @AuthenticationPrincipal principal: AgentPrincipal,
     ): V1Results<V1TradeResult> {
         requireWrite(principal)
@@ -120,7 +121,7 @@ class AgentV1Controller(
 
     @PostMapping("/proposals")
     fun submitProposals(
-        @RequestBody body: Map<String, Any?>,
+        @RequestBody(required = false) body: Any?,
         @AuthenticationPrincipal principal: AgentPrincipal,
     ): V1Results<V1ProposalResult> {
         requireWrite(principal)
@@ -145,16 +146,17 @@ class AgentV1Controller(
     }
 
     /**
-     * 본문의 최상위 키는 [key] 하나만 받는다. 값은 객체의 배열이어야 한다. 개수와 항목의 칸은 서비스가 검사한다.
+     * 본문은 객체여야 하고 최상위 키는 [key] 하나만 받는다. 값은 객체의 배열이어야 한다. 개수와 항목의 칸은 서비스가 검사한다.
      * 키가 없거나 null 이면 null 을 넘겨 서비스가 개수 오류로 답한다
      */
-    private fun items(body: Map<String, Any?>, key: String): List<Map<String, Any?>>? {
+    private fun items(raw: Any?, key: String): List<Map<String, Any?>>? {
+        val body = raw as? Map<*, *> ?: throw ValidationFailedException(mapOf("body" to "객체여야 합니다."))
         val errors = linkedMapOf<String, String>()
-        body.keys.filterNot { it == key }.forEach { errors[it] = "알 수 없는 필드입니다." }
-        val raw = body[key]
-        val list = when (raw) {
+        body.keys.filterNot { it == key }.forEach { errors[it.toString()] = "알 수 없는 필드입니다." }
+        val value = body[key]
+        val list = when (value) {
             null -> null
-            is List<*> -> raw
+            is List<*> -> value
             else -> null.also { errors[key] = "배열이어야 합니다." }
         }
         list?.forEachIndexed { i, item -> if (item !is Map<*, *>) errors["$key[$i]"] = "객체여야 합니다." }

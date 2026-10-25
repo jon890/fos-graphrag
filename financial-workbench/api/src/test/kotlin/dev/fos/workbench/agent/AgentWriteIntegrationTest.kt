@@ -95,6 +95,21 @@ class AgentWriteIntegrationTest : IntegrationTest() {
     }
 
     @Test
+    fun `조회만 토큰이 배열 본문을 보내면 403 INSUFFICIENT_SCOPE 이고 기록 토큰이면 400 이다`() {
+        val session = loggedIn(newUser(Role.EDITOR))
+        val read = issue(session, "READ")
+        val readWrite = issue(session, "READ_WRITE")
+
+        for (target in listOf("/api/v1/trades", "/api/v1/proposals")) {
+            val byRead = bearer("POST", target, read, listOf(mapOf("kind" to "STUDY_NOTE")))
+            assertThat(byRead.status).describedAs("$target: ${byRead.body}").isEqualTo(403)
+            assertThat(byRead.code).describedAs(target).isEqualTo("INSUFFICIENT_SCOPE")
+
+            assertValidationFailed(bearer("POST", target, readWrite, listOf(mapOf("kind" to "STUDY_NOTE"))), "body", "$target 배열 본문")
+        }
+    }
+
+    @Test
     fun `같은 체결을 다시 보내거나 동시에 보내도 한 번만 저장된다`() {
         val token = issue(loggedIn(newUser(Role.VIEWER)), "READ_WRITE")
         val ticker = uniqueTicker()

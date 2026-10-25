@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { NodeRef, ProposalKind, ProposalView, TradeView } from '../api/types'
 import { testOntology } from '../components/testSupport'
 import { formatDate } from './format'
-import { canAccept, kindLabel, nodeName, proposalLinkSentences, proposalSummary, tradeLine } from './proposals'
+import { canAccept, editInitialValues, kindLabel, nodeName, proposalLinkSentences, proposalSummary, tradeLine } from './proposals'
 
 const ref = (id: string, type: string, label: string): NodeRef => ({ id, type, label, archived: false })
 
@@ -116,5 +116,24 @@ describe('승인할 수 있는 역할', () => {
   it('열람자도 자기 이해 표시나 체결 잇기는 승인한다', () => {
     expect(canAccept('VIEWER', proposal('STUDY_NOTE', {}))).toBe(true)
     expect(canAccept('VIEWER', proposal('LINK_TRADE_DECISION', {}))).toBe(true)
+  })
+})
+
+describe('고쳐서 승인 폼의 처음 값', () => {
+  it('항목 만들기는 payload 의 속성을 입력칸 문자열로 담는다', () => {
+    const p = proposal('CREATE_NODE', { type: 'Decision', properties: { title: '추가 매입' } })
+    const defs = testOntology.nodeTypes.Decision.properties
+    expect(editInitialValues(p, defs).values).toEqual({ title: '추가 매입', reason: '' })
+  })
+
+  it('payload 가 바뀌면 처음 값도 바뀐다', () => {
+    const defs = testOntology.nodeTypes.Decision.properties
+    const next = proposal('CREATE_NODE', { type: 'Decision', properties: { title: '고친 이름' } })
+    expect(editInitialValues(next, defs).values.title).toBe('고친 이름')
+  })
+
+  it('공부 메모는 표시와 메모를 담고 없으면 잘 모름과 빈 메모다', () => {
+    expect(editInitialValues(proposal('STUDY_NOTE', { nodeId: 'c1', level: 'LEARNING', note: '메모' }), undefined)).toMatchObject({ level: 'LEARNING', note: '메모' })
+    expect(editInitialValues(proposal('STUDY_NOTE', {}), undefined)).toMatchObject({ level: 'UNSURE', note: '' })
   })
 })

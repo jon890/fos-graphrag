@@ -1,5 +1,6 @@
-import type { NodeRef, Ontology, ProposalKind, ProposalView, TradeView } from '../api/types'
+import type { NodeRef, Ontology, PropertyDef, PropertyValue, ProposalKind, ProposalView, TradeView } from '../api/types'
 import { formatDate } from './format'
+import { initialFormValues, type FormValues } from './formValues'
 import { typeLabel, valueLabel, withEulReul, withJosa } from './labels'
 import { relationSentence } from './relationSentence'
 import { formatMoney, formatQuantity, sideLabel } from './trades'
@@ -101,4 +102,13 @@ export function payloadTradeIds(p: ProposalView): string[] {
 /** 근거 노드 참조. refs 에 없는 id 는 빠진다 */
 export function evidenceNodes(p: ProposalView): NodeRef[] {
   return strings(p.evidence.nodeIds).flatMap((id) => (p.refs.nodes[id] ? [p.refs.nodes[id]] : []))
+}
+
+/** 「고쳐서 승인」 폼의 처음 값. 폼을 여는 시점의 payload 로 정한다 */
+export function editInitialValues(p: ProposalView, defs: Record<string, PropertyDef> | undefined): { values: FormValues; level: string; note: string } {
+  return {
+    values: initialFormValues(defs ?? {}, createNodeParts(p).properties as Record<string, PropertyValue>),
+    level: typeof p.payload.level === 'string' ? p.payload.level : 'UNSURE',
+    note: typeof p.payload.note === 'string' ? p.payload.note : '',
+  }
 }

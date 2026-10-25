@@ -24,8 +24,8 @@ const base: ProposalView = {
 
 const viewer: CurrentUser = { id: 'u2', email: 'v@example.com', displayName: 'V', role: 'VIEWER', guideDoneAt: null }
 
-const render = (p: ProposalView, user?: CurrentUser) =>
-  renderToStaticMarkup(withApp(<ProposalCard proposal={p} onOpenNode={() => {}} onAccept={async () => {}} onReject={async () => {}} />, testOntology, user))
+const render = (p: ProposalView, user?: CurrentUser, error: string | null = null) =>
+  renderToStaticMarkup(withApp(<ProposalCard proposal={p} error={error} onOpenNode={() => {}} onAccept={async () => {}} onReject={async () => {}} />, testOntology, user))
 
 describe('ProposalCard', () => {
   it('대기 중인 항목 만들기 카드에 내용과 세 단추가 있다', () => {
@@ -57,5 +57,15 @@ describe('ProposalCard', () => {
     expect(html).toContain('data-testid="proposal-decided"')
     expect(html).toContain('이미 있는 결정입니다')
     expect(html).not.toContain('data-testid="proposal-accept"')
+  })
+
+  it('실패 이유와 서버가 남긴 마지막 실패를 함께 보인다', () => {
+    const html = render({ ...base, lastError: { code: 'DUPLICATE', message: '중복', at: '2026-10-25T04:00:00Z' } }, undefined, '승인하지 못했습니다')
+    expect(html).toContain('data-testid="proposal-card-error"')
+    expect(html).toContain('data-testid="proposal-last-error"')
+  })
+
+  it('실패 이유가 없으면 카드 오류가 없다', () => {
+    expect(render(base)).not.toContain('proposal-card-error')
   })
 })

@@ -1022,7 +1022,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 
 에이전트가 체결 사실을 넣고 해석을 제안으로 올리는 경로다. 체결은 바로 저장하고, 해석은 사람이 웹의 「제안」 에서 승인해야 공유 지식이나 이해 표시가 바뀐다. 결정과 근거는 [ADR-013](adr/013-owner-trades-and-agent-proposals.md) 이다.
 
-- 쓰기(`POST`)는 「조회와 기록」 범위(`scope = READ_WRITE`)로 발급한 토큰만 한다. 「조회만」 토큰이면 `403 INSUFFICIENT_SCOPE`(「이 토큰은 조회만 할 수 있습니다. 「조회와 기록」 토큰을 새로 발급하세요.」)다. 범위는 `GET /api/v1/me` 의 `token.scope` 로 확인한다.
+- 쓰기(`POST`)는 「조회와 기록」 범위(`scope = READ_WRITE`)로 발급한 토큰만 한다. 「조회만」 토큰이면 `403 INSUFFICIENT_SCOPE`(「이 토큰은 조회만 할 수 있습니다. 「조회와 기록」 토큰을 새로 발급하세요.」)다. 범위는 `GET /api/v1/me` 의 `token.scope` 로 확인한다. 범위 확인은 본문 검사보다 먼저다. 다만 JSON 으로 읽을 수 없는 본문은 범위와 상관없이 `400 VALIDATION_FAILED` 다.
 - 두 `GET`(`/api/v1/trades`, `/api/v1/proposals`)은 모든 범위가 부른다.
 - 토큰 주인의 역할과 상관없이 쓴다. 열람자의 토큰도 체결을 넣고 제안을 올린다. 공유 지식을 만드는 제안의 승인만 편집 권한이 필요하다(「제안」).
 - 한 요청은 전부 저장되거나 전부 거절된다. 항목 하나라도 틀리면 아무것도 저장하지 않고 오류로 답한다. `details.fieldErrors` 의 키는 `trades[2].quantity`, `proposals[0].payload.type` 처럼 몇 번째 항목의 어느 칸인지 담는다. 온톨로지 위반은 `400 ONTOLOGY_VIOLATION` 에 `details.index`(몇 번째 항목)를 더한다. 가리키는 노드나 체결이 없으면 `404 NOT_FOUND` 에 `details.index` 를 더한다.
@@ -1155,7 +1155,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 }
 ```
 
-필드의 뜻은 「제안」 의 `ProposalView` 와 같다. `refs`, `token`, `requiresEditor` 는 담지 않는다. 결과의 노드는 `GET /api/v1/nodes/{id}` 로 읽는다.
+필드의 뜻은 「제안」 의 `ProposalView` 와 같다. `refs`, `token`, `requiresEditor`, `createdVia` 는 담지 않고 `dedupeKey` 를 더 담는다. 결과의 노드는 `GET /api/v1/nodes/{id}` 로 읽는다.
 
 #### `GET /api/v1/proposals`
 

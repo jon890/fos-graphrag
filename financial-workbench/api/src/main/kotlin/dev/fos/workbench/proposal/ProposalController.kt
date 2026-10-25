@@ -71,14 +71,14 @@ class ProposalController(private val proposals: ProposalService) {
         @PathVariable id: String,
         @RequestBody(required = false) body: AcceptProposalRequest?,
         @AuthenticationPrincipal user: WorkbenchPrincipal,
-    ): ProposalView = proposals.view(user.id, proposals.accept(user.id, roleOf(user), id, body?.payload))
+    ): ProposalView = proposals.views(user.id, listOf(proposals.accept(user.id, roleOf(user), id, body?.payload))).single()
 
     @PostMapping("/{id}/reject")
     fun reject(
         @PathVariable id: String,
         @RequestBody(required = false) body: RejectProposalRequest?,
         @AuthenticationPrincipal user: WorkbenchPrincipal,
-    ): ProposalView = proposals.view(user.id, proposals.reject(user.id, id, body?.reason))
+    ): ProposalView = proposals.views(user.id, listOf(proposals.reject(user.id, id, body?.reason))).single()
 
     /** CurrentUserFilter 가 요청마다 `ROLE_<역할>` 하나를 넣는다 */
     private fun roleOf(user: WorkbenchPrincipal): Role =

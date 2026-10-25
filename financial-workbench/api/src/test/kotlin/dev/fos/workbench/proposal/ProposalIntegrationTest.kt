@@ -389,6 +389,55 @@ class ProposalIntegrationTest : IntegrationTest() {
     }
 
     @Test
+    fun `승인한 제안을 같은 키로 다시 올리면 내용을 다시 검사하지 않고 있던 제안을 돌려준다`() {
+        val alice = loggedIn(ALICE)
+        val fixtures = Fixtures(alice)
+        val ownerEmail = newUser(Role.EDITOR)
+        val owner = loggedIn(ownerEmail)
+        val ownerId = userId(ownerEmail)
+        val company = fixtures.company("다시 올릴 기업")
+        val security = fixtures.security("다시 올릴 종목")
+        val decision = decision(fixtures)
+        val tradeId = trade(ownerId)
+
+        val relationship = item(
+            "CREATE_RELATIONSHIP", mapOf("type" to "ISSUES", "fromId" to company.id, "toId" to security.id), dedupeKey = "rel-${fixtures.suffix}",
+        )
+        val link = item(
+            "LINK_TRADE_DECISION", mapOf("tradeIds" to listOf(tradeId), "decisionId" to decision.id), dedupeKey = "link-${fixtures.suffix}",
+        )
+        val first = proposals.submit(ownerId, null, null, listOf(relationship, link)).map { it.proposal.id }
+        first.forEach { id -> assertThat(accept(owner, id).status).describedAs("승인 $id").isEqualTo(200) }
+        val archived = alice.post("/api/nodes/${decision.id}/archive", mapOf("expectedRevision" to 1))
+        assertThat(archived.status).describedAs(archived.body.toString()).isEqualTo(200)
+
+        val again = proposals.submit(ownerId, null, null, listOf(relationship, link))
+
+        assertThat(again.map { it.status }).describedAs("같은 관계가 생겼고 결정이 보관됐어도 409 가 아니다").containsExactly("existing", "existing")
+        assertThat(again.map { it.proposal.id }).containsExactlyElementsOf(first)
+        assertThat(again.map { it.proposal.status }).containsOnly("ACCEPTED")
+    }
+
+    @Test
+    fun `오래된 결정한 제안을 같은 키로 다시 올리면 돌려주고 지우지 않는다`() {
+        val ownerEmail = newUser(Role.VIEWER)
+        val owner = loggedIn(ownerEmail)
+        val ownerId = userId(ownerEmail)
+        val nodeId = Fixtures(loggedIn(ALICE)).company("오래된 키 기업").id
+        val keyed = item("STUDY_NOTE", mapOf("nodeId" to nodeId, "level" to "KNOWN"), dedupeKey = "old-${unique()}")
+        val old = submitOne(ownerId, keyed)
+        assertThat(owner.post("$path/${old.id}/reject", null).status).isEqualTo(200)
+        neo4j.query("MATCH (p:Proposal {id: \$id}) SET p.decidedAt = \$at")
+            .bindAll(mapOf("id" to old.id, "at" to Timestamps.system(Instant.now().minus(91, ChronoUnit.DAYS)))).run()
+
+        val again = proposals.submit(ownerId, null, null, listOf(keyed)).single()
+
+        assertThat(again.status).isEqualTo("existing")
+        assertThat(again.proposal.id).isEqualTo(old.id)
+        assertThat(count("MATCH (p:Proposal {id: \$id}) RETURN count(p) AS n", "id" to old.id)).describedAs("돌려준 제안은 남는다").isEqualTo(1)
+    }
+
+    @Test
     fun `대기 제안이 상한을 넘게 되면 아무것도 만들지 않는다`() {
         val ownerId = userId(newUser(Role.VIEWER))
         val nodeId = Fixtures(loggedIn(ALICE)).company("상한 기업").id

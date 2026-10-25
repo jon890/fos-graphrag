@@ -98,7 +98,7 @@ class ProposalRepository(private val client: Neo4jClient) {
     fun create(ownerId: String, props: Map<String, Any?>): String
     fun deleteDecidedBefore(ownerId: String, before: String): Long
     fun lock(ownerId: String, id: String): Map<String, Any?>?        // SET p._lock = true, properties(p)
-    fun finish(id: String, props: Map<String, Any?>)                  // status, decidedAt, payload, result, decisionNote, REMOVE p._lock, lastError* 지우기
+    fun finish(ownerId: String, id: String, props: Map<String, Any?>)                  // status, decidedAt, payload, result, decisionNote, REMOVE p._lock, lastError* 지우기
     fun recordError(ownerId: String, id: String, code: String, message: String, at: String)
     fun page(ownerId: String, status: String?, page: PageQuery): Page<Map<String, Any?>>
     fun countPending(ownerId: String): Long

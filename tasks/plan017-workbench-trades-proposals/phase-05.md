@@ -40,14 +40,14 @@
 ### 3. `components/trades/TradeList.tsx`(신규)
 
 ```tsx
-export function TradeList({ filter, testId, onOpenNode }: { filter: { securityId?: string; decisionId?: string }; testId: 'detail-trades' | 'trace-step-trades'; onOpenNode: (id: string) => void }): JSX.Element | null
+export function TradeList({ filter, testId }: { filter: { securityId?: string; decisionId?: string }; testId: 'detail-trades' | 'trace-step-trades' }): JSX.Element | null
 ```
 
 ```tsx
 /** 받은 쪽에서 보일 줄과 「모두 보기」 여부, 「모두 보기」 가 넣을 ticker(첫 체결의 ticker) */
 export function visibleTrades(page: Page<TradeView>): { items: TradeView[]; more: boolean; ticker: string | null }
 /** 읽기와 무관하게 줄을 그린다. items 가 비면 null */
-export function TradeListView({ view, title, testId, onOpenNode, onMore }: { view: ReturnType<typeof visibleTrades>; title: string; testId: string; onOpenNode: (id: string) => void; onMore: (ticker: string) => void }): JSX.Element | null
+export function TradeListView({ view, title, testId, onMore }: { view: ReturnType<typeof visibleTrades>; title: string; testId: string; onMore: (ticker: string) => void }): JSX.Element | null
 ```
 
 - `TradeList` 는 `api.trades.list({ ...filter, size: 20 })` 로 읽고 `TradeListView` 를 그린다. 줄마다 `trade-list-item`(날짜, 매수·매도, 수량, 금액)이다. `more` 는 `totalItems > 20` 이다.

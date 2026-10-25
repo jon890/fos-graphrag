@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { api, ApiError, errorMessage } from '../../api/client'
-import type { Page, ProposalView, PropertyValue } from '../../api/types'
+import type { Page, ProposalView } from '../../api/types'
 import { useApp, useLabels } from '../../context'
-import { buildCreateProperties, initialFormValues, type FormValues } from '../../lib/formValues'
+import { buildCreateProperties, type FormValues } from '../../lib/formValues'
 import { formatDateTime } from '../../lib/format'
-import { canAccept, createNodeParts, evidenceNodes, kindLabel, levelLabel, payloadTradeIds, proposalLinkSentences, proposalSummary, tradeLine } from '../../lib/proposals'
+import { canAccept, createNodeParts, editInitialValues, evidenceNodes, kindLabel, levelLabel, payloadTradeIds, proposalLinkSentences, proposalSummary, tradeLine } from '../../lib/proposals'
 import { parseProposalsQuery, proposalsSearch, TAB_PATHS, type ProposalsQuery, type ProposalsStatus } from '../../routes'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -44,6 +44,8 @@ export function ProposalsTab({ onOpenNode }: Props) {
   const [list, setList] = useState<Load>({ kind: 'loading' })
   const [reloadKey, setReloadKey] = useState(0)
   const [message, setMessage] = useState<Message | null>(null)
+  // 목록을 다시 읽어도 남도록 카드의 실패 이유를 제안 id 로 든다
+  const [cardErrors, setCardErrors] = useState<Record<string, string>>({})
   const navigateRef = useRef(navigate)
   navigateRef.current = navigate
 
@@ -88,7 +90,8 @@ export function ProposalsTab({ onOpenNode }: Props) {
 
   /** 다른 탭에서 먼저 결정했으면 던지지 않고 안내와 다시 읽기로 마무리한다. 그 밖의 실패는 카드가 보인다 */
   const run = useCallback(
-    async (action: () => Promise<unknown>, doneText: string) => {
+    async (id: string, action: () => Promise<unknown>, doneText: string) => {
+      setCardErrors(({ [id]: _cleared, ...rest }) => rest)
       try {
         await action()
         decided({ kind: 'success', text: doneText })
@@ -97,10 +100,13 @@ export function ProposalsTab({ onOpenNode }: Props) {
           decided({ kind: 'error', text: '이미 처리한 제안입니다' })
           return
         }
+        // 서버가 남긴 lastError 를 보이려고 목록을 다시 읽고, 던져서 카드가 칸 오류를 읽게 한다
+        setCardErrors((prev) => ({ ...prev, [id]: errorMessage(e) }))
+        reload()
         throw e
       }
     },
-    [decided],
+    [decided, reload],
   )
 
   return (
@@ -157,8 +163,9 @@ export function ProposalsTab({ onOpenNode }: Props) {
                   key={p.id}
                   proposal={p}
                   onOpenNode={onOpenNode}
-                  onAccept={(payload) => run(() => api.proposals.accept(p.id, payload), '승인했습니다')}
-                  onReject={(reason) => run(() => api.proposals.reject(p.id, reason), '거절했습니다')}
+                  error={cardErrors[p.id] ?? null}
+                  onAccept={(payload) => run(p.id, () => api.proposals.accept(p.id, payload), '승인했습니다')}
+                  onReject={(reason) => run(p.id, () => api.proposals.reject(p.id, reason), '거절했습니다')}
                 />
               ))}
             </ul>
@@ -171,6 +178,8 @@ export function ProposalsTab({ onOpenNode }: Props) {
 
 interface CardProps {
   proposal: ProposalView
+  /** 마지막 승인이나 거절의 실패 이유. 목록을 다시 읽어도 남도록 화면이 든다 */
+  error?: string | null
   onOpenNode: (id: string) => void
   /** payload 가 있으면 고친 내용 전체로 승인한다. 실패하면 던진다 */
   onAccept: (payload?: Record<string, unknown>) => Promise<void>
@@ -178,11 +187,10 @@ interface CardProps {
 }
 
 /** 제안 카드. 요청 없이 props 로 그리고, 승인과 거절은 onAccept, onReject 로 넘긴다 */
-export function ProposalCard({ proposal: p, onOpenNode, onAccept, onReject }: CardProps) {
+export function ProposalCard({ proposal: p, error = null, onOpenNode, onAccept, onReject }: CardProps) {
   const { user, ontology } = useApp()
   const labels = useLabels()
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState(false)
   const [rejectOpen, setRejectOpen] = useState(false)
@@ -190,9 +198,19 @@ export function ProposalCard({ proposal: p, onOpenNode, onAccept, onReject }: Ca
 
   const { type: newType, properties } = createNodeParts(p)
   const defs = ontology.nodeTypes[newType]?.properties
-  const [values, setValues] = useState<FormValues>(() => initialFormValues(defs ?? {}, properties as Record<string, PropertyValue>))
-  const [level, setLevel] = useState(() => (typeof p.payload.level === 'string' ? p.payload.level : 'UNSURE'))
-  const [note, setNote] = useState(() => (typeof p.payload.note === 'string' ? p.payload.note : ''))
+  const [values, setValues] = useState<FormValues>({})
+  const [level, setLevel] = useState('UNSURE')
+  const [note, setNote] = useState('')
+
+  /** 폼을 여는 시점의 payload 로 칸을 다시 정한다. 그 사이 목록을 다시 읽어 payload 가 바뀌었을 수 있다 */
+  const openEdit = () => {
+    const initial = editInitialValues(p, defs)
+    setValues(initial.values)
+    setLevel(initial.level)
+    setNote(initial.note)
+    setFieldErrors({})
+    setEditing(true)
+  }
 
   const pending = p.status === 'PENDING'
   const allowed = canAccept(user.role, p)
@@ -206,11 +224,9 @@ export function ProposalCard({ proposal: p, onOpenNode, onAccept, onReject }: Ca
 
   const guarded = async (action: () => Promise<void>) => {
     setBusy(true)
-    setError(null)
     try {
       await action()
     } catch (e) {
-      setError(errorMessage(e))
       if (e instanceof ApiError) setFieldErrors(fieldErrorsOf(e.details))
     } finally {
       setBusy(false)
@@ -356,7 +372,7 @@ export function ProposalCard({ proposal: p, onOpenNode, onAccept, onReject }: Ca
             승인
           </Button>
           {editable && (
-            <Button type="button" size="sm" variant="outline" data-testid="proposal-edit-open" disabled={busy || !allowed} onClick={() => setEditing(true)}>
+            <Button type="button" size="sm" variant="outline" data-testid="proposal-edit-open" disabled={busy || !allowed} onClick={openEdit}>
               고쳐서 승인
             </Button>
           )}

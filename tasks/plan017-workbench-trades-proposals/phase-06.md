@@ -30,7 +30,7 @@
 
 ### 1. `financial-workbench/web/e2e/support.ts`
 
-`ScreenKey` 에 `'proposals' | 'trades'` 를 더한다.
+`ScreenKey` 에 `'proposals' | 'trades'` 를 더한다. 「연동 토큰」 화면에서 이름과 범위를 골라 발급하고 원문을 돌려주는 도우미 `issueToken(page, name, scope)` 를 더한다. `openScreen` 은 더보기 항목을 누른 뒤 `[data-testid^="more-item-"]` 가 0개가 될 때까지 기다린다. 메뉴가 닫히기 전에 스크린샷을 찍으면 메뉴가 겹쳐 찍히기 때문이다. 모든 e2e 가 이 함수를 쓰므로 기존 테스트가 그대로 통과하는지 함께 본다.
 
 ### 2. `financial-workbench/web/e2e/workbench.spec.ts`
 
