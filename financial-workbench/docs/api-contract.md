@@ -1131,7 +1131,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 | `payload` | 예 | 「제안」 의 「제안 내용」 의 모양과 규칙 |
 | `rationale` | 예 | 사람이 승인할지 판단할 까닭. 앞뒤 공백을 지운 1자 이상 2000자 이하 |
 | `evidence` | 아니오 | `{"nodeIds", "tradeIds", "urls"}`. 각각 20개, 50개, 10개까지. `urls` 는 `http`, `https` 절대 주소 2000자까지. `nodeIds` 는 있는 노드, `tradeIds` 는 내 체결이어야 한다 |
-| `dedupeKey` | 아니오 | 1자 이상 100자 이하. 같은 키로 다시 올리면 상태와 상관없이 있던 제안을 돌려준다. 이미 있는 제안은 내용을 다시 검사하지 않고 돌려주며, 칸의 모양 검사는 그대로 한다. 같은 해석을 매번 다시 올리는 에이전트는 키를 붙인다 |
+| `dedupeKey` | 아니오 | 1자 이상 100자 이하. 같은 키로 다시 올리면 상태와 상관없이 있던 제안을 돌려준다. 이미 있는 제안은 `payload` 의 모양과 내용을 다시 검사하지 않고 돌려준다. 항목의 칸(`kind`, `payload` 가 있는지, `rationale`, `evidence`, `dedupeKey`)은 검사한다. 같은 해석을 매번 다시 올리는 에이전트는 키를 붙인다 |
 
 - 올린 뒤 대기 중인 제안이 200개를 넘으면 아무것도 저장하지 않고 `409 PROPOSAL_LIMIT`(`details.max`, `details.pending`)이다. 이미 있는 제안(`existing`)은 세지 않는다.
 - 같은 요청 안에서 같은 `dedupeKey` 가 두 번 나오면 뒤의 것은 `existing` 이다.

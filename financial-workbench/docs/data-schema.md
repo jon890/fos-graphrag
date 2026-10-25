@@ -401,7 +401,7 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 | `result` | String | 승인으로 생긴 것 `{nodeIds, relationshipIds, tradeIds}` 의 JSON 문자열 |
 | `lastErrorCode`, `lastErrorMessage`, `lastErrorAt` | String | 마지막 승인 실패의 오류 코드, 문장, 시각. 승인하면 지운다 |
 
-- 같은 주인 안에서 `dedupeKey` 는 하나다(유일 제약 `proposal_owner_dedupe_unique`, `(ownerId, dedupeKey)`). 같은 키로 다시 올리면 상태와 상관없이 새로 만들지 않고 있던 제안을 돌려준다. 이때 내용(온톨로지, 가리키는 노드, 내 체결)은 다시 검사하지 않고 칸의 모양만 검사한다. 키가 없는 제안은 검사하지 않는다.
+- 같은 주인 안에서 `dedupeKey` 는 하나다(유일 제약 `proposal_owner_dedupe_unique`, `(ownerId, dedupeKey)`). 같은 키로 다시 올리면 상태와 상관없이 새로 만들지 않고 있던 제안을 돌려준다. 이때 `payload` 의 모양과 내용(온톨로지, 가리키는 노드, 내 체결)은 다시 검사하지 않는다. 항목의 칸(`kind`, `payload` 가 있는지, `rationale`, `evidence`, `dedupeKey`)만 검사한다. 키가 없는 제안은 검사하지 않는다.
 - 올리기는 주인 사용자 노드에 쓰기 잠금(`_lock`)을 건 뒤 대기 수를 세고 만든다. 대기 중인 제안은 사용자마다 200개까지다. 같은 트랜잭션에서 그 사용자의 결정한 제안 가운데 `decidedAt` 이 90일보다 오래된 것을 지운다. 이번 요청이 같은 `dedupeKey` 로 돌려준 제안은 오래됐어도 지우지 않는다. 대기 중인 제안은 저절로 지우지 않는다.
 - 승인과 거절은 그 제안 노드에 쓰기 잠금을 건 뒤 상태를 확인한다. 같은 제안을 두 탭에서 동시에 승인해도 한 번만 실행된다.
 - 승인의 실행은 기존 서비스가 한다. 노드와 관계는 `NodeService`, `RelationshipService` 로 만들어 온톨로지 검증, 같은 종목 검사, 잠금, 변경 이력이 그대로다. 이력의 작업자는 승인한 사용자이고 메모는 「에이전트 제안을 승인했다」 다. 이해 표시는 `KnowledgeMarkService` 로 쓴다(이력 없음). 실행과 상태 변경은 한 트랜잭션이다. 실행이 실패하면 함께 롤백되고, 별도 트랜잭션으로 `lastError*` 만 쓴다. 상태는 `PENDING` 그대로다.
