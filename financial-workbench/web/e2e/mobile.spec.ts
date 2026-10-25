@@ -235,9 +235,9 @@ test('휴대폰 폭에서 사용법 따라하기가 아래쪽 카드로 열리�
 test('휴대폰 폭에서 개념 지도와 머리글이 한 줄에 들어간다', async ({ page }) => {
   await loginAs(page, admin, 'success', '/map')
   await expect(page.getByTestId('concept-map-canvas')).toHaveAttribute('data-layout-done', 'true')
-  // 둘째 줄의 탭 셋과 「더보기」 가 줄바꿈 없이 한 줄에 놓인다.
+  // 둘째 줄의 상단 탭과 「더보기」 가 줄바꿈 없이 한 줄에 놓인다.
   const ys = await Promise.all(
-    ['tab-map', 'tab-workspace', 'tab-list', 'more-open'].map(async (id) => (await page.getByTestId(id).boundingBox())?.y ?? Number.NaN),
+    ['tab-map', 'tab-workspace', 'tab-list', 'tab-study', 'more-open'].map(async (id) => (await page.getByTestId(id).boundingBox())?.y ?? Number.NaN),
   )
   expect(new Set(ys).size, `머리글 둘째 줄의 y 좌표 ${ys.join(', ')}`).toBe(1)
   await expectNoHorizontalOverflow(page)
@@ -246,4 +246,35 @@ test('휴대폰 폭에서 개념 지도와 머리글이 한 줄에 들어간다'
   await expect(page.getByTestId('map-type-panel')).toBeVisible()
   await expectNoHorizontalOverflow(page)
   await shot(page, 'map-mobile')
+})
+
+test('휴대폰 폭에서 근거 따라가기와 공부 탭이 가로 스크롤 없이 열린다', async ({ page }) => {
+  await loginAs(page, admin)
+  await openScreen(page, 'workspace')
+  await page.getByTestId('search-input').fill('FLNC 첫 매수')
+  await page.getByTestId('search-submit').click()
+  await page.getByTestId('search-result').filter({ has: page.locator('.result-label', { hasText: exact('FLNC 첫 매수') }) }).click()
+  await expect(page.getByTestId('detail-label')).toHaveText(exact('FLNC 첫 매수'))
+
+  await page.getByTestId('node-trace').click()
+  await expect(page.getByTestId('trace-step').first()).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await shot(page, 'trace-mobile')
+
+  // 단계 하나를 「잘 모르겠어요」 로 표시하면 공부 탭에 항목이 생긴다.
+  const step = page.getByTestId('trace-step').first()
+  const stepId = (await step.getAttribute('data-node-id')) ?? ''
+  expect(stepId).not.toBe('')
+  await step.getByTestId('knowledge-unsure').click()
+  await expect(step.getByTestId('knowledge-unsure')).toHaveAttribute('aria-pressed', 'true')
+
+  await openScreen(page, 'study')
+  const item = page.locator(`[data-testid="study-item"][data-node-id="${stepId}"]`)
+  await expect(item).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await shot(page, 'study-mobile')
+
+  // 다른 테스트에 남지 않게 이해했다고 표시해 목록에서 뺀다.
+  await item.getByTestId('study-known').click()
+  await expect(item).toHaveCount(0)
 })
