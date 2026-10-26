@@ -1,35 +1,35 @@
-import { useCallback, useEffect, useState } from "react";
-import { api, errorMessage } from "../../api/client";
+import { useCallback, useEffect, useState } from 'react'
+import { api, errorMessage } from '../../api/client'
 import type {
   OntologyImpact,
   OntologyPreview,
   ProposalView,
-} from "../../api/types";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { OntologyDiffSummary } from "../ontology/OntologyPreviewPanel";
+} from '../../api/types'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { OntologyDiffSummary } from '../ontology/OntologyPreviewPanel'
 
 /** 온톨로지 변경 제안이 담은 YAML 과 기준 버전. payload 의 모양은 docs/api-contract.md 「제안 내용」 */
 function ontologyPayload(p: ProposalView): {
-  baseVersion: number;
-  yaml: string;
-  note: string;
+  baseVersion: number
+  yaml: string
+  note: string
 } {
-  const { baseVersion, yaml, note } = p.payload;
+  const { baseVersion, yaml, note } = p.payload
   return {
-    baseVersion: typeof baseVersion === "number" ? baseVersion : 0,
-    yaml: typeof yaml === "string" ? yaml : "",
-    note: typeof note === "string" ? note : "",
-  };
+    baseVersion: typeof baseVersion === 'number' ? baseVersion : 0,
+    yaml: typeof yaml === 'string' ? yaml : '',
+    note: typeof note === 'string' ? note : '',
+  }
 }
 
 export interface OntologyPreviewState {
-  preview: OntologyPreview | null;
+  preview: OntologyPreview | null
   /** 화면에 그리는 영향. 승인이 `ONTOLOGY_IMPACT_UNCONFIRMED` 로 돌려준 영향으로 바뀔 수 있다 */
-  impacts: OntologyImpact[];
-  error: string | null;
-  setImpacts: (impacts: OntologyImpact[]) => void;
-  reload: () => void;
+  impacts: OntologyImpact[]
+  error: string | null
+  setImpacts: (impacts: OntologyImpact[]) => void
+  reload: () => void
 }
 
 /**
@@ -41,43 +41,43 @@ export function useOntologyPreview(
   enabled: boolean,
   initial?: OntologyPreview,
 ): OntologyPreviewState {
-  const { baseVersion, yaml } = ontologyPayload(p);
+  const { baseVersion, yaml } = ontologyPayload(p)
   const [preview, setPreview] = useState<OntologyPreview | null>(
     initial ?? null,
-  );
+  )
   const [impacts, setImpacts] = useState<OntologyImpact[]>(
     initial?.impacts ?? [],
-  );
-  const [error, setError] = useState<string | null>(null);
+  )
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    setError(null);
+    setError(null)
     try {
-      const next = await api.ontology.preview({ baseVersion, yaml });
-      setPreview(next);
-      setImpacts(next.impacts);
+      const next = await api.ontology.preview({ baseVersion, yaml })
+      setPreview(next)
+      setImpacts(next.impacts)
     } catch (e) {
-      setPreview(null);
-      setError(errorMessage(e));
+      setPreview(null)
+      setError(errorMessage(e))
     }
-  }, [baseVersion, yaml]);
+  }, [baseVersion, yaml])
 
   useEffect(() => {
-    if (enabled && !initial) void load();
-  }, [enabled, initial, load]);
+    if (enabled && !initial) void load()
+  }, [enabled, initial, load])
 
-  return { preview, impacts, error, setImpacts, reload: () => void load() };
+  return { preview, impacts, error, setImpacts, reload: () => void load() }
 }
 
 interface Props {
-  proposal: ProposalView;
+  proposal: ProposalView
   /** 기준 버전과 지금 버전이 다를 때 보일 지금 버전. 같으면 null */
-  staleAgainst: number | null;
+  staleAgainst: number | null
   /** ADMIN 이 대기 중인 카드만 미리보기를 보인다 */
-  showPreview: boolean;
-  state: OntologyPreviewState;
-  confirmed: boolean;
-  onConfirm: (confirmed: boolean) => void;
+  showPreview: boolean
+  state: OntologyPreviewState
+  confirmed: boolean
+  onConfirm: (confirmed: boolean) => void
 }
 
 /** 온톨로지 변경 카드의 본문. 메모, YAML 보기, 바뀐 점과 영향, 기준 버전 안내, 확인란이다 */
@@ -89,11 +89,11 @@ export function OntologyChangeCard({
   confirmed,
   onConfirm,
 }: Props) {
-  const { baseVersion, yaml, note } = ontologyPayload(p);
+  const { baseVersion, yaml, note } = ontologyPayload(p)
   const lineNumbers = Array.from(
-    { length: yaml.split("\n").length },
+    { length: yaml.split('\n').length },
     (_, i) => i + 1,
-  ).join("\n");
+  ).join('\n')
 
   return (
     <div className="grid gap-2 text-sm">
@@ -123,7 +123,7 @@ export function OntologyChangeCard({
           data-testid="proposal-ontology-stale"
         >
           <AlertDescription>
-            기준 버전이 바뀌었습니다(제안 버전 {baseVersion}, 지금 버전{" "}
+            기준 버전이 바뀌었습니다(제안 버전 {baseVersion}, 지금 버전{' '}
             {staleAgainst}). 아래는 지금 버전과 비교한 바뀐 점이라 그 사이의
             변경이 「뺌」 이나 「바뀜」 으로 보일 수 있습니다. 에이전트에게 지금
             버전에서 다시 만들어 달라고 하거나 거절하세요.
@@ -180,5 +180,5 @@ export function OntologyChangeCard({
         </label>
       )}
     </div>
-  );
+  )
 }

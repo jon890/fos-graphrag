@@ -189,7 +189,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `web/src/components/connect/` | 앱 연결 동의 화면(`/connect`). 머리글과 탭, 첫 접속 가이드 없이 그린다. 화면 규칙은 [흐름](flow.md) 의 「앱 연결」 이 소유한다 |
 | `web/src/components/proposals/` | 더보기 메뉴의 「제안」 화면과 대기 수 배지. 제안 내용을 문장으로 바꾸는 순수 규칙은 `web/src/lib/proposals.ts` 에 있다. 화면 규칙은 [흐름](flow.md) 의 「제안」 이 소유한다 |
 | `web/src/components/trades/` | 더보기 메뉴의 「내 체결」 화면과, 상세와 근거 따라가기에 끼우는 체결 목록. 수와 금액 표시는 `web/src/lib/trades.ts` 에 있다. 화면 규칙은 [흐름](flow.md) 의 「내 체결」 이 소유한다 |
-| `web/src/components/ontology/` | 온톨로지 상세 화면의 보기, YAML 편집기(줄 번호 칸, 툴바, 결과 칸), 미리보기 결과, 버전 기록. 초안(YAML 문자열)은 `App` 이 들고 있어 화면을 옮겨도 남는다. 웹에 YAML 라이브러리와 코드 편집기 라이브러리를 들이지 않는다([ADR-016](adr/016-ontology-yaml-only-editor.md)). 미리보기 결과의 바뀐 점과 영향 목록은 「제안」 화면의 온톨로지 변경 카드도 쓴다 |
+| `web/src/components/ontology/` | 온톨로지 상세 화면의 보기, YAML 편집기, 미리보기 결과, 버전 기록. 초안(YAML 문자열)은 `App` 이 들고 있어 화면을 옮겨도 남는다. 웹에 YAML 라이브러리와 코드 편집기 라이브러리를 들이지 않는다([ADR-016](adr/016-ontology-yaml-only-editor.md)). 미리보기 결과의 바뀐 점과 영향 목록은 「제안」 화면의 온톨로지 변경 카드도 쓴다 |
 | `web/src/components/guide/` | 첫 접속 가이드. 단계 정의, 진행 상태(`localStorage` 의 `workbench.guide`), 말풍선. 만들기 폼과 주장 폼은 가이드가 넘긴 미리 채울 값을 props 로 받고, 만들기에 성공하면 가이드에 알린다 |
 | `web/src/routes.ts` | 화면 경로 목록과 query 를 읽고 쓰는 순수 함수(기본값 생략, 옛 `/?node=` 넘기기, 로그인 뒤 돌아갈 주소 검사). 경로와 query 의 뜻은 [흐름](flow.md) 의 「주소와 뒤로가기」 가 소유한다 |
 | `web/src/styles.css` | Tailwind 진입점과 색 토큰. shadcn 의 CSS 변수(`--background`, `--primary` 등)를 여기 둔다 |
@@ -223,9 +223,9 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `plugin/.claude-plugin/plugin.json` | Claude Code 플러그인 정보(이름 `valuation-ontology`, 설명, 저장소) |
 | `plugin/.codex-plugin/plugin.json` | Codex 플러그인 정보. 같은 이름과 스킬 목록을 담는다. MCP 설정은 키로 가리키지 않아도 Codex 0.164.0 이 플러그인 루트의 `.mcp.json` 을 읽는다(2026-10-26 확인). Codex 는 이 파일이 있으면 `.claude-plugin/plugin.json` 을 읽지 않는다 |
 | `plugin/.mcp.json` | 원격 MCP 연결 설정. 운영 공개 주소의 `/mcp` 를 가리킨다 |
-| `plugin/skills/ontology-start/` | 처음 시작하기. 연결 확인과 로그인 안내, 누구로 어떤 역할과 범위로 붙었는지, 조회만이면 다시 연결하는 안내, 지금 온톨로지 한눈에 보기, 할 수 있는 일 세 가지(조회, 데이터 추가, 온톨로지 수정)와 예시, 첫 데이터 추가를 함께 해 보고 승인 위치까지 이끈다. 새 스킬을 따로 두지 않는다. 「연결해 줘」 로 이미 이 스킬이 불리기 때문이다 |
+| `plugin/skills/ontology-start/` | 처음 시작하기. 연결 확인부터 첫 데이터 추가와 승인 위치 안내까지 이끈다. 「연결해 줘」 가 이미 이 스킬을 불러 처음 시작 스킬을 따로 두지 않는다 |
 | `plugin/skills/ontology-explore/` | 개념과 근거 찾기 스킬. 출처를 붙여 답한다 |
-| `plugin/skills/ontology-record/` | 기록과 제안. 체결 기록과 인스턴스 제안(만들기, 고치기, 보관, 주장 만들기) 올리기를 이끌고 승인은 웹의 「제안」 에서 한다고 안내한다 |
+| `plugin/skills/ontology-record/` | 기록과 제안. 체결 기록과 인스턴스 제안 올리기를 이끌고 승인은 웹의 「제안」 에서 한다고 안내한다 |
 | `plugin/skills/ontology-change/` | 온톨로지 정의 바꾸기. 지금 YAML 받기, 고치기, 온톨로지 변경 제안 올리기를 이끌고 관리자가 「제안」 에서 승인한다고 알린다 |
 | `plugin/README.md` | 비개발자용 설치와 연결 안내 |
 
