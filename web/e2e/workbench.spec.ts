@@ -1987,8 +1987,8 @@ test.describe('가치투자 온톨로지: 역할별 협업', () => {
   })
 
   test('9d) 긴 YAML 을 스크롤해도 툴바와 결과가 화면 안에 있고, 틀린 키의 줄 번호를 누르면 편집칸이 그 줄을 고른다', async () => {
-    await openScreen(pageAdmin, 'ontology')
-    await pageAdmin.reload()
+    // 앞 테스트가 편집기(view=yaml)에 두고 끝나므로 보기 화면 주소로 새로 연다. 편집기에서는 「YAML 로 편집」 이 숨는다
+    await pageAdmin.goto('/ontology')
     await pageAdmin.getByTestId('ontology-edit-yaml').click()
     const input = pageAdmin.getByTestId('ontology-yaml-input')
     await expect(input).not.toHaveValue('')
