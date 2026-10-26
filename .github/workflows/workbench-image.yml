@@ -1,4 +1,4 @@
-# 금융 온톨로지 워크벤치 컨테이너 이미지를 GHCR 에 올린다.
+# 가치투자 온톨로지 컨테이너 이미지를 GHCR 에 올린다.
 # GitHub-hosted runner 에서 Buildx 로 linux/amd64 이미지를 빌드한다.
 # 공개 저장소이므로 홈서버 runner 를 쓰지 않는다(사용자 결정: 2026-10-24).
 # 이미지 이름, 태그(latest, sha-<7자리>), OCI label 과 provenance 설정을 아래에 명시한다.
@@ -44,13 +44,13 @@ jobs:
       - name: 이미지 빌드와 push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
-          context: financial-workbench
+          context: .
           platforms: linux/amd64
           push: true
           provenance: false
           tags: |
-            ghcr.io/jon890/fos-graphrag-workbench:latest
-            ghcr.io/jon890/fos-graphrag-workbench:${{ steps.image.outputs.sha-tag }}
+            ghcr.io/jon890/fos-valuation-ontology:latest
+            ghcr.io/jon890/fos-valuation-ontology:${{ steps.image.outputs.sha-tag }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}

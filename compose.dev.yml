@@ -1,0 +1,30 @@
+# 개발 Compose. Neo4j 와 가짜 OIDC 공급자만 띄우고 loopback 에만 연다.
+# 기본 포트(7474, 7687)를 쓰는 다른 Neo4j 와 겹치지 않는다. API 는 mockoidc 프로필로 직접 실행한다.
+name: fos-workbench-dev
+
+services:
+  neo4j:
+    image: neo4j:5.26.30-community@sha256:3388e05ee53c8313d01acdf33e63ad175af95a92226dc8551160564439ce2c8c
+    environment:
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD:?Copy .env.example to .env and set NEO4J_PASSWORD}"
+    ports:
+      - "127.0.0.1:7476:7474"
+      - "127.0.0.1:7689:7687"
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$${NEO4J_AUTH#*/}\" 'RETURN 1;' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  mock-oidc:
+    image: ghcr.io/navikt/mock-oauth2-server:3.0.1@sha256:4f3660e5f3586b81fe2e0d42d0c9fcd3c8c64268db0d3ade261dadd70d27020b
+    environment:
+      JSON_CONFIG: '{"interactiveLogin":true}'
+    ports:
+      - "127.0.0.1:8090:8080"
+
+volumes:
+  neo4j-data:
