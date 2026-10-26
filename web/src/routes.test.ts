@@ -119,7 +119,7 @@ describe('isSafeReturnTo', () => {
 describe('온톨로지 주소', () => {
   it('view 와 version 을 읽고 모르는 값은 버린다', () => {
     expect(parseOntologyQuery('?view=history&version=3')).toEqual({ view: 'history', version: 3 })
-    expect(parseOntologyQuery('?view=form')).toEqual({ view: 'form' })
+    expect(parseOntologyQuery('?view=form')).toEqual({ view: 'yaml' })
     expect(parseOntologyQuery('?view=nope&version=x')).toEqual({})
     expect(parseOntologyQuery('')).toEqual({})
   })

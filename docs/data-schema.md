@@ -10,7 +10,7 @@ Neo4j 는 온톨로지 규칙을 집행하지 않는다. 아래 제약 조건은
 
 온톨로지를 바꾸는 절차는 이렇다.
 
-1. ADMIN 이 온톨로지 상세 화면(더보기)의 폼 편집기나 YAML 편집기로 고친다(「온톨로지 편집」, [흐름](flow.md)).
+1. ADMIN 이 온톨로지 상세 화면(더보기)의 YAML 편집기로 고치거나, 에이전트가 올린 온톨로지 변경 제안을 「제안」 에서 승인한다(「온톨로지 편집」 과 「제안」, [흐름](flow.md)).
 2. 저장하기 전에 기존 데이터가 새 정의를 어기는지 영향 목록으로 본다. 서버와 편집 폼은 바뀐 칸만 검사하므로, 새 정의를 어기는 값이 남아도 다른 칸은 고칠 수 있다. 어긴 칸을 고칠 때는 새 정의에 맞는 값을 넣어야 한다. 문자열 칸을 enum 으로 바꾸거나 enum 값을 뺄 때는 예전 표기를 `valueAliases` 에 적는다. API 가 시작할 때 고친다(「예전 값 정리」).
 3. 확인하고 저장하면 새 버전이 생기고 바로 쓰인다. 재배포는 없다.
 
@@ -447,9 +447,9 @@ MCP 클라이언트(Claude Code, Codex)가 OAuth 로그인으로 받은 연결�
 | --- | --- | --- |
 | `id` | String | UUID |
 | `ownerId` | String | 주인 `:User` 의 `id`. 토큰의 주인이다 |
-| `kind` | String | `CREATE_NODE`, `CREATE_RELATIONSHIP`, `LINK_TRADE_DECISION`, `STUDY_NOTE` |
+| `kind` | String | `CREATE_NODE`, `CREATE_RELATIONSHIP`, `UPDATE_NODE`, `ARCHIVE_NODE`, `ARCHIVE_RELATIONSHIP`, `CREATE_CLAIM`, `ONTOLOGY_CHANGE`, `LINK_TRADE_DECISION`, `STUDY_NOTE` |
 | `status` | String | `PENDING`(대기), `ACCEPTED`(승인), `REJECTED`(거절) |
-| `payload` | String | 종류별 내용을 JSON 문자열로 둔다. 승인할 때 사용자가 고친 값이면 고친 값으로 바꿔 둔다. 모양은 [API 계약](api-contract.md) 의 「제안 내용」 이다 |
+| `payload` | String | 종류별 내용을 JSON 문자열로 둔다. 승인할 때 사용자가 고친 값이면 고친 값으로 바꿔 둔다. 모양은 [API 계약](api-contract.md) 의 「제안 내용」 이다. `ONTOLOGY_CHANGE` 는 정규화한 YAML 전체를 담아 수십 KiB 가 될 수 있다 |
 | `rationale` | String | 에이전트가 붙인 까닭. 2000자까지 |
 | `evidence` | String | 근거 참조 `{nodeIds, tradeIds, urls}` 의 JSON 문자열 |
 | `dedupeKey` | String | 에이전트가 붙인 같은 제안 검사 키. 100자까지. 없으면 속성이 없다 |
@@ -458,13 +458,13 @@ MCP 클라이언트(Claude Code, Codex)가 OAuth 로그인으로 받은 연결�
 | `tokenId`, `tokenName` | String | 올린 연동 토큰과 그때의 토큰 이름. OAuth 연결로 올렸으면 연결의 `id` 와 클라이언트 이름 |
 | `decidedAt` | String | 승인하거나 거절한 시각 |
 | `decisionNote` | String | 거절 이유. 1000자까지 |
-| `result` | String | 승인으로 생긴 것 `{nodeIds, relationshipIds, tradeIds}` 의 JSON 문자열 |
+| `result` | String | 승인으로 생기거나 바뀐 것 `{nodeIds, relationshipIds, tradeIds, ontologyVersion}` 의 JSON 문자열 |
 | `lastErrorCode`, `lastErrorMessage`, `lastErrorAt` | String | 마지막 승인 실패의 오류 코드, 문장, 시각. 승인하면 지운다 |
 
 - 같은 주인 안에서 `dedupeKey` 는 하나다(유일 제약 `proposal_owner_dedupe_unique`, `(ownerId, dedupeKey)`). 같은 키로 다시 올리면 상태와 상관없이 새로 만들지 않고 있던 제안을 돌려준다. 이때 `payload` 의 모양과 내용(온톨로지, 가리키는 노드, 내 체결)은 다시 검사하지 않는다. 항목의 칸(`kind`, `payload` 가 있는지, `rationale`, `evidence`, `dedupeKey`)만 검사한다. 키가 없는 제안은 검사하지 않는다.
 - 올리기는 주인 사용자 노드에 쓰기 잠금(`_lock`)을 건 뒤 대기 수를 세고 만든다. 대기 중인 제안은 사용자마다 200개까지다. 같은 트랜잭션에서 그 사용자의 결정한 제안 가운데 `decidedAt` 이 90일보다 오래된 것을 지운다. 이번 요청이 같은 `dedupeKey` 로 돌려준 제안은 오래됐어도 지우지 않는다. 대기 중인 제안은 저절로 지우지 않는다.
 - 승인과 거절은 그 제안 노드에 쓰기 잠금을 건 뒤 상태를 확인한다. 같은 제안을 두 탭에서 동시에 승인해도 한 번만 실행된다.
-- 승인의 실행은 기존 서비스가 한다. 노드와 관계는 `NodeService`, `RelationshipService` 로 만들어 온톨로지 검증, 같은 종목 검사, 잠금, 변경 이력이 그대로다. 이력의 작업자는 승인한 사용자이고 메모는 「에이전트 제안을 승인했다」 다. 이해 표시는 `KnowledgeMarkService` 로 쓴다(이력 없음). 실행과 상태 변경은 한 트랜잭션이다. 실행이 실패하면 함께 롤백되고, 별도 트랜잭션으로 `lastError*` 만 쓴다. 상태는 `PENDING` 그대로다.
+- 승인의 실행은 기존 서비스가 한다. 노드와 관계는 `NodeService`, `RelationshipService` 로 만들고 고치고 보관해 온톨로지 검증, 같은 종목 검사, 잠금, 변경 이력이 그대로다. 주장은 `ClaimService`, 온톨로지 버전은 `OntologyEditService` 가 저장한다([ADR-017](adr/017-agent-ontology-and-instance-proposals.md)). 이력의 작업자는 승인한 사용자이고 메모는 「에이전트 제안을 승인했다」 다. 이해 표시는 `KnowledgeMarkService` 로 쓴다(이력 없음). 실행과 상태 변경은 한 트랜잭션이다. 실행이 실패하면 함께 롤백되고, 별도 트랜잭션으로 `lastError*` 만 쓴다. 상태는 `PENDING` 그대로다.
 - 제안은 변경 이력에 남기지 않는다. 승인으로 생긴 노드와 관계의 이력만 남는다.
 - 제안과 `OWNS` 에는 `archived` 를 두지 않는다. 다른 노드와 관계로 잇지 않고, 가리키는 노드와 체결은 `payload` 와 `evidence` 의 id 로만 가진다. 그래서 그래프 조회에 섞이지 않는다.
 

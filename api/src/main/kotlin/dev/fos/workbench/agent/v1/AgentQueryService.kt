@@ -11,6 +11,7 @@ import dev.fos.workbench.learning.KnowledgeMarkService
 import dev.fos.workbench.learning.LearningRules
 import dev.fos.workbench.learning.TraceService
 import dev.fos.workbench.ontology.OntologyHolder
+import dev.fos.workbench.ontology.OntologyVersionStore
 import dev.fos.workbench.web.NotFoundException
 import dev.fos.workbench.web.Page
 import org.springframework.stereotype.Service
@@ -29,8 +30,17 @@ class AgentQueryService(
     private val traces: TraceService,
     private val marks: KnowledgeMarkService,
     private val holder: OntologyHolder,
+    private val versions: OntologyVersionStore,
     private val mapper: V1Mapper,
 ) {
+
+    /** 최신 번호와 그 버전의 YAML 을 한 트랜잭션에서 읽는다. `OntologyController.export` 와 같다 */
+    @Transactional(readOnly = true)
+    fun ontologyYaml(): V1OntologyYaml {
+        val latest = versions.latestNumber()
+        val found = versions.get(latest) ?: throw NotFoundException(latest.toString())
+        return V1OntologyYaml(latest, found.yaml)
+    }
 
     /** 보관하지 않은 노드만 이름 순서로 찾는다. 검색어와 타입 형식 검사는 NodeQueryService 가 한다 */
     fun search(q: String?, types: List<String>?, page: Int?, size: Int?): Page<V1NodeSummary> {

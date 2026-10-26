@@ -357,22 +357,18 @@ ADMIN 에게만 나오는 요소다.
 
 | testid | 요소 |
 | --- | --- |
-| `ontology-edit-form`, `ontology-edit-yaml`, `ontology-history-open` | 「폼으로 편집」, 「YAML 로 편집」, 「버전 기록」 |
-| `ontology-export` | 「YAML 내려받기」 링크 |
-| `ontology-yaml-editor`, `ontology-yaml-help`, `ontology-yaml-input`, `ontology-yaml-error` | YAML 편집기, 접힌 도움말, YAML 입력칸, 초안을 읽지 못한 오류 |
-| `ontology-preview`, `ontology-preview-failed`, `ontology-draft-discard` | 「저장 전에 확인」, 미리보기 요청 오류, 「초안 버리기」. 폼과 YAML 편집기가 같은 id 를 쓴다 |
-| `ontology-yaml-to-form`, `ontology-yaml-back-to-form` | YAML 편집기의 「폼으로 보기」, 폼 초안을 YAML 로 옮기지 못했을 때의 「폼으로 돌아가기」 |
-| `ontology-form`, `ontology-form-convert-error`, `ontology-form-back-to-yaml` | 폼 편집기, YAML 을 폼으로 옮기지 못한 오류, 「YAML 로 돌아가기」 |
-| `ontology-form-type` *(`data-type`)*, `ontology-form-type-label` | 노드 타입 카드, 그 표시 이름 입력칸 |
-| `ontology-form-prop` *(`data-prop`)*, `ontology-form-required`, `ontology-form-enum-value` *(`data-value`)* | 속성 한 줄, 필수 확인란, enum 값 한 줄 |
-| `ontology-form-rel` *(`data-rel`)*, `ontology-form-predicate` *(`data-predicate`)* | 관계 종류 행, 주장 종류 행 |
-| `ontology-form-rel-sentence` | 관계 종류 행의 문장 틀 입력칸 |
-| `ontology-form-new-sentence` | 더하기 줄의 문장 틀 입력칸. 주장 종류와 관계 종류가 같은 이름을 쓴다 |
-| `ontology-form-remove`, `ontology-form-restore` | 「빼기」, 「되살리기」(뺄 예정인 행에만 나온다) |
-| `ontology-form-type-add`, `ontology-form-prop-add`, `ontology-form-rel-add`, `ontology-form-predicate-add` | 「노드 타입 더하기」, 「속성 더하기」(타입 카드 안), 「관계 종류 더하기」, 「주장 종류 더하기」 |
-| `ontology-form-new` | 더하기 입력 영역. 안에 `ontology-form-new-key`, `-new-type`(속성 값 타입), `-new-label`, `-new-values`(enum 값), `-new-sentence`(문장 틀), `-new-submit`(「더하기」) |
-| `ontology-form-error`, `ontology-form-emptied` | 키나 문장 틀 오류, 「이 종류도 함께 빼야 합니다」 |
-| `ontology-form-to-yaml` | 폼의 「YAML 로 보기」 |
+| `ontology-edit-yaml`, `ontology-history-open` | 보기 화면의 「YAML 로 편집」, 「버전 기록」 |
+| `ontology-export` | 보기 화면의 「YAML 내려받기」 링크 |
+| `ontology-yaml-editor`, `ontology-yaml-input`, `ontology-yaml-gutter`, `ontology-yaml-error` | YAML 편집기(화면 높이에 맞춘 영역), YAML 입력칸, 줄 번호 칸, 초안을 읽지 못한 오류 |
+| `ontology-yaml-toolbar` | 편집칸 위의 툴바. 스크롤해도 보인다 |
+| `ontology-preview`, `ontology-draft-discard` | 툴바의 「저장 전에 확인」, 「초안 버리기」 |
+| `ontology-toolbar-history`, `ontology-toolbar-export` | 툴바의 「버전 기록」, 「YAML 내려받기」 링크 |
+| `ontology-draft-status` | 초안 상태(「버전 N 에서 시작」, 「· 고침」). `data-dirty` 가 `true`, `false` |
+| `ontology-yaml-help-open`, `ontology-yaml-help` | 툴바의 「키 설명」 단추와 그 창. 창은 Portal 로 `body` 아래에 그려진다 |
+| `ontology-discard-confirm`, `ontology-discard-confirm-submit`, `ontology-discard-confirm-cancel` | 고친 초안을 버릴 때의 확인 창, 「버리기」, 「취소」 |
+| `ontology-preview-failed` | 미리보기 요청 오류 |
+| `ontology-preview-side` | 결과 칸. `data-layout` 이 `side`(편집칸 옆)나 `below`(편집칸 아래 접힘 칸). 결과가 없으면 없다 |
+| `ontology-preview-error-line` * | 오류 문장의 줄 번호 단추. `data-line`. 누르면 편집칸이 그 줄을 고른다 |
 | `ontology-preview-panel` | 미리보기 결과 |
 | `ontology-preview-error` * | 틀린 YAML 이나 저장 거절의 오류 한 줄 |
 | `ontology-diff-added`, `ontology-diff-removed`, `ontology-diff-changed`, `ontology-diff-empty` | 더함, 뺌, 바뀜 경로 목록과 「바뀐 점이 없습니다」 |
@@ -397,7 +393,22 @@ ADMIN 에게만 나오는 요소다.
 
 ## 연동 화면
 
-「연동」 화면(`/tokens`)은 위의 「연결된 앱」 과 아래의 「연동 토큰」 이다. 확인 창과 발급 창은 Portal 로 `body` 아래에 그려진다.
+「연동」 화면(`/tokens`)은 위에서부터 「Claude Code·Codex 에서 쓰기」, 「연결된 앱」, 「고급: 개인 비서 연동」 접힘 칸 안의 「연동 토큰」 이다. 확인 창과 발급 창은 Portal 로 `body` 아래에 그려진다.
+
+### Claude Code·Codex 에서 쓰기
+
+| testid | 요소 |
+| --- | --- |
+| `integrations-install` | 절 전체 |
+| `install-claude`, `install-codex` | Claude Code 칸, Codex 칸 |
+| `install-command` * | 명령 한 줄. `data-command` 가 명령 문자열 |
+| `install-copy` * | 그 명령의 「복사」. 누르면 2초 동안 「복사했습니다」 |
+
+### 고급: 개인 비서 연동
+
+| testid | 요소 |
+| --- | --- |
+| `tokens-advanced` | 접힘 칸(`<details>`). 처음에 `open` 속성이 없다. 안에 아래 「연동 토큰」 의 요소가 있다 |
 
 ### 연결된 앱
 
@@ -418,7 +429,7 @@ ADMIN 에게만 나오는 요소다.
 | testid | 요소 |
 | --- | --- |
 | `tokens-tab` | 화면 전체 |
-| `tokens-guide` | 위쪽의 Hermes 연결 안내 |
+| `tokens-guide` | 접힘 칸 맨 위의 Hermes 연결 안내. fos-assistant 커넥터 설명은 여기에만 있다 |
 | `tokens-table`, `tokens-empty`, `tokens-error`, `tokens-retry` | 목록 표, 토큰이 없을 때의 안내, 목록을 받지 못했을 때의 이유와 「다시 시도」 |
 | `tokens-message` | 처리 결과. `data-kind` 가 `success` 나 `error` |
 | `tokens-row` * | 행. `data-id`, `data-name` |
@@ -462,15 +473,21 @@ ADMIN 에게만 나오는 요소다.
 | `proposals-message` | 처리 결과. `data-kind` 가 `success` 나 `error` |
 | `proposal-card` * | 제안 카드. `data-id`, `data-kind`, `data-status` |
 | `proposal-kind`, `proposal-meta` * | 종류 이름, 올린 때와 토큰 이름 |
-| `proposal-summary` * | 내용 문장(「{타입} 「{이름}」 을(를) 만듭니다」, 관계 문장, 체결 줄과 결정 이름, 공부 메모) |
-| `proposal-prop` * | 항목 만들기의 속성 한 줄. `data-prop` |
+| `proposal-summary` * | 내용 문장(「{타입} 「{이름}」 을(를) 만듭니다」, 고칩니다, 보관합니다, 관계 문장, 주장 문장, 「버전 N 을(를) 바꾸는 제안입니다」, 체결 줄과 결정 이름, 공부 메모) |
+| `proposal-prop` * | 항목 만들기와 고치기의 속성 한 줄. `data-prop`. 고치기에서 지우는 속성은 「(지움)」 이다 |
 | `proposal-link` * | 이어 만들 관계 문장 |
 | `proposal-trade` * | 체결 줄. `data-trade-id` |
 | `proposal-node-open` * | 항목 이름 링크. `data-node-id`. 작업 공간에서 그 항목을 연다 |
 | `proposal-rationale`, `proposal-evidence` * | 에이전트가 붙인 까닭, 근거 목록 |
 | `proposal-last-error` * | 「승인하지 못했습니다: …」 |
-| `proposal-editor-required` * | 열람자에게 보이는 「편집 권한이 있어야 승인할 수 있습니다」 안내 |
-| `proposal-accept`, `proposal-edit-open`, `proposal-reject-open` * | 「승인」, 「고쳐서 승인」, 「거절」. 열람자의 공유 지식 제안에서 앞의 둘은 `disabled` |
+| `proposal-editor-required` * | 역할이 모자란 사람에게 보이는 「편집 권한이 있어야 승인할 수 있습니다」 안내(`requiredRole` 이 `EDITOR`) |
+| `proposal-admin-required` * | 「관리자만 승인할 수 있습니다」 안내(`requiredRole` 이 `ADMIN` 이고 내가 ADMIN 이 아님) |
+| `proposal-ontology-yaml` * | 온톨로지 변경 카드의 「YAML 보기」 접힘 칸 |
+| `proposal-ontology-preview` * | 온톨로지 변경 카드의 바뀐 점과 영향. 안의 목록은 `ontology-diff-*`, `ontology-impact` 와 같은 id 다 |
+| `proposal-ontology-stale` * | 「기준 버전이 바뀌었습니다」 안내 |
+| `proposal-ontology-confirm` * | 「기존 데이터와 어긋나는 것을 알고 승인합니다」 확인란 |
+| `proposal-ontology-preview-error`, `proposal-ontology-preview-retry` * | 미리보기를 받지 못한 이유와 「다시 확인」 |
+| `proposal-accept`, `proposal-edit-open`, `proposal-reject-open` * | 「승인」, 「고쳐서 승인」, 「거절」. 역할이 모자라거나 온톨로지 변경의 기준 버전이 바뀌었으면 「승인」 이 `disabled` 다. 「고쳐서 승인」 은 항목 만들기와 공부 메모에만 있다 |
 | `proposal-edit-form`, `proposal-edit-prop-<속성>`, `proposal-edit-level`, `proposal-edit-note`, `proposal-edit-submit`, `proposal-edit-cancel` | 고칠 칸, 속성 칸, 공부 메모의 표시와 메모 칸, 「이대로 승인」, 「취소」 |
 | `proposal-card-error` * | 승인이나 거절 실패 이유. 그 카드 안에 나온다 |
 | `proposal-decided` * | 결정한 때와 거절 이유 |

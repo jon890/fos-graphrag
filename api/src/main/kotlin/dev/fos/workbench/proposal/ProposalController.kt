@@ -4,9 +4,12 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import dev.fos.workbench.auth.Role
 import dev.fos.workbench.auth.WorkbenchPrincipal
 import dev.fos.workbench.knowledge.NodeRef
+import dev.fos.workbench.knowledge.RelationshipView
+import dev.fos.workbench.ontology.OntologyVersionHeaderFilter
 import dev.fos.workbench.trade.TradeView
 import dev.fos.workbench.web.Page
 import dev.fos.workbench.web.PageQuery
+import jakarta.servlet.http.HttpServletResponse
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -33,6 +36,7 @@ data class ProposalView(
     val result: Map<String, Any?>?,
     val lastError: ProposalError?,
     val requiresEditor: Boolean,
+    val requiredRole: String,
     val refs: ProposalRefs,
 )
 
@@ -40,10 +44,11 @@ data class ProposalView(
 @JsonInclude(JsonInclude.Include.ALWAYS)
 data class ProposalToken(val id: String?, val name: String?)
 
-/** payload, evidence, result 가 가리키는 노드와 내 체결의 지금 값. 찾지 못한 id 는 빠진다 */
-data class ProposalRefs(val nodes: Map<String, NodeRef>, val trades: Map<String, TradeView>)
+/** payload, evidence, result 가 가리키는 노드, 관계, 내 체결의 지금 값. 찾지 못한 id 는 빠진다 */
+data class ProposalRefs(val nodes: Map<String, NodeRef>, val relationships: Map<String, RelationshipView>, val trades: Map<String, TradeView>)
 
-data class AcceptProposalRequest(val payload: Any? = null)
+/** `confirm` 은 온톨로지 변경의 영향 확인이다 */
+data class AcceptProposalRequest(val payload: Any? = null, val confirm: Boolean = false)
 
 data class RejectProposalRequest(val reason: String? = null)
 
@@ -66,12 +71,18 @@ class ProposalController(private val proposals: ProposalService) {
     @GetMapping("/summary")
     fun summary(@AuthenticationPrincipal user: WorkbenchPrincipal): Map<String, Long> = mapOf("pending" to proposals.pendingCount(user.id))
 
+    /** 온톨로지 변경을 승인하면 필터가 요청 처음에 넣은 버전 헤더를 새 번호로 바꾼다. 헤더를 더하면 값이 두 개가 된다 */
     @PostMapping("/{id}/accept")
     fun accept(
         @PathVariable id: String,
         @RequestBody(required = false) body: AcceptProposalRequest?,
         @AuthenticationPrincipal user: WorkbenchPrincipal,
-    ): ProposalView = proposals.views(user.id, listOf(proposals.accept(user.id, roleOf(user), id, body?.payload))).single()
+        response: HttpServletResponse,
+    ): ProposalView {
+        val accepted = proposals.accept(user.id, roleOf(user), id, body?.payload, body?.confirm ?: false)
+        (accepted.result?.get("ontologyVersion") as? Number)?.let { response.setHeader(OntologyVersionHeaderFilter.HEADER, it.toString()) }
+        return proposals.views(user.id, listOf(accepted)).single()
+    }
 
     @PostMapping("/{id}/reject")
     fun reject(

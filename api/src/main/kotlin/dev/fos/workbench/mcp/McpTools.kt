@@ -11,6 +11,7 @@ import dev.fos.workbench.agent.v1.V1Results
 import dev.fos.workbench.agent.v1.V1TradeResult
 import dev.fos.workbench.config.RateLimiter
 import dev.fos.workbench.config.WorkbenchProperties
+import dev.fos.workbench.proposal.ProposalKind
 import dev.fos.workbench.proposal.ProposalService
 import dev.fos.workbench.trade.TradeService
 import dev.fos.workbench.web.ApiException
@@ -57,6 +58,12 @@ class McpTools(
                 "항목을 찾을 때 넣을 종류 이름이나 제안에 쓸 속성 키를 모를 때 먼저 부릅니다. 대화마다 한 번이면 충분합니다. 입력은 없습니다.",
             schema(),
         ) { _, _ -> v1.ontology() },
+        tool(
+            "get_ontology_yaml", "온톨로지 정의 받기",
+            "온톨로지 정의 전체를 YAML 로 받습니다. 항목 종류, 속성, 관계 종류 같은 정의를 바꾸려 할 때만 부릅니다. " +
+                "결과의 version 을 propose_ontology_change 의 baseVersion 에 넣습니다. 키의 뜻은 get_ontology 의 설명을 봅니다. 입력은 없습니다.",
+            schema(),
+        ) { _, _ -> queries.ontologyYaml() },
         tool(
             "search_nodes", "항목 찾기",
             "이름이나 종목 코드로 워크벤치의 기업, 산업, 투자 결정, 근거 문서 같은 항목을 찾습니다. " +
@@ -137,9 +144,17 @@ class McpTools(
         tool(
             "submit_proposals", "제안 올리기",
             "대화에서 해석한 내용을 워크벤치에 제안으로 올립니다. 올리기만 하고 바로 바뀌지 않습니다. 사용자가 워크벤치의 「제안」 에서 승인해야 반영됩니다. " +
-                "체결을 투자 결정과 잇거나, 새 투자 결정을 만들거나, 근거를 잇거나, 공부 메모를 남길 때 씁니다. " +
+                "체결을 투자 결정과 잇거나, 새 투자 결정을 만들거나, 근거를 잇거나, 공부 메모를 남기거나, 항목을 고치거나 보관하거나, 주장을 만들 때 씁니다. " +
                 "kind 별 payload: LINK_TRADE_DECISION 은 {tradeIds, decisionId}, CREATE_NODE 는 {type, properties, links, tradeIds}, " +
-                "CREATE_RELATIONSHIP 은 {type, fromId, toId}, STUDY_NOTE 는 {nodeId, level(KNOWN, UNSURE, LEARNING), note(1000자까지)} 입니다. " +
+                "CREATE_RELATIONSHIP 은 {type, fromId, toId}, STUDY_NOTE 는 {nodeId, level(KNOWN, UNSURE, LEARNING), note(1000자까지)}, " +
+                "UPDATE_NODE 는 {nodeId, expectedRevision, properties(바꿀 속성만. null 은 지움)}, ARCHIVE_NODE 는 {nodeId, expectedRevision, reason(1000자까지)}, " +
+                "ARCHIVE_RELATIONSHIP 은 {relationshipId, reason(1000자까지)}, " +
+                "CREATE_CLAIM 은 {predicate, subjectId, objectId, documentIds, description, evidenceText, validFrom, validTo}, " +
+                "ONTOLOGY_CHANGE 는 {baseVersion, yaml, note} 입니다. " +
+                "UPDATE_NODE, ARCHIVE_NODE 의 expectedRevision 에는 get_node 가 준 node.revision 을 넣습니다. 그 사이 항목이 바뀌면 승인이 실패하니 다시 읽고 올립니다. " +
+                "ARCHIVE_RELATIONSHIP 의 relationshipId 는 get_node 의 relations[].relationshipId 입니다. 주장에 딸린 관계는 보관할 수 없습니다. " +
+                "CREATE_CLAIM 의 documentIds 에는 근거 문서(Document) id 가 하나 이상(20개까지) 있어야 합니다. Claim 은 UPDATE_NODE 로 고치지 않습니다. " +
+                "온톨로지 정의 전체를 보내는 ONTOLOGY_CHANGE 는 propose_ontology_change 가 더 맞습니다. " +
                 "종류와 속성 키는 get_ontology 로 확인합니다. 같은 dedupeKey 로 다시 올리면 새로 생기지 않고 있던 제안을 돌려줍니다. " +
                 "한 건이라도 틀리면 아무것도 올라가지 않습니다.",
             schema("proposals" to array("올릴 제안. 1~20건입니다", PROPOSAL), required = listOf("proposals")),
@@ -147,6 +162,32 @@ class McpTools(
         ) { principal, args ->
             val saved = proposals.submit(principal.userId, principal.tokenId, principal.tokenName, V1Inputs.items(args.raw, "proposals"))
             V1Results(saved.map { V1ProposalResult(it.index, it.status, v1.proposal(it.proposal)) })
+        },
+        tool(
+            "propose_ontology_change", "온톨로지 변경 제안하기",
+            "항목 종류, 속성, 관계 종류 같은 온톨로지 정의를 바꾸자고 제안합니다. 올리기만 하고 바로 바뀌지 않습니다. 관리자가 워크벤치의 「제안」 에서 승인해야 반영됩니다. " +
+                "먼저 get_ontology_yaml 로 받은 YAML 을 고쳐 정의 전체를 보내고, 그때 받은 version 을 baseVersion 에 넣습니다. " +
+                "정의가 틀리면 ONTOLOGY_INVALID 오류의 details.errors(줄 번호 포함)를 읽고 고쳐 다시 올립니다. " +
+                "REVISION_CONFLICT 면 그 사이 정의가 바뀐 것이니 get_ontology_yaml 로 다시 받아 고칩니다. " +
+                "같은 dedupeKey 로 다시 올리면 새로 생기지 않고 있던 제안을 돌려줍니다.",
+            schema(
+                "baseVersion" to integer("고친 YAML 을 받은 온톨로지 버전. get_ontology_yaml 의 version 입니다"),
+                "yaml" to string("고친 온톨로지 정의 전체(YAML)입니다"),
+                "rationale" to string("사람이 승인할지 판단할 까닭. 2000자까지입니다"),
+                "note" to string("새 버전에 남길 메모. 1000자까지이고 선택입니다"),
+                "dedupeKey" to string("같은 제안이면 늘 같은 값이 되는 키. 100자까지이고 선택입니다"),
+                required = listOf("baseVersion", "yaml", "rationale"),
+            ),
+            write = true,
+        ) { principal, args ->
+            val item = buildMap {
+                put("kind", ProposalKind.ONTOLOGY_CHANGE.name)
+                put("payload", mapOf("baseVersion" to args.int("baseVersion"), "yaml" to args.string("yaml"), "note" to args.string("note")))
+                put("rationale", args.string("rationale"))
+                args.string("dedupeKey")?.let { put("dedupeKey", it) }
+            }
+            val saved = proposals.submit(principal.userId, principal.tokenId, principal.tokenName, listOf(item)).single()
+            V1ProposalResult(saved.index, saved.status, v1.proposal(saved.proposal))
         },
         tool(
             "list_my_proposals", "내 제안 보기",
@@ -280,7 +321,11 @@ class McpTools(
 
         /** `V1ProposalInput`(docs/api-contract.md 「`POST /api/v1/proposals`」) */
         private val PROPOSAL = schema(
-            "kind" to string("LINK_TRADE_DECISION, CREATE_NODE, CREATE_RELATIONSHIP, STUDY_NOTE 가운데 하나입니다"),
+            "kind" to string(
+                "LINK_TRADE_DECISION, CREATE_NODE, CREATE_RELATIONSHIP, STUDY_NOTE, UPDATE_NODE, ARCHIVE_NODE, ARCHIVE_RELATIONSHIP, " +
+                    "CREATE_CLAIM, ONTOLOGY_CHANGE 가운데 하나입니다. payload 모양은 submit_proposals 의 설명에 있습니다. " +
+                    "ONTOLOGY_CHANGE({baseVersion, yaml, note})로 정의 전체를 보낼 때는 propose_ontology_change 가 더 맞습니다",
+            ),
             "payload" to mapOf("type" to "object", "description" to "kind 별 제안 내용입니다"),
             "rationale" to string("사람이 승인할지 판단할 까닭. 2000자까지입니다"),
             "evidence" to mapOf(

@@ -1,26 +1,47 @@
 package dev.fos.workbench.proposal
 
+import dev.fos.workbench.auth.Role
+import dev.fos.workbench.config.Limits
 import dev.fos.workbench.config.params
+import dev.fos.workbench.knowledge.ClaimService
+import dev.fos.workbench.knowledge.CreateClaimRequest
 import dev.fos.workbench.knowledge.KnowledgeReader
 import dev.fos.workbench.learning.KnowledgeMarkService
+import dev.fos.workbench.ontology.EditInput
+import dev.fos.workbench.ontology.OntologyEditService
 import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.ontology.OntologyValidator
+import dev.fos.workbench.ontology.OntologyVersionStore
 import dev.fos.workbench.trade.TradeRepository
 import dev.fos.workbench.web.ArchivedException
 import dev.fos.workbench.web.DuplicateException
 import dev.fos.workbench.web.NotFoundException
+import dev.fos.workbench.web.OntologyInvalidException
 import dev.fos.workbench.web.OntologyViolationException
+import dev.fos.workbench.web.RevisionConflictException
 import dev.fos.workbench.web.ValidationFailedException
 import org.springframework.data.neo4j.core.Neo4jClient
 import org.springframework.stereotype.Component
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.json.JsonMapper
 
-/** 제안의 종류. `requiresEditor` 면 공유 지식을 만들어 EDITOR 이상만 승인한다 */
-enum class ProposalKind(val requiresEditor: Boolean) {
-    CREATE_NODE(true),
-    CREATE_RELATIONSHIP(true),
-    LINK_TRADE_DECISION(false),
-    STUDY_NOTE(false),
+/**
+ * 제안의 종류와 승인에 필요한 역할. 공유 지식을 만들면 EDITOR, 온톨로지를 바꾸면 ADMIN 이상이 승인한다.
+ * `requiresEditor` 는 예전 화면과의 호환을 위해 남긴다
+ */
+enum class ProposalKind(val requiredRole: Role) {
+    CREATE_NODE(Role.EDITOR),
+    CREATE_RELATIONSHIP(Role.EDITOR),
+    LINK_TRADE_DECISION(Role.VIEWER),
+    STUDY_NOTE(Role.VIEWER),
+    ONTOLOGY_CHANGE(Role.ADMIN),
+    UPDATE_NODE(Role.EDITOR),
+    ARCHIVE_NODE(Role.EDITOR),
+    ARCHIVE_RELATIONSHIP(Role.EDITOR),
+    CREATE_CLAIM(Role.EDITOR),
     ;
+
+    val requiresEditor get() = requiredRole != Role.VIEWER
 
     companion object {
         fun parse(value: String?): ProposalKind? = entries.firstOrNull { it.name == value }
@@ -55,6 +76,51 @@ sealed interface ProposalPayload {
         override fun toMap(): Map<String, Any?> = mapOf("nodeId" to nodeId, "level" to level, "note" to note)
     }
 
+    /** `yaml` 은 올릴 때 정규화한 정의 전체다. `definition` 으로 받았어도 YAML 로 바꿔 둔다 */
+    data class OntologyChange(val baseVersion: Int, val yaml: String, val note: String?) : ProposalPayload {
+        override fun toMap(): Map<String, Any?> = mapOf("baseVersion" to baseVersion, "yaml" to yaml, "note" to note)
+    }
+
+    /** `properties` 의 null 은 그 속성을 지운다 */
+    data class UpdateNode(val nodeId: String, val expectedRevision: Long, val properties: Map<String, Any?>) : ProposalPayload {
+        override fun toMap(): Map<String, Any?> = mapOf("nodeId" to nodeId, "expectedRevision" to expectedRevision, "properties" to properties)
+    }
+
+    data class ArchiveNode(val nodeId: String, val expectedRevision: Long, val reason: String?) : ProposalPayload {
+        override fun toMap(): Map<String, Any?> = mapOf("nodeId" to nodeId, "expectedRevision" to expectedRevision, "reason" to reason)
+    }
+
+    /** 에이전트가 읽는 관계에는 revision 이 없다. 승인할 때 지금 revision 을 읽어 보관한다 */
+    data class ArchiveRelationship(val relationshipId: String, val reason: String?) : ProposalPayload {
+        override fun toMap(): Map<String, Any?> = mapOf("relationshipId" to relationshipId, "reason" to reason)
+    }
+
+    data class CreateClaim(
+        val predicate: String,
+        val subjectId: String,
+        val objectId: String,
+        val documentIds: List<String>,
+        val description: String?,
+        val evidenceText: String?,
+        val validFrom: String?,
+        val validTo: String?,
+    ) : ProposalPayload {
+        override fun toMap(): Map<String, Any?> = mapOf(
+            "predicate" to predicate, "subjectId" to subjectId, "objectId" to objectId, "documentIds" to documentIds,
+            "description" to description, "evidenceText" to evidenceText, "validFrom" to validFrom, "validTo" to validTo,
+        )
+
+        /** 에이전트가 만든 주장이라 `authoringMethod` 는 AI 다 */
+        fun toRequest() = CreateClaimRequest(
+            predicate, subjectId, objectId, documentIds, description, evidenceText, validFrom, validTo,
+            authoringMethod = AI, extractionConfidence = null,
+        )
+
+        companion object {
+            const val AI = "AI"
+        }
+    }
+
     /** 계약(docs/api-contract.md 「제안 내용」)의 payload 모양 */
     fun toMap(): Map<String, Any?>
 }
@@ -70,6 +136,10 @@ class ProposalPayloads(
     private val reader: KnowledgeReader,
     private val trades: TradeRepository,
     private val client: Neo4jClient,
+    private val edits: OntologyEditService,
+    private val versions: OntologyVersionStore,
+    private val mapper: JsonMapper,
+    private val claims: ClaimService,
 ) {
 
     /** 모양, 온톨로지, 노드 존재, 내 체결을 확인한다. prefix 는 fieldErrors 키 앞부분(`proposals[0].payload`, 승인에서는 `payload`) */
@@ -89,6 +159,25 @@ class ProposalPayloads(
                 fields.done { ProposalPayload.LinkTradeDecision(tradeIds!!, decisionId!!) }
             }
             ProposalKind.STUDY_NOTE -> studyNoteShape(fields)
+            ProposalKind.ONTOLOGY_CHANGE -> return checkOntologyChange(ontologyChangeShape(fields))
+            ProposalKind.UPDATE_NODE -> {
+                val nodeId = fields.text("nodeId")
+                val expectedRevision = fields.revision("expectedRevision")
+                val properties = fields.nonEmptyObject("properties")
+                fields.done { ProposalPayload.UpdateNode(nodeId!!, expectedRevision!!, properties!!) }
+            }
+            ProposalKind.ARCHIVE_NODE -> {
+                val nodeId = fields.text("nodeId")
+                val expectedRevision = fields.revision("expectedRevision")
+                val reason = fields.text("reason", required = false, maxLength = MAX_REASON)
+                fields.done { ProposalPayload.ArchiveNode(nodeId!!, expectedRevision!!, reason) }
+            }
+            ProposalKind.ARCHIVE_RELATIONSHIP -> {
+                val relationshipId = fields.text("relationshipId")
+                val reason = fields.text("reason", required = false, maxLength = MAX_REASON)
+                fields.done { ProposalPayload.ArchiveRelationship(relationshipId!!, reason) }
+            }
+            ProposalKind.CREATE_CLAIM -> createClaimShape(fields)
         }
         return when (payload) {
             is ProposalPayload.CreateNode -> checkCreateNode(ownerId, payload, prefix)
@@ -98,6 +187,76 @@ class ProposalPayloads(
                 requireOwnedTrades(ownerId, it.tradeIds)
             }
             is ProposalPayload.StudyNote -> payload.also { reader.nodeProps(it.nodeId) }
+            is ProposalPayload.OntologyChange -> payload
+            is ProposalPayload.UpdateNode -> checkUpdateNode(payload, prefix)
+            is ProposalPayload.ArchiveNode -> payload.also { requireNodeAt(it.nodeId, it.expectedRevision) }
+            is ProposalPayload.ArchiveRelationship -> payload.also { checkArchiveRelationship(it) }
+            is ProposalPayload.CreateClaim -> payload.also { checkCreateClaim(it, prefix) }
+        }
+    }
+
+    private fun createClaimShape(fields: Fields): ProposalPayload.CreateClaim {
+        val predicate = fields.text("predicate")
+        val subjectId = fields.text("subjectId")
+        val objectId = fields.text("objectId")
+        val documentIds = fields.ids("documentIds", Limits.MAX_DOCUMENTS_PER_CLAIM, required = true)
+        val description = fields.text("description", required = false)
+        val evidenceText = fields.text("evidenceText", required = false)
+        val validFrom = fields.text("validFrom", required = false)
+        val validTo = fields.text("validTo", required = false)
+        return fields.done {
+            ProposalPayload.CreateClaim(predicate!!, subjectId!!, objectId!!, documentIds!!, description, evidenceText, validFrom, validTo)
+        }
+    }
+
+    /**
+     * `PATCH /api/nodes/{id}` 와 같은 규칙. 검사 순서는 Claim, 보관, revision 이다.
+     * 승인할 때는 실행하는 `NodeService` 가 잠근 뒤 revision 과 같은 종목을 다시 확인한다
+     */
+    private fun checkUpdateNode(payload: ProposalPayload.UpdateNode, prefix: String): ProposalPayload.UpdateNode {
+        val node = reader.nodeProps(payload.nodeId)
+        val type = node["type"] as String
+        if (holder.current().requireNodeType(type).managedBy != null) {
+            throw OntologyViolationException("claim-via-claims-api", "$type 은(는) 제안으로 고칠 수 없습니다. Claim 은 PATCH /api/claims/{id} 로 고칩니다.")
+        }
+        requireActiveAt(node, payload.expectedRevision)
+        val changes = try {
+            validator.validatePatch(type, payload.properties)
+        } catch (e: ValidationFailedException) {
+            throw ValidationFailedException(fieldErrorsOf(e).mapKeys { (k, _) -> "$prefix.properties.$k" })
+        }
+        if (type == SECURITY && (MARKET in changes || TICKER in changes)) {
+            requireUniqueListing((node + changes).filterValues { it != null }, exceptId = payload.nodeId)
+        }
+        return payload.copy(properties = changes)
+    }
+
+    /** 보관 여부를 먼저 보고 revision 을 비교한다. 승인할 때는 `NodeService` 가 잠근 뒤 다시 비교한다 */
+    private fun requireNodeAt(nodeId: String, expectedRevision: Long) {
+        requireActiveAt(reader.nodeProps(nodeId), expectedRevision)
+    }
+
+    private fun requireActiveAt(node: Map<String, Any?>, expectedRevision: Long) {
+        if (node["archived"] == true) throw ArchivedException()
+        val current = (node["revision"] as Number).toLong()
+        if (current != expectedRevision) throw RevisionConflictException(expectedRevision, current)
+    }
+
+    /** 일반 관계만 보관한다. 주장 관계는 `RelationshipService.archive` 와 같이 거절한다 */
+    private fun checkArchiveRelationship(payload: ProposalPayload.ArchiveRelationship) {
+        val relationship = reader.relationshipProps(payload.relationshipId)
+        if (relationship["type"] !in holder.current().relationshipTypes) {
+            throw OntologyViolationException("claim-relationship", "Claim 에 딸린 관계는 Claim 을 보관해 정리합니다.")
+        }
+        if (relationship["archived"] == true) throw ArchivedException()
+    }
+
+    /** `POST /api/claims` 와 같은 규칙. 칸 오류의 키는 payload 의 칸 이름이다 */
+    private fun checkCreateClaim(payload: ProposalPayload.CreateClaim, prefix: String) {
+        try {
+            claims.checkCreate(payload.toRequest())
+        } catch (e: ValidationFailedException) {
+            throw ValidationFailedException(fieldErrorsOf(e).mapKeys { (k, _) -> "$prefix.$k" })
         }
     }
 
@@ -119,6 +278,32 @@ class ProposalPayloads(
         return fields.done { ProposalPayload.StudyNote(nodeId!!, level!!, note) }
     }
 
+    private fun ontologyChangeShape(fields: Fields): OntologyChangeInput {
+        val baseVersion = fields.integer("baseVersion")
+        val yaml = fields.raw("yaml")
+        val definition = fields.raw("definition")
+        if ((yaml == null) == (definition == null)) fields.fail("yaml", "yaml 이나 definition 가운데 하나만 보냅니다.")
+        if (yaml != null && (yaml !is String || yaml.isBlank())) fields.fail("yaml", "문자열이어야 합니다.")
+        if (definition != null && definition !is Map<*, *>) fields.fail("definition", "객체여야 합니다.")
+        val note = fields.text("note", required = false, maxLength = OntologyEditService.MAX_NOTE_LENGTH)
+        return fields.done { OntologyChangeInput(baseVersion!!, yaml as String?, definition as Map<*, *>?, note) }
+    }
+
+    /**
+     * `POST /api/ontology/preview` 와 같은 검사를 한 뒤 기준 버전을 지금 버전과 비교한다.
+     * 영향 확인은 승인할 때 `OntologyEditService.save` 가 한다. 올린 뒤 데이터가 바뀌면 영향도 바뀌기 때문이다
+     */
+    private fun checkOntologyChange(input: OntologyChangeInput): ProposalPayload.OntologyChange {
+        val preview = edits.preview(EditInput(input.yaml, input.definition?.let { mapper.valueToTree<JsonNode>(it) }))
+        if (!preview.valid || preview.yaml == null) throw OntologyInvalidException(preview.errors)
+        if (preview.added.isEmpty() && preview.removed.isEmpty() && preview.changed.isEmpty()) {
+            throw OntologyInvalidException(listOf("바뀐 점이 없습니다."))
+        }
+        val current = versions.latestNumber()
+        if (input.baseVersion != current) throw RevisionConflictException(input.baseVersion.toLong(), current.toLong())
+        return ProposalPayload.OntologyChange(input.baseVersion, preview.yaml, input.note)
+    }
+
     /** `POST /api/nodes` 와 같은 규칙. 승인할 때는 실행하는 `NodeService` 가 같은 종목을 다시 막는다 */
     private fun checkCreateNode(ownerId: String, payload: ProposalPayload.CreateNode, prefix: String): ProposalPayload.CreateNode {
         val ontology = holder.current()
@@ -138,7 +323,7 @@ class ProposalPayloads(
             requireEndpoints(link.type, rel.from, rel.to, fromType, toType)
             if (other["archived"] == true) throw ArchivedException()
         }
-        if (payload.type == SECURITY) requireUniqueListing(properties)
+        if (payload.type == SECURITY) requireUniqueListing(properties, exceptId = null)
         requireOwnedTrades(ownerId, payload.tradeIds)
         return payload.copy(properties = properties)
     }
@@ -153,10 +338,11 @@ class ProposalPayloads(
         requireNoActiveRelationship(payload)
     }
 
-    /** 보관된 종목도 센다. 유일 제약 `security_listing_unique` 가 보관된 것에도 걸린다 */
-    private fun requireUniqueListing(props: Map<String, Any?>) {
-        val exists = client.query("MATCH (s:Knowledge:Security {market: \$market, ticker: \$ticker}) RETURN count(s) > 0 AS exists")
-            .bindAll(params("market" to props["market"], "ticker" to props["ticker"]))
+    /** 보관된 종목도 센다. 유일 제약 `security_listing_unique` 가 보관된 것에도 걸린다. 고칠 때는 그 종목 자신(`exceptId`)을 뺀다 */
+    private fun requireUniqueListing(props: Map<String, Any?>, exceptId: String?) {
+        val exists = client.query(
+            "MATCH (s:Knowledge:Security {market: \$market, ticker: \$ticker}) WHERE s.id <> coalesce(\$exceptId, '') RETURN count(s) > 0 AS exists",
+        ).bindAll(params("market" to props["market"], "ticker" to props["ticker"], "exceptId" to exceptId))
             .fetch().one().map { it["exists"] == true }.orElse(false)
         if (exists) throw DuplicateException("같은 시장에 같은 종목 코드가 이미 있습니다. 보관된 종목이면 복원하세요.")
     }
@@ -234,6 +420,30 @@ class ProposalPayloads(
             return trimmed
         }
 
+        fun raw(field: String): Any? = map[field]
+
+        /** 소수점 없는 수만 받는다 */
+        fun integer(field: String): Int? = when (val value = map[field]) {
+            null -> null.also { fail(field, "필수입니다.") }
+            is Int -> value
+            is Long -> value.takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt() ?: null.also { fail(field, "정수여야 합니다.") }
+            else -> null.also { fail(field, "정수여야 합니다.") }
+        }
+
+        /** 0 이상의 정수 */
+        fun revision(field: String): Long? = when (val value = map[field]) {
+            null -> null.also { fail(field, "필수입니다.") }
+            is Int, is Long -> (value as Number).toLong().takeIf { it >= 0 } ?: null.also { fail(field, "0 이상의 정수여야 합니다.") }
+            else -> null.also { fail(field, "0 이상의 정수여야 합니다.") }
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        fun nonEmptyObject(field: String): Map<String, Any?>? = when (val value = map[field]) {
+            is Map<*, *> -> (value as Map<String, Any?>).takeIf { it.isNotEmpty() } ?: null.also { fail(field, "1개 이상이어야 합니다.") }
+            null -> null.also { fail(field, "필수입니다.") }
+            else -> null.also { fail(field, "객체여야 합니다.") }
+        }
+
         @Suppress("UNCHECKED_CAST")
         fun objectOrEmpty(field: String): Map<String, Any?>? = when (val value = map[field]) {
             null -> emptyMap()
@@ -285,9 +495,15 @@ class ProposalPayloads(
         }
     }
 
+    /** 모양만 확인한 온톨로지 변경 제안. `yaml` 과 `definition` 가운데 하나만 있다 */
+    private data class OntologyChangeInput(val baseVersion: Int, val yaml: String?, val definition: Map<*, *>?, val note: String?)
+
     companion object {
         const val DECISION = "Decision"
         const val SECURITY = "Security"
+        const val MARKET = "market"
+        const val TICKER = "ticker"
+        const val MAX_REASON = 1000
         const val MAX_LINKS = 10
         const val MAX_TRADE_IDS = 50
 
@@ -297,6 +513,13 @@ class ProposalPayloads(
             ProposalKind.CREATE_RELATIONSHIP to setOf("type", "fromId", "toId"),
             ProposalKind.LINK_TRADE_DECISION to setOf("tradeIds", "decisionId"),
             ProposalKind.STUDY_NOTE to setOf("nodeId", "level", "note"),
+            ProposalKind.ONTOLOGY_CHANGE to setOf("baseVersion", "yaml", "definition", "note"),
+            ProposalKind.UPDATE_NODE to setOf("nodeId", "expectedRevision", "properties"),
+            ProposalKind.ARCHIVE_NODE to setOf("nodeId", "expectedRevision", "reason"),
+            ProposalKind.ARCHIVE_RELATIONSHIP to setOf("relationshipId", "reason"),
+            ProposalKind.CREATE_CLAIM to setOf(
+                "predicate", "subjectId", "objectId", "documentIds", "description", "evidenceText", "validFrom", "validTo",
+            ),
         )
 
         @Suppress("UNCHECKED_CAST")

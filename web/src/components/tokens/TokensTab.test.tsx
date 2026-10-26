@@ -38,4 +38,25 @@ describe('TokensTab', () => {
     expect(scopeLabel('READ')).toBe('조회만')
     expect(scopeLabel('READ_WRITE')).toBe('조회와 기록')
   })
+
+  it('설치 안내가 연결된 앱보다 위에 있고 두 도구의 명령이 있다', () => {
+    const html = renderToStaticMarkup(withApp(<TokensTab />))
+    expect(html.indexOf('data-testid="integrations-install"')).toBeGreaterThan(-1)
+    expect(html.indexOf('data-testid="integrations-install"')).toBeLessThan(html.indexOf('data-testid="connections-section"'))
+    expect(html).toContain('data-testid="install-claude"')
+    expect(html).toContain('data-testid="install-codex"')
+    expect(html).toContain('data-command="/plugin install valuation-ontology@fos-valuation-ontology"')
+    expect(html).toContain('data-command="codex plugin add valuation-ontology@fos-valuation-ontology"')
+    expect(html).toContain('data-testid="install-copy"')
+  })
+
+  it('연동 토큰은 처음에 접힌 고급 칸 안에 있다', () => {
+    const html = renderToStaticMarkup(withApp(<TokensTab />))
+    const details = html.match(/<details[^>]*data-testid="tokens-advanced"[^>]*>/)?.[0] ?? ''
+    expect(details).not.toBe('')
+    expect(details).not.toMatch(/\sopen(=|\s|>)/)
+    expect(html.indexOf('data-testid="tokens-advanced"')).toBeLessThan(html.indexOf('data-testid="tokens-guide"'))
+    expect(html.indexOf('data-testid="tokens-guide"')).toBeLessThan(html.indexOf('</details>'))
+    expect(html).toContain('고급: 개인 비서 연동')
+  })
 })
