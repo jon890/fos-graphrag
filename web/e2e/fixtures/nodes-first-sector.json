@@ -1,0 +1,41 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/nodes",
+    "query": "types=Sector&size=1"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000017",
+        "type": "Sector",
+        "label": "가상 메모리 반도체",
+        "properties": {
+          "name": "가상 메모리 반도체",
+          "scheme": "GICS"
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:14.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "updatedAt": "2026-01-01T00:00:14.000000Z",
+        "updatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "reviewStatus": null
+      }
+    ],
+    "page": 0,
+    "size": 1,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}

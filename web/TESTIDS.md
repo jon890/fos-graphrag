@@ -1,6 +1,6 @@
 # data-testid 목록
 
-e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec.ts` 와 `e2e/mobile.spec.ts` 도 함께 고친다.
+화면 테스트(`e2e/*.spec.ts`)가 기대는 셀렉터다. 이름을 바꾸면 그 테스트도 함께 고친다.
 `*` 표시는 같은 화면에 여러 개 나오는 요소다. `filter({ hasText })` 나 `data-*` 속성으로 좁힌다.
 
 ## 로그인과 상단

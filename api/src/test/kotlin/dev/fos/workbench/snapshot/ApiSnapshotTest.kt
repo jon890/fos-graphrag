@@ -34,6 +34,8 @@ import java.net.URLEncoder
         "workbench.oauth.token-rate-limit-per-minute=10000",
         // OAuth 주소에 실행마다 다른 포트가 들어가지 않게 가짜 API 의 origin 으로 고정한다
         "workbench.oauth.public-url=http://127.0.0.1:5180",
+        // 초기 데이터의 적용 시간(트랜잭션 시간 초과)과 파일 내용에 스냅샷이 흔들리지 않게 넣지 않는다
+        "workbench.seeds.enabled=false",
     ],
 )
 @ActiveProfiles("mockoidc")
@@ -260,19 +262,32 @@ class ApiSnapshotTest {
         getAndSave(anonymous(), "oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp")
         getAndSave(anonymous(), "oauth-authorization-server", "/.well-known/oauth-authorization-server")
 
-        SnapshotNormalizer().normalize(saved).map { if (it.name == "graph-company") sortGraphById(it) else it }
+        // 사용법 따라하기(GuideProvider)가 주장의 대상으로 고를 산업을 찾는 요청
+        getAndSave(alice, "nodes-first-sector", "/api/nodes?" + query("types" to "Sector", "size" to 1))
+        getAndSave(alice, "graph-decision", "/api/graph/neighborhood?" + query("id" to decision.id, "hops" to 1))
+        // 상세(KnowledgeMarkControls)가 부르는 내 표시. 표시가 없는 노드다
+        getAndSave(alice, "knowledge-mark-none", "/api/me/knowledge/${company.id}")
+        // 종목과 결정 상세의 내 체결(TradeList). 결정과 이은 체결은 아직 없다
+        getAndSave(alice, "trades-security", "/api/me/trades?" + query("securityId" to security.id, "size" to 20))
+        getAndSave(alice, "trades-decision", "/api/me/trades?" + query("decisionId" to decision.id, "size" to 20))
+
+        SnapshotNormalizer().normalize(saved.map { if (it.name.startsWith("graph-")) sortGraph(it) else it })
             .forEach { File(dir, "${it.name}.json").writeText(render(it)) }
     }
 
     /**
-     * 그래프 응답은 노드(중심 다음)와 관계를 실제 id 순서로 준다. 실제 id 는 무작위라 순서가 실행마다 바뀌므로,
-     * 같은 규칙을 자리표시 id 에 다시 적용한다. 중심 노드는 맨 앞에 둔다
+     * 그래프 응답은 노드(중심 다음)와 관계를 실제 id 순서로 준다. 실제 id 는 무작위라, 정규화 전에 id 가 아닌 값으로 정렬해
+     * 자리표시를 매기는 순서까지 고정한다. 노드는 중심 다음 (type, label), 관계는 (type, 시작 노드 키, 끝 노드 키) 순서다
      */
-    private fun sortGraphById(s: Snapshot): Snapshot {
+    private fun sortGraph(s: Snapshot): Snapshot {
         val body = s.body.deepCopy() as ObjectNode
         val nodes = body["nodes"].values().toList()
-        val edges = body["edges"].values().sortedBy { it.id }
-        body.putArray("nodes").addAll(listOf(nodes.first()) + nodes.drop(1).sortedBy { it.id })
+        val keyOf = nodes.associate { it.id to "${it["type"].asString()}\u0000${it["label"].asString()}" }
+        val edges = body["edges"].values().sortedWith(
+            compareBy({ it["type"].asString() }, { keyOf[it["source"].asString()] }, { keyOf[it["target"].asString()] }),
+        )
+        val rest = nodes.drop(1).sortedWith(compareBy({ it["type"].asString() }, { it["label"].asString() }))
+        body.putArray("nodes").addAll(listOf(nodes.first()) + rest)
         body.putArray("edges").addAll(edges)
         return s.copy(body = body)
     }

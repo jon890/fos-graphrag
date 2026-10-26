@@ -1,0 +1,55 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/graph/neighborhood",
+    "query": "id=00000000-0000-4000-8000-000000000010&hops=1"
+  },
+  "status": 200,
+  "body": {
+    "centerId": "00000000-0000-4000-8000-000000000010",
+    "hops": 1,
+    "nodes": [
+      {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "type": "Decision",
+        "label": "가상전자 첫 매수",
+        "reviewStatus": null,
+        "predicate": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000009",
+        "type": "Security",
+        "label": "가상전자 보통주",
+        "reviewStatus": null,
+        "predicate": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000007",
+        "type": "Valuation",
+        "label": "가상전자 2026-10-20",
+        "reviewStatus": null,
+        "predicate": null
+      }
+    ],
+    "edges": [
+      {
+        "id": "00000000-0000-4000-8000-000000000020",
+        "type": "BASED_ON",
+        "source": "00000000-0000-4000-8000-000000000007",
+        "target": "00000000-0000-4000-8000-000000000010"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000018",
+        "type": "HAS_DECISION",
+        "source": "00000000-0000-4000-8000-000000000009",
+        "target": "00000000-0000-4000-8000-000000000010"
+      }
+    ],
+    "truncated": false,
+    "limits": {
+      "maxHops": 2,
+      "maxNodes": 150,
+      "maxRelationships": 300
+    }
+  }
+}

@@ -1,13 +1,13 @@
 {
   "request": {
     "method": "GET",
-    "path": "/api/nodes/00000000-0000-4000-8000-000000000026",
+    "path": "/api/nodes/00000000-0000-4000-8000-000000000022",
     "query": ""
   },
   "status": 200,
   "body": {
     "node": {
-      "id": "00000000-0000-4000-8000-000000000026",
+      "id": "00000000-0000-4000-8000-000000000022",
       "type": "Company",
       "label": "보관한 가상기업",
       "properties": {
@@ -16,14 +16,14 @@
       },
       "revision": 2,
       "archived": true,
-      "archivedAt": "2026-01-01T00:00:56.000000Z",
-      "createdAt": "2026-01-01T00:00:54.000000Z",
+      "archivedAt": "2026-01-01T00:00:52.000000Z",
+      "createdAt": "2026-01-01T00:00:50.000000Z",
       "createdBy": {
         "id": "00000000-0000-4000-8000-000000000002",
         "email": "alice@example.com",
         "displayName": "Alice"
       },
-      "updatedAt": "2026-01-01T00:00:57.000000Z",
+      "updatedAt": "2026-01-01T00:00:53.000000Z",
       "updatedBy": {
         "id": "00000000-0000-4000-8000-000000000002",
         "email": "alice@example.com",

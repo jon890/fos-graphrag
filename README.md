@@ -170,6 +170,9 @@ git diff --stat -- ../web/e2e/fixtures
 
 # cwd: web
 npm ci && npm run typecheck && npm test && npm run build
+
+# cwd: 저장소 루트
+cd web && npx playwright install chromium && npm run test:e2e   # 가짜 API 로 1440px, 390px 화면 테스트
 ```
 
 브라우저 테스트는 운영 Compose 에 가짜 OIDC 를 겹쳐 띄운 뒤 돌려요.
