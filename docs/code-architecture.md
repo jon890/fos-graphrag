@@ -7,16 +7,15 @@
   ontology/financial-ontology.yaml   온톨로지의 첫 버전과 코드 소유 부분. API 빌드가 jar 에 복사한다
   api/                               Kotlin + Spring Boot API. 자체 Gradle Wrapper
   web/                               React + TypeScript + Vite. Cytoscape.js 그래프
-  web/e2e/                           Playwright 브라우저 테스트
+  web/e2e/                           Playwright 화면 테스트와 가짜 API, 응답 스냅샷(fixtures/)
   scripts/                           백업, 복원, Compose 설정 검사 스크립트
   Dockerfile                         웹 빌드, API 빌드, 실행 이미지를 한 파일에서 만든다
   compose.yml                        운영 Compose. Neo4j 포트를 공개하지 않는다
   compose.dev.yml                    개발 Compose. Neo4j 와 가짜 OIDC 공급자를 loopback 에 묶는다
-  compose.e2e.yml                    브라우저 테스트용 override. 가짜 OIDC 공급자를 더한다
   docs/                              이 문서들
   plugin/                            Claude Code·Codex 플러그인. 원격 MCP 연결 설정(.mcp.json)과 비개발자용 스킬
   .claude-plugin/marketplace.json    Claude Code·Codex 마켓플레이스 목록. ./plugin 을 가리킨다
-  .github/workflows/                 GHCR 이미지를 올리는 workflow
+  .github/workflows/                 GHCR 이미지 workflow 와 테스트 workflow
 ```
 
 브라우저는 API 하고만 통신한다. Neo4j 자격증명과 Cypher 실행 기능은 클라이언트에 없다.
@@ -149,9 +148,9 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | 프로필 | 들어 있는 것 | 쓰는 곳 |
 | --- | --- | --- |
 | `prod` | `container`, 실제 Google 등록, Secure 쿠키 기본값 true | 운영 이미지 기본값 |
-| `e2e` | `container`, `mockoidc` | 브라우저 테스트(`compose.e2e.yml`) |
-| `container` | 이미지 안의 정적 파일 위치 | prod, e2e 공통 |
-| `mockoidc` | 가짜 OIDC 공급자(`ghcr.io/navikt/mock-oauth2-server`) | 개발 실행, 자동 테스트, e2e |
+| `e2e` | `container`, `mockoidc` | 쓰지 않는다 |
+| `container` | 이미지 안의 정적 파일 위치 | prod 가 쓴다 |
+| `mockoidc` | 가짜 OIDC 공급자(`ghcr.io/navikt/mock-oauth2-server`) | 개발 실행, 자동 테스트 |
 
 `prod` 는 시작할 때 `ProdStartupGuard` 가 아래를 확인하고 하나라도 어기면 멈춘다.
 
@@ -313,9 +312,7 @@ ADR 로 남기지 않은 작은 결정은 다음과 같다.
 - 타입 순서는 온톨로지 필드가 아니라 관계 방향으로 계산한다([ADR-010](adr/010-concept-map-first-screen.md)). 깊이는 뿌리에서의 너비 우선 거리라 개념 지도의 `breadthfirst` 층과 같다.
 - 개념 지도의 최근 항목은 검색 API 에 `sort=recent` 를 더해 받는다(2026-10-24). 화면이 여러 쪽을 받아 정렬하는 안은 항목이 늘면 요청이 커져 버렸다.
 - 첫 접속 가이드는 라이브러리 없이 만든다(2026-10-23). 말풍선 라이브러리는 실행 중에 `<style>` 을 넣는 것이 많아 `style-src 'self'` 와 부딪히고, 가이드가 만들기 폼을 미리 채우고 만들기 성공을 받아야 해서 단계마다 화면 코드와 맞물린다. 말풍선 위치는 대상 요소의 `getBoundingClientRect` 로 계산해 React 의 `style` 속성(CSSOM)으로 둔다. 끝낸 기록은 서버의 `:User.guideDoneAt` 이다(사용자 결정 2026-10-23). 기기를 바꿔도 다시 열리지 않게 하려는 것이다.
-- 브라우저 테스트는 `prod` 를 켜지 않고 `e2e` 프로필(= `container` + `mockoidc`)로 돈다. `prod` 와 `mockoidc` 를 함께 켜면 시작을 막는다.
-  e2e 스택은 운영 Compose 위에 override 만 겹치므로 이미지, 보안 헤더, cap_drop, 메모리 상한, 포트 규칙이 운영과 같다. Secure 쿠키와 forward headers 만 끈다.
-  `prod` 에 가짜 공급자를 허용하는 안은 버렸다. 설정 실수 하나로 아무나 첫 관리자로 로그인할 수 있게 되기 때문이다.
+- `prod` 와 `mockoidc` 를 함께 켜면 시작을 막는다. `prod` 에 가짜 공급자를 허용하는 안은 버렸다. 설정 실수 하나로 아무나 첫 관리자로 로그인할 수 있게 되기 때문이다.
 - 시각은 고정 자릿수 문자열로 저장한다. Neo4j `datetime` 타입으로 바꾸는 안은 JSON 계약과 기존 개발 데이터를 함께 바꿔야 해서 버렸다.
 - 백업은 `neo4j-admin database dump --to-stdout` 으로 받아 호스트 파일(600)에 쓴다. 호스트 디렉터리를 컨테이너에 마운트하지 않아 권한을 넓힐 필요가 없다.
 - 화면 부품은 shadcn(Radix, Tailwind)으로 만든다(2026-10-21 사용자 결정). Mantine 같은 부품 라이브러리는 라이브러리 버전에 화면이 묶이고, 직접 쓴 CSS 만으로는 접근성과 반응형을 화면마다 다시 짜야 해서 버렸다.

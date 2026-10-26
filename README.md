@@ -134,8 +134,8 @@ AI 가 올린 내용은 바로 반영되지 않아요.
 | `ontology/` | 온톨로지 첫 버전(`financial-ontology.yaml`)과 초기 데이터(`seeds/`) |
 | `docs/` | 요구사항, 흐름, API 계약, 데이터 스키마, 배포, ADR |
 | `scripts/` | 배포, 백업, 복원, 설정 검사 |
-| `compose*.yml` | 운영(`compose.yml`), 개발(`compose.dev.yml`), 브라우저 테스트(`compose.e2e.yml`) |
-| `.github/workflows/` | GHCR 이미지 빌드 |
+| `compose*.yml` | 운영(`compose.yml`), 개발(`compose.dev.yml`) |
+| `.github/workflows/` | GHCR 이미지 빌드, 테스트(`test.yml`) |
 
 온톨로지는 첫 버전만 파일에 있어요.
 그 뒤의 버전은 DB 에 쌓이고 웹에서 고쳐요.
@@ -175,12 +175,8 @@ npm ci && npm run typecheck && npm test && npm run build
 cd web && npx playwright install chromium && npm run test:e2e   # 가짜 API 로 1440px, 390px 화면 테스트
 ```
 
-브라우저 테스트는 운영 Compose 에 가짜 OIDC 를 겹쳐 띄운 뒤 돌려요.
-
-```bash
-COMPOSE_FILE=compose.yml:compose.e2e.yml docker compose up -d --build --wait   # cwd: 저장소 루트
-WORKBENCH_URL=http://127.0.0.1:8081 E2E_ADMIN_NAME=관리자 npx playwright test  # cwd: web
-```
+PR 과 main 에서는 테스트 workflow(`.github/workflows/test.yml`)가 위와 같은 서버, 웹, 화면, 스크립트 검사를 돌려요.
+GitHub 의 체크 이름은 `test / api`, `test / web`, `test / scripts` 예요.
 
 ### 개인 비서 연동(고급)
 

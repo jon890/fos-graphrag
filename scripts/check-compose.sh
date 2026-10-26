@@ -2,7 +2,7 @@
 # Compose 설정 규칙을 docker compose config 출력으로 검사한다. 위반이 있으면 종료 코드 1 이다.
 # - 운영: neo4j 호스트 포트 없음, app 은 모든 주소에 열리지 않음, 컨테이너마다 cap_drop ALL 과 no-new-privileges,
 #   docker.sock 마운트 없음, neo4j 이미지 digest 고정, 가짜 OIDC 공급자 없음
-# - 개발과 e2e override: 호스트 포트는 127.0.0.1 에만 묶인다
+# - 개발: 호스트 포트는 127.0.0.1 에만 묶인다
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -12,11 +12,10 @@ export COMPOSE_FILE=
 
 prod_json="$(docker compose --env-file /dev/null -f compose.yml config --format json)"
 dev_json="$(docker compose --env-file /dev/null -f compose.dev.yml config --format json)"
-e2e_json="$(docker compose --env-file /dev/null -f compose.yml -f compose.e2e.yml config --format json)"
 
-python3 - "$prod_json" "$dev_json" "$e2e_json" <<'PY'
+python3 - "$prod_json" "$dev_json" <<'PY'
 import json, sys
-prod, dev, e2e = (json.loads(a) for a in sys.argv[1:4])
+prod, dev = (json.loads(a) for a in sys.argv[1:3])
 errors = []
 services = prod["services"]
 if services["neo4j"].get("ports"):
@@ -38,16 +37,13 @@ for name, svc in services.items():
     for v in svc.get("volumes", []):
         if "docker.sock" in str(v.get("source", "")):
             errors.append(f"운영 {name} 이 docker.sock 을 마운트한다")
-for label, cfg in (("개발", dev), ("e2e", e2e)):
-    for name, svc in cfg["services"].items():
-        for p in svc.get("ports", []):
-            if p.get("host_ip") != "127.0.0.1":
-                errors.append(f"{label} {name} 포트가 127.0.0.1 이 아닌 곳에 묶인다: {p}")
-if e2e["services"]["neo4j"].get("ports"):
-    errors.append("e2e override 가 neo4j 포트를 연다")
+for name, svc in dev["services"].items():
+    for p in svc.get("ports", []):
+        if p.get("host_ip") != "127.0.0.1":
+            errors.append(f"개발 {name} 포트가 127.0.0.1 이 아닌 곳에 묶인다: {p}")
 for e in errors:
     print("위반:", e)
 if errors:
     sys.exit(1)
-print("통과: 운영 neo4j 포트 비공개, digest 고정, cap_drop, no-new-privileges, mem_limit, 개발과 e2e 포트 loopback 전용")
+print("통과: 운영 neo4j 포트 비공개, digest 고정, cap_drop, no-new-privileges, mem_limit, 개발 포트 loopback 전용")
 PY
