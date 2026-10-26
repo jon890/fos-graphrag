@@ -111,7 +111,8 @@ cd api && ./gradlew test --rerun
 | `api/src/main/kotlin/dev/fos/workbench/web/RequestSizeFilter.kt` | 수정 |
 | `api/src/main/kotlin/dev/fos/workbench/config/Limits.kt` | 수정 |
 | `api/src/main/kotlin/dev/fos/workbench/agent/v1/V1Dtos.kt` | 수정 |
-| `api/src/main/kotlin/dev/fos/workbench/agent/v1/V1Mapper.kt` | 수정 |
+| `api/src/main/kotlin/dev/fos/workbench/agent/v1/AgentQueryService.kt` | 수정 |
+| `docs/api-contract.md` | 수정 |
 | `api/src/main/kotlin/dev/fos/workbench/agent/v1/AgentV1Controller.kt` | 수정 |
 | `api/src/main/kotlin/dev/fos/workbench/mcp/McpTools.kt` | 수정 |
 | `api/src/main/kotlin/dev/fos/workbench/mcp/McpServerConfig.kt` | 수정 |
