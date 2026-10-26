@@ -14,6 +14,7 @@
   compose.dev.yml                    개발 Compose. Neo4j 와 가짜 OIDC 공급자를 loopback 에 묶는다
   compose.e2e.yml                    브라우저 테스트용 override. 가짜 OIDC 공급자를 더한다
   docs/                              이 문서들
+  .github/workflows/                 GHCR 이미지를 올리는 workflow
 ```
 
 브라우저는 API 하고만 통신한다. Neo4j 자격증명과 Cypher 실행 기능은 클라이언트에 없다.
@@ -33,13 +34,13 @@ flowchart LR
 
 | 구성 | 버전 | 근거 |
 | --- | --- | --- |
-| JDK | 21 (Temurin) | 저장소의 `java-agent-lab` 과 같다 |
-| Spring Boot | 4.1.0 | `java-agent-lab/gradle/libs.versions.toml` 과 같다 |
+| JDK | 21 (Temurin) | Spring Boot 4.1 이 지원하는 LTS |
+| Spring Boot | 4.1.0 | `api/gradle/libs.versions.toml` |
 | Kotlin | 2.3.21 | Spring Boot 4.1.0 BOM 의 `kotlin.version` |
 | Neo4j Java Driver | 6.1.0 | Spring Boot 4.1.0 BOM 의 `neo4j-java-driver.version` |
 | Testcontainers | 2.0.5 | Spring Boot 4.1.0 BOM 의 `testcontainers.version` |
-| Neo4j | `neo4j:5.26.30-community` | 5.26 LTS. `python-graphrag` 와 같은 계열 |
-| Gradle | 8.14.3 | `java-agent-lab` 의 Wrapper 와 같다 |
+| Neo4j | `neo4j:5.26.30-community` | 5.26 LTS |
+| Gradle | 8.14.3 | `api/gradle/wrapper/gradle-wrapper.properties` |
 | Node | 24 | 이 머신의 `v24.15.0` |
 | React | 19.3.1 | |
 | Vite | 8.3.3 | |
@@ -220,6 +221,7 @@ mock 으로 Neo4j 를 대신한 테스트는 없다. 트랜잭션 일관성 테�
 | [011](adr/011-learning-marks-and-trace.md) | 사용자별 이해 표시를 `KNOWS` 관계로 두고 이력에 남기지 않는다. 근거 따라가기를 서버 API 로 계산한다 |
 | [012](adr/012-agent-integration-token.md) | 에이전트는 개인 연동 토큰으로 Bearer 전용 `/api/v1` 조회 API 를 부른다. 세션 API 와 경로를 나누고 Hermes 내부망을 공유하지 않는다. 쓰기와 토큰 범위는 013 이 더했다 |
 | [013](adr/013-owner-trades-and-agent-proposals.md) | 체결 기록은 주인만 보는 코드 소유 모델(`:Trade`)로 지식 그래프와 나눈다. 에이전트 쓰기는 체결 사실은 바로, 해석은 제안으로 받고 승인은 기존 서비스를 거친다 |
+| [014](adr/014-single-app-repository.md) | 저장소에는 가치투자 온톨로지 앱 하나만 두고 앱을 루트에 둔다. 운영 서비스 키 `financial-workbench` 는 그대로 둔다 |
 
 대체된 ADR 은 `adr/superseded/` 에 있다. 당시 맥락을 읽을 때만 본다.
 
@@ -269,6 +271,6 @@ ADR 로 남기지 않은 작은 결정은 다음과 같다.
 
 - 작성자와 마지막으로 내용을 고친 사람은 그 Claim 을 검토할 수 없다. 다른 사람이 확인하는 것이 검토의 목적이다.
 - Claim 내용을 고치면 검토 상태가 `DRAFT` 로 돌아간다. 검토한 내용과 다른 내용이 검토 완료로 남지 않게 한다.
-- 개발 Compose 는 Neo4j 를 `127.0.0.1:7476`, `127.0.0.1:7689` 에 연다. `python-graphrag` 의 7475, 7688 과 겹치지 않는다.
+- 개발 Compose 는 Neo4j 를 `127.0.0.1:7476`, `127.0.0.1:7689` 에 연다. 기본 포트(7474, 7687)를 쓰는 다른 Neo4j 와 겹치지 않는다.
 - 운영 Compose 의 app 은 기본으로 `127.0.0.1:8081` 에 연다. 앞단 reverse proxy 가 이 포트로 넘긴다. 8080 은 다른 서비스와 겹치기 쉬워 기본값으로 쓰지 않는다.
 - 운영 Neo4j 이미지는 digest 로 고정한다. 태그가 다른 이미지를 가리키게 되어도 배포 결과가 바뀌지 않는다.

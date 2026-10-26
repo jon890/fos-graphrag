@@ -280,7 +280,7 @@ cd web && npm ci && npm run dev                    # 웹 :5173, /api 와 OAuth �
 ```
 
 개발 로그인은 가짜 공급자의 폼에서 아무 sub 과 claims JSON(`{"email":"admin@example.com","email_verified":true}`)을 넣는다.
-개발 Compose 의 포트는 `127.0.0.1` 에만 묶인다. `python-graphrag` 의 `7475`, `7688` 과 겹치지 않는다.
+개발 Compose 의 포트는 `127.0.0.1` 에만 묶인다. 기본 포트(`7474`, `7687`)를 쓰는 다른 Neo4j 와 겹치지 않는다.
 개발 Compose 의 프로젝트 이름은 `fos-workbench-dev` 이고 볼륨도 운영 Compose 와 따로 쓴다.
 
 ## 브라우저 테스트
