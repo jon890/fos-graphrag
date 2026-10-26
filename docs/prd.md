@@ -103,7 +103,7 @@
 - 「제안」 화면에서 대기 제안의 내용과 까닭을 보고 고쳐 승인하거나 거절하고, 「내 체결」 과 종목 상세에 내 체결이 보이며 다른 사용자의 같은 화면에는 보이지 않는다. 폭 1440px 와 390px 에서 확인한다.
 - 다른 사용자의 토큰 목록과 공부 목록은 어느 토큰과 세션으로도 보이지 않는다.
 - `/.well-known/oauth-protected-resource/mcp` 와 `/.well-known/oauth-authorization-server` 가 계약의 메타데이터를 돌려주고, 토큰 없이 `POST /mcp` 를 부르면 `401` 과 `WWW-Authenticate`(보호 자원 메타데이터 주소)다.
-- 동적 등록이 loopback 과 https 의 redirect URI 만 받는다. PKCE 가 없거나 S256 이 아닌 인가 요청, 등록하지 않은 redirect URI, 다시 쓴 인가 코드는 거절된다. 코드를 다시 쓰면 그 코드로 만든 연결이 끊긴다.
+- 동적 등록이 loopback 의 redirect URI 와, 설정이 허용한 host 의 https redirect URI 만 받는다(기본은 loopback 만). PKCE 가 없거나 S256 이 아닌 인가 요청, 등록하지 않은 redirect URI, 다시 쓴 인가 코드는 거절된다. 코드를 다시 쓰면 그 코드로 만든 연결이 끊긴다.
 - 갱신 토큰을 쓰면 새 갱신 토큰이 나오고, 이전 갱신 토큰을 다시 쓰면 `invalid_grant` 이고 그 연결이 끊긴다.
 - 「조회만」 연결이나 토큰으로 쓰기 도구를 부르면 도구 오류 `INSUFFICIENT_SCOPE` 다. 연동 토큰으로도 `/mcp` 의 도구를 부른다. A 의 체결은 B 의 어느 MCP 도구 결과에도 나오지 않는다. 연결을 끊으면 그 접근 토큰과 갱신 토큰이 거절된다.
 - MCP SDK 클라이언트로 `initialize`, `tools/list`, `tools/call` 이 되고, 실제 Claude Code(`claude mcp add --transport http`)가 로컬 서버에 OAuth 동의를 거쳐 도구 하나를 부른다. Codex 도 지원 방식대로 한 번 붙는다.

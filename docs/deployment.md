@@ -78,6 +78,7 @@ bash scripts/check-compose.sh
 | `WORKBENCH_FORWARD_HEADERS_STRATEGY` | 아니요 | 기본 `native`. 앞단 없이 직접 열면 `none` |
 | `WORKBENCH_SESSION_TIMEOUT` | 아니요 | 유휴 세션 만료. 기본 `8h` |
 | `WORKBENCH_HSTS` | 아니요 | 기본 `false` |
+| `WORKBENCH_PUBLIC_URL` | 아니요 | OAuth 발급 주소, MCP 자원 주소, Origin 비교의 기준이 되는 공개 origin(`https://<공개 origin>`). 비우면 요청의 scheme 과 host 로 만든다 |
 | `WORKBENCH_TRUSTED_PROXIES` | 아니요 | X-Forwarded-* 를 믿을 프록시 주소(정규식). 비우면 loopback 과 `172.16.0.0/12` |
 | `NEO4J_TX_TIMEOUT`, `NEO4J_LOCK_TIMEOUT` | 아니요 | Neo4j 서버의 트랜잭션 시간 제한(기본 `10s`)과 잠금 대기 상한(기본 `5s`) |
 | `WORKBENCH_IMAGE` | 아니요 | GHCR 이미지를 쓸 때 `ghcr.io/jon890/fos-valuation-ontology:sha-<7자리>` |
