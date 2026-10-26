@@ -33,4 +33,8 @@ check "운영 Neo4j 에 트랜잭션과 잠금 대기 상한이 있다" bash -c 
 # 백업과 복원의 실패 경로(중단, load 실패)를 가짜 docker 로 검사한다
 if bash scripts/tests/test_backup_failures.sh; then :; else failed=1; fi
 
+# 플러그인 파일 형식과, 틀린 값을 검사가 잡는지
+if python3 scripts/tests/test_plugin.py; then :; else failed=1; fi
+if python3 scripts/tests/test_plugin.py --self-test; then :; else failed=1; fi
+
 exit $failed
