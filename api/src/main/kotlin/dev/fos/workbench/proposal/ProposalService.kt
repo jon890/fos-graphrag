@@ -2,6 +2,7 @@ package dev.fos.workbench.proposal
 
 import dev.fos.workbench.auth.Role
 import dev.fos.workbench.config.Limits
+import dev.fos.workbench.config.Neo4jSchemaInitializer
 import dev.fos.workbench.config.Timestamps
 import dev.fos.workbench.knowledge.CreateNodeRequest
 import dev.fos.workbench.knowledge.CreateRelationshipRequest
@@ -11,6 +12,8 @@ import dev.fos.workbench.knowledge.NodeService
 import dev.fos.workbench.knowledge.RelationshipService
 import dev.fos.workbench.learning.KnowledgeMarkService
 import dev.fos.workbench.learning.PutKnowledgeRequest
+import dev.fos.workbench.ontology.EditInput
+import dev.fos.workbench.ontology.OntologyEditService
 import dev.fos.workbench.trade.TradeRepository
 import dev.fos.workbench.web.ApiException
 import dev.fos.workbench.web.ForbiddenException
@@ -71,6 +74,8 @@ class ProposalService(
     private val nodes: NodeService,
     private val relationships: RelationshipService,
     private val knowledgeMarks: KnowledgeMarkService,
+    private val edits: OntologyEditService,
+    private val schemaInitializer: Neo4jSchemaInitializer,
     private val mapper: JsonMapper,
     transactionManager: PlatformTransactionManager,
 ) {
@@ -133,10 +138,14 @@ class ProposalService(
      * 별도 트랜잭션으로 lastError 를 쓴 뒤 같은 오류를 던진다. 기록이 실패해도 경고만 남기고 원래 오류를 던진다.
      * 존재, 상태, 권한 확인의 오류와 ApiException 이 아닌 실패는 기록하지 않는다.
      * 이 메서드에 @Transactional 을 붙이면 실패 기록이 실행과 함께 롤백된다.
+     * 온톨로지 변경으로 새 관계 종류가 생기면 커밋한 뒤 id 인덱스를 만든다. Neo4j 는 한 트랜잭션에서 스키마와 데이터를 함께 바꾸지 못한다.
+     * 새 온톨로지 버전 번호는 결과의 `result.ontologyVersion` 이다.
      */
-    fun accept(ownerId: String, role: Role, id: String, editedPayload: Any?): StoredProposal {
+    fun accept(ownerId: String, role: Role, id: String, editedPayload: Any?, confirm: Boolean = false): StoredProposal {
         try {
-            return write.execute { acceptInTransaction(ownerId, role, id, editedPayload) }!!
+            val accepted = write.execute { acceptInTransaction(ownerId, role, id, editedPayload, confirm) }!!
+            ensureRelationshipIndexes(accepted.newRelationshipTypes)
+            return accepted.proposal
         } catch (e: ExecutionFailed) {
             val failure = e.failure
             try {
@@ -148,44 +157,63 @@ class ProposalService(
         }
     }
 
-    private fun acceptInTransaction(ownerId: String, role: Role, id: String, editedPayload: Any?): StoredProposal {
-        val proposal = stored(lockPending(ownerId, id))
-        if (proposal.kind.requiresEditor && role != Role.EDITOR && role != Role.ADMIN) {
-            throw ForbiddenException("편집 권한이 있어야 승인할 수 있습니다.")
+    /** 실패해도 버전은 남기고 경고만 남긴다. 다음 시작이 다시 만든다. `OntologyController` 의 저장과 같다 */
+    private fun ensureRelationshipIndexes(types: List<String>) {
+        if (types.isEmpty()) return
+        try {
+            schemaInitializer.ensureRelationshipIndexes(types)
+        } catch (e: RuntimeException) {
+            log.warn("새 관계 종류의 인덱스를 만들지 못했다. 다음 시작에서 다시 만든다. 관계 종류: {}, 사유: {}", types, e.message)
         }
-        val (payload, result) = try {
+    }
+
+    private fun acceptInTransaction(ownerId: String, role: Role, id: String, editedPayload: Any?, confirm: Boolean): Accepted {
+        val proposal = stored(lockPending(ownerId, id))
+        val required = proposal.kind.requiredRole
+        if (role.ordinal < required.ordinal) {
+            throw ForbiddenException(if (required == Role.ADMIN) "관리자만 승인할 수 있습니다." else "편집 권한이 있어야 승인할 수 있습니다.")
+        }
+        // 기준 버전을 고쳐 남의 저장을 덮어쓰지 않게 막는다
+        if (proposal.kind == ProposalKind.ONTOLOGY_CHANGE && editedPayload != null) {
+            throw ValidationFailedException(mapOf("payload" to "온톨로지 변경 제안은 고쳐서 승인할 수 없습니다."))
+        }
+        val (payload, executed) = try {
             val payload = payloads.check(ownerId, proposal.kind, editedPayload ?: proposal.payload, "payload")
-            payload to execute(ownerId, id, payload)
+            payload to execute(ownerId, id, payload, confirm)
         } catch (e: ApiException) {
             throw ExecutionFailed(e)
         }
         val props = mapOf(
             "status" to ACCEPTED, "decidedAt" to Timestamps.now(),
-            "payload" to mapper.writeValueAsString(payload.toMap()), "result" to mapper.writeValueAsString(result),
+            "payload" to mapper.writeValueAsString(payload.toMap()), "result" to mapper.writeValueAsString(executed.result),
         )
-        return stored(proposals.finish(ownerId, id, props))
+        return Accepted(stored(proposals.finish(ownerId, id, props)), executed.newRelationshipTypes)
     }
 
-    private fun execute(ownerId: String, proposalId: String, payload: ProposalPayload): Map<String, Any?> = when (payload) {
+    private fun execute(ownerId: String, proposalId: String, payload: ProposalPayload, confirm: Boolean): Executed = when (payload) {
         is ProposalPayload.CreateNode -> {
             val nodeId = nodes.create(CreateNodeRequest(payload.type, payload.properties), ownerId, NOTE).id
             val relationshipIds = payload.links.map { link ->
                 relationships.create(CreateRelationshipRequest(link.type, link.fromId ?: nodeId, link.toId ?: nodeId), ownerId, NOTE).id
             }
             if (payload.tradeIds.isNotEmpty()) trades.linkDecision(ownerId, payload.tradeIds, nodeId, proposalId)
-            result(listOf(nodeId), relationshipIds, payload.tradeIds)
+            Executed(result(listOf(nodeId), relationshipIds, payload.tradeIds))
         }
         is ProposalPayload.CreateRelationship -> {
             val relationshipId = relationships.create(CreateRelationshipRequest(payload.type, payload.fromId, payload.toId), ownerId, NOTE).id
-            result(emptyList(), listOf(relationshipId), emptyList())
+            Executed(result(emptyList(), listOf(relationshipId), emptyList()))
         }
         is ProposalPayload.LinkTradeDecision -> {
             trades.linkDecision(ownerId, payload.tradeIds, payload.decisionId, proposalId)
-            result(listOf(payload.decisionId), emptyList(), payload.tradeIds)
+            Executed(result(listOf(payload.decisionId), emptyList(), payload.tradeIds))
         }
         is ProposalPayload.StudyNote -> {
             knowledgeMarks.put(ownerId, payload.nodeId, PutKnowledgeRequest(payload.level, payload.note))
-            result(listOf(payload.nodeId), emptyList(), emptyList())
+            Executed(result(listOf(payload.nodeId), emptyList(), emptyList()))
+        }
+        is ProposalPayload.OntologyChange -> {
+            val saved = edits.save(payload.baseVersion, EditInput(payload.yaml, null), payload.note ?: NOTE, confirm, ownerId)
+            Executed(result(emptyList(), emptyList(), emptyList(), saved.summary.version), saved.newRelationshipTypes)
         }
     }
 
@@ -238,6 +266,7 @@ class ProposalService(
                 result = item.result,
                 lastError = item.lastError,
                 requiresEditor = item.kind.requiresEditor,
+                requiredRole = item.kind.requiredRole.name,
                 refs = ProposalRefs(
                     nodes = nodeIdsOf(item).mapNotNull { id -> nodeRefs[id]?.let { id to it } }.toMap(),
                     trades = tradeIdsOf(item).mapNotNull { id -> tradeViews[id]?.let { id to it } }.toMap(),
@@ -385,8 +414,13 @@ class ProposalService(
 
     private fun idsIn(value: Any?): List<String> = (value as? List<*>).orEmpty().filterIsInstance<String>()
 
-    private fun result(nodeIds: List<String>, relationshipIds: List<String>, tradeIds: List<String>) =
-        mapOf("nodeIds" to nodeIds, "relationshipIds" to relationshipIds, "tradeIds" to tradeIds)
+    private fun result(nodeIds: List<String>, relationshipIds: List<String>, tradeIds: List<String>, ontologyVersion: Int? = null) =
+        mapOf("nodeIds" to nodeIds, "relationshipIds" to relationshipIds, "tradeIds" to tradeIds, "ontologyVersion" to ontologyVersion)
+
+    /** 실행 결과와, 커밋한 뒤 id 인덱스를 만들 새 관계 종류 */
+    private data class Executed(val result: Map<String, Any?>, val newRelationshipTypes: List<String> = emptyList())
+
+    private data class Accepted(val proposal: StoredProposal, val newRelationshipTypes: List<String>)
 
     /** 검사한 올리기 항목 하나 */
     private data class ProposalInput(

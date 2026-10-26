@@ -102,6 +102,7 @@ class ProposalIntegrationTest : IntegrationTest() {
 
         val pendingView = read(owner, proposal.id)
         assertThat(pendingView["requiresEditor"].asBoolean()).isTrue()
+        assertThat(pendingView["requiredRole"].asString()).isEqualTo("EDITOR")
         assertThat(pendingView["token"]["name"].asString()).isEqualTo("Hermes")
         assertThat(pendingView["refs"]["nodes"][security.id]["type"].asString()).isEqualTo("Security")
         assertThat(pendingView["refs"]["trades"][tradeId]["id"].asString()).isEqualTo(tradeId)
@@ -174,6 +175,7 @@ class ProposalIntegrationTest : IntegrationTest() {
         val noteAccepted = accept(viewer, note.id)
         assertThat(noteAccepted.status).describedAs(noteAccepted.body.toString()).isEqualTo(200)
         assertThat(noteAccepted.body["requiresEditor"].asBoolean()).isFalse()
+        assertThat(noteAccepted.body["requiredRole"].asString()).isEqualTo("VIEWER")
         assertThat(noteAccepted.body["result"]["nodeIds"].toList().map { it.asString() }).containsExactly(security.id)
         val mark = viewer.get("/api/me/knowledge/${security.id}").body
         assertThat(mark["level"].asString()).isEqualTo("LEARNING")

@@ -95,6 +95,21 @@ class AgentWriteIntegrationTest : IntegrationTest() {
     }
 
     @Test
+    fun `ontology yaml 은 내보내기와 같은 지금 버전의 YAML 과 번호를 준다`() {
+        val token = issue(loggedIn(newUser(Role.VIEWER)), "READ")
+        val admin = loggedIn(ADMIN)
+
+        val body = ok(bearer("GET", "/api/v1/ontology/yaml", token), "온톨로지 YAML")
+
+        val version = body["version"].asInt()
+        val export = admin.get("/api/ontology/export")
+        assertThat(export.status).isEqualTo(200)
+        assertThat(export.header("Content-Disposition")).describedAs("내보내기와 같은 버전").contains("financial-ontology-v$version.yaml")
+        // 내보내기의 본문은 그 버전의 저장된 YAML 이다. 테스트 클라이언트는 JSON 만 읽어 버전 상세의 yaml 과 비교한다
+        assertThat(body["yaml"].asString()).isEqualTo(admin.get("/api/ontology/versions/$version").body["yaml"].asString())
+    }
+
+    @Test
     fun `조회만 토큰이 배열 본문을 보내면 403 INSUFFICIENT_SCOPE 이고 기록 토큰이면 400 이다`() {
         val session = loggedIn(newUser(Role.EDITOR))
         val read = issue(session, "READ")

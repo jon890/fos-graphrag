@@ -51,6 +51,6 @@ class McpServerConfig {
         const val TITLE = "가치투자 온톨로지"
 
         /** 클라이언트에 알리는 서버 버전. 도구의 이름이나 입력을 바꾸면 올린다 */
-        const val VERSION = "1.0.0"
+        const val VERSION = "1.1.0"
     }
 }

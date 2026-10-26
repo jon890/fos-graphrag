@@ -92,7 +92,7 @@
 | 400 | `OAUTH_INVALID_CLIENT` | 동의 화면의 인가 요청에서 클라이언트나 돌아갈 주소가 등록되지 않았다(「OAuth 인가 서버」) |
 | 400 | `OAUTH_REDIRECT_ERROR` | 동의 화면의 인가 요청이 틀렸다. `details.redirectUrl` 에 앱으로 알릴 오류 주소가 있다(「OAuth 인가 서버」) |
 | 411 | `LENGTH_REQUIRED` | 본문이 있는 `/api` 요청에 Content-Length 가 없다(chunked 전송) |
-| 413 | `PAYLOAD_TOO_LARGE` | 요청 본문이 64KiB 를 넘는다. 온톨로지 미리보기, 저장, 되돌리기는 512KiB 다 |
+| 413 | `PAYLOAD_TOO_LARGE` | 요청 본문이 64KiB 를 넘는다. 온톨로지 미리보기, 저장, 되돌리기와 에이전트의 제안 올리기, 원격 MCP 는 512KiB 다 |
 | 403 | `SELF_REVIEW_FORBIDDEN` | 자기가 작성한 Claim 을 검토하려 했다 |
 | 404 | `NOT_FOUND` | 그 ID 의 노드나 관계가 없다. 온톨로지 버전 조회와 되돌리기에서는 그 버전 번호가 없다. 없는 `/api` 경로도 같다 |
 | 405 | `METHOD_NOT_ALLOWED` | 경로는 있지만 그 메서드를 받지 않는다. `/api/v1` 에서는 `POST /api/v1/trades`, `POST /api/v1/proposals` 밖의 `POST`, `PUT`, `PATCH`, `DELETE` 가 여기 해당한다 |
@@ -1416,7 +1416,7 @@ Claude Code, Codex, Hermes 가 가치투자 온톨로지를 조회하고 기록�
 - 세션 쿠키는 읽지 않고 CSRF 를 요구하지 않는다.
 - `Origin` 헤더가 있고 `{base}` 와 다르면 `403 FORBIDDEN` 이다. 명령줄 클라이언트는 `Origin` 을 보내지 않는다.
 - 요청 한도는 연결(OAuth 연결이나 연동 토큰)마다 1분에 60번이다. `tools/list` 같은 요청도 센다. 연동 토큰은 `/api/v1` 과 같은 카운터를 써서 두 경로를 합쳐 1분에 60번, 쓰기 10번이다. 넘으면 `429 RATE_LIMITED` 와 `Retry-After` 다. 인증에 실패한 요청은 세지 않는다.
-- 요청 본문은 64KiB 까지다(`413 PAYLOAD_TOO_LARGE`, Content-Length 가 없으면 `411 LENGTH_REQUIRED`).
+- 요청 본문은 512KiB 까지다(`413 PAYLOAD_TOO_LARGE`, Content-Length 가 없으면 `411 LENGTH_REQUIRED`). 온톨로지 변경 제안이 정의 전체를 담기 때문이다.
 
 ### 도구
 

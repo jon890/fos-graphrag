@@ -1,26 +1,40 @@
 package dev.fos.workbench.proposal
 
+import dev.fos.workbench.auth.Role
 import dev.fos.workbench.config.params
 import dev.fos.workbench.knowledge.KnowledgeReader
 import dev.fos.workbench.learning.KnowledgeMarkService
+import dev.fos.workbench.ontology.EditInput
+import dev.fos.workbench.ontology.OntologyEditService
 import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.ontology.OntologyValidator
+import dev.fos.workbench.ontology.OntologyVersionStore
 import dev.fos.workbench.trade.TradeRepository
 import dev.fos.workbench.web.ArchivedException
 import dev.fos.workbench.web.DuplicateException
 import dev.fos.workbench.web.NotFoundException
+import dev.fos.workbench.web.OntologyInvalidException
 import dev.fos.workbench.web.OntologyViolationException
+import dev.fos.workbench.web.RevisionConflictException
 import dev.fos.workbench.web.ValidationFailedException
 import org.springframework.data.neo4j.core.Neo4jClient
 import org.springframework.stereotype.Component
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.json.JsonMapper
 
-/** 제안의 종류. `requiresEditor` 면 공유 지식을 만들어 EDITOR 이상만 승인한다 */
-enum class ProposalKind(val requiresEditor: Boolean) {
-    CREATE_NODE(true),
-    CREATE_RELATIONSHIP(true),
-    LINK_TRADE_DECISION(false),
-    STUDY_NOTE(false),
+/**
+ * 제안의 종류와 승인에 필요한 역할. 공유 지식을 만들면 EDITOR, 온톨로지를 바꾸면 ADMIN 이상이 승인한다.
+ * `requiresEditor` 는 예전 화면과의 호환을 위해 남긴다
+ */
+enum class ProposalKind(val requiredRole: Role) {
+    CREATE_NODE(Role.EDITOR),
+    CREATE_RELATIONSHIP(Role.EDITOR),
+    LINK_TRADE_DECISION(Role.VIEWER),
+    STUDY_NOTE(Role.VIEWER),
+    ONTOLOGY_CHANGE(Role.ADMIN),
     ;
+
+    val requiresEditor get() = requiredRole != Role.VIEWER
 
     companion object {
         fun parse(value: String?): ProposalKind? = entries.firstOrNull { it.name == value }
@@ -55,6 +69,11 @@ sealed interface ProposalPayload {
         override fun toMap(): Map<String, Any?> = mapOf("nodeId" to nodeId, "level" to level, "note" to note)
     }
 
+    /** `yaml` 은 올릴 때 정규화한 정의 전체다. `definition` 으로 받았어도 YAML 로 바꿔 둔다 */
+    data class OntologyChange(val baseVersion: Int, val yaml: String, val note: String?) : ProposalPayload {
+        override fun toMap(): Map<String, Any?> = mapOf("baseVersion" to baseVersion, "yaml" to yaml, "note" to note)
+    }
+
     /** 계약(docs/api-contract.md 「제안 내용」)의 payload 모양 */
     fun toMap(): Map<String, Any?>
 }
@@ -70,6 +89,9 @@ class ProposalPayloads(
     private val reader: KnowledgeReader,
     private val trades: TradeRepository,
     private val client: Neo4jClient,
+    private val edits: OntologyEditService,
+    private val versions: OntologyVersionStore,
+    private val mapper: JsonMapper,
 ) {
 
     /** 모양, 온톨로지, 노드 존재, 내 체결을 확인한다. prefix 는 fieldErrors 키 앞부분(`proposals[0].payload`, 승인에서는 `payload`) */
@@ -89,6 +111,7 @@ class ProposalPayloads(
                 fields.done { ProposalPayload.LinkTradeDecision(tradeIds!!, decisionId!!) }
             }
             ProposalKind.STUDY_NOTE -> studyNoteShape(fields)
+            ProposalKind.ONTOLOGY_CHANGE -> return checkOntologyChange(ontologyChangeShape(fields))
         }
         return when (payload) {
             is ProposalPayload.CreateNode -> checkCreateNode(ownerId, payload, prefix)
@@ -98,6 +121,7 @@ class ProposalPayloads(
                 requireOwnedTrades(ownerId, it.tradeIds)
             }
             is ProposalPayload.StudyNote -> payload.also { reader.nodeProps(it.nodeId) }
+            is ProposalPayload.OntologyChange -> payload
         }
     }
 
@@ -117,6 +141,32 @@ class ProposalPayloads(
         }
         val note = fields.text("note", required = false, maxLength = KnowledgeMarkService.MAX_NOTE)
         return fields.done { ProposalPayload.StudyNote(nodeId!!, level!!, note) }
+    }
+
+    private fun ontologyChangeShape(fields: Fields): OntologyChangeInput {
+        val baseVersion = fields.integer("baseVersion")
+        val yaml = fields.raw("yaml")
+        val definition = fields.raw("definition")
+        if ((yaml == null) == (definition == null)) fields.fail("yaml", "yaml 이나 definition 가운데 하나만 보냅니다.")
+        if (yaml != null && (yaml !is String || yaml.isBlank())) fields.fail("yaml", "문자열이어야 합니다.")
+        if (definition != null && definition !is Map<*, *>) fields.fail("definition", "객체여야 합니다.")
+        val note = fields.text("note", required = false, maxLength = OntologyEditService.MAX_NOTE_LENGTH)
+        return fields.done { OntologyChangeInput(baseVersion!!, yaml as String?, definition as Map<*, *>?, note) }
+    }
+
+    /**
+     * `POST /api/ontology/preview` 와 같은 검사를 한 뒤 기준 버전을 지금 버전과 비교한다.
+     * 영향 확인은 승인할 때 `OntologyEditService.save` 가 한다. 올린 뒤 데이터가 바뀌면 영향도 바뀌기 때문이다
+     */
+    private fun checkOntologyChange(input: OntologyChangeInput): ProposalPayload.OntologyChange {
+        val preview = edits.preview(EditInput(input.yaml, input.definition?.let { mapper.valueToTree<JsonNode>(it) }))
+        if (!preview.valid || preview.yaml == null) throw OntologyInvalidException(preview.errors)
+        if (preview.added.isEmpty() && preview.removed.isEmpty() && preview.changed.isEmpty()) {
+            throw OntologyInvalidException(listOf("바뀐 점이 없습니다."))
+        }
+        val current = versions.latestNumber()
+        if (input.baseVersion != current) throw RevisionConflictException(input.baseVersion.toLong(), current.toLong())
+        return ProposalPayload.OntologyChange(input.baseVersion, preview.yaml, input.note)
     }
 
     /** `POST /api/nodes` 와 같은 규칙. 승인할 때는 실행하는 `NodeService` 가 같은 종목을 다시 막는다 */
@@ -234,6 +284,16 @@ class ProposalPayloads(
             return trimmed
         }
 
+        fun raw(field: String): Any? = map[field]
+
+        /** 소수점 없는 수만 받는다 */
+        fun integer(field: String): Int? = when (val value = map[field]) {
+            null -> null.also { fail(field, "필수입니다.") }
+            is Int -> value
+            is Long -> value.takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt() ?: null.also { fail(field, "정수여야 합니다.") }
+            else -> null.also { fail(field, "정수여야 합니다.") }
+        }
+
         @Suppress("UNCHECKED_CAST")
         fun objectOrEmpty(field: String): Map<String, Any?>? = when (val value = map[field]) {
             null -> emptyMap()
@@ -285,6 +345,9 @@ class ProposalPayloads(
         }
     }
 
+    /** 모양만 확인한 온톨로지 변경 제안. `yaml` 과 `definition` 가운데 하나만 있다 */
+    private data class OntologyChangeInput(val baseVersion: Int, val yaml: String?, val definition: Map<*, *>?, val note: String?)
+
     companion object {
         const val DECISION = "Decision"
         const val SECURITY = "Security"
@@ -297,6 +360,7 @@ class ProposalPayloads(
             ProposalKind.CREATE_RELATIONSHIP to setOf("type", "fromId", "toId"),
             ProposalKind.LINK_TRADE_DECISION to setOf("tradeIds", "decisionId"),
             ProposalKind.STUDY_NOTE to setOf("nodeId", "level", "note"),
+            ProposalKind.ONTOLOGY_CHANGE to setOf("baseVersion", "yaml", "definition", "note"),
         )
 
         @Suppress("UNCHECKED_CAST")
