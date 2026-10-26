@@ -97,10 +97,6 @@ class ApiSnapshotTest {
 
     @Test
     fun `writes api snapshots`() {
-        val dir = File(FIXTURES_DIR)
-        dir.mkdirs()
-        dir.listFiles { f -> f.name.endsWith(".json") }?.forEach { it.delete() }
-
         IntegrationTest.USERS.forEach { (email, name, role) -> users.create(email, name, role, "system") }
         val viewer = loggedIn(IntegrationTest.VIEWER)
         val alice = loggedIn(IntegrationTest.ALICE)
@@ -545,8 +541,13 @@ class ApiSnapshotTest {
         save("proposal-accept-ontology", "POST", ontologyAcceptPath, ontologyAccepted)
         getAndSave(admin, "ontology-after-proposal", "/api/ontology", namedOnly = true)
 
-        SnapshotNormalizer().normalize(saved.map { if (it.name.startsWith("graph-")) sortGraph(it) else it })
-            .forEach { File(dir, "${it.name}.json").writeText(render(it)) }
+        // 흐름이 중간에 실패하면 기존 파일을 그대로 둔다. 모두 렌더링한 뒤에 지우고 쓴다
+        val files = SnapshotNormalizer().normalize(saved.map { if (it.name.startsWith("graph-")) sortGraph(it) else it })
+            .associate { "${it.name}.json" to render(it) }
+        val dir = File(FIXTURES_DIR)
+        dir.mkdirs()
+        dir.listFiles { f -> f.name.endsWith(".json") }?.forEach { it.delete() }
+        files.forEach { (name, text) -> File(dir, name).writeText(text) }
     }
 
     /**
@@ -594,7 +595,6 @@ class ApiSnapshotTest {
         private const val COMPANY_NAME = "가상전자"
         private const val TICKER = "900100"
 
-        /** base64url 43자. 무작위 값이면 동의 화면 query 의 code_challenge 가 실행마다 바뀐다 */
         /** 화면 테스트가 YAML 로 더하는 펀드 타입. web/e2e/admin.spec.ts 와 같은 줄이다 */
         private val FUND_TYPE_LINES = listOf(
             "  Fund:",
@@ -626,6 +626,7 @@ class ApiSnapshotTest {
         /** 온톨로지 변경 제안이 인물에 더하는 속성 */
         private val PROPOSED_PERSON_LINES = listOf("      proposed:", "        type: string", "        label: 제안 속성")
 
+        /** base64url 43자. 무작위 값이면 동의 화면 query 의 code_challenge 가 실행마다 바뀐다 */
         private const val PKCE_VERIFIER = "snapshot-pkce-verifier-0123456789abcdefghij"
 
         /** 다른 테스트의 데이터가 섞이지 않게 자기 Neo4j 를 띄운다. Spring 이 supplier 를 여러 번 부르므로 한 번만 띄운다 */

@@ -166,7 +166,7 @@ bash scripts/tests/test_scripts.sh          # 스크립트 문법, 포트, cap_d
 
 # cwd: api
 ./gradlew test --rerun --tests '*ApiSnapshotTest'   # web/e2e/fixtures/*.json 을 다시 써요. 바뀐 파일은 함께 커밋해요
-git diff --stat -- ../web/e2e/fixtures
+git status --porcelain -- ../web/e2e/fixtures        # 새로 생긴 파일까지 보여요
 
 # cwd: web
 npm ci && npm run typecheck && npm test && npm run build
