@@ -223,7 +223,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `plugin/.claude-plugin/plugin.json` | Claude Code 플러그인 정보(이름 `valuation-ontology`, 설명, 저장소) |
 | `plugin/.codex-plugin/plugin.json` | Codex 플러그인 정보. 같은 이름과 스킬 목록을 담는다. MCP 설정은 키로 가리키지 않아도 Codex 0.164.0 이 플러그인 루트의 `.mcp.json` 을 읽는다(2026-10-26 확인). Codex 는 이 파일이 있으면 `.claude-plugin/plugin.json` 을 읽지 않는다 |
 | `plugin/.mcp.json` | 원격 MCP 연결 설정. 운영 공개 주소의 `/mcp` 를 가리킨다 |
-| `plugin/skills/ontology-start/` | 시작하기. 연결을 확인하고, 안 됐으면 로그인을 이끌고, 할 수 있는 일을 예시 질문으로 보인다 |
+| `plugin/skills/ontology-start/` | 처음 시작하기. 연결 확인과 로그인 안내, 누구로 어떤 역할과 범위로 붙었는지, 조회만이면 다시 연결하는 안내, 지금 온톨로지 한눈에 보기, 할 수 있는 일 세 가지(조회, 데이터 추가, 온톨로지 수정)와 예시, 첫 데이터 추가를 함께 해 보고 승인 위치까지 이끈다. 새 스킬을 따로 두지 않는다. 「연결해 줘」 로 이미 이 스킬이 불리기 때문이다 |
 | `plugin/skills/ontology-explore/` | 개념과 근거 찾기 스킬. 출처를 붙여 답한다 |
 | `plugin/skills/ontology-record/` | 기록과 제안. 체결 기록과 인스턴스 제안(만들기, 고치기, 보관, 주장 만들기) 올리기를 이끌고 승인은 웹의 「제안」 에서 한다고 안내한다 |
 | `plugin/skills/ontology-change/` | 온톨로지 정의 바꾸기. 지금 YAML 받기, 고치기, 온톨로지 변경 제안 올리기를 이끌고 관리자가 「제안」 에서 승인한다고 알린다 |

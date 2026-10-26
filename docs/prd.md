@@ -59,6 +59,7 @@
 
 | 일 | 스킬 | 도구 | 제안 종류 | 승인에 필요한 역할 | 친구 혼자 끝내나 |
 | --- | --- | --- | --- | --- | --- |
+| 처음 시작(연결, 역할과 범위 확인, 온톨로지 한눈에 보기, 첫 데이터 추가 연습) | `ontology-start` | `get_connection`, `get_ontology`, `submit_proposals` | `CREATE_NODE` | `EDITOR` | 예 |
 | 개념, 투자 근거, 내 공부 목록 조회 | `ontology-explore` | `search_nodes`, `get_node`, `trace_node`, `get_neighborhood`, `lookup_security`, `list_my_knowledge` | 없음 | 없음 | 예. 모든 역할 |
 | 항목(노드) 만들기, 근거 문서 만들기 | `ontology-record` | `submit_proposals` | `CREATE_NODE` | `EDITOR` | 예 |
 | 항목 속성 고치기 | `ontology-record` | `get_node`, `submit_proposals` | `UPDATE_NODE` | `EDITOR` | 예 |
@@ -144,7 +145,7 @@
 - 기존 데이터와 어긋나는 온톨로지 변경은 영향을 확인하지 않으면 저장되지 않고, 예전 버전으로 되돌리면 새 버전이 생긴다.
 - 운영 크기의 YAML 에서도 YAML 편집기의 툴바(「저장 전에 확인」, 「초안 버리기」)가 스크롤과 상관없이 보이고, 「저장 전에 확인」 결과가 편집칸 옆(1440px)이나 아래(390px)에 나온다. 오류의 줄 번호를 누르면 그 줄로 간다. 「폼으로 편집」 은 없고 `?view=form` 주소는 YAML 편집기로 열린다.
 - 틀린 정의로 올린 온톨로지 변경 제안은 `400` 으로 거절되고, ADMIN 이 아닌 사람의 승인과 기준 버전이 바뀐 뒤의 승인은 거절된다. 승인하면 새 버전과 변경 이력이 생긴다. 「조회만」 연결로 `propose_ontology_change` 를 부르면 `INSUFFICIENT_SCOPE` 다.
-- Codex 가 로컬 서버에 붙어 `get_ontology_yaml` 로 YAML 을 받고 `propose_ontology_change` 로 제안을 올린다.
+- Codex 가 로컬 서버에 붙어 세 가지를 한 번씩 끝낸다. 처음 시작 스킬의 연결 확인과 온톨로지 한눈에 보기, 데이터 추가 제안(`submit_proposals`), 온톨로지 변경 제안(`get_ontology_yaml`, `propose_ontology_change`)이다.
 - 「연동」 화면 맨 위에 Claude Code 와 Codex 의 설치 단계와 복사 단추가 있고, 「고급: 개인 비서 연동」 은 접힌 채로 열린다. 폭 1440px 와 390px 에서 확인한다.
 
 ## 남은 한계
