@@ -55,7 +55,7 @@
 ## 친구가 대화로 하는 일
 
 친구는 Claude Code 와 Codex 를 1순위로 쓴다(사용자 결정 2026-10-26). 아래는 플러그인 도구와 스킬로 친구가 대화만으로 할 수 있는 일과, 지금 역할 규칙에서 누가 끝내는지다.
-제안은 올린 사람의 것이라 승인도 친구 본인이 웹의 「제안」 에서 한다([ADR-013](adr/013-owner-trades-and-agent-proposals.md), [ADR-017](adr/017-agent-ontology-and-instance-proposals.md)). 친구의 역할은 `ADMIN` 으로 둔다(사용자 결정 대기).
+제안은 올린 사람의 것이라 승인도 친구 본인이 웹의 「제안」 에서 한다([ADR-013](adr/013-owner-trades-and-agent-proposals.md), [ADR-017](adr/017-agent-ontology-and-instance-proposals.md)). 친구의 역할은 `ADMIN` 으로 둔다(사용자 결정 2026-10-26). 승인 규칙은 바꾸지 않는다. 운영에서 역할을 바꾸는 일은 사용자가 웹의 「사용자」 화면에서 한다.
 
 | 일 | 스킬 | 도구 | 제안 종류 | 승인에 필요한 역할 | 친구 혼자 끝내나 |
 | --- | --- | --- | --- | --- | --- |
