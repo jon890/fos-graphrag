@@ -1,0 +1,43 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/changes",
+    "query": "targetId=00000000-0000-4000-8000-000000000005&page=0&size=20"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000048",
+        "at": "2026-01-01T00:00:16.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000005",
+        "targetKind": "NODE",
+        "targetType": "Company",
+        "targetLabel": "가상전자",
+        "revision": 1,
+        "changes": {
+          "name": {
+            "before": null,
+            "after": "가상전자"
+          },
+          "country": {
+            "before": null,
+            "after": "KR"
+          }
+        },
+        "refs": {},
+        "note": null
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}

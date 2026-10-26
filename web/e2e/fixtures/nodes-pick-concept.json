@@ -1,0 +1,41 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/nodes",
+    "query": "q=%EC%95%88%EC%A0%84%EB%A7%88%EC%A7%84&types=Concept&size=10"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000064",
+        "type": "Concept",
+        "label": "안전마진",
+        "properties": {
+          "name": "안전마진",
+          "summary": "투자 판단에서 손실 가능성을 줄이는 여유다."
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:01:08.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "updatedAt": "2026-01-01T00:01:08.000000Z",
+        "updatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "reviewStatus": null
+      }
+    ],
+    "page": 0,
+    "size": 10,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}

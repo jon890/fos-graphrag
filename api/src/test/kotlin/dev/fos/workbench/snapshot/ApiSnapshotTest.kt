@@ -271,6 +271,69 @@ class ApiSnapshotTest {
         getAndSave(alice, "trades-security", "/api/me/trades?" + query("securityId" to security.id, "size" to 20))
         getAndSave(alice, "trades-decision", "/api/me/trades?" + query("decisionId" to decision.id, "size" to 20))
 
+        // 화면 이동과 지식 편집 화면 테스트가 여는 상세, 그래프, 목록, 이력.
+        // 위 저장에 없던 예전 시각(산업 상세의 관계, 앞 쪽에 없던 이력)을 담으면 시각 자리표시가 밀리므로 그런 응답은 남기지 않는다
+        getAndSave(alice, "node-claim", "/api/nodes/${reviewed.id}")
+        getAndSave(alice, "graph-claim", "/api/graph/neighborhood?" + query("id" to reviewed.id, "hops" to 1))
+        getAndSave(alice, "graph-bottleneck", "/api/graph/neighborhood?" + query("id" to bottleneck.id, "hops" to 1))
+        getAndSave(alice, "graph-company-2hops", "/api/graph/neighborhood?" + query("id" to company.id, "hops" to 2))
+        // 목록 탭(ListTab)의 타입과 검색어 조건
+        getAndSave(alice, "nodes-list-company", "/api/nodes?" + query("q" to COMPANY_NAME, "types" to "Company", "page" to 0, "size" to 20))
+        getAndSave(alice, "changes-actor-bob", "/api/changes?" + query("actor" to IntegrationTest.BOB, "page" to 0, "size" to 20))
+        getAndSave(alice, "changes-company", "/api/changes?" + query("targetId" to company.id, "page" to 0, "size" to 20))
+        getAndSave(alice, "changes-claim", "/api/changes?" + query("targetId" to reviewed.id, "page" to 0, "size" to 20))
+
+        // 근거 문서가 그 문서뿐인 주장이 있으면 보관하지 못한다
+        val lastEvidence = alice.post("/api/nodes/${document.id}/archive", mapOf("expectedRevision" to document.revision, "reason" to null))
+        expect(409, lastEvidence)
+        save("node-archive-last-evidence", "POST", "/api/nodes/${document.id}/archive", lastEvidence)
+
+        // 동시 수정. B 가 먼저 고친 뒤 A 가 예전 revision 으로 저장하면 409 다
+        val companyProps = mapOf("name" to COMPANY_NAME, "country" to "KR")
+        expect(
+            200,
+            bob.patch("/api/nodes/${company.id}", mapOf("expectedRevision" to company.revision, "properties" to companyProps + ("description" to "B 가 먼저 고친 메모"))),
+        )
+        val conflict = alice.patch("/api/nodes/${company.id}", mapOf("expectedRevision" to company.revision, "properties" to companyProps + ("description" to "A 가 고친 메모")))
+        expect(409, conflict)
+        save("node-patch-conflict", "PATCH", "/api/nodes/${company.id}", conflict)
+
+        // 보관하고 복원한 노드와 그 이력
+        val toArchive = node(alice, "Company", mapOf("name" to "보관 연습 기업", "country" to "KR"))
+        getAndSave(alice, "node-archive-target", "/api/nodes/${toArchive.id}")
+        val archivedNow = alice.post("/api/nodes/${toArchive.id}/archive", mapOf("expectedRevision" to toArchive.revision, "reason" to "화면 테스트 보관"))
+        expect(200, archivedNow)
+        save("node-archive", "POST", "/api/nodes/${toArchive.id}/archive", archivedNow)
+        val restored = alice.post("/api/nodes/${toArchive.id}/restore", mapOf("expectedRevision" to archivedNow.body.revision))
+        expect(200, restored)
+        save("node-restore", "POST", "/api/nodes/${toArchive.id}/restore", restored)
+        getAndSave(alice, "changes-archive-target", "/api/changes?" + query("targetId" to toArchive.id, "page" to 0, "size" to 20))
+
+        // 책을 근거로 인물이 개념을 강조한다는 주장
+        val person = node(alice, "Person", mapOf("name" to "가상 투자자", "englishName" to "Virtual Investor"))
+        val concept = node(alice, "Concept", mapOf("name" to "안전마진", "summary" to "투자 판단에서 손실 가능성을 줄이는 여유다."))
+        val book = node(
+            alice, "Document",
+            mapOf("title" to "안전마진 해설서", "url" to "https://example.com/margin-of-safety", "documentType" to "BOOK", "collectedAt" to "2026-10-20T03:00:00Z"),
+        )
+        relate(alice, "AUTHORED", person.id, book.id)
+        val advocates = expect(
+            201,
+            alice.post(
+                "/api/claims",
+                mapOf(
+                    "predicate" to "ADVOCATES", "subjectId" to person.id, "objectId" to concept.id, "documentIds" to listOf(book.id),
+                    "description" to "가상 투자자는 안전마진을 투자의 핵심으로 본다.", "evidenceText" to "안전마진은 투자의 핵심이다.",
+                ),
+            ),
+        )
+        getAndSave(alice, "node-person", "/api/nodes/${person.id}")
+        getAndSave(alice, "graph-person", "/api/graph/neighborhood?" + query("id" to person.id, "hops" to 1))
+        getAndSave(alice, "node-book", "/api/nodes/${book.id}")
+        getAndSave(alice, "claim-advocates", "/api/claims/${advocates.id}")
+        // 주장 폼의 대상 고르기(NodePicker)가 개념을 찾는 요청
+        getAndSave(alice, "nodes-pick-concept", "/api/nodes?" + query("q" to "안전마진", "types" to "Concept", "size" to 10))
+
         SnapshotNormalizer().normalize(saved.map { if (it.name.startsWith("graph-")) sortGraph(it) else it })
             .forEach { File(dir, "${it.name}.json").writeText(render(it)) }
     }

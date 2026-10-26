@@ -1,0 +1,33 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/nodes/00000000-0000-4000-8000-000000000056/archive",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "id": "00000000-0000-4000-8000-000000000056",
+    "type": "Company",
+    "label": "보관 연습 기업",
+    "properties": {
+      "name": "보관 연습 기업",
+      "country": "KR"
+    },
+    "revision": 2,
+    "archived": true,
+    "archivedAt": "2026-01-01T00:01:02.000000Z",
+    "createdAt": "2026-01-01T00:01:00.000000Z",
+    "createdBy": {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "email": "alice@example.com",
+      "displayName": "Alice"
+    },
+    "updatedAt": "2026-01-01T00:01:03.000000Z",
+    "updatedBy": {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "email": "alice@example.com",
+      "displayName": "Alice"
+    },
+    "reviewStatus": null
+  }
+}

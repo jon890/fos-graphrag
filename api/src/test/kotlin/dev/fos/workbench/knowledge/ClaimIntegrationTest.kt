@@ -82,6 +82,30 @@ class ClaimIntegrationTest : IntegrationTest() {
     }
 
     @Test
+    fun `인물이 쓴 책을 AUTHORED 로 잇고 그 책을 근거로 인물이 개념을 강조한다는 주장을 만든다`() {
+        val alice = loggedIn(ALICE)
+        val fx = Fixtures(alice)
+        val person = fx.node("Person", mapOf("name" to "가상 투자자-${fx.suffix}", "englishName" to "Virtual Investor ${fx.suffix}"))
+        val concept = fx.node("Concept", mapOf("name" to "안전마진-${fx.suffix}", "summary" to "손실 가능성을 줄이는 여유다."))
+        val book = fx.node(
+            "Document",
+            mapOf("title" to "안전마진 해설서-${fx.suffix}", "url" to "https://example.com/book-${fx.suffix}", "documentType" to "BOOK", "collectedAt" to "2026-10-20T03:00:00Z"),
+        )
+
+        val authored = alice.post("/api/relationships", mapOf("type" to "AUTHORED", "fromId" to person.id, "toId" to book.id))
+        assertThat(authored.status).describedAs(authored.body.toString()).isEqualTo(201)
+        val reversed = alice.post("/api/relationships", mapOf("type" to "AUTHORED", "fromId" to book.id, "toId" to person.id))
+        assertThat(reversed.status).isEqualTo(400)
+        assertThat(reversed.code).isEqualTo("ONTOLOGY_VIOLATION")
+        assertThat(alice.get("/api/nodes/${book.id}").body["relationships"].toList().map { it["type"].asString() }).containsExactly("AUTHORED")
+
+        val created = fx.claim("ADVOCATES", person.id, concept.id, listOf(book.id))
+        assertThat(created.status).describedAs(created.body.toString()).isEqualTo(201)
+        assertThat(created.body["label"].asString()).isEqualTo("가상 투자자-${fx.suffix} → 안전마진-${fx.suffix} 강조한다")
+        assertThat(alice.get("/api/nodes/${person.id}").body["claims"].toList().map { it.id }).containsExactly(created.body.id)
+    }
+
+    @Test
     fun `내용을 고치면 검토 상태가 DRAFT 로 돌아가고 유효 기간을 미상으로 되돌릴 수 있다`() {
         val alice = loggedIn(ALICE)
         val bob = loggedIn(BOB)

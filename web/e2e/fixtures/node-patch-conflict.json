@@ -1,0 +1,16 @@
+{
+  "request": {
+    "method": "PATCH",
+    "path": "/api/nodes/00000000-0000-4000-8000-000000000005",
+    "query": ""
+  },
+  "status": 409,
+  "body": {
+    "code": "REVISION_CONFLICT",
+    "message": "다른 사용자가 먼저 수정했습니다. 최신 내용을 확인한 뒤 다시 저장하세요.",
+    "details": {
+      "expectedRevision": 1,
+      "currentRevision": 2
+    }
+  }
+}
