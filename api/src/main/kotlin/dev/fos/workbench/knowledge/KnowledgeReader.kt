@@ -22,6 +22,21 @@ class KnowledgeReader(
         client.query("MATCH (n:Knowledge {id: \$id}) RETURN properties(n) AS n").bind(id).to("id")
             .fetch().one().map { it["n"] as Map<String, Any?> }.orElseThrow { NotFoundException(id) }
 
+    /**
+     * 관계의 저장된 속성에 관계 타입(`type`)을 더한 맵. 주장 관계도 찾는다.
+     * `RevisionGuard.lockRelationship` 처럼 타입마다 id 인덱스로 찾되 잠그지 않는다. 없으면 404 다
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun relationshipProps(id: String): Map<String, Any?> {
+        for (type in holder.current().allRelationshipTypes.sorted()) {
+            val found = client.query("MATCH (:Knowledge)-[r:`$type` {id: \$id}]->(:Knowledge) RETURN properties(r) AS r")
+                .bind(id).to("id").fetch().one().map { (it["r"] as Map<String, Any?>) - RevisionGuard.LOCK + ("type" to type) }
+                .orElse(null)
+            if (found != null) return found
+        }
+        throw NotFoundException(id)
+    }
+
     fun node(id: String): NodeView = nodes(listOf(nodeProps(id))).single()
 
     fun nodes(rows: List<Map<String, Any?>>): List<NodeView> {

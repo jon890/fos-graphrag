@@ -144,10 +144,17 @@ class McpTools(
         tool(
             "submit_proposals", "제안 올리기",
             "대화에서 해석한 내용을 워크벤치에 제안으로 올립니다. 올리기만 하고 바로 바뀌지 않습니다. 사용자가 워크벤치의 「제안」 에서 승인해야 반영됩니다. " +
-                "체결을 투자 결정과 잇거나, 새 투자 결정을 만들거나, 근거를 잇거나, 공부 메모를 남길 때 씁니다. " +
+                "체결을 투자 결정과 잇거나, 새 투자 결정을 만들거나, 근거를 잇거나, 공부 메모를 남기거나, 항목을 고치거나 보관하거나, 주장을 만들 때 씁니다. " +
                 "kind 별 payload: LINK_TRADE_DECISION 은 {tradeIds, decisionId}, CREATE_NODE 는 {type, properties, links, tradeIds}, " +
                 "CREATE_RELATIONSHIP 은 {type, fromId, toId}, STUDY_NOTE 는 {nodeId, level(KNOWN, UNSURE, LEARNING), note(1000자까지)}, " +
-                "ONTOLOGY_CHANGE 는 {baseVersion, yaml, note} 입니다. 온톨로지 정의 전체를 보내는 ONTOLOGY_CHANGE 는 propose_ontology_change 가 더 맞습니다. " +
+                "UPDATE_NODE 는 {nodeId, expectedRevision, properties(바꿀 속성만. null 은 지움)}, ARCHIVE_NODE 는 {nodeId, expectedRevision, reason(1000자까지)}, " +
+                "ARCHIVE_RELATIONSHIP 은 {relationshipId, reason(1000자까지)}, " +
+                "CREATE_CLAIM 은 {predicate, subjectId, objectId, documentIds, description, evidenceText, validFrom, validTo}, " +
+                "ONTOLOGY_CHANGE 는 {baseVersion, yaml, note} 입니다. " +
+                "UPDATE_NODE, ARCHIVE_NODE 의 expectedRevision 에는 get_node 가 준 node.revision 을 넣습니다. 그 사이 항목이 바뀌면 승인이 실패하니 다시 읽고 올립니다. " +
+                "ARCHIVE_RELATIONSHIP 의 relationshipId 는 get_node 의 relations[].relationshipId 입니다. 주장에 딸린 관계는 보관할 수 없습니다. " +
+                "CREATE_CLAIM 의 documentIds 에는 근거 문서(Document) id 가 하나 이상(20개까지) 있어야 합니다. Claim 은 UPDATE_NODE 로 고치지 않습니다. " +
+                "온톨로지 정의 전체를 보내는 ONTOLOGY_CHANGE 는 propose_ontology_change 가 더 맞습니다. " +
                 "종류와 속성 키는 get_ontology 로 확인합니다. 같은 dedupeKey 로 다시 올리면 새로 생기지 않고 있던 제안을 돌려줍니다. " +
                 "한 건이라도 틀리면 아무것도 올라가지 않습니다.",
             schema("proposals" to array("올릴 제안. 1~20건입니다", PROPOSAL), required = listOf("proposals")),
@@ -315,7 +322,8 @@ class McpTools(
         /** `V1ProposalInput`(docs/api-contract.md 「`POST /api/v1/proposals`」) */
         private val PROPOSAL = schema(
             "kind" to string(
-                "LINK_TRADE_DECISION, CREATE_NODE, CREATE_RELATIONSHIP, STUDY_NOTE, ONTOLOGY_CHANGE 가운데 하나입니다. " +
+                "LINK_TRADE_DECISION, CREATE_NODE, CREATE_RELATIONSHIP, STUDY_NOTE, UPDATE_NODE, ARCHIVE_NODE, ARCHIVE_RELATIONSHIP, " +
+                    "CREATE_CLAIM, ONTOLOGY_CHANGE 가운데 하나입니다. payload 모양은 submit_proposals 의 설명에 있습니다. " +
                     "ONTOLOGY_CHANGE({baseVersion, yaml, note})로 정의 전체를 보낼 때는 propose_ontology_change 가 더 맞습니다",
             ),
             "payload" to mapOf("type" to "object", "description" to "kind 별 제안 내용입니다"),

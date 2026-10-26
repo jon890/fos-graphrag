@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import dev.fos.workbench.auth.Role
 import dev.fos.workbench.auth.WorkbenchPrincipal
 import dev.fos.workbench.knowledge.NodeRef
+import dev.fos.workbench.knowledge.RelationshipView
 import dev.fos.workbench.ontology.OntologyVersionHeaderFilter
 import dev.fos.workbench.trade.TradeView
 import dev.fos.workbench.web.Page
@@ -43,8 +44,8 @@ data class ProposalView(
 @JsonInclude(JsonInclude.Include.ALWAYS)
 data class ProposalToken(val id: String?, val name: String?)
 
-/** payload, evidence, result 가 가리키는 노드와 내 체결의 지금 값. 찾지 못한 id 는 빠진다 */
-data class ProposalRefs(val nodes: Map<String, NodeRef>, val trades: Map<String, TradeView>)
+/** payload, evidence, result 가 가리키는 노드, 관계, 내 체결의 지금 값. 찾지 못한 id 는 빠진다 */
+data class ProposalRefs(val nodes: Map<String, NodeRef>, val relationships: Map<String, RelationshipView>, val trades: Map<String, TradeView>)
 
 /** `confirm` 은 온톨로지 변경의 영향 확인이다 */
 data class AcceptProposalRequest(val payload: Any? = null, val confirm: Boolean = false)

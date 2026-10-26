@@ -4,12 +4,15 @@ import dev.fos.workbench.auth.Role
 import dev.fos.workbench.config.Limits
 import dev.fos.workbench.config.Neo4jSchemaInitializer
 import dev.fos.workbench.config.Timestamps
+import dev.fos.workbench.knowledge.ClaimService
 import dev.fos.workbench.knowledge.CreateNodeRequest
 import dev.fos.workbench.knowledge.CreateRelationshipRequest
 import dev.fos.workbench.knowledge.KnowledgeReader
-import dev.fos.workbench.knowledge.NodeRef
 import dev.fos.workbench.knowledge.NodeService
+import dev.fos.workbench.knowledge.PatchNodeRequest
 import dev.fos.workbench.knowledge.RelationshipService
+import dev.fos.workbench.knowledge.RelationshipView
+import dev.fos.workbench.knowledge.RevisionRequest
 import dev.fos.workbench.learning.KnowledgeMarkService
 import dev.fos.workbench.learning.PutKnowledgeRequest
 import dev.fos.workbench.ontology.EditInput
@@ -63,7 +66,7 @@ data class StoredProposal(
 
 /**
  * 에이전트가 해석해 올린 쓰기(`:Proposal`)를 받고, 주인이 승인하면 기존 서비스로 실행한다(docs/adr/013-owner-trades-and-agent-proposals.md).
- * 제안 자체는 변경 이력에 남기지 않는다. 승인으로 생긴 노드와 관계만 NodeService, RelationshipService 가 남긴다.
+ * 제안 자체는 변경 이력에 남기지 않는다. 승인으로 생기거나 바뀐 노드, 관계, 주장만 NodeService, RelationshipService, ClaimService 가 남긴다.
  */
 @Service
 class ProposalService(
@@ -73,6 +76,7 @@ class ProposalService(
     private val reader: KnowledgeReader,
     private val nodes: NodeService,
     private val relationships: RelationshipService,
+    private val claims: ClaimService,
     private val knowledgeMarks: KnowledgeMarkService,
     private val edits: OntologyEditService,
     private val schemaInitializer: Neo4jSchemaInitializer,
@@ -215,6 +219,24 @@ class ProposalService(
             val saved = edits.save(payload.baseVersion, EditInput(payload.yaml, null), payload.note ?: NOTE, confirm, ownerId)
             Executed(result(emptyList(), emptyList(), emptyList(), saved.summary.version), saved.newRelationshipTypes)
         }
+        is ProposalPayload.UpdateNode -> {
+            nodes.patch(payload.nodeId, PatchNodeRequest(payload.expectedRevision, payload.properties), ownerId)
+            Executed(result(listOf(payload.nodeId), emptyList(), emptyList()))
+        }
+        is ProposalPayload.ArchiveNode -> {
+            nodes.archive(payload.nodeId, RevisionRequest(payload.expectedRevision, payload.reason), ownerId)
+            Executed(result(listOf(payload.nodeId), emptyList(), emptyList()))
+        }
+        is ProposalPayload.ArchiveRelationship -> {
+            // 제안에는 revision 이 없다. RelationshipService 가 잠근 뒤 이 값과 다시 비교한다
+            val revision = (reader.relationshipProps(payload.relationshipId)["revision"] as Number).toLong()
+            relationships.archive(payload.relationshipId, RevisionRequest(revision, payload.reason), ownerId)
+            Executed(result(emptyList(), listOf(payload.relationshipId), emptyList()))
+        }
+        is ProposalPayload.CreateClaim -> {
+            val claimId = claims.create(payload.toRequest(), ownerId).node.id
+            Executed(result(listOf(claimId), emptyList(), emptyList()))
+        }
     }
 
     @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
@@ -238,10 +260,12 @@ class ProposalService(
     @Transactional(readOnly = true)
     fun pendingCount(ownerId: String): Long = proposals.countPending(ownerId)
 
-    /** 화면용 표현. 가리키는 노드와 내 체결은 제안 전체에서 모아 한 번씩 읽는다 */
+    /** 화면용 표현. 가리키는 노드, 관계, 내 체결은 제안 전체에서 모아 한 번씩 읽는다. 관계의 양 끝 노드도 노드로 담는다 */
     @Transactional(readOnly = true)
     fun views(ownerId: String, items: List<StoredProposal>): List<ProposalView> {
-        val nodeIds = items.flatMap(::nodeIdsOf).distinct()
+        val relationshipViews = items.flatMap(::relationshipIdsOf).distinct().mapNotNull(::relationshipOrNull).associateBy { it.id }
+        fun endsOf(item: StoredProposal) = relationshipIdsOf(item).flatMap { id -> relationshipViews[id]?.let { listOf(it.from.id, it.to.id) }.orEmpty() }
+        val nodeIds = (items.flatMap(::nodeIdsOf) + items.flatMap(::endsOf)).distinct()
         val tradeIds = items.flatMap(::tradeIdsOf).distinct()
         val nodeProps = proposals.nodes(nodeIds)
         val claimNames = reader.claimLabels(nodeProps.map { it["id"] as String })
@@ -268,11 +292,19 @@ class ProposalService(
                 requiresEditor = item.kind.requiresEditor,
                 requiredRole = item.kind.requiredRole.name,
                 refs = ProposalRefs(
-                    nodes = nodeIdsOf(item).mapNotNull { id -> nodeRefs[id]?.let { id to it } }.toMap(),
+                    nodes = (nodeIdsOf(item) + endsOf(item)).mapNotNull { id -> nodeRefs[id]?.let { id to it } }.toMap(),
+                    relationships = relationshipIdsOf(item).mapNotNull { id -> relationshipViews[id]?.let { id to it } }.toMap(),
                     trades = tradeIdsOf(item).mapNotNull { id -> tradeViews[id]?.let { id to it } }.toMap(),
                 ),
             )
         }
+    }
+
+    /** 일반 관계만 찾는다. 주장 관계와 없는 id 는 빠진다 */
+    private fun relationshipOrNull(id: String): RelationshipView? = try {
+        relationships.view(id)
+    } catch (_: NotFoundException) {
+        null
     }
 
     private fun lockPending(ownerId: String, id: String): Map<String, Any?> {
@@ -404,10 +436,14 @@ class ProposalService(
 
     private fun nodeIdsOf(item: StoredProposal): List<String> {
         val p = item.payload
-        val fromPayload = listOfNotNull(p["fromId"], p["toId"], p["decisionId"], p["nodeId"]) +
+        val fromPayload = listOfNotNull(p["fromId"], p["toId"], p["decisionId"], p["nodeId"], p["subjectId"], p["objectId"]) +
+            idsIn(p["documentIds"]) +
             (p["links"] as? List<*>).orEmpty().flatMap { (it as? Map<*, *>)?.let { l -> listOfNotNull(l["fromId"], l["toId"]) }.orEmpty() }
         return (fromPayload + idsIn(item.evidence["nodeIds"]) + idsIn(item.result?.get("nodeIds"))).filterIsInstance<String>().distinct()
     }
+
+    private fun relationshipIdsOf(item: StoredProposal): List<String> =
+        (listOfNotNull(item.payload["relationshipId"]).filterIsInstance<String>() + idsIn(item.result?.get("relationshipIds"))).distinct()
 
     private fun tradeIdsOf(item: StoredProposal): List<String> =
         (idsIn(item.payload["tradeIds"]) + idsIn(item.evidence["tradeIds"]) + idsIn(item.result?.get("tradeIds"))).distinct()

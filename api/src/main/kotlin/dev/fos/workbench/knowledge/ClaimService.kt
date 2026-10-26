@@ -8,6 +8,8 @@ import dev.fos.workbench.history.ChangeEventRecorder
 import dev.fos.workbench.history.FieldChange
 import dev.fos.workbench.history.TargetKind
 import dev.fos.workbench.history.diff
+import dev.fos.workbench.ontology.ClaimPredicateDef
+import dev.fos.workbench.ontology.Ontology
 import dev.fos.workbench.ontology.OntologyHolder
 import dev.fos.workbench.ontology.OntologyValidator
 import dev.fos.workbench.web.ArchivedException
@@ -35,35 +37,13 @@ class ClaimService(
     @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun create(request: CreateClaimRequest, actorId: String): ClaimView {
         val ontology = holder.current()
-        val predicate = ontology.requirePredicate(request.predicate)
-        if (request.documentIds.isEmpty()) throw ValidationFailedException(mapOf("documentIds" to "근거 문서를 하나 이상 고르세요."))
-        if (request.documentIds.distinct().size > Limits.MAX_DOCUMENTS_PER_CLAIM) {
-            throw ValidationFailedException(mapOf("documentIds" to "근거 문서는 ${Limits.MAX_DOCUMENTS_PER_CLAIM}개까지 고를 수 있습니다."))
-        }
-        val ids = (listOf(request.subjectId, request.objectId) + request.documentIds).distinct()
+        val predicate = requirePredicateAndDocuments(ontology, request)
+        val ids = nodeIdsOf(request)
         // 주어, 목적어, 근거 문서가 그 사이에 보관되지 않게 ID 순서로 잠근다. 없는 ID 는 404 다
         val found = ids.sorted().associateWith { guard.lockNode(it) }
-
+        val properties = checkNodes(predicate, request, found)
         val subject = found.getValue(request.subjectId)
         val obj = found.getValue(request.objectId)
-        requireType(subject, predicate.subjectTypes, "claim-subject-type", "주어")
-        requireType(obj, predicate.objectTypes, "claim-object-type", "목적어")
-        request.documentIds.forEach { requireType(found.getValue(it), listOf("Document"), "claim-evidence-type", "근거") }
-        if (found.values.any { it["archived"] == true }) throw ArchivedException()
-
-        val properties = validator.validateCreate(
-            CLAIM,
-            mapOf(
-                "predicate" to request.predicate,
-                "description" to request.description,
-                "evidenceText" to request.evidenceText,
-                "validFrom" to request.validFrom,
-                "validTo" to request.validTo,
-                "authoringMethod" to (request.authoringMethod ?: "MANUAL"),
-                "extractionConfidence" to request.extractionConfidence,
-            ),
-        )
-        requireValidPeriod(properties)
         val id = UUID.randomUUID().toString()
         val now = Timestamps.now()
         val audit = mapOf("revision" to 1L, "archived" to false, "createdAt" to now, "createdBy" to actorId, "updatedAt" to now, "updatedBy" to actorId)
@@ -109,6 +89,48 @@ class ClaimService(
             ),
         )
         return reader.claim(id)
+    }
+
+    /** [create] 와 같은 규칙으로 검사하되 잠그지 않는다. 에이전트가 주장 만들기를 제안할 때 쓴다 */
+    fun checkCreate(request: CreateClaimRequest) {
+        val predicate = requirePredicateAndDocuments(holder.current(), request)
+        checkNodes(predicate, request, nodeIdsOf(request).associateWith { reader.nodeProps(it) })
+    }
+
+    private fun nodeIdsOf(request: CreateClaimRequest): List<String> =
+        (listOf(request.subjectId, request.objectId) + request.documentIds).distinct()
+
+    /** 노드를 읽기 전에 하는 검사. 없는 근거 문서를 많이 보내도 404 보다 개수 오류가 먼저다 */
+    private fun requirePredicateAndDocuments(ontology: Ontology, request: CreateClaimRequest): ClaimPredicateDef {
+        val predicate = ontology.requirePredicate(request.predicate)
+        if (request.documentIds.isEmpty()) throw ValidationFailedException(mapOf("documentIds" to "근거 문서를 하나 이상 고르세요."))
+        if (request.documentIds.distinct().size > Limits.MAX_DOCUMENTS_PER_CLAIM) {
+            throw ValidationFailedException(mapOf("documentIds" to "근거 문서는 ${Limits.MAX_DOCUMENTS_PER_CLAIM}개까지 고를 수 있습니다."))
+        }
+        return predicate
+    }
+
+    /** found 는 주어, 목적어, 근거 문서의 속성이다. 검증한 주장 속성을 돌려준다 */
+    private fun checkNodes(predicate: ClaimPredicateDef, request: CreateClaimRequest, found: Map<String, Map<String, Any?>>): Map<String, Any> {
+        requireType(found.getValue(request.subjectId), predicate.subjectTypes, "claim-subject-type", "주어")
+        requireType(found.getValue(request.objectId), predicate.objectTypes, "claim-object-type", "목적어")
+        request.documentIds.forEach { requireType(found.getValue(it), listOf("Document"), "claim-evidence-type", "근거") }
+        if (found.values.any { it["archived"] == true }) throw ArchivedException()
+
+        val properties = validator.validateCreate(
+            CLAIM,
+            mapOf(
+                "predicate" to request.predicate,
+                "description" to request.description,
+                "evidenceText" to request.evidenceText,
+                "validFrom" to request.validFrom,
+                "validTo" to request.validTo,
+                "authoringMethod" to (request.authoringMethod ?: "MANUAL"),
+                "extractionConfidence" to request.extractionConfidence,
+            ),
+        )
+        requireValidPeriod(properties)
+        return properties
     }
 
     /** 본문은 바꿀 필드만 담는다. 키가 있고 값이 null 이면 그 값을 지운다(유효 기간은 미상으로 돌아간다). */
