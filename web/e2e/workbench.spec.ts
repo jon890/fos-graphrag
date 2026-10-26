@@ -1354,7 +1354,9 @@ test.describe('가치투자 온톨로지: 역할별 협업', () => {
         expect(await pageA.evaluate(async () => (await fetch('/api/v1/ontology')).status)).toBe(401)
 
         // 쓴 뒤에는 마지막 사용 시각이 생긴다.
+        // 새로 읽으면 「고급: 개인 비서 연동」 이 다시 접힌다
         await pageA.reload()
+        await advanced.locator('summary').click()
         await expect(row.getByTestId('tokens-row-last-used')).not.toContainText('아직 쓰지 않음')
 
         // 다른 사용자(편집자 B)에게는 이 토큰이 목록에도 API 응답에도 없다.
