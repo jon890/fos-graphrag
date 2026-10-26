@@ -1272,9 +1272,9 @@ OAuth 경로의 오류 본문은 이 문서의 `{code, message, details}` 가 �
   - `http://127.0.0.1`, `http://localhost`, `http://[::1]` 의 loopback 주소. 포트는 주소에 적은 그대로 등록한다.
   - `https://` 주소.
 - 각 값은 2000자 이하다. 넘으면 `400 invalid_redirect_uri` 다.
-- `client_name` 은 앞뒤 공백을 지운 1자 이상 100자 이하이고 줄바꿈 같은 제어 문자가 없어야 한다. 없으면 「이름 없는 앱」 이다. 100자를 넘거나 제어 문자가 있으면 `400 invalid_client_metadata` 다.
+- `client_name` 은 앞뒤 공백을 지운 1자 이상 100자 이하이고 줄바꿈 같은 제어 문자가 없어야 한다. 없거나 공백뿐이면 「이름 없는 앱」 이다. 100자를 넘거나 제어 문자가 있으면 `400 invalid_client_metadata` 다.
 - `token_endpoint_auth_method` 는 `none` 만 받는다. 없으면 `none` 이다. 다른 값이면 `400 invalid_client_metadata` 다. 클라이언트 비밀은 발급하지 않는다.
-- `grant_types` 는 `authorization_code`, `refresh_token` 의 부분 집합, `response_types` 는 `["code"]` 만 받는다. 없으면 각각 두 값과 `["code"]` 다. 다른 값이면 `400 invalid_client_metadata` 다.
+- `grant_types` 는 `authorization_code`, `refresh_token` 의 부분 집합, `response_types` 는 `["code"]` 만 받는다. 없으면 각각 두 값과 `["code"]` 다. 다른 값이나 빈 목록이면 `400 invalid_client_metadata` 다.
 - 그 밖의 필드(`client_uri`, `logo_uri`, `scope` 등)는 읽지 않고 응답에도 담지 않는다.
 - 본문은 16KiB 까지다. 넘으면 `413`, Content-Length 가 없으면 `411` 이고 본문은 OAuth 형식(`invalid_request`)이다. 같은 IP 에서 1분에 10번까지다. 넘으면 `429 {"error": "too_many_requests"}` 와 `Retry-After` 다.
 
