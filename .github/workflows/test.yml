@@ -12,6 +12,11 @@ on:
 permissions:
   contents: read
 
+# 같은 PR 이나 브랜치에 새로 push 하면 앞 실행을 취소한다
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   api:
     runs-on: ubuntu-latest
@@ -27,8 +32,21 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: Gradle wrapper 확인
+        uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
       - name: 서버 테스트
         run: cd api && ./gradlew test --rerun
+
+      - name: 실패 보고서 올리기
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: junit-reports
+          path: |
+            api/build/test-results/test/
+            api/build/reports/tests/test/
+          if-no-files-found: ignore
 
       # 서버 테스트가 다시 쓴 응답 스냅샷이 커밋한 것과 같아야 한다. git diff 는 untracked 파일을 놓친다
       - name: 응답 스냅샷 확인
