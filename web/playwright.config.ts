@@ -27,8 +27,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      // workbench.spec.ts 는 Compose 서버가 필요한 옛 시나리오다. 가짜 API 로 옮기면 지운다.
-      testIgnore: [/mobile\.spec\.ts$/, /workbench\.spec\.ts$/],
+      testIgnore: /mobile\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
     },
     {

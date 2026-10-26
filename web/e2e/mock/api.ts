@@ -39,6 +39,8 @@ interface Snapshot {
   request: { method: string; path: string; query: string }
   status: number
   body: unknown
+  /** 같은 요청의 다른 응답이 있어 요청만 보고 주지 않는다. 테스트가 fixture 로 골라 on 에 넘긴다 */
+  namedOnly?: boolean
 }
 
 interface Override {
@@ -68,7 +70,10 @@ function keyOf(method: string, pathname: string, query: string): string {
 
 let snapshotCache: { byKey: Map<string, Snapshot>; byName: Map<string, Snapshot> } | null = null
 
-/** 스냅샷을 한 번만 읽는다. 같은 요청을 가리키는 스냅샷이 둘이면 실패한다(auth-me-* 는 로그인 규칙이 고른다) */
+/**
+ * 스냅샷을 한 번만 읽는다. 같은 요청을 가리키는 스냅샷이 둘이면 실패한다.
+ * auth-me-* 는 로그인 규칙이 고르고, namedOnly 스냅샷은 테스트가 이름으로 고른다
+ */
 function loadSnapshots(): { byKey: Map<string, Snapshot>; byName: Map<string, Snapshot> } {
   if (snapshotCache) return snapshotCache
   const byKey = new Map<string, Snapshot>()
@@ -78,7 +83,7 @@ function loadSnapshots(): { byKey: Map<string, Snapshot>; byName: Map<string, Sn
     const parsed = JSON.parse(fs.readFileSync(path.join(FIXTURES_DIR, file), 'utf8')) as Omit<Snapshot, 'name'>
     const snapshot: Snapshot = { name, ...parsed, request: { ...parsed.request, query: normalizeQuery(parsed.request.query) } }
     byName.set(name, snapshot)
-    if (name.startsWith('auth-me-')) continue
+    if (name.startsWith('auth-me-') || snapshot.namedOnly) continue
     const key = keyOf(snapshot.request.method, snapshot.request.path, snapshot.request.query)
     const other = byKey.get(key)
     if (other) throw new Error(`스냅샷 ${other.name} 과 ${name} 이 같은 요청(${key})을 가리킨다`)

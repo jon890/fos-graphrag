@@ -1,0 +1,130 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/nodes/00000000-0000-4000-8000-000000000064",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "node": {
+      "id": "00000000-0000-4000-8000-000000000064",
+      "type": "Concept",
+      "label": "안전마진",
+      "properties": {
+        "name": "안전마진",
+        "summary": "투자 판단에서 손실 가능성을 줄이는 여유다."
+      },
+      "revision": 1,
+      "archived": false,
+      "archivedAt": null,
+      "createdAt": "2026-01-01T00:01:08.000000Z",
+      "createdBy": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "email": "alice@example.com",
+        "displayName": "Alice"
+      },
+      "updatedAt": "2026-01-01T00:01:08.000000Z",
+      "updatedBy": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "email": "alice@example.com",
+        "displayName": "Alice"
+      },
+      "reviewStatus": null
+    },
+    "claim": null,
+    "relationships": [
+      {
+        "id": "00000000-0000-4000-8000-000000000068",
+        "type": "USES_CONCEPT",
+        "from": {
+          "id": "00000000-0000-4000-8000-000000000007",
+          "type": "Valuation",
+          "label": "가상전자 2026-10-20",
+          "archived": false
+        },
+        "to": {
+          "id": "00000000-0000-4000-8000-000000000064",
+          "type": "Concept",
+          "label": "안전마진",
+          "archived": false
+        },
+        "revision": 1,
+        "archived": false,
+        "createdAt": "2026-01-01T00:01:12.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        }
+      }
+    ],
+    "claims": [
+      {
+        "id": "00000000-0000-4000-8000-000000000063",
+        "type": "Claim",
+        "label": "가상 투자자 → 안전마진 강조한다",
+        "properties": {
+          "predicate": "ADVOCATES",
+          "description": "가상 투자자는 안전마진을 투자의 핵심으로 본다.",
+          "evidenceText": "안전마진은 투자의 핵심이다.",
+          "authoringMethod": "MANUAL"
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:01:11.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "updatedAt": "2026-01-01T00:01:11.000000Z",
+        "updatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "reviewStatus": "DRAFT",
+        "reviewedBy": null,
+        "reviewedAt": null,
+        "reviewNote": null,
+        "contentUpdatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "subject": {
+          "id": "00000000-0000-4000-8000-000000000060",
+          "type": "Person",
+          "label": "가상 투자자",
+          "archived": false
+        },
+        "object": {
+          "id": "00000000-0000-4000-8000-000000000064",
+          "type": "Concept",
+          "label": "안전마진",
+          "archived": false
+        },
+        "documents": [
+          {
+            "id": "00000000-0000-4000-8000-000000000062",
+            "title": "안전마진 해설서",
+            "url": "https://example.com/margin-of-safety",
+            "publisher": null,
+            "documentType": "BOOK",
+            "publishedAt": null,
+            "collectedAt": "2026-10-20T03:00:00Z",
+            "archived": false
+          }
+        ]
+      }
+    ],
+    "concepts": [],
+    "relationshipsTruncated": false,
+    "claimsTruncated": false,
+    "limits": {
+      "maxRelationships": 100,
+      "maxClaims": 50
+    }
+  }
+}

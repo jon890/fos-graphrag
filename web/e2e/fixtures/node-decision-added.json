@@ -1,0 +1,70 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/nodes/00000000-0000-4000-8000-000000000071",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "node": {
+      "id": "00000000-0000-4000-8000-000000000071",
+      "type": "Decision",
+      "label": "가상전자 추가 매수(고침)",
+      "properties": {
+        "title": "가상전자 추가 매수(고침)",
+        "action": "ADD"
+      },
+      "revision": 1,
+      "archived": false,
+      "archivedAt": null,
+      "createdAt": "2026-01-01T00:01:14.000000Z",
+      "createdBy": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "email": "alice@example.com",
+        "displayName": "Alice"
+      },
+      "updatedAt": "2026-01-01T00:01:14.000000Z",
+      "updatedBy": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "email": "alice@example.com",
+        "displayName": "Alice"
+      },
+      "reviewStatus": null
+    },
+    "claim": null,
+    "relationships": [
+      {
+        "id": "00000000-0000-4000-8000-000000000072",
+        "type": "HAS_DECISION",
+        "from": {
+          "id": "00000000-0000-4000-8000-000000000009",
+          "type": "Security",
+          "label": "가상전자 보통주",
+          "archived": false
+        },
+        "to": {
+          "id": "00000000-0000-4000-8000-000000000071",
+          "type": "Decision",
+          "label": "가상전자 추가 매수(고침)",
+          "archived": false
+        },
+        "revision": 1,
+        "archived": false,
+        "createdAt": "2026-01-01T00:01:15.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        }
+      }
+    ],
+    "claims": [],
+    "concepts": [],
+    "relationshipsTruncated": false,
+    "claimsTruncated": false,
+    "limits": {
+      "maxRelationships": 100,
+      "maxClaims": 50
+    }
+  }
+}

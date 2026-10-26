@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/ontology/versions",
+    "query": ""
+  },
+  "status": 201,
+  "body": {
+    "version": 2,
+    "createdAt": "2026-01-01T00:01:20.000000Z",
+    "createdBy": {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "email": "admin@example.com",
+      "displayName": "Admin"
+    },
+    "note": null,
+    "restoredFrom": null
+  }
+}

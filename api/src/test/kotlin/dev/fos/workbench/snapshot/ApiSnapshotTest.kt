@@ -54,10 +54,11 @@ class ApiSnapshotTest {
         check(location.endsWith("/") && !location.contains("denied")) { "로그인 실패: $location" }
     }
 
-    fun save(name: String, method: String, pathAndQuery: String, response: ApiClient.Response) {
+    /** namedOnly 면 가짜 API 가 요청만 보고 이 응답을 주지 않는다. 같은 요청의 다른 응답이 있어 테스트가 이름으로 고른다 */
+    fun save(name: String, method: String, pathAndQuery: String, response: ApiClient.Response, namedOnly: Boolean = false) {
         val path = pathAndQuery.substringBefore('?')
         val query = pathAndQuery.substringAfter('?', "")
-        saved += Snapshot(name, method, path, query, response.status, response.body)
+        saved += Snapshot(name, method, path, query, response.status, response.body, namedOnly)
     }
 
     /** 응답이 기대한 상태인지 확인하고 본문을 돌려준다 */
@@ -66,11 +67,20 @@ class ApiSnapshotTest {
         return response.body
     }
 
-    private fun getAndSave(client: ApiClient, name: String, pathAndQuery: String, status: Int = 200): JsonNode {
+    private fun getAndSave(client: ApiClient, name: String, pathAndQuery: String, status: Int = 200, namedOnly: Boolean = false): JsonNode {
         val response = client.get(pathAndQuery)
         expect(status, response)
-        save(name, "GET", pathAndQuery, response)
+        save(name, "GET", pathAndQuery, response, namedOnly)
         return response.body
+    }
+
+    /** [from] 줄 뒤에서 처음 나오는 [marker] 줄 바로 아래에 [lines] 를 넣는다 */
+    private fun insertAfter(yaml: String, marker: String, lines: List<String>, from: Int = 0): String {
+        val all = yaml.lines().toMutableList()
+        val at = all.withIndex().indexOfFirst { (i, line) -> i >= from && line == marker }
+        check(at >= 0) { "YAML 에 「$marker」 줄이 없다" }
+        all.addAll(at + 1, lines)
+        return all.joinToString("\n")
     }
 
     private fun node(client: ApiClient, type: String, properties: Map<String, Any?>): JsonNode =
@@ -149,7 +159,7 @@ class ApiSnapshotTest {
             bob.post("/api/claims/${reviewed.id}/review", mapOf("expectedRevision" to reviewed.revision, "status" to "REVIEWED", "note" to "사업보고서와 맞다")),
         )
         // 검토 대기 주장
-        expect(
+        val pending = expect(
             201,
             alice.post(
                 "/api/claims",
@@ -286,7 +296,14 @@ class ApiSnapshotTest {
         // 근거 문서가 그 문서뿐인 주장이 있으면 보관하지 못한다
         val lastEvidence = alice.post("/api/nodes/${document.id}/archive", mapOf("expectedRevision" to document.revision, "reason" to null))
         expect(409, lastEvidence)
-        save("node-archive-last-evidence", "POST", "/api/nodes/${document.id}/archive", lastEvidence)
+        // 서버는 claimIds 를 무작위 실제 id 로 정렬해 실행마다 순서가 바뀐다. 만든 순서로 다시 정렬한다
+        val createdOrder = listOf(reviewed.id, pending.id)
+        val claimIds = lastEvidence.body["details"]["claimIds"].values().map { it.asString() }.sortedBy { createdOrder.indexOf(it) }
+        check(claimIds.all { it in createdOrder }) { "모르는 주장 id: $claimIds" }
+        val sortedBody = (lastEvidence.body.deepCopy() as ObjectNode).also { body ->
+            (body["details"] as ObjectNode).putArray("claimIds").also { arr -> claimIds.forEach { arr.add(it) } }
+        }
+        save("node-archive-last-evidence", "POST", "/api/nodes/${document.id}/archive", lastEvidence.copy(body = sortedBody))
 
         // 동시 수정. B 가 먼저 고친 뒤 A 가 예전 revision 으로 저장하면 409 다
         val companyProps = mapOf("name" to COMPANY_NAME, "country" to "KR")
@@ -334,6 +351,116 @@ class ApiSnapshotTest {
         // 주장 폼의 대상 고르기(NodePicker)가 개념을 찾는 요청
         getAndSave(alice, "nodes-pick-concept", "/api/nodes?" + query("q" to "안전마진", "types" to "Concept", "size" to 10))
 
+        // 밸류에이션이 쓰는 개념. 개념 상세의 「이 개념을 쓴 곳」 에 그 밸류에이션이 나온다
+        relate(alice, "USES_CONCEPT", valuation.id, concept.id)
+        getAndSave(alice, "node-concept", "/api/nodes/${concept.id}")
+
+        // 앱 연결 거절. 허용과 같은 요청이라 화면 테스트가 이름으로 골라 쓴다
+        val denied = alice.post("/api/oauth/authorize", authorize.toMap() + mapOf("decision" to "DENY"))
+        expect(200, denied)
+        save("oauth-authorize-deny", "POST", "/api/oauth/authorize", denied, namedOnly = true)
+
+        // 에이전트가 올린 항목 만들기 제안과 공부 메모 제안. A 가 만들기는 제목을 고쳐 승인하고 공부 메모는 거절한다
+        val createPayload = mapOf(
+            "type" to "Decision",
+            "properties" to mapOf("title" to "가상전자 추가 매수", "action" to "ADD"),
+            "links" to listOf(mapOf("type" to "HAS_DECISION", "fromId" to security.id)),
+            "tradeIds" to listOf(trade.id),
+        )
+        val submitted = expect(
+            200,
+            anonymous().bearer(
+                "POST", "/api/v1/proposals", token,
+                mapOf(
+                    "proposals" to listOf(
+                        mapOf(
+                            "kind" to "CREATE_NODE", "payload" to createPayload,
+                            "rationale" to "10월 24일 매수 체결은 추가 매수 결정을 실행한 것이다.",
+                            "evidence" to mapOf("nodeIds" to listOf(security.id), "tradeIds" to listOf(trade.id), "urls" to emptyList<String>()),
+                            "dedupeKey" to "create:20261024-000001",
+                        ),
+                        mapOf(
+                            "kind" to "STUDY_NOTE",
+                            "payload" to mapOf("nodeId" to security.id, "level" to "UNSURE", "note" to "체결한 종목의 밸류에이션을 다시 본다"),
+                            "rationale" to "체결한 종목이라 이해 표시를 남긴다.",
+                            "dedupeKey" to "note:20261024-000001",
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val (createId, noteId) = submitted["results"].values().map { it["proposal"].id }
+        // 한 요청으로 올린 제안은 만든 시각이 같아 서버가 실제 id 로 순서를 가른다. (만든 시각, 종류)로 다시 정렬한다
+        val pendingPath = "/api/me/proposals?" + query("status" to "PENDING", "page" to 0, "size" to 20)
+        val pendingAgent = alice.get(pendingPath)
+        expect(200, pendingAgent)
+        val pendingBody = (pendingAgent.body.deepCopy() as ObjectNode).also { body ->
+            val items = body["items"].values().sortedWith(compareBy({ it["createdAt"].asString() }, { it["kind"].asString() }))
+            body.putArray("items").addAll(items)
+        }
+        save("proposals-pending-agent", "GET", pendingPath, pendingAgent.copy(body = pendingBody), namedOnly = true)
+        val acceptPath = "/api/me/proposals/$createId/accept"
+        val accepted = alice.post(acceptPath, mapOf("payload" to createPayload + ("properties" to mapOf("title" to "가상전자 추가 매수(고침)", "action" to "ADD"))))
+        expect(200, accepted)
+        save("proposal-accept", "POST", acceptPath, accepted)
+        val rejectPath = "/api/me/proposals/$noteId/reject"
+        val rejected = alice.post(rejectPath, mapOf("reason" to "이미 공부 탭에 표시했다"))
+        expect(200, rejected)
+        save("proposal-reject", "POST", rejectPath, rejected)
+        getAndSave(alice, "proposals-accepted", "/api/me/proposals?" + query("status" to "ACCEPTED", "page" to 0, "size" to 20))
+        // 새 결정의 근거 따라가기는 B 가 고친 기업의 수정 시각을 담아 남기지 않는다. 화면 테스트가 기존 따라가기로 만든다
+        val added = accepted.body["result"]["nodeIds"][0].asString()
+        getAndSave(alice, "node-decision-added", "/api/nodes/$added")
+        getAndSave(alice, "graph-decision-added", "/api/graph/neighborhood?" + query("id" to added, "hops" to 1))
+        getAndSave(alice, "trades-decision-added", "/api/me/trades?" + query("decisionId" to added, "size" to 20))
+
+        // 관리자가 사용자를 추가하고 열람자를 비활성화한다
+        val createdUser = admin.post("/api/users", mapOf("email" to "new-editor@example.com", "displayName" to "새 편집자", "role" to "EDITOR"))
+        expect(201, createdUser)
+        save("user-created", "POST", "/api/users", createdUser)
+        val viewerRow = admin.get("/api/users").body.values().first { it["email"].asString() == IntegrationTest.VIEWER }
+        val disablePath = "/api/users/${viewerRow.id}"
+        val disabled = admin.patch(disablePath, mapOf("expectedRevision" to viewerRow.revision, "enabled" to false))
+        expect(200, disabled)
+        save("user-disabled", "PATCH", disablePath, disabled)
+
+        // 관리자의 온톨로지 편집. 미리보기는 모두 같은 요청이라 화면 테스트가 이름으로 골라 쓴다
+        val current = admin.get("/api/ontology").body
+        val base = current["version"].asInt()
+        val baseYaml = getAndSave(admin, "ontology-version", "/api/ontology/versions/$base")["yaml"].asString()
+        val preview = { name: String, body: Map<String, Any?> ->
+            val response = admin.post("/api/ontology/preview", mapOf("baseVersion" to base) + body)
+            expect(200, response)
+            save(name, "POST", "/api/ontology/preview", response, namedOnly = true)
+            response.body
+        }
+        // YAML 로 새 타입을 더한다
+        val fundYaml = insertAfter(baseYaml, "nodeTypes:", FUND_TYPE_LINES)
+        preview("ontology-preview-add-type", mapOf("yaml" to fundYaml))
+        // 폼으로 인물에 속성을 더한다
+        val definition = (current.deepCopy() as ObjectNode).apply { listOf("version", "versionCreatedAt", "versionCreatedBy").forEach { remove(it) } }
+        val withNickname = definition.deepCopy().also {
+            (it["nodeTypes"]["Person"]["properties"] as ObjectNode).putObject(NICKNAME).put("type", "string").put("label", "별명").put("required", false)
+        }
+        preview("ontology-preview-add-property", mapOf("definition" to withNickname))
+        // 관계 문장 틀에 끝 자리가 빠지면 미리보기가 거짓이다
+        val brokenSentence = definition.deepCopy().also { (it["relationshipTypes"]["ISSUES"] as ObjectNode).put("sentence", "{from} 테스트") }
+        preview("ontology-preview-invalid", mapOf("definition" to brokenSentence))
+        // 개념에 필수 속성을 더하면 값이 없는 개념 수만큼 영향이 있다
+        val conceptAt = baseYaml.lines().indexOf("  Concept:").also { check(it >= 0) { "YAML 에 Concept 타입이 없다" } }
+        val requiredYaml = insertAfter(baseYaml, "    properties:", REQUIRED_CONCEPT_LINES, from = conceptAt)
+        preview("ontology-preview-impact", mapOf("yaml" to requiredYaml))
+        // 새 타입을 저장하고 저장 전 버전으로 되돌린다
+        val saveResponse = admin.post("/api/ontology/versions", mapOf("baseVersion" to base, "yaml" to fundYaml))
+        expect(201, saveResponse)
+        save("ontology-save", "POST", "/api/ontology/versions", saveResponse)
+        val savedVersion = saveResponse.body["version"].asInt()
+        preview("ontology-preview-restore", mapOf("baseVersion" to savedVersion, "yaml" to baseYaml))
+        val restorePath = "/api/ontology/versions/$base/restore"
+        val restoreResponse = admin.post(restorePath, mapOf("baseVersion" to savedVersion))
+        expect(201, restoreResponse)
+        save("ontology-restore", "POST", restorePath, restoreResponse)
+
         SnapshotNormalizer().normalize(saved.map { if (it.name.startsWith("graph-")) sortGraph(it) else it })
             .forEach { File(dir, "${it.name}.json").writeText(render(it)) }
     }
@@ -359,6 +486,7 @@ class ApiSnapshotTest {
     private fun render(s: Snapshot): String {
         val file = mapper.createObjectNode()
         file.putObject("request").put("method", s.method).put("path", s.path).put("query", s.query)
+        if (s.namedOnly) file.put("namedOnly", true)
         file.put("status", s.status)
         file.set("body", s.body)
         return pretty(file, "") + "\n"
@@ -383,6 +511,31 @@ class ApiSnapshotTest {
         private const val TICKER = "900100"
 
         /** base64url 43자. 무작위 값이면 동의 화면 query 의 code_challenge 가 실행마다 바뀐다 */
+        /** 화면 테스트가 YAML 로 더하는 펀드 타입. web/e2e/admin.spec.ts 와 같은 줄이다 */
+        private val FUND_TYPE_LINES = listOf(
+            "  Fund:",
+            "    label: 펀드",
+            "    description: 투자 펀드",
+            "    labelProperty: name",
+            "    properties:",
+            "      name:",
+            "        type: string",
+            "        label: 펀드 이름",
+            "        required: true",
+        )
+
+        /** 화면 테스트가 개념에 더하는 필수 속성. web/e2e/admin.spec.ts 와 같은 줄이다 */
+        private val REQUIRED_CONCEPT_LINES = listOf(
+            "      source:",
+            "        type: string",
+            "        label: 출처",
+            "        required: true",
+            "        maxLength: 50",
+        )
+
+        /** 화면 테스트가 폼으로 인물에 더하는 속성 키 */
+        private const val NICKNAME = "nickname"
+
         private const val PKCE_VERIFIER = "snapshot-pkce-verifier-0123456789abcdefghij"
 
         /** 다른 테스트의 데이터가 섞이지 않게 자기 Neo4j 를 띄운다. Spring 이 supplier 를 여러 번 부르므로 한 번만 띄운다 */

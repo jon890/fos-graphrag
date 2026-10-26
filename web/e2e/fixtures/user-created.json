@@ -1,0 +1,20 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/users",
+    "query": ""
+  },
+  "status": 201,
+  "body": {
+    "id": "00000000-0000-4000-8000-000000000073",
+    "email": "new-editor@example.com",
+    "displayName": "새 편집자",
+    "role": "EDITOR",
+    "enabled": true,
+    "linked": false,
+    "revision": 1,
+    "createdAt": "2026-01-01T00:01:18.000000Z",
+    "updatedAt": "2026-01-01T00:01:18.000000Z",
+    "lastLoginAt": null
+  }
+}

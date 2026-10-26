@@ -6,8 +6,19 @@ import tools.jackson.databind.node.JsonNodeFactory
 import java.net.URLDecoder
 import java.time.Instant
 
-/** 저장할 응답 하나. [query] 는 `?` 를 뺀 인코딩된 문자열이고, 없으면 빈 문자열이다 */
-data class Snapshot(val name: String, val method: String, val path: String, val query: String, val status: Int, val body: JsonNode)
+/**
+ * 저장할 응답 하나. [query] 는 `?` 를 뺀 인코딩된 문자열이고, 없으면 빈 문자열이다.
+ * [namedOnly] 면 가짜 API 가 요청만 보고 이 응답을 주지 않고, 화면 테스트가 이름으로 골라 쓴다
+ */
+data class Snapshot(
+    val name: String,
+    val method: String,
+    val path: String,
+    val query: String,
+    val status: Int,
+    val body: JsonNode,
+    val namedOnly: Boolean = false,
+)
 
 /**
  * 실행마다 달라지는 값(UUID, 시스템 시각, 토큰 원문, client_id)을 자리표시로 바꾼다.

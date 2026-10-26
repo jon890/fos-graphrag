@@ -1,0 +1,12 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/oauth/authorize",
+    "query": ""
+  },
+  "namedOnly": true,
+  "status": 200,
+  "body": {
+    "redirectUrl": "http://127.0.0.1:43210/callback?error=access_denied&state=st-%ED%85%8C%EC%8A%A4%ED%8A%B8+%26%EA%B0%92&iss=http%3A%2F%2F127.0.0.1%3A5180"
+  }
+}
