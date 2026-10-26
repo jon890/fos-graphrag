@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/ontology/preview",
+    "query": ""
+  },
+  "namedOnly": true,
+  "status": 200,
+  "body": {
+    "valid": false,
+    "errors": [
+      "알 수 없는 키 nokey (줄 314)"
+    ],
+    "added": [],
+    "removed": [],
+    "changed": [],
+    "impacts": [],
+    "codeOwnedIgnored": [],
+    "yaml": null,
+    "definition": null
+  }
+}

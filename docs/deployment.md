@@ -113,8 +113,36 @@ action 은 commit SHA 로 고정하고 버전 주석을 단다.
 로컬에서 확인하려면 `docker buildx build --platform linux/amd64 .` 를 실행한다.
 홈서버에서는 `latest` 대신 `sha-<7자리>` 를 `WORKBENCH_IMAGE` 에 고정해 쓴다.
 
-운영 배포는 `scripts/deploy-prod.sh` 한 명령으로 한다. main 의 이미지 workflow 를 돌려 성공을 기다리고, 홈서버의 `scripts/deploy/host-deploy-service.sh financial-workbench`(fos-home-infra)로 배포한 뒤 공개 주소의 health 를 본다.
+운영 배포는 `scripts/deploy-prod.sh` 한 명령으로 한다. main 의 이미지 workflow 를 돌려 성공을 기다리고, 홈서버의 `scripts/deploy/host-deploy-service.sh financial-workbench`(fos-home-infra)로 배포한 뒤 공개 주소의 health 를 보고, 마지막에 아래 「배포 뒤 확인」 을 돈다.
 PR 을 머지 큐(`merge-with-finish.py`)로 머지하면 `.orch/config.json` 의 머지 뒤 명령이 이 스크립트를 부른다. 문서만 머지했으면 배포하지 않는다.
+
+## 배포 뒤 확인
+
+`scripts/smoke-prod.ts` 가 공개 origin 에 읽기 요청만 보내 배포 결과를 확인한다. 외부 패키지 없이 Node 24 로 바로 돈다. `scripts/deploy-prod.sh` 가 마지막 단계로 부르고, 직접 부를 수도 있다.
+
+```bash
+# cwd: 저장소 루트
+node scripts/smoke-prod.ts https://<공개 origin>
+```
+
+| 검사 | 기대값 |
+| --- | --- |
+| `GET /api/health` | 200 |
+| 토큰 없는 `GET /api/v1/ontology` | 401 |
+| 토큰 없는 `POST /mcp` | 401, `WWW-Authenticate` 가 `Bearer resource_metadata="https://<공개 origin>/.well-known/oauth-protected-resource/mcp"` 를 담는다 |
+| `GET /.well-known/oauth-protected-resource/mcp` | `resource` 가 `https://<공개 origin>/mcp` |
+| `GET /.well-known/oauth-authorization-server` | `issuer` 가 `https://<공개 origin>` |
+| `GET /.well-known/oauth-authorization-server` | `code_challenge_methods_supported` 가 `S256` 을 담는다 |
+| `SMOKE_TOKEN` 으로 `GET /api/v1/me` | 200. 환경 변수가 없으면 건너뛴다 |
+
+검사마다 `통과:` 나 `실패:` 로 시작하는 줄을 찍고, 하나라도 실패하면 종료 코드 1 이다. origin 은 `https://` 여야 한다. `import.meta.main` 이 없는 Node(24.2 미만)에서도 직접 실행한 파일이면 검사를 돈다.
+토큰 확인을 하려면 웹의 더보기 → 연동 토큰에서 「조회만」 확인용 토큰을 발급해 환경 변수로 넘긴다. 토큰 원문은 터미널 기록과 로그에 남기지 않고, 확인이 끝나면 화면에서 폐기한다.
+
+```bash
+read -rs SMOKE_TOKEN && export SMOKE_TOKEN
+node scripts/smoke-prod.ts https://<공개 origin>
+unset SMOKE_TOKEN
+```
 
 ## 에이전트 연동 확인
 
@@ -147,12 +175,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $WORKBENCH_T
 
 원격 MCP 와 OAuth 인가 서버를 처음 배포한 뒤 한 번 확인한다. 데이터 구조는 새 label(`:OAuthClient`, `:OAuthCode`, `:OAuthGrant`)과 제약 조건만 더하고, 시작할 때 생기므로 옮길 데이터가 없다.
 
-```bash
-curl -sS https://<공개 origin>/.well-known/oauth-protected-resource/mcp      # resource 가 https://<공개 origin>/mcp
-curl -sS https://<공개 origin>/.well-known/oauth-authorization-server         # issuer 가 https://<공개 origin>, code_challenge_methods_supported 에 S256
-curl -sS -o /dev/null -D - -X POST -H 'Content-Type: application/json' -d '{}' https://<공개 origin>/mcp | grep -i -E '^HTTP|^www-authenticate'
-# HTTP/2 401 과 WWW-Authenticate: Bearer resource_metadata="https://<공개 origin>/.well-known/oauth-protected-resource/mcp", scope="read write"
-```
+메타데이터의 `resource` 와 `issuer`, 토큰 없는 `POST /mcp` 의 401 과 `WWW-Authenticate` 는 위의 「배포 뒤 확인」 스크립트로 본다.
 
 `resource` 나 `issuer` 가 `http://` 로 나오면 `WORKBENCH_PUBLIC_URL` 이 비어 있고 앞단의 `X-Forwarded-*` 를 app 이 믿지 않는 것이다. `WORKBENCH_PUBLIC_URL` 을 넣거나 위의 「기본 시나리오」 의 forward headers 설정을 확인한다.
 
@@ -300,14 +323,11 @@ cd web && npm ci && npm run dev                    # 웹 :5173, /api 와 Google 
 개발 Compose 의 포트는 `127.0.0.1` 에만 묶인다. 기본 포트(`7474`, `7687`)를 쓰는 다른 Neo4j 와 겹치지 않는다.
 개발 Compose 의 프로젝트 이름은 `fos-workbench-dev` 이고 볼륨도 운영 Compose 와 따로 쓴다.
 
-## 브라우저 테스트
+## 화면 테스트
+
+화면 테스트는 Docker 없이 가짜 API 로 돈다. 가짜 API 는 서버 테스트가 만든 응답 스냅샷(`web/e2e/fixtures/`)을 돌려준다.
 
 ```bash
-# cwd: 저장소 루트
-COMPOSE_FILE=compose.yml:compose.e2e.yml docker compose up -d --build --wait
-cd web && WORKBENCH_URL=http://127.0.0.1:8081 E2E_ADMIN_NAME=관리자 npx playwright test
+# cwd: web
+npx playwright install chromium && npx playwright test --project=chromium --project=mobile
 ```
-
-`compose.e2e.yml` 은 가짜 OIDC 공급자를 더하고 app 을 `e2e` 프로필로 띄운다. `e2e` 는 `prod` 를 포함하지 않는다.
-운영 Compose 위에 겹치므로 이미지, 보안 헤더, cap_drop, 메모리 상한은 운영과 같다. TLS 가 없으므로 Secure 쿠키와 forward headers 만 끈다.
-`prod` 와 가짜 공급자(`mockoidc`)를 함께 켜면 app 이 시작하지 않는다. 운영에서 이 파일을 쓰지 않는다.

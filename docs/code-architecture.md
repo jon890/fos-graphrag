@@ -7,16 +7,15 @@
   ontology/financial-ontology.yaml   온톨로지의 첫 버전과 코드 소유 부분. API 빌드가 jar 에 복사한다
   api/                               Kotlin + Spring Boot API. 자체 Gradle Wrapper
   web/                               React + TypeScript + Vite. Cytoscape.js 그래프
-  web/e2e/                           Playwright 브라우저 테스트
+  web/e2e/                           Playwright 화면 테스트와 가짜 API, 응답 스냅샷(fixtures/)
   scripts/                           백업, 복원, Compose 설정 검사 스크립트
   Dockerfile                         웹 빌드, API 빌드, 실행 이미지를 한 파일에서 만든다
   compose.yml                        운영 Compose. Neo4j 포트를 공개하지 않는다
   compose.dev.yml                    개발 Compose. Neo4j 와 가짜 OIDC 공급자를 loopback 에 묶는다
-  compose.e2e.yml                    브라우저 테스트용 override. 가짜 OIDC 공급자를 더한다
   docs/                              이 문서들
   plugin/                            Claude Code·Codex 플러그인. 원격 MCP 연결 설정(.mcp.json)과 비개발자용 스킬
   .claude-plugin/marketplace.json    Claude Code·Codex 마켓플레이스 목록. ./plugin 을 가리킨다
-  .github/workflows/                 GHCR 이미지를 올리는 workflow
+  .github/workflows/                 GHCR 이미지 workflow 와 테스트 workflow
 ```
 
 브라우저는 API 하고만 통신한다. Neo4j 자격증명과 Cypher 실행 기능은 클라이언트에 없다.
@@ -42,7 +41,8 @@ flowchart LR
 | Spring Boot | 4.1.0 | `api/gradle/libs.versions.toml` |
 | Kotlin | 2.3.21 | Spring Boot 4.1.0 BOM 의 `kotlin.version` |
 | Neo4j Java Driver | 6.1.0 | Spring Boot 4.1.0 BOM 의 `neo4j-java-driver.version` |
-| Testcontainers | 2.0.5 | Spring Boot 4.1.0 BOM 의 `testcontainers.version` |
+| Neo4j 테스트 하네스(neo4j-harness) | 5.26.30 | 운영 이미지와 같은 패치. BOM 밖의 Gradle 설정 `neo4jHarness` |
+| 가짜 OIDC 공급자 라이브러리(mock-oauth2-server) | 3.0.1 | 개발 Compose 의 이미지와 같은 버전 |
 | MCP Java SDK(`io.modelcontextprotocol.sdk:mcp`) | 2.1.0 | 최신 GA. `mcp-core` 와 Jackson 3 모듈(`mcp-json-jackson3`)을 묶은 것이다. MCP `2025-11-25` 까지 말한다. 테스트의 MCP 클라이언트도 같은 jar 다 |
 | Neo4j | `neo4j:5.26.30-community` | 5.26 LTS |
 | Gradle | 8.14.3 | `api/gradle/wrapper/gradle-wrapper.properties` |
@@ -75,7 +75,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 - Claude Code 의 원격 MCP 와 플러그인 마켓플레이스: https://code.claude.com/docs/en/mcp , https://code.claude.com/docs/en/plugin-marketplaces
 - Codex 의 원격 MCP 와 OAuth 로그인: https://learn.chatgpt.com/docs/extend/mcp?surface=cli , https://learn.chatgpt.com/docs/config-file/config-reference
 
-드라이버 6.1.0 과 Neo4j 5.26.30 의 조합은 Testcontainers 통합 테스트와 Compose 실행으로 실제 확인했다.
+드라이버 6.1.0 과 Neo4j 5.26.30 의 조합은 JUnit 안의 Neo4j 통합 테스트와 Compose 실행으로 실제 확인했다.
 
 ## API 패키지
 
@@ -148,9 +148,9 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | 프로필 | 들어 있는 것 | 쓰는 곳 |
 | --- | --- | --- |
 | `prod` | `container`, 실제 Google 등록, Secure 쿠키 기본값 true | 운영 이미지 기본값 |
-| `e2e` | `container`, `mockoidc` | 브라우저 테스트(`compose.e2e.yml`) |
-| `container` | 이미지 안의 정적 파일 위치 | prod, e2e 공통 |
-| `mockoidc` | 가짜 OIDC 공급자(`ghcr.io/navikt/mock-oauth2-server`) | 개발 실행, 자동 테스트, e2e |
+| `e2e` | `container`, `mockoidc` | 쓰지 않는다 |
+| `container` | 이미지 안의 정적 파일 위치 | prod 가 쓴다 |
+| `mockoidc` | 가짜 OIDC 공급자(`ghcr.io/navikt/mock-oauth2-server`) | 개발 실행, 자동 테스트 |
 
 `prod` 는 시작할 때 `ProdStartupGuard` 가 아래를 확인하고 하나라도 어기면 멈춘다.
 
@@ -233,15 +233,53 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 
 ## 테스트
 
-| 종류 | 위치 | Neo4j |
+모든 자동 테스트는 Docker 없이 돈다([ADR-018](adr/018-tests-without-containers.md)).
+
+| 종류 | 위치 | 서버와 Neo4j |
 | --- | --- | --- |
 | 온톨로지 단위 테스트 | `api/src/test/kotlin/.../ontology/` | 쓰지 않음 |
-| 통합 테스트 | `api/src/test/kotlin/.../` 의 `*IntegrationTest` | Testcontainers 로 `neo4j:5.26.30-community` 와 가짜 OIDC 공급자를 띄운다 |
+| 통합 테스트 | `api/src/test/kotlin/.../` 의 `*IntegrationTest` | 실제 서버 포트와 테스트 JVM 안의 Neo4j 5.26(`neo4j-harness`), 같은 JVM 안의 가짜 OIDC 공급자(`mock-oauth2-server` 라이브러리) |
+| 응답 스냅샷 | `api/src/test/kotlin/.../snapshot/ApiSnapshotTest.kt` 가 `web/e2e/fixtures/*.json` 을 쓴다 | 통합 테스트와 같다. 다만 Neo4j 는 다른 테스트의 데이터가 섞이지 않게 따로 띄운다 |
 | 웹 단위 테스트 | `web/src/**/*.test.ts`, `*.test.tsx` | 쓰지 않음. 컴포넌트는 `react-dom/server` 로 렌더링해 확인한다 |
+| 화면 테스트 | `web/e2e/` | Playwright 가 웹을 빌드해 Vite preview 서버로 띄우고(운영과 같은 CSP 헤더), `web/e2e/mock/` 의 가짜 API 가 `page.route` 로 응답한다. 넓은 화면(1440×900)과 휴대폰 폭(390×844) 두 project 로 돈다. 휴대폰 project 는 `mobile.spec.ts` 만 돈다 |
 | 플러그인 형식 검사 | `scripts/tests/test_plugin.py` | 쓰지 않음. 검사 항목은 그 스크립트가 소유한다 |
-| 브라우저 테스트 | `web/e2e/` | 운영 Compose 와 `compose.e2e.yml`. 가짜 OIDC 공급자로 실제 OAuth 리다이렉트를 탄다. 넓은 화면(1440×900)과 휴대폰 폭(390×844) 두 project 로 돈다. 휴대폰 project 는 `mobile.spec.ts` 만 돈다 |
+| 운영 확인 | `scripts/smoke-prod.ts`, 검사는 `scripts/tests/smoke-prod.test.ts` | 배포 뒤 운영 주소에 읽기 요청만 보낸다. 검사는 Node 가 띄운 가짜 HTTP 서버로 한다 |
 
-mock 으로 Neo4j 를 대신한 테스트는 없다. 트랜잭션 일관성 테스트만 실패하는 `ChangeEventRecorder` 를 주입한다. 이때도 Neo4j 는 실제 컨테이너다.
+mock 으로 Neo4j 를 대신한 서버 테스트는 없다. 트랜잭션 일관성 테스트만 실패하는 `ChangeEventRecorder` 를 주입한다. 이때도 Neo4j 는 실제 서버다.
+
+### JUnit 안의 Neo4j
+
+- 테스트 JVM 하나에 Neo4j 하나를 띄워 모든 통합 테스트가 나눠 쓴다. 띄우는 코드는 `api/src/test/kotlin/dev/fos/workbench/support/EmbeddedServers.kt` 다.
+  운영 Compose 와 같은 서버 상한(`db.transaction.timeout` 10s, `db.lock.acquisition.timeout` 5s)을 준다. bolt 로 붙는다.
+  pagecache 는 운영 Compose(512m)에 가깝게 256MiB 를 준다. 하네스 기본값(8MiB)에서는 관계 인덱스를 쓰는 실행 계획이 실행마다 달라진 적이 있다. 하네스는 인증이 꺼져 있어(`dbms.security.auth_enabled` 기본값 false) 설정의 placeholder 비밀번호를 무시한다.
+- Neo4j 5.26 서버는 Netty 4.1 을 쓰고, 앱의 Neo4j Java Driver 6.1 은 Spring Boot BOM 이 고른 Netty 4.2 를 쓴다. 한 클래스로더에 두면 서버가 내부 채널을 열지 못한다.
+  그래서 하네스는 BOM 을 받지 않는 Gradle 설정 `neo4jHarness` 로 받는다. `test` task 가 그 jar 경로를 시스템 속성 `neo4j.harness.classpath` 로 넘기고, `EmbeddedServers` 가 그 jar 만 담은 클래스로더(부모는 platform 클래스로더)에서 하네스를 리플렉션으로 띄운다.
+  하네스는 자기 SLF4J provider 를 들고 오지만 격리 클래스로더 안에만 있어 앱의 Logback 과 부딪히지 않는다.
+- 가짜 OIDC 공급자 `mock-oauth2-server` 는 개발 Compose 와 같은 3.0.1 이다. 6.x 는 Jackson 3.2 를 요구해 BOM 의 Jackson 3.1 과 어긋난다. 3.0.1 은 Jackson 2 를 써 앱의 Jackson 3 과 패키지가 다르다.
+- 버전은 `api/gradle/libs.versions.toml` 이 소유한다. Neo4j 하네스는 운영 이미지와 같은 5.26 패치 버전으로 올린다.
+
+### 응답 스냅샷
+
+- `ApiSnapshotTest` 가 화면 테스트에 필요한 대표 데이터를 API 로 만들고, 대표 응답을 정규화해 `web/e2e/fixtures/<이름>.json` 에 쓴다. 테스트를 돌릴 때마다 다시 쓰고, 바뀌었으면 `git status` 로 드러난다. 흐름이 중간에 실패하면 기존 파일을 지우지 않는다.
+  스냅샷 테스트는 초기 데이터를 넣지 않는다. 화면 테스트의 데이터는 이 테스트가 만든 것뿐이다.
+- 파일 하나가 응답 하나다. `request`(`method`, `path`, `query`), `status`, `body` 를 담는다. 화면 테스트의 가짜 API 는 이 `request` 로 응답을 고른다.
+  같은 요청의 다른 상태(예: 온톨로지 미리보기 여러 개, 승인 전후의 제안 목록)를 남길 때는 `namedOnly: true` 를 붙인다. 가짜 API 는 그 파일을 요청으로 고르지 않고, 테스트가 이름으로 골라 덮어쓴다.
+- 정규화 규칙은 `api/src/test/kotlin/dev/fos/workbench/snapshot/SnapshotNormalizer.kt` 가 소유한다. 모든 응답을 모은 뒤 한 번에 바꾼다. UUID 는 저장한 순서에서 처음 나온 순서대로 `00000000-0000-4000-8000-<12자리 순번>` 으로, 시각은 실제 시각 순서대로 `2026-01-01T00:00:00` 부터 1초씩 늘린 값으로, 토큰 원문과 `last4`, `client_id`, 인가 코드는 고정 문자열로 바꾼다.
+  OAuth 주소의 origin 은 `workbench.oauth.public-url` 을 가짜 API 와 같은 `http://127.0.0.1:5180` 으로 고정해 실행마다 같게 한다. PKCE 검증값도 고정 문자열을 쓴다.
+  새 데이터와 새 저장은 기존 흐름의 끝에 붙인다. 중간에 끼우면 뒤의 자리표시가 모두 바뀐다. 화면 테스트는 id 를 코드에 적지 않고 스냅샷에서 읽는다.
+  같은 실제 값은 모든 파일에서 같은 자리표시로 바뀌어, 검색 결과의 id 로 상세 응답을 찾을 수 있다.
+  서버가 실제 id 순서로 정렬하는 응답(주변 그래프)은 정규화하기 전에 id 가 아닌 값으로 다시 정렬한다. 노드는 중심 다음 (타입, 이름) 순서이고, 관계는 (타입, 시작 노드, 끝 노드) 순서다. 실제 UUID 가 무작위라 그대로 두면 실행마다 순서와 자리표시가 바뀐다. 서버가 id 로 정렬한 목록(마지막 근거 문서 보관 거절의 claimIds, 같은 시각에 올린 제안의 대기 목록)도 같은 방법으로 다시 정렬한다. 키가 id 인 객체도 바뀐 키 순서로 정렬한다.
+- 갱신 명령은 `README.md` 의 「검증」 에 있다.
+
+### 가짜 API
+
+- `web/e2e/mock/` 의 가짜 API 는 스냅샷을 읽어 `request` 가 같은 요청에 그 응답을 준다. 경로가 같고 query 가 다른 요청은 query 없는 스냅샷으로 답하지 않고 실패로 돌린다.
+  같은 요청을 가리키는 스냅샷이 둘 이상이면 읽을 때 실패한다. 예외는 역할마다 다른 `GET /api/auth/me`(`auth-me-*`)와 `namedOnly` 스냅샷이다. 같은 요청의 다른 상태는 테스트가 덮어쓴다.
+  테스트가 응답을 바꿔야 하면 그 테스트 안에서 덮어쓴다. 스냅샷에도 덮어쓰기에도 없는 요청은 501 로 답하고 테스트를 실패시킨다.
+- 로그인 상태와 역할(VIEWER, EDITOR, ADMIN)은 테스트가 고른다. 「Google 로 로그인」 이 여는 `/oauth2/authorization/google` 을 가짜 API 가 받아 로그인 상태로 바꾸고 `/` 로 돌려보낸다.
+  `/api/auth/csrf` 는 서버 계약대로 `XSRF-TOKEN` 쿠키를 심고, 쓰기 요청의 `X-XSRF-TOKEN` 헤더가 그 값과 다르면 `403 CSRF_REJECTED` 로 답한다.
+- 화면 테스트의 서버는 `web/vite.config.ts` 의 `preview.headers` 로 운영 API(`SecurityConfig`)와 같은 CSP 를 건다. 그래서 Cytoscape 가 실행 중에 넣는 컨테이너 스타일(`position: relative`)이 운영처럼 막히고, 그래프 칸은 `legacy.css` 의 배치를 따른다. 두 CSP 값은 함께 고친다.
+- 가짜 API 는 받은 요청을 기록한다. 화면 테스트는 화면이 보낸 요청의 경로와 본문을 확인하고, 저장 뒤 다른 사용자에게 보이는지 같은 서버 동작은 서버 JUnit 테스트가 확인한다.
 
 ## 결정
 
@@ -262,6 +300,7 @@ mock 으로 Neo4j 를 대신한 테스트는 없다. 트랜잭션 일관성 테�
 | [015](adr/015-remote-mcp-oauth.md) | 서버가 원격 MCP(`/mcp`)를 직접 제공하고 OAuth 인가 서버를 겸한다. 비개발자는 플러그인 설치와 OAuth 로그인으로 Claude Code, Codex 를 붙이고, Hermes 는 연동 토큰으로 같은 `/mcp` 를 부른다 |
 | [016](adr/016-ontology-yaml-only-editor.md) | 온톨로지는 웹의 YAML 편집기 하나로만 고친다. 폼 편집기를 지우고, 편집기는 화면 높이에 맞춘 줄 번호 편집칸과 늘 보이는 툴바를 둔다. 008 의 폼 편집기를 뺐다 |
 | [017](adr/017-agent-ontology-and-instance-proposals.md) | 에이전트의 온톨로지 변경(`ONTOLOGY_CHANGE`)과 인스턴스 고치기, 보관, 주장 만들기도 제안으로 받는다. 온톨로지 변경은 ADMIN 이 승인하고 기준 버전이 바뀌면 승인하지 않는다 |
+| [018](adr/018-tests-without-containers.md) | 테스트에서 컨테이너를 띄우지 않는다. 서버는 JUnit 안의 Neo4j 로, 화면은 서버가 남긴 응답 스냅샷을 주는 가짜 API 로 테스트한다 |
 
 대체된 ADR 은 `adr/superseded/` 에 있다. 당시 맥락을 읽을 때만 본다.
 
@@ -276,9 +315,7 @@ ADR 로 남기지 않은 작은 결정은 다음과 같다.
 - 타입 순서는 온톨로지 필드가 아니라 관계 방향으로 계산한다([ADR-010](adr/010-concept-map-first-screen.md)). 깊이는 뿌리에서의 너비 우선 거리라 개념 지도의 `breadthfirst` 층과 같다.
 - 개념 지도의 최근 항목은 검색 API 에 `sort=recent` 를 더해 받는다(2026-10-24). 화면이 여러 쪽을 받아 정렬하는 안은 항목이 늘면 요청이 커져 버렸다.
 - 첫 접속 가이드는 라이브러리 없이 만든다(2026-10-23). 말풍선 라이브러리는 실행 중에 `<style>` 을 넣는 것이 많아 `style-src 'self'` 와 부딪히고, 가이드가 만들기 폼을 미리 채우고 만들기 성공을 받아야 해서 단계마다 화면 코드와 맞물린다. 말풍선 위치는 대상 요소의 `getBoundingClientRect` 로 계산해 React 의 `style` 속성(CSSOM)으로 둔다. 끝낸 기록은 서버의 `:User.guideDoneAt` 이다(사용자 결정 2026-10-23). 기기를 바꿔도 다시 열리지 않게 하려는 것이다.
-- 브라우저 테스트는 `prod` 를 켜지 않고 `e2e` 프로필(= `container` + `mockoidc`)로 돈다. `prod` 와 `mockoidc` 를 함께 켜면 시작을 막는다.
-  e2e 스택은 운영 Compose 위에 override 만 겹치므로 이미지, 보안 헤더, cap_drop, 메모리 상한, 포트 규칙이 운영과 같다. Secure 쿠키와 forward headers 만 끈다.
-  `prod` 에 가짜 공급자를 허용하는 안은 버렸다. 설정 실수 하나로 아무나 첫 관리자로 로그인할 수 있게 되기 때문이다.
+- `prod` 와 `mockoidc` 를 함께 켜면 시작을 막는다. `prod` 에 가짜 공급자를 허용하는 안은 버렸다. 설정 실수 하나로 아무나 첫 관리자로 로그인할 수 있게 되기 때문이다.
 - 시각은 고정 자릿수 문자열로 저장한다. Neo4j `datetime` 타입으로 바꾸는 안은 JSON 계약과 기존 개발 데이터를 함께 바꿔야 해서 버렸다.
 - 백업은 `neo4j-admin database dump --to-stdout` 으로 받아 호스트 파일(600)에 쓴다. 호스트 디렉터리를 컨테이너에 마운트하지 않아 권한을 넓힐 필요가 없다.
 - 화면 부품은 shadcn(Radix, Tailwind)으로 만든다(2026-10-21 사용자 결정). Mantine 같은 부품 라이브러리는 라이브러리 버전에 화면이 묶이고, 직접 쓴 CSS 만으로는 접근성과 반응형을 화면마다 다시 짜야 해서 버렸다.

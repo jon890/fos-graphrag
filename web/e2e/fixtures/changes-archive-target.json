@@ -1,0 +1,89 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/changes",
+    "query": "targetId=00000000-0000-4000-8000-000000000056&page=0&size=20"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000057",
+        "at": "2026-01-01T00:01:06.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "RESTORE",
+        "targetId": "00000000-0000-4000-8000-000000000056",
+        "targetKind": "NODE",
+        "targetType": "Company",
+        "targetLabel": "보관 연습 기업",
+        "revision": 3,
+        "changes": {
+          "archived": {
+            "before": true,
+            "after": false
+          }
+        },
+        "refs": {},
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000058",
+        "at": "2026-01-01T00:01:04.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "ARCHIVE",
+        "targetId": "00000000-0000-4000-8000-000000000056",
+        "targetKind": "NODE",
+        "targetType": "Company",
+        "targetLabel": "보관 연습 기업",
+        "revision": 2,
+        "changes": {
+          "archived": {
+            "before": false,
+            "after": true
+          }
+        },
+        "refs": {},
+        "note": "화면 테스트 보관"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000059",
+        "at": "2026-01-01T00:01:01.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000056",
+        "targetKind": "NODE",
+        "targetType": "Company",
+        "targetLabel": "보관 연습 기업",
+        "revision": 1,
+        "changes": {
+          "name": {
+            "before": null,
+            "after": "보관 연습 기업"
+          },
+          "country": {
+            "before": null,
+            "after": "KR"
+          }
+        },
+        "refs": {},
+        "note": null
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalItems": 3,
+    "totalPages": 1
+  }
+}

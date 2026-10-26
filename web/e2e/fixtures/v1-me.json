@@ -1,0 +1,23 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/me",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "user": {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "displayName": "Alice",
+      "role": "EDITOR"
+    },
+    "token": {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "name": "Hermes",
+      "last4": "AAAA",
+      "scope": "READ_WRITE"
+    },
+    "rateLimitPerMinute": 60,
+    "writeRateLimitPerMinute": 10
+  }
+}

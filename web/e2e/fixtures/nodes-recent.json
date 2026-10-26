@@ -1,0 +1,41 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/nodes",
+    "query": "types=Company&sort=recent&size=5"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000005",
+        "type": "Company",
+        "label": "가상전자",
+        "properties": {
+          "name": "가상전자",
+          "country": "KR"
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:15.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "updatedAt": "2026-01-01T00:00:15.000000Z",
+        "updatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "reviewStatus": null
+      }
+    ],
+    "page": 0,
+    "size": 5,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}

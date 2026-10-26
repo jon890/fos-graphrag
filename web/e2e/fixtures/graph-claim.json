@@ -1,0 +1,68 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/graph/neighborhood",
+    "query": "id=00000000-0000-4000-8000-000000000015&hops=1"
+  },
+  "status": 200,
+  "body": {
+    "centerId": "00000000-0000-4000-8000-000000000015",
+    "hops": 1,
+    "nodes": [
+      {
+        "id": "00000000-0000-4000-8000-000000000015",
+        "type": "Claim",
+        "label": "가상전자 → 가상 메모리 반도체 속한다",
+        "reviewStatus": "REVIEWED",
+        "predicate": "BELONGS_TO_SECTOR"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000005",
+        "type": "Company",
+        "label": "가상전자",
+        "reviewStatus": null,
+        "predicate": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000006",
+        "type": "Document",
+        "label": "가상전자 2026 사업보고서",
+        "reviewStatus": null,
+        "predicate": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000017",
+        "type": "Sector",
+        "label": "가상 메모리 반도체",
+        "reviewStatus": null,
+        "predicate": null
+      }
+    ],
+    "edges": [
+      {
+        "id": "00000000-0000-4000-8000-000000000026",
+        "type": "OBJECT",
+        "source": "00000000-0000-4000-8000-000000000015",
+        "target": "00000000-0000-4000-8000-000000000017"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000027",
+        "type": "SUBJECT",
+        "source": "00000000-0000-4000-8000-000000000015",
+        "target": "00000000-0000-4000-8000-000000000005"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000052",
+        "type": "SUPPORTED_BY",
+        "source": "00000000-0000-4000-8000-000000000015",
+        "target": "00000000-0000-4000-8000-000000000006"
+      }
+    ],
+    "truncated": false,
+    "limits": {
+      "maxHops": 2,
+      "maxNodes": 150,
+      "maxRelationships": 300
+    }
+  }
+}

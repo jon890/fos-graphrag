@@ -1,0 +1,48 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/me/proposals/00000000-0000-4000-8000-000000000070/reject",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "id": "00000000-0000-4000-8000-000000000070",
+    "kind": "STUDY_NOTE",
+    "status": "REJECTED",
+    "payload": {
+      "nodeId": "00000000-0000-4000-8000-000000000009",
+      "level": "UNSURE",
+      "note": "체결한 종목의 밸류에이션을 다시 본다"
+    },
+    "rationale": "체결한 종목이라 이해 표시를 남긴다.",
+    "evidence": {
+      "nodeIds": [],
+      "tradeIds": [],
+      "urls": []
+    },
+    "createdAt": "2026-01-01T00:01:13.000000Z",
+    "createdVia": "AGENT",
+    "token": {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "name": "Hermes"
+    },
+    "decidedAt": "2026-01-01T00:01:17.000000Z",
+    "decisionNote": "이미 공부 탭에 표시했다",
+    "result": null,
+    "lastError": null,
+    "requiresEditor": false,
+    "requiredRole": "VIEWER",
+    "refs": {
+      "nodes": {
+        "00000000-0000-4000-8000-000000000009": {
+          "id": "00000000-0000-4000-8000-000000000009",
+          "type": "Security",
+          "label": "가상전자 보통주",
+          "archived": false
+        }
+      },
+      "relationships": {},
+      "trades": {}
+    }
+  }
+}

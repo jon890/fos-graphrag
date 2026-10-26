@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/me/tokens",
+    "query": ""
+  },
+  "status": 201,
+  "body": {
+    "id": "00000000-0000-4000-8000-000000000004",
+    "name": "Hermes",
+    "scope": "READ_WRITE",
+    "last4": "AAAA",
+    "createdAt": "2026-01-01T00:00:55.000000Z",
+    "lastUsedAt": null,
+    "token": "fwb_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  }
+}

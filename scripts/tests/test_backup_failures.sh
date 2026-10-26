@@ -70,7 +70,8 @@ check "load 가 실패하면 0 이 아닌 코드로 끝난다(받은 코드 $cod
 check "load 가 실패하면 서비스를 다시 올리지 않는다" bash -c "! grep -q 'compose start' '$log'"
 check "실패해도 안전 덤프 경로와 되돌리는 명령을 출력한다" bash -c "grep -q '복원 전 상태: .*neo4j-before-restore-' '$work/restore.out' && grep -q '되돌리려면: .*restore.sh --skip-safety-dump' '$work/restore.out'"
 check "안전 덤프 파일이 남아 있다" bash -c "ls '$work/fw/backups/'neo4j-before-restore-*.dump >/dev/null 2>&1"
-check "안전 덤프 파일은 실행한 사용자만 읽는다" bash -c "[ \"\$(stat -f %Lp '$work/fw/backups/'neo4j-before-restore-*.dump 2>/dev/null || stat -c %a '$work/fw/backups/'neo4j-before-restore-*.dump)\" = 600 ]"
+# GNU stat 의 -f 는 파일시스템 정보라 실패하지 않고 다른 값을 낸다. GNU 형식(-c)을 먼저 쓰고, 안 되면 BSD 형식(macOS)으로 읽는다
+check "안전 덤프 파일은 실행한 사용자만 읽는다" bash -c "[ \"\$(stat -c %a '$work/fw/backups/'neo4j-before-restore-*.dump 2>/dev/null || stat -f %Lp '$work/fw/backups/'neo4j-before-restore-*.dump)\" = 600 ]"
 
 [ "$failed" = 0 ] || { echo "--- backup 출력"; cat "$work/backup.out"; echo "--- restore 출력"; cat "$work/restore.out"; }
 exit $failed

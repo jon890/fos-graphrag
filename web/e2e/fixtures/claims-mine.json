@@ -1,0 +1,75 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/claims",
+    "query": "reviewStatus=DRAFT&scope=mine&page=0&size=20"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000019",
+        "type": "Claim",
+        "label": "가상전자 보통주 → 가상 메모리 반도체 속한다",
+        "properties": {
+          "predicate": "BELONGS_TO_SECTOR",
+          "description": "가상전자 보통주는 메모리 반도체 산업에 속한다.",
+          "evidenceText": "당사는 D램과 낸드 플래시를 주력으로 생산한다.",
+          "authoringMethod": "MANUAL"
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:47.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "updatedAt": "2026-01-01T00:00:47.000000Z",
+        "updatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "reviewStatus": "DRAFT",
+        "reviewedBy": null,
+        "reviewedAt": null,
+        "reviewNote": null,
+        "contentUpdatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "subject": {
+          "id": "00000000-0000-4000-8000-000000000009",
+          "type": "Security",
+          "label": "가상전자 보통주",
+          "archived": false
+        },
+        "object": {
+          "id": "00000000-0000-4000-8000-000000000017",
+          "type": "Sector",
+          "label": "가상 메모리 반도체",
+          "archived": false
+        },
+        "documents": [
+          {
+            "id": "00000000-0000-4000-8000-000000000006",
+            "title": "가상전자 2026 사업보고서",
+            "url": "https://example.com/virtual-electronics-2026",
+            "publisher": "가상공시",
+            "documentType": "FILING",
+            "publishedAt": "2026-03-15",
+            "collectedAt": "2026-10-20T03:00:00Z",
+            "archived": false
+          }
+        ]
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}

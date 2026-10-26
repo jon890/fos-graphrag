@@ -28,8 +28,11 @@ check "Dockerfile 의 모든 FROM 이 digest 로 고정됐다" bash -c '! grep -
 check "Gradle Wrapper 가 배포본 sha256 을 확인한다" grep -q '^distributionSha256Sum=[0-9a-f]\{64\}$' api/gradle/wrapper/gradle-wrapper.properties
 check "이미지 workflow 는 main 에서만 publish 한다" grep -q "if: github.ref == 'refs/heads/main'" .github/workflows/workbench-image.yml
 check "이미지에 제목과 설명 라벨이 있다" bash -c 'grep -q "org.opencontainers.image.title=" .github/workflows/workbench-image.yml && grep -q "org.opencontainers.image.description=" .github/workflows/workbench-image.yml'
-check "e2e override 는 prod 프로필을 켜지 않는다" bash -c '! grep -E "SPRING_PROFILES_ACTIVE:.*prod" compose.e2e.yml'
+check "테스트 workflow 의 action 이 SHA 로 고정됐다" bash -c 'grep -q "uses:" .github/workflows/test.yml && ! grep -E "^[[:space:]-]*uses:" .github/workflows/test.yml | grep -vE "@[0-9a-f]{40}( |$)"'
 check "운영 Neo4j 에 트랜잭션과 잠금 대기 상한이 있다" bash -c 'grep -q NEO4J_db_transaction_timeout compose.yml && grep -q NEO4J_db_lock_acquisition_timeout compose.yml'
+
+# 운영 확인 스크립트를 로컬 가짜 HTTP 서버로 검사한다
+if node --test scripts/tests/smoke-prod.test.ts; then :; else failed=1; fi
 
 # 백업과 복원의 실패 경로(중단, load 실패)를 가짜 docker 로 검사한다
 if bash scripts/tests/test_backup_failures.sh; then :; else failed=1; fi

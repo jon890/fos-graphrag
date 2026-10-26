@@ -5,7 +5,6 @@ import dev.fos.workbench.auth.UserRepository
 import org.junit.jupiter.api.BeforeEach
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.context.annotation.Import
 import org.springframework.core.env.Environment
 import org.springframework.data.neo4j.core.Neo4jClient
 import org.springframework.test.context.ActiveProfiles
@@ -15,20 +14,19 @@ import tools.jackson.databind.json.JsonMapper
 import java.util.UUID
 
 /**
- * 실제 서버 포트, 실제 Neo4j, 가짜 OIDC 공급자로 도는 통합 테스트의 공통 설정.
- * NEO4J_PASSWORD 는 설정 placeholder 를 채우기 위한 값이고, 접속 정보는 ServiceConnection 이 덮어쓴다.
+ * 실제 서버 포트, 테스트 JVM 안의 Neo4j 와 가짜 OIDC 공급자로 도는 통합 테스트의 공통 설정.
+ * 하네스는 인증이 꺼져 있어(`dbms.security.auth_enabled` 기본값 false) 이 비밀번호를 무시한다. placeholder 만 채운다.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = [
-        "NEO4J_PASSWORD=placeholder-overridden-by-service-connection",
+        "NEO4J_PASSWORD=unused-auth-disabled",
         // 모든 테스트 요청이 127.0.0.1 에서 와 OAuth 의 IP 한도를 나눠 쓴다. 한도를 보는 테스트만 값을 낮춘다
         "workbench.oauth.register-rate-limit-per-minute=10000",
         "workbench.oauth.token-rate-limit-per-minute=10000",
     ],
 )
 @ActiveProfiles("mockoidc")
-@Import(TestcontainersConfig::class)
 abstract class IntegrationTest {
 
     @Autowired lateinit var environment: Environment
@@ -75,9 +73,10 @@ abstract class IntegrationTest {
 
         @JvmStatic
         @DynamicPropertySource
-        fun mockOidc(registry: DynamicPropertyRegistry) {
-            registry.add("MOCK_OIDC_BROWSER_URL") { TestcontainersConfig.mockOidcUrl() }
-            registry.add("MOCK_OIDC_INTERNAL_URL") { TestcontainersConfig.mockOidcUrl() }
+        fun embeddedServers(registry: DynamicPropertyRegistry) {
+            registry.add("spring.neo4j.uri") { EmbeddedServers.neo4jUri }
+            registry.add("MOCK_OIDC_BROWSER_URL") { EmbeddedServers.mockOidcUrl() }
+            registry.add("MOCK_OIDC_INTERNAL_URL") { EmbeddedServers.mockOidcUrl() }
         }
     }
 }

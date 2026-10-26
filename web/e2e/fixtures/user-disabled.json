@@ -1,0 +1,20 @@
+{
+  "request": {
+    "method": "PATCH",
+    "path": "/api/users/00000000-0000-4000-8000-000000000001",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "email": "viewer@example.com",
+    "displayName": "Viewer",
+    "role": "VIEWER",
+    "enabled": false,
+    "linked": true,
+    "revision": 2,
+    "createdAt": "2026-01-01T00:00:04.000000Z",
+    "updatedAt": "2026-01-01T00:01:19.000000Z",
+    "lastLoginAt": "2026-01-01T00:00:05.000000Z"
+  }
+}

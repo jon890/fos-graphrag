@@ -1,0 +1,58 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/users",
+    "query": ""
+  },
+  "status": 200,
+  "body": [
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "email": "admin@example.com",
+      "displayName": "Admin",
+      "role": "ADMIN",
+      "enabled": true,
+      "linked": true,
+      "revision": 1,
+      "createdAt": "2026-01-01T00:00:03.000000Z",
+      "updatedAt": "2026-01-01T00:00:03.000000Z",
+      "lastLoginAt": "2026-01-01T00:00:08.000000Z"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "email": "alice@example.com",
+      "displayName": "Alice",
+      "role": "EDITOR",
+      "enabled": true,
+      "linked": true,
+      "revision": 1,
+      "createdAt": "2026-01-01T00:00:01.000000Z",
+      "updatedAt": "2026-01-01T00:00:01.000000Z",
+      "lastLoginAt": "2026-01-01T00:00:06.000000Z"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000016",
+      "email": "bob@example.com",
+      "displayName": "Bob",
+      "role": "EDITOR",
+      "enabled": true,
+      "linked": true,
+      "revision": 1,
+      "createdAt": "2026-01-01T00:00:02.000000Z",
+      "updatedAt": "2026-01-01T00:00:02.000000Z",
+      "lastLoginAt": "2026-01-01T00:00:07.000000Z"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "email": "viewer@example.com",
+      "displayName": "Viewer",
+      "role": "VIEWER",
+      "enabled": true,
+      "linked": true,
+      "revision": 1,
+      "createdAt": "2026-01-01T00:00:04.000000Z",
+      "updatedAt": "2026-01-01T00:00:04.000000Z",
+      "lastLoginAt": "2026-01-01T00:00:05.000000Z"
+    }
+  ]
+}

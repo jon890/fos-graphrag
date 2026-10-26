@@ -19,7 +19,10 @@ kotlin {
     }
 }
 
+val neo4jHarness by configurations.creating
+
 dependencies {
+    neo4jHarness(libs.neo4j.harness)
     implementation(platform(libs.spring.boot.bom))
     implementation(libs.spring.boot.webmvc)
     implementation(libs.spring.boot.security)
@@ -32,9 +35,7 @@ dependencies {
     implementation(libs.mcp)
 
     testImplementation(libs.spring.boot.test)
-    testImplementation(libs.spring.boot.testcontainers)
-    testImplementation(libs.testcontainers.neo4j)
-    testImplementation(libs.testcontainers.junit)
+    testImplementation(libs.mock.oauth2.server)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 
@@ -47,10 +48,9 @@ tasks.processResources {
 
 tasks.withType<Test> {
     useJUnitPlatform()
-    // Colima 처럼 호스트 소켓 경로를 VM 안에서 마운트할 수 없는 런타임은 Ryuk 이 VM 안의 기본 소켓을 쓰게 한다
-    if (System.getenv("DOCKER_HOST").orEmpty().contains(".colima") && System.getenv("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE") == null) {
-        environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
-    }
+    // Neo4j 하네스는 Netty 4.1 을, 앱의 드라이버는 Netty 4.2 를 써서 하네스를 BOM 밖에서 받아 격리 클래스로더로 띄운다
+    inputs.files(neo4jHarness)
+    jvmArgumentProviders.add(CommandLineArgumentProvider { listOf("-Dneo4j.harness.classpath=${neo4jHarness.asPath}") })
     testLogging {
         events("failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL

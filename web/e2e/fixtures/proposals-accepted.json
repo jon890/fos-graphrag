@@ -1,0 +1,145 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/me/proposals",
+    "query": "status=ACCEPTED&page=0&size=20"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000069",
+        "kind": "CREATE_NODE",
+        "status": "ACCEPTED",
+        "payload": {
+          "type": "Decision",
+          "properties": {
+            "title": "가상전자 추가 매수(고침)",
+            "action": "ADD"
+          },
+          "links": [
+            {
+              "type": "HAS_DECISION",
+              "fromId": "00000000-0000-4000-8000-000000000009"
+            }
+          ],
+          "tradeIds": [
+            "00000000-0000-4000-8000-000000000051"
+          ]
+        },
+        "rationale": "10월 24일 매수 체결은 추가 매수 결정을 실행한 것이다.",
+        "evidence": {
+          "nodeIds": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "tradeIds": [
+            "00000000-0000-4000-8000-000000000051"
+          ],
+          "urls": []
+        },
+        "createdAt": "2026-01-01T00:01:13.000000Z",
+        "createdVia": "AGENT",
+        "token": {
+          "id": "00000000-0000-4000-8000-000000000004",
+          "name": "Hermes"
+        },
+        "decidedAt": "2026-01-01T00:01:16.000000Z",
+        "decisionNote": null,
+        "result": {
+          "nodeIds": [
+            "00000000-0000-4000-8000-000000000071"
+          ],
+          "relationshipIds": [
+            "00000000-0000-4000-8000-000000000072"
+          ],
+          "tradeIds": [
+            "00000000-0000-4000-8000-000000000051"
+          ],
+          "ontologyVersion": null
+        },
+        "lastError": null,
+        "requiresEditor": true,
+        "requiredRole": "EDITOR",
+        "refs": {
+          "nodes": {
+            "00000000-0000-4000-8000-000000000009": {
+              "id": "00000000-0000-4000-8000-000000000009",
+              "type": "Security",
+              "label": "가상전자 보통주",
+              "archived": false
+            },
+            "00000000-0000-4000-8000-000000000071": {
+              "id": "00000000-0000-4000-8000-000000000071",
+              "type": "Decision",
+              "label": "가상전자 추가 매수(고침)",
+              "archived": false
+            }
+          },
+          "relationships": {
+            "00000000-0000-4000-8000-000000000072": {
+              "id": "00000000-0000-4000-8000-000000000072",
+              "type": "HAS_DECISION",
+              "from": {
+                "id": "00000000-0000-4000-8000-000000000009",
+                "type": "Security",
+                "label": "가상전자 보통주",
+                "archived": false
+              },
+              "to": {
+                "id": "00000000-0000-4000-8000-000000000071",
+                "type": "Decision",
+                "label": "가상전자 추가 매수(고침)",
+                "archived": false
+              },
+              "revision": 1,
+              "archived": false,
+              "createdAt": "2026-01-01T00:01:15.000000Z",
+              "createdBy": {
+                "id": "00000000-0000-4000-8000-000000000002",
+                "email": "alice@example.com",
+                "displayName": "Alice"
+              }
+            }
+          },
+          "trades": {
+            "00000000-0000-4000-8000-000000000051": {
+              "id": "00000000-0000-4000-8000-000000000051",
+              "broker": "TOSS",
+              "externalId": "20261024-000001",
+              "side": "BUY",
+              "market": "KR",
+              "ticker": "900100",
+              "name": "가상전자 보통주",
+              "quantity": 10.0,
+              "price": 50000.0,
+              "currency": "KRW",
+              "amount": 500000.0,
+              "fee": 100.0,
+              "executedAt": "2026-10-24T01:00:00Z",
+              "createdAt": "2026-01-01T00:00:57.000000Z",
+              "createdVia": "AGENT",
+              "security": {
+                "id": "00000000-0000-4000-8000-000000000009",
+                "type": "Security",
+                "label": "가상전자 보통주",
+                "archived": false
+              },
+              "decisions": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000071",
+                  "type": "Decision",
+                  "label": "가상전자 추가 매수(고침)",
+                  "archived": false
+                }
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}

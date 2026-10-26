@@ -1,0 +1,15 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/auth/me",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "email": "viewer@example.com",
+    "displayName": "Viewer",
+    "role": "VIEWER",
+    "guideDoneAt": "2026-01-01T00:00:09.000000Z"
+  }
+}

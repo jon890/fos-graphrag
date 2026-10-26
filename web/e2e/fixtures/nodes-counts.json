@@ -1,0 +1,24 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/nodes/counts",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "counts": {
+      "Company": 1,
+      "Security": 1,
+      "Sector": 1,
+      "Document": 1,
+      "Person": 0,
+      "Concept": 0,
+      "Change": 1,
+      "Bottleneck": 1,
+      "Valuation": 1,
+      "Scenario": 1,
+      "Decision": 1,
+      "Claim": 2
+    }
+  }
+}

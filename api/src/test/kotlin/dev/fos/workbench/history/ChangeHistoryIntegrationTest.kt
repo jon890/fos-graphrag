@@ -53,6 +53,22 @@ class ChangeHistoryIntegrationTest : IntegrationTest() {
     }
 
     @Test
+    fun `작성자로 거르면 그 사람이 남긴 이력만 온다`() {
+        val alice = loggedIn(ALICE)
+        val bob = loggedIn(BOB)
+        val claim = Fixtures(alice).let { fx -> fx.claim("BELONGS_TO_SECTOR", fx.company("a").id, fx.sector("b").id, listOf(fx.document("d").id)).body }
+        assertThat(bob.post("/api/claims/${claim.id}/review", mapOf("expectedRevision" to 1, "status" to "REVIEWED")).status).isEqualTo(200)
+
+        fun actors(actor: String): List<String> {
+            val response = alice.get("/api/changes?targetId=${claim.id}&actor=$actor")
+            assertThat(response.status).describedAs(response.body.toString()).isEqualTo(200)
+            return response.body["items"].toList().map { it["actor"]["email"].asString() }
+        }
+        assertThat(actors(BOB)).containsExactly(BOB)
+        assertThat(actors(ALICE)).containsExactly(ALICE)
+    }
+
+    @Test
     fun `사용자 목록은 이력에 나온 사람만, ADMIN 이 아니면 사용자 관리 이벤트만 남긴 사람은 빠진다`() {
         // 기본 ADMIN 계정은 다른 테스트가 지식 데이터를 바꾸므로 이 테스트 전용 관리자를 만든다
         val admin = loggedIn(ADMIN)

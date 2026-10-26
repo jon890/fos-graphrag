@@ -1,0 +1,204 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/nodes/00000000-0000-4000-8000-000000000010/trace",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "root": {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "type": "Decision",
+      "typeLabel": "투자 결정",
+      "label": "가상전자 첫 매수"
+    },
+    "steps": [
+      {
+        "node": {
+          "id": "00000000-0000-4000-8000-000000000010",
+          "type": "Decision",
+          "typeLabel": "투자 결정",
+          "label": "가상전자 첫 매수"
+        },
+        "depth": 0,
+        "via": null,
+        "status": "MISSING",
+        "documents": [],
+        "claims": [],
+        "concepts": [],
+        "missing": [],
+        "myKnowledge": null
+      },
+      {
+        "node": {
+          "id": "00000000-0000-4000-8000-000000000009",
+          "type": "Security",
+          "typeLabel": "종목",
+          "label": "가상전자 보통주"
+        },
+        "depth": 1,
+        "via": {
+          "relationshipId": "00000000-0000-4000-8000-000000000018",
+          "relationshipType": "HAS_DECISION",
+          "childId": "00000000-0000-4000-8000-000000000010",
+          "sentence": "가상전자 첫 매수은(는) 가상전자 보통주에 대한 결정이다"
+        },
+        "status": "PARTIAL",
+        "documents": [],
+        "claims": [
+          {
+            "id": "00000000-0000-4000-8000-000000000019",
+            "label": "가상전자 보통주 → 가상 메모리 반도체 속한다",
+            "predicate": "BELONGS_TO_SECTOR",
+            "reviewStatus": "DRAFT"
+          }
+        ],
+        "concepts": [],
+        "missing": [],
+        "myKnowledge": null
+      },
+      {
+        "node": {
+          "id": "00000000-0000-4000-8000-000000000007",
+          "type": "Valuation",
+          "typeLabel": "밸류에이션",
+          "label": "가상전자 2026-10-20"
+        },
+        "depth": 1,
+        "via": {
+          "relationshipId": "00000000-0000-4000-8000-000000000020",
+          "relationshipType": "BASED_ON",
+          "childId": "00000000-0000-4000-8000-000000000010",
+          "sentence": "가상전자 첫 매수은(는) 가상전자 2026-10-20을(를) 근거로 한다"
+        },
+        "status": "MISSING",
+        "documents": [],
+        "claims": [],
+        "concepts": [],
+        "missing": [],
+        "myKnowledge": null
+      },
+      {
+        "node": {
+          "id": "00000000-0000-4000-8000-000000000005",
+          "type": "Company",
+          "typeLabel": "기업",
+          "label": "가상전자"
+        },
+        "depth": 2,
+        "via": {
+          "relationshipId": "00000000-0000-4000-8000-000000000013",
+          "relationshipType": "ISSUES",
+          "childId": "00000000-0000-4000-8000-000000000009",
+          "sentence": "가상전자이(가) 가상전자 보통주을(를) 발행한다"
+        },
+        "status": "SUPPORTED",
+        "documents": [],
+        "claims": [
+          {
+            "id": "00000000-0000-4000-8000-000000000015",
+            "label": "가상전자 → 가상 메모리 반도체 속한다",
+            "predicate": "BELONGS_TO_SECTOR",
+            "reviewStatus": "REVIEWED"
+          }
+        ],
+        "concepts": [],
+        "missing": [],
+        "myKnowledge": null
+      },
+      {
+        "node": {
+          "id": "00000000-0000-4000-8000-000000000012",
+          "type": "Bottleneck",
+          "typeLabel": "병목",
+          "label": "HBM 생산과 고적층 패키징"
+        },
+        "depth": 3,
+        "via": {
+          "relationshipId": "00000000-0000-4000-8000-000000000011",
+          "relationshipType": "BENEFITS",
+          "childId": "00000000-0000-4000-8000-000000000005",
+          "sentence": "HBM 생산과 고적층 패키징이(가) 가상전자에 이익을 준다"
+        },
+        "status": "SUPPORTED",
+        "documents": [
+          {
+            "id": "00000000-0000-4000-8000-000000000006",
+            "title": "가상전자 2026 사업보고서",
+            "url": "https://example.com/virtual-electronics-2026",
+            "publisher": "가상공시",
+            "documentType": "FILING",
+            "publishedAt": "2026-03-15",
+            "collectedAt": "2026-10-20T03:00:00Z"
+          }
+        ],
+        "claims": [],
+        "concepts": [],
+        "missing": [],
+        "myKnowledge": {
+          "level": "UNSURE",
+          "note": "고적층이 왜 어려운지 모르겠다",
+          "updatedAt": "2026-01-01T00:00:49.000000Z"
+        }
+      },
+      {
+        "node": {
+          "id": "00000000-0000-4000-8000-000000000023",
+          "type": "Change",
+          "typeLabel": "세상의 변화",
+          "label": "AI 서버가 늘면서 고성능 메모리 수요가 커진다"
+        },
+        "depth": 4,
+        "via": {
+          "relationshipId": "00000000-0000-4000-8000-000000000024",
+          "relationshipType": "CREATES",
+          "childId": "00000000-0000-4000-8000-000000000012",
+          "sentence": "AI 서버가 늘면서 고성능 메모리 수요가 커진다이(가) HBM 생산과 고적층 패키징을(를) 만든다"
+        },
+        "status": "MISSING",
+        "documents": [],
+        "claims": [],
+        "concepts": [],
+        "missing": [],
+        "myKnowledge": null
+      },
+      {
+        "node": {
+          "id": "00000000-0000-4000-8000-000000000017",
+          "type": "Sector",
+          "typeLabel": "산업",
+          "label": "가상 메모리 반도체"
+        },
+        "depth": 4,
+        "via": {
+          "relationshipId": "00000000-0000-4000-8000-000000000025",
+          "relationshipType": "HAS_BOTTLENECK",
+          "childId": "00000000-0000-4000-8000-000000000012",
+          "sentence": "HBM 생산과 고적층 패키징은(는) 가상 메모리 반도체에 있는 병목이다"
+        },
+        "status": "SUPPORTED",
+        "documents": [],
+        "claims": [
+          {
+            "id": "00000000-0000-4000-8000-000000000015",
+            "label": "가상전자 → 가상 메모리 반도체 속한다",
+            "predicate": "BELONGS_TO_SECTOR",
+            "reviewStatus": "REVIEWED"
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000019",
+            "label": "가상전자 보통주 → 가상 메모리 반도체 속한다",
+            "predicate": "BELONGS_TO_SECTOR",
+            "reviewStatus": "DRAFT"
+          }
+        ],
+        "concepts": [],
+        "missing": [],
+        "myKnowledge": null
+      }
+    ],
+    "dependents": [],
+    "truncated": false,
+    "dependentsTruncated": false
+  }
+}

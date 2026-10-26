@@ -1,0 +1,207 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/me/proposals",
+    "query": "status=PENDING&page=0&size=20"
+  },
+  "namedOnly": true,
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000050",
+        "kind": "LINK_TRADE_DECISION",
+        "status": "PENDING",
+        "payload": {
+          "tradeIds": [
+            "00000000-0000-4000-8000-000000000051"
+          ],
+          "decisionId": "00000000-0000-4000-8000-000000000010"
+        },
+        "rationale": "10월 24일 가상전자 매수 체결은 「가상전자 첫 매수」 결정을 실행한 것이다.",
+        "evidence": {
+          "nodeIds": [
+            "00000000-0000-4000-8000-000000000010"
+          ],
+          "tradeIds": [
+            "00000000-0000-4000-8000-000000000051"
+          ],
+          "urls": []
+        },
+        "createdAt": "2026-01-01T00:00:58.000000Z",
+        "createdVia": "AGENT",
+        "token": {
+          "id": "00000000-0000-4000-8000-000000000004",
+          "name": "Hermes"
+        },
+        "decidedAt": null,
+        "decisionNote": null,
+        "result": null,
+        "lastError": null,
+        "requiresEditor": false,
+        "requiredRole": "VIEWER",
+        "refs": {
+          "nodes": {
+            "00000000-0000-4000-8000-000000000010": {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "type": "Decision",
+              "label": "가상전자 첫 매수",
+              "archived": false
+            }
+          },
+          "relationships": {},
+          "trades": {
+            "00000000-0000-4000-8000-000000000051": {
+              "id": "00000000-0000-4000-8000-000000000051",
+              "broker": "TOSS",
+              "externalId": "20261024-000001",
+              "side": "BUY",
+              "market": "KR",
+              "ticker": "900100",
+              "name": "가상전자 보통주",
+              "quantity": 10.0,
+              "price": 50000.0,
+              "currency": "KRW",
+              "amount": 500000.0,
+              "fee": 100.0,
+              "executedAt": "2026-10-24T01:00:00Z",
+              "createdAt": "2026-01-01T00:00:57.000000Z",
+              "createdVia": "AGENT",
+              "security": {
+                "id": "00000000-0000-4000-8000-000000000009",
+                "type": "Security",
+                "label": "가상전자 보통주",
+                "archived": false
+              },
+              "decisions": []
+            }
+          }
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000069",
+        "kind": "CREATE_NODE",
+        "status": "PENDING",
+        "payload": {
+          "type": "Decision",
+          "properties": {
+            "title": "가상전자 추가 매수",
+            "action": "ADD"
+          },
+          "links": [
+            {
+              "type": "HAS_DECISION",
+              "fromId": "00000000-0000-4000-8000-000000000009"
+            }
+          ],
+          "tradeIds": [
+            "00000000-0000-4000-8000-000000000051"
+          ]
+        },
+        "rationale": "10월 24일 매수 체결은 추가 매수 결정을 실행한 것이다.",
+        "evidence": {
+          "nodeIds": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "tradeIds": [
+            "00000000-0000-4000-8000-000000000051"
+          ],
+          "urls": []
+        },
+        "createdAt": "2026-01-01T00:01:13.000000Z",
+        "createdVia": "AGENT",
+        "token": {
+          "id": "00000000-0000-4000-8000-000000000004",
+          "name": "Hermes"
+        },
+        "decidedAt": null,
+        "decisionNote": null,
+        "result": null,
+        "lastError": null,
+        "requiresEditor": true,
+        "requiredRole": "EDITOR",
+        "refs": {
+          "nodes": {
+            "00000000-0000-4000-8000-000000000009": {
+              "id": "00000000-0000-4000-8000-000000000009",
+              "type": "Security",
+              "label": "가상전자 보통주",
+              "archived": false
+            }
+          },
+          "relationships": {},
+          "trades": {
+            "00000000-0000-4000-8000-000000000051": {
+              "id": "00000000-0000-4000-8000-000000000051",
+              "broker": "TOSS",
+              "externalId": "20261024-000001",
+              "side": "BUY",
+              "market": "KR",
+              "ticker": "900100",
+              "name": "가상전자 보통주",
+              "quantity": 10.0,
+              "price": 50000.0,
+              "currency": "KRW",
+              "amount": 500000.0,
+              "fee": 100.0,
+              "executedAt": "2026-10-24T01:00:00Z",
+              "createdAt": "2026-01-01T00:00:57.000000Z",
+              "createdVia": "AGENT",
+              "security": {
+                "id": "00000000-0000-4000-8000-000000000009",
+                "type": "Security",
+                "label": "가상전자 보통주",
+                "archived": false
+              },
+              "decisions": []
+            }
+          }
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000070",
+        "kind": "STUDY_NOTE",
+        "status": "PENDING",
+        "payload": {
+          "nodeId": "00000000-0000-4000-8000-000000000009",
+          "level": "UNSURE",
+          "note": "체결한 종목의 밸류에이션을 다시 본다"
+        },
+        "rationale": "체결한 종목이라 이해 표시를 남긴다.",
+        "evidence": {
+          "nodeIds": [],
+          "tradeIds": [],
+          "urls": []
+        },
+        "createdAt": "2026-01-01T00:01:13.000000Z",
+        "createdVia": "AGENT",
+        "token": {
+          "id": "00000000-0000-4000-8000-000000000004",
+          "name": "Hermes"
+        },
+        "decidedAt": null,
+        "decisionNote": null,
+        "result": null,
+        "lastError": null,
+        "requiresEditor": false,
+        "requiredRole": "VIEWER",
+        "refs": {
+          "nodes": {
+            "00000000-0000-4000-8000-000000000009": {
+              "id": "00000000-0000-4000-8000-000000000009",
+              "type": "Security",
+              "label": "가상전자 보통주",
+              "archived": false
+            }
+          },
+          "relationships": {},
+          "trades": {}
+        }
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalItems": 3,
+    "totalPages": 1
+  }
+}

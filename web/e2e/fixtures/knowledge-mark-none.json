@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/me/knowledge/00000000-0000-4000-8000-000000000005",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "nodeId": "00000000-0000-4000-8000-000000000005",
+    "level": null,
+    "note": null,
+    "updatedAt": null
+  }
+}

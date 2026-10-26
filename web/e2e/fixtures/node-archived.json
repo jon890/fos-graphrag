@@ -1,0 +1,45 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/nodes/00000000-0000-4000-8000-000000000022",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "node": {
+      "id": "00000000-0000-4000-8000-000000000022",
+      "type": "Company",
+      "label": "보관한 가상기업",
+      "properties": {
+        "name": "보관한 가상기업",
+        "country": "KR"
+      },
+      "revision": 2,
+      "archived": true,
+      "archivedAt": "2026-01-01T00:00:52.000000Z",
+      "createdAt": "2026-01-01T00:00:50.000000Z",
+      "createdBy": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "email": "alice@example.com",
+        "displayName": "Alice"
+      },
+      "updatedAt": "2026-01-01T00:00:53.000000Z",
+      "updatedBy": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "email": "alice@example.com",
+        "displayName": "Alice"
+      },
+      "reviewStatus": null
+    },
+    "claim": null,
+    "relationships": [],
+    "claims": [],
+    "concepts": [],
+    "relationshipsTruncated": false,
+    "claimsTruncated": false,
+    "limits": {
+      "maxRelationships": 100,
+      "maxClaims": 50
+    }
+  }
+}

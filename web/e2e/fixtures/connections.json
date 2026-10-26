@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/me/connections",
+    "query": ""
+  },
+  "status": 200,
+  "body": [
+    {
+      "id": "00000000-0000-4000-8000-000000000049",
+      "clientName": "Claude Code",
+      "scope": "READ_WRITE",
+      "createdAt": "2026-01-01T00:00:59.000000Z",
+      "lastUsedAt": null
+    }
+  ]
+}

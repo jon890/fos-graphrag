@@ -1,0 +1,39 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/changes",
+    "query": "actor=bob%40example.com&page=0&size=20"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000031",
+        "at": "2026-01-01T00:00:46.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000016",
+          "email": "bob@example.com",
+          "displayName": "Bob"
+        },
+        "action": "REVIEW",
+        "targetId": "00000000-0000-4000-8000-000000000015",
+        "targetKind": "NODE",
+        "targetType": "Claim",
+        "targetLabel": "가상전자 → 가상 메모리 반도체 속한다",
+        "revision": 2,
+        "changes": {
+          "reviewStatus": {
+            "before": "DRAFT",
+            "after": "REVIEWED"
+          }
+        },
+        "refs": {},
+        "note": "사업보고서와 맞다"
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/changes",
+    "query": "targetId=00000000-0000-4000-8000-000000000015&page=0&size=20"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000031",
+        "at": "2026-01-01T00:00:46.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000016",
+          "email": "bob@example.com",
+          "displayName": "Bob"
+        },
+        "action": "REVIEW",
+        "targetId": "00000000-0000-4000-8000-000000000015",
+        "targetKind": "NODE",
+        "targetType": "Claim",
+        "targetLabel": "가상전자 → 가상 메모리 반도체 속한다",
+        "revision": 2,
+        "changes": {
+          "reviewStatus": {
+            "before": "DRAFT",
+            "after": "REVIEWED"
+          }
+        },
+        "refs": {},
+        "note": "사업보고서와 맞다"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000032",
+        "at": "2026-01-01T00:00:43.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000015",
+        "targetKind": "NODE",
+        "targetType": "Claim",
+        "targetLabel": "가상전자 → 가상 메모리 반도체 속한다",
+        "revision": 1,
+        "changes": {
+          "predicate": {
+            "before": null,
+            "after": "BELONGS_TO_SECTOR"
+          },
+          "description": {
+            "before": null,
+            "after": "가상전자는 메모리 반도체 산업에 속한다."
+          },
+          "evidenceText": {
+            "before": null,
+            "after": "당사는 D램과 낸드 플래시를 주력으로 생산한다."
+          },
+          "authoringMethod": {
+            "before": null,
+            "after": "MANUAL"
+          },
+          "subjectId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000005"
+          },
+          "objectId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000017"
+          },
+          "documentIds": {
+            "before": null,
+            "after": [
+              "00000000-0000-4000-8000-000000000006"
+            ]
+          }
+        },
+        "refs": {
+          "00000000-0000-4000-8000-000000000005": {
+            "id": "00000000-0000-4000-8000-000000000005",
+            "type": "Company",
+            "label": "가상전자",
+            "archived": false
+          },
+          "00000000-0000-4000-8000-000000000006": {
+            "id": "00000000-0000-4000-8000-000000000006",
+            "type": "Document",
+            "label": "가상전자 2026 사업보고서",
+            "archived": false
+          },
+          "00000000-0000-4000-8000-000000000017": {
+            "id": "00000000-0000-4000-8000-000000000017",
+            "type": "Sector",
+            "label": "가상 메모리 반도체",
+            "archived": false
+          }
+        },
+        "note": null
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalItems": 2,
+    "totalPages": 1
+  }
+}

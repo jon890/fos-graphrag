@@ -1,0 +1,48 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/me/proposals/00000000-0000-4000-8000-000000000074/reject",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "id": "00000000-0000-4000-8000-000000000074",
+    "kind": "ARCHIVE_NODE",
+    "status": "REJECTED",
+    "payload": {
+      "nodeId": "00000000-0000-4000-8000-000000000056",
+      "expectedRevision": 3,
+      "reason": "연습으로 만든 기업이다"
+    },
+    "rationale": "실제 기업이 아니다.",
+    "evidence": {
+      "nodeIds": [],
+      "tradeIds": [],
+      "urls": []
+    },
+    "createdAt": "2026-01-01T00:01:22.000000Z",
+    "createdVia": "AGENT",
+    "token": {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "name": "Hermes"
+    },
+    "decidedAt": "2026-01-01T00:01:24.000000Z",
+    "decisionNote": "아직 쓰는 기업이다",
+    "result": null,
+    "lastError": null,
+    "requiresEditor": true,
+    "requiredRole": "EDITOR",
+    "refs": {
+      "nodes": {
+        "00000000-0000-4000-8000-000000000056": {
+          "id": "00000000-0000-4000-8000-000000000056",
+          "type": "Company",
+          "label": "보관 연습 기업",
+          "archived": false
+        }
+      },
+      "relationships": {},
+      "trades": {}
+    }
+  }
+}
