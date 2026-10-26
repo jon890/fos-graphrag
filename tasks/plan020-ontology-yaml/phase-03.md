@@ -67,7 +67,7 @@
 
 ```bash
 cd web && npm ci && npm run typecheck && npm test && npm run build
-! git grep -n "OntologyFormEditor\|ontology-edit-form\|ontology-form" -- web/src ':!web/src/**/*.test.tsx' ':!web/src/**/*.test.ts'
+! git grep -n "OntologyFormEditor\|ontology-edit-form\|ontology-form" -- ':/web/src' ':(exclude,top)web/src/**/*.test.tsx' ':(exclude,top)web/src/**/*.test.ts'
 ```
 
 모두 종료 코드 0.

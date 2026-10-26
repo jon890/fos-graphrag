@@ -46,7 +46,7 @@
 
 - 역할 안내: `requiredRole` 이 `EDITOR` 면 지금의 `proposal-editor-required`, `ADMIN` 이면 `proposal-admin-required`(「관리자만 승인할 수 있습니다. 관리자에게 부탁하거나 거절하세요.」).
 - 「고쳐서 승인」 은 `CREATE_NODE`, `STUDY_NOTE` 에만 둔다.
-- 온톨로지 변경 카드(새 부품 `OntologyChangeCard.tsx` 로 나눠도 된다): 「YAML 보기」 접힘 칸(`proposal-ontology-yaml`, 줄 번호와 함께 읽기 전용). ADMIN 이고 대기 중이면 마운트할 때 `api.ontology.preview({ baseVersion, yaml })` 를 불러 `OntologyDiffSummary` 를 `proposal-ontology-preview` 안에 그린다. 실패하면 `proposal-ontology-preview-error` 와 「다시 확인」(`proposal-ontology-preview-retry`). 기준 버전이 다르면 `proposal-ontology-stale` 안내를 보이고 「승인」 을 끈다. 영향이 있으면 `proposal-ontology-confirm` 확인란을 켜야 「승인」 이 켜지고 `confirm: true` 를 보낸다.
+- 온톨로지 변경 카드(새 부품 `OntologyChangeCard.tsx` 로 나눠도 된다): 「YAML 보기」 접힘 칸(`proposal-ontology-yaml`, 줄 번호와 함께 읽기 전용). 카드는 선택 prop `initialPreview?: OntologyPreview` 를 받는다(단위 테스트는 `renderToStaticMarkup` 이라 `useEffect` 가 돌지 않아 이 prop 으로 결과를 넣는다). ADMIN 이고 대기 중이고 `initialPreview` 가 없으면 마운트할 때 `api.ontology.preview({ baseVersion, yaml })` 를 불러 `OntologyDiffSummary` 를 `proposal-ontology-preview` 안에 그린다. 실패하면 `proposal-ontology-preview-error` 와 「다시 확인」(`proposal-ontology-preview-retry`). 기준 버전이 다르면 `proposal-ontology-stale` 안내를 보이고 「승인」 을 끈다. 영향이 있으면 `proposal-ontology-confirm` 확인란을 켜야 「승인」 이 켜지고 `confirm: true` 를 보낸다.
 - 승인 결과: `ONTOLOGY_CHANGE` 성공이면 `reloadOntology()` 를 부르고 「승인했습니다. 온톨로지 버전 {N} 을(를) 저장했습니다.」. `409 REVISION_CONFLICT` 면 미리보기를 다시 부른다. `409 ONTOLOGY_IMPACT_UNCONFIRMED` 면 응답 `details.impacts` 로 영향 목록을 다시 그린다.
 - 빈 상태 문장을 `docs/flow.md` 와 맞춘다.
 
@@ -59,7 +59,7 @@
 ### 5. 이 phase 를 검증하는 테스트
 
 - `web/src/lib/proposals.test.ts`(수정): 새 종류의 `kindLabel`, `proposalSummary`(고치기, 보관, 관계 보관, 주장, 온톨로지), `canAccept`(EDITOR 는 `ONTOLOGY_CHANGE` 를 승인하지 못하고 ADMIN 은 한다), `isStaleOntologyChange`.
-- `web/src/components/proposals/ProposalsTab.test.tsx`(수정): EDITOR 가 본 `ONTOLOGY_CHANGE` 카드에 `proposal-admin-required` 와 꺼진 `proposal-accept` 가 있다. 미리보기 결과를 넘긴 ADMIN 카드에 영향이 있으면 `proposal-ontology-confirm` 이 있다. 기준 버전이 다른 카드에 `proposal-ontology-stale` 이 있다. 새 종류에 `proposal-edit-open` 이 없다.
+- `web/src/components/proposals/ProposalsTab.test.tsx`(수정): EDITOR 가 본 `ONTOLOGY_CHANGE` 카드에 `proposal-admin-required` 와 꺼진 `proposal-accept` 가 있다. `initialPreview` 로 영향이 있는 미리보기를 넘긴 ADMIN 카드에 `proposal-ontology-confirm` 이 있다. 기준 버전이 다른 카드에 `proposal-ontology-stale` 이 있다. 새 종류에 `proposal-edit-open` 이 없다.
 - `web/src/components/tokens/TokensTab.test.tsx`(수정): `integrations-install` 이 `connections-section` 앞에 있고, `tokens-advanced` 가 `open` 속성 없이 그려지며 그 안에 `tokens-guide` 가 있다. `install-command` 의 `data-command` 에 `/plugin install valuation-ontology@fos-valuation-ontology` 와 `codex plugin add valuation-ontology@fos-valuation-ontology` 가 있다.
 
 ## 검증

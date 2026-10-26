@@ -34,8 +34,8 @@
 - `ProposalPayload.OntologyChange(val baseVersion: Int, val yaml: String, val note: String?)` 와 `toMap()`(`baseVersion`, `yaml`, `note`).
 - `FIELDS` 에 `ONTOLOGY_CHANGE to setOf("baseVersion", "yaml", "definition", "note")`.
 - 모양 검사: `baseVersion` 은 정수(소수점 없는 수만), `yaml`(문자열)과 `definition`(객체) 가운데 하나만(둘 다나 둘 다 없음은 `fieldErrors.yaml` = 「yaml 이나 definition 가운데 하나만 보냅니다.」), `note` 는 선택이고 1000자(`OntologyEditService.MAX_NOTE_LENGTH`)까지.
-- 내용 검사 `checkOntologyChange`: `OntologyEditService.preview(EditInput(yaml, definition))` 를 부른다. `valid` 가 거짓이면 `OntologyInvalidException(errors)`, `added`, `removed`, `changed` 가 모두 비면 `OntologyInvalidException(listOf("바뀐 점이 없습니다."))`, `baseVersion != OntologyVersionStore.latestNumber()` 면 `RevisionConflictException(baseVersion, current)`. 통과하면 `preview.yaml` 로 바꾼 `OntologyChange` 를 돌려준다. `definition` 으로 보냈어도 저장은 정규화한 YAML 이다.
-- 생성자에 `OntologyEditService` 와 `OntologyVersionStore` 를 더한다. `ProposalPayloads` 를 만드는 다른 곳이 있는지 `git grep -n "ProposalPayloads("` 로 확인하고 함께 고친다.
+- 내용 검사 `checkOntologyChange`: `EditInput(yaml: String?, definition: JsonNode?)` 이라 payload 의 `definition`(Map)은 생성자에 더한 `JsonMapper` 의 `valueToTree<JsonNode>(definition)` 로 바꾼다. 그다음 `OntologyEditService.preview(EditInput(yaml, definition))` 를 부른다. `valid` 가 거짓이면 `OntologyInvalidException(errors)`, `added`, `removed`, `changed` 가 모두 비면 `OntologyInvalidException(listOf("바뀐 점이 없습니다."))`, `baseVersion != OntologyVersionStore.latestNumber()` 면 `RevisionConflictException(baseVersion.toLong(), current.toLong())`. 통과하면 `preview.yaml` 로 바꾼 `OntologyChange` 를 돌려준다. `definition` 으로 보냈어도 저장은 정규화한 YAML 이다.
+- 생성자에 `OntologyEditService`, `OntologyVersionStore`, `JsonMapper` 를 더한다. `ProposalPayloads` 를 만드는 다른 곳이 있는지 `git grep -n "ProposalPayloads("` 로 확인하고 함께 고친다.
 
 ### 2. `proposal/ProposalService.kt`
 
@@ -72,13 +72,13 @@
 
 ### 7. 이 phase 를 검증하는 테스트
 
-`api/src/test/kotlin/dev/fos/workbench/proposal/OntologyChangeProposalIntegrationTest.kt`(신규). `ProposalIntegrationTest.kt` 의 `submitOne`, `accept`, `failure` 같은 도우미 모양을 따른다.
+`api/src/test/kotlin/dev/fos/workbench/proposal/OntologyChangeProposalIntegrationTest.kt`(신규). `ProposalIntegrationTest.kt` 의 `submitOne`, `accept`, `failure` 같은 도우미 모양을 따른다. 이 테스트는 공유 Neo4j 의 온톨로지를 실제로 바꾸므로 `ontology/OntologyEditIntegrationTest.kt` 의 `@BeforeEach`(`holder.replace(versions.latest()!!)`)와 `@AfterEach`(시작 버전 정의로 되돌리는 저장) 정리를 같은 방법으로 둔다. 지우거나 바꾸는 속성과 타입은 테스트가 직접 더한 것만 쓴다(`Fixtures` 가 쓰는 `Company.country` 같은 기존 속성은 건드리지 않는다).
 
 - 형식 오류: 알 수 없는 키가 든 YAML 로 올리면 `400 ONTOLOGY_INVALID` 이고 `details.errors` 에 `(줄 ` 이 있다. 바뀐 점이 없는 YAML 도 `400 ONTOLOGY_INVALID` 다. 낡은 `baseVersion` 은 `409 REVISION_CONFLICT` 다. 셋 다 제안이 생기지 않는다.
 - 비관리자 승인 거절: EDITOR 가 자기 `ONTOLOGY_CHANGE` 를 승인하면 `403 FORBIDDEN` 이고 제안은 `PENDING`, `lastError` 가 없다.
 - 기준 버전이 바뀐 뒤 승인 거절: ADMIN 이 올린 뒤 같은 ADMIN 이 `POST /api/ontology/versions` 로 저장하면, 승인은 `409 REVISION_CONFLICT` 이고 버전 수가 그대로이며 `lastError.code` 가 `REVISION_CONFLICT` 다.
 - 승인 뒤 새 버전과 변경 이력: 새 노드 타입을 더한 YAML 을 ADMIN 이 승인하면 `200` 과 `ProposalView(ACCEPTED)` 이고, `result.ontologyVersion` 이 이전 번호보다 1 크고, 응답 헤더 `X-Ontology-Version` 이 같은 값, `GET /api/ontology/versions` 맨 위의 `note` 가 payload 의 `note`, `ChangeEvent`(`targetKind = ONTOLOGY`)의 작업자가 승인한 ADMIN 이다. 그 뒤 새 타입의 노드를 `POST /api/nodes` 로 만들 수 있다.
-- 영향 확인: 기존 노드가 쓰는 속성을 지운 YAML 은 `confirm` 없이 승인하면 `409 ONTOLOGY_IMPACT_UNCONFIRMED`, `confirm: true` 면 승인된다.
+- 영향 확인: 테스트가 먼저 더한 타입에 노드를 만든 뒤, 그 노드가 쓰는 속성을 지운 YAML 은 `confirm` 없이 승인하면 `409 ONTOLOGY_IMPACT_UNCONFIRMED`, `confirm: true` 면 승인된다.
 - 고쳐서 승인 거절: `payload` 를 담은 승인은 `400 VALIDATION_FAILED`(`fieldErrors.payload`).
 
 `api/src/test/kotlin/dev/fos/workbench/mcp/McpIntegrationTest.kt`(수정):

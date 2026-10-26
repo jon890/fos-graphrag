@@ -18,7 +18,7 @@
   - `ClaimService.create(CreateClaimRequest(predicate, subjectId, objectId, documentIds, description, evidenceText, validFrom, validTo, authoringMethod = "AI", extractionConfidence = null), actorId)`
 - 이 서비스들은 변경 이력에 `note` 를 받지 않는 것이 있다. `patch`, `archive`, `ClaimService.create` 의 이력 메모는 지금 그대로 둔다(`archive` 는 `reason` 이 메모다). `CREATE_NODE` 처럼 `NOTE` 를 넘길 수 있는 곳만 넘긴다.
 - revision 읽기와 비교는 `knowledge/RevisionGuard.kt`(`lockNode`, `requireRevision`, `requireActive`)가 한다. 올릴 때의 검사는 잠그지 않고 `KnowledgeReader.nodeProps(id)` 로 읽어 비교한다.
-- 관계 하나를 id 로 읽는 것은 `RelationshipService.view(id)`(`RelationshipView`)다. 없으면 `NotFoundException` 이다.
+- `RelationshipService.view(id)` 는 일반 관계(`ontology.relationshipTypes`)만 찾아, 주장 관계 id 면 `NotFoundException` 이다. 그래서 제안 검사는 `RevisionGuard.lockRelationship` 처럼 `allRelationshipTypes` 를 도는 조회를 잠그지 않고 하는 함수가 필요하다.
 - `ProposalService.views` 가 `refs` 를 만든다. 지금은 `nodes`, `trades` 둘이다.
 - MCP 의 `submit_proposals` 설명과 `PROPOSAL` 스키마는 `mcp/McpTools.kt` 에 있다.
 
@@ -40,14 +40,14 @@
 - 모양 검사: `expectedRevision` 은 0 이상의 정수, `properties` 는 1개 이상인 객체, `reason` 은 선택이고 1000자까지, `documentIds` 는 문자열 1~20개(`Limits.MAX_DOCUMENTS_PER_CLAIM`).
 - 내용 검사:
   - `UPDATE_NODE`: 노드를 읽어 Claim(`managedBy` 가 있는 타입)이면 `OntologyViolationException("claim-via-claims-api", …)`, 보관됐으면 `ArchivedException`, revision 이 다르면 `RevisionConflictException`. `validator.validatePatch(type, properties)` 의 칸 오류는 `"$prefix.properties.$k"` 키로 바꾼다(`checkCreateNode` 와 같다). Security 의 시장과 종목 코드가 바뀌면 같은 값의 다른 종목을 막는다(`requireUniqueListing` 을 `exceptId` 를 받게 고친다).
-  - `ARCHIVE_NODE`: 노드가 있고 보관되지 않았고 revision 이 같다.
-  - `ARCHIVE_RELATIONSHIP`: `RelationshipService.view(relationshipId)` 로 읽어 지금 온톨로지의 `relationshipTypes` 에 없는 타입(주장 관계)이면 `OntologyViolationException("claim-relationship", …)`, 보관됐으면 `ArchivedException`.
-  - `CREATE_CLAIM`: `holder.current().requirePredicate(predicate)`, 주체와 대상과 근거 문서가 있고 보관되지 않았는지, 근거가 `Document` 인지, 타입이 `predicate` 의 `subjectTypes`, `objectTypes` 에 드는지, `validFrom <= validTo` 인지 본다. 규칙과 오류는 `ClaimService.create` 와 같게 둔다. 같은 검사를 두 벌 쓰지 않도록 `ClaimService` 에 잠그지 않는 검사 함수(`checkCreate(request)`)를 꺼내 두 곳이 함께 부르면 더 좋다.
+  - `ARCHIVE_NODE`: 노드가 있는지, 보관되지 않았는지(`ArchivedException`)를 먼저 보고 그다음 revision 을 비교한다(`RevisionConflictException`). `UPDATE_NODE` 도 같은 순서다(Claim 검사, 보관, revision).
+  - `ARCHIVE_RELATIONSHIP`: `KnowledgeReader` 에 `relationshipProps(id): Map<String, Any?>`(타입, `archived`, `revision`)를 더한다. `RevisionGuard.lockRelationship` 의 탐색(`allRelationshipTypes` 를 돌며 id 로 찾기)을 잠금 없이 한 것이고 없으면 `NotFoundException` 이다. 타입이 지금 온톨로지의 `relationshipTypes` 에 없으면(주장 관계) `OntologyViolationException("claim-relationship", "Claim 에 딸린 관계는 Claim 을 보관해 정리합니다.")`, 보관됐으면 `ArchivedException`.
+  - `CREATE_CLAIM`: `holder.current().requirePredicate(predicate)`, 주체와 대상과 근거 문서가 있고 보관되지 않았는지, 근거가 `Document` 인지, 타입이 `predicate` 의 `subjectTypes`, `objectTypes` 에 드는지, `validFrom <= validTo` 인지 본다. 규칙과 오류는 `ClaimService.create` 와 같게 둔다. 같은 검사를 두 벌 쓰지 않도록 `ClaimService` 에 잠그지 않는 검사 함수 `checkCreate(request: CreateClaimRequest)` 를 꺼내고, `ClaimService.create` 는 잠근 뒤 이 함수를 부르고 제안 검사도 이 함수를 부른다.
 
 ### 2. `proposal/ProposalService.kt`
 
 - `execute` 에 네 갈래. 결과는 `UPDATE_NODE`, `ARCHIVE_NODE` 가 `nodeIds = [nodeId]`, `ARCHIVE_RELATIONSHIP` 이 `relationshipIds = [relationshipId]`, `CREATE_CLAIM` 이 `nodeIds = [만든 주장 id]` 다.
-- `ARCHIVE_RELATIONSHIP` 의 `expectedRevision` 은 실행 직전에 `RelationshipService.view(id).revision` 으로 읽는다.
+- `ARCHIVE_RELATIONSHIP` 의 `expectedRevision` 은 실행 직전에 `reader.relationshipProps(id)["revision"]` 으로 읽는다.
 - `nodeIdsOf` 에 `nodeId`(이미 있음), `subjectId`, `objectId`, `documentIds` 를 더한다. 관계 id 를 모으는 `relationshipIdsOf`(`payload.relationshipId`, `result.relationshipIds`)를 더하고, `views` 가 `RelationshipService.views` 나 `view` 로 읽어 `refs.relationships` 에 담는다. 관계의 양 끝 노드도 `refs.nodes` 에 더한다.
 - `ProposalRefs` 에 `val relationships: Map<String, RelationshipView>` 를 더한다(`ProposalController.kt`).
 
@@ -60,8 +60,8 @@
 `api/src/test/kotlin/dev/fos/workbench/proposal/InstanceProposalIntegrationTest.kt`(신규). `ProposalIntegrationTest.kt` 의 도우미 모양을 따른다.
 
 - `UPDATE_NODE`: 편집자가 승인하면 속성이 바뀌고 revision 이 오르며 `ChangeEvent` 의 작업자가 승인한 사람이다. 올린 뒤 사람이 그 노드를 고치면 승인이 `409 REVISION_CONFLICT` 이고 `lastError` 가 남는다. Claim 을 고치는 제안은 올릴 때 `400 ONTOLOGY_VIOLATION` 이다. 알 수 없는 속성은 `400 VALIDATION_FAILED`(`proposals[0].payload.properties.<키>`)다.
-- `ARCHIVE_NODE`: 승인하면 노드가 보관되고 `result.nodeIds` 에 그 id 가 있다. 이미 보관된 노드는 올릴 때 `409 ARCHIVED` 다.
-- `ARCHIVE_RELATIONSHIP`: 승인하면 관계가 보관된다. `refs.relationships` 에 그 관계가 있다.
+- `ARCHIVE_NODE`: 승인하면 노드가 보관되고 `result.nodeIds` 에 그 id 가 있다. 이미 보관된 노드는 지금 revision 을 넣어 올려도 `409 ARCHIVED` 다.
+- `ARCHIVE_RELATIONSHIP`: 승인하면 관계가 보관된다. `refs.relationships` 에 그 관계가 있다. 주장 관계(`SUBJECT`) id 로 올리면 `400 ONTOLOGY_VIOLATION`(`details.rule = "claim-relationship"`)이다.
 - `CREATE_CLAIM`: 승인하면 `DRAFT` 주장이 생기고 `authoringMethod` 가 `AI`, 작성자가 승인한 사람이다. 근거 문서가 없으면 올릴 때 `400 VALIDATION_FAILED` 다.
 - 열람자는 네 종류 모두 승인하면 `403 FORBIDDEN` 이고 `requiredRole` 이 `EDITOR` 다.
 
@@ -82,5 +82,6 @@ cd api && ./gradlew test --rerun
 | `api/src/main/kotlin/dev/fos/workbench/proposal/ProposalService.kt` | 수정 |
 | `api/src/main/kotlin/dev/fos/workbench/proposal/ProposalController.kt` | 수정 |
 | `api/src/main/kotlin/dev/fos/workbench/knowledge/ClaimService.kt` | 수정 |
+| `api/src/main/kotlin/dev/fos/workbench/knowledge/KnowledgeReader.kt` | 수정 |
 | `api/src/main/kotlin/dev/fos/workbench/mcp/McpTools.kt` | 수정 |
 | `api/src/test/kotlin/dev/fos/workbench/proposal/InstanceProposalIntegrationTest.kt` | 신규 |
