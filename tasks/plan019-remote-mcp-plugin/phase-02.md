@@ -73,7 +73,11 @@
 - 등록하지 않은 redirect URI(`http://127.0.0.1:43210/other`), 포트만 다른 주소(`http://127.0.0.1:43211/callback`), 접두 일치(`http://127.0.0.1:43210/callback/x`)는 모두 `400 OAUTH_INVALID_CLIENT`.
 - `code_challenge` 가 43자 base64url 이 아니면(빈 값, 42자) `OAUTH_REDIRECT_ERROR`.
 - `X-XSRF-TOKEN` 없이 보낸 `POST /api/oauth/authorize` 는 `403 CSRF_REJECTED` 이고 코드가 생기지 않는다. 다른 사용자의 세션으로 받은 코드는 그 사용자의 연결이 된다(코드는 결정한 세션의 사용자에 묶인다).
-- 코드는 60초 뒤 끝난다: 코드 노드의 `expiresAt` 을 과거로 고친 뒤 바꾸면 `invalid_grant`.
+- 코드는 60초 뒤 끝난다: 만든 코드 노드의 `expiresAt` 과 `createdAt` 의 차가 60초다. 코드 노드의 `expiresAt` 을 과거로 고친 뒤 바꾸면 `invalid_grant`.
+- `code_verifier` 없이 바꾸면 `400 invalid_request`, `grant_type` 이 없으면 `400 invalid_request` 다(전역 처리기의 `VALIDATION_FAILED` 가 아니다).
+- 갱신 요청의 `client_id` 가 연결의 클라이언트와 다르면 `invalid_grant`.
+- `state` 501자는 `OAUTH_REDIRECT_ERROR`(`invalid_request`), `scope=admin` 은 `OAUTH_REDIRECT_ERROR`(`invalid_scope`).
+- `/oauth/revoke` 도 토큰 한도를 함께 쓴다: 한도 nested 클래스에서 토큰 요청과 폐기 요청을 섞어 한도를 넘기면 `429`.
 - 코드를 만든 요청과 다른 `client_id`(다른 등록 클라이언트), 다른 `resource` 로 바꾸면 각각 `invalid_grant`, `invalid_target`.
 - 원문이 새지 않는다: 실패한 토큰 요청의 응답 본문에 보낸 코드, 갱신 토큰, `code_verifier` 문자열이 없다. 테스트 클래스에 `OutputCaptureExtension` 을 걸고 흐름 전체를 돈 뒤 캡처한 로그에 접근 토큰, 갱신 토큰, 코드 원문이 없다.
 - `resource=http://evil.example/mcp` 는 `OAUTH_REDIRECT_ERROR`, `error=invalid_target`.
@@ -86,7 +90,8 @@
 - `/oauth/revoke` 에 갱신 토큰을 보내면 `200` 이고 연결이 사라진다. 모르는 값도 `200`.
 - 주인을 비활성화(관리자 API `PATCH /api/users/{id}`, `RoleAndUserAdminIntegrationTest` 의 방식)하면 갱신이 `invalid_grant`.
 - 모르는 `client_id` 로 토큰을 요청하면 `401 invalid_client`, `grant_type=password` 는 `400 unsupported_grant_type`.
-- 같은 IP 한도는 phase 01 의 등록 한도 테스트와 같은 방식으로 한 번 확인한다(`token-rate-limit-per-minute` 를 낮춘 클래스).
+- 같은 IP 한도는 phase 01 의 등록 한도 테스트와 같은 방식(`@Nested inner class` 와 `@TestPropertySource` 로 `token-rate-limit-per-minute` 를 낮춘다)으로 한 번 확인한다. `support/IntegrationTest.kt` 는 phase 01 이 한도를 크게 잡아 두었다.
+- 연결 목록의 줄 수를 단언하는 테스트는 공용 사용자(`VIEWER`, `ALICE` 등)가 아니라 `newUser(Role.VIEWER)` 로 만든 사용자를 쓴다. Neo4j 를 테스트끼리 함께 써서 다른 테스트의 연결이 섞인다.
 - `GET /connect` 가 `200` 이고 본문이 테스트 `index.html` 이다(`SpaRouteIntegrationTest` 의 방식을 따르거나 그 테스트에 경로를 더한다).
 
 ## 검증

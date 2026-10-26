@@ -42,6 +42,7 @@
 - 처음 그릴 때 `api.oauth.preview(location.search)` 를 부른다. 결과에 따라 동의 본문, `OAUTH_INVALID_CLIENT` 화면, `OAUTH_REDIRECT_ERROR` 화면을 그린다. 범위 라디오, 「연결 허용」, 「거절」, 진행 중 안내, 실패 안내는 `docs/flow.md` 「동의 화면」 대로다.
 - testid: `connect-page`, `connect-user`, `connect-sentence`, `connect-redirect`, `connect-warning`, `connect-scope-write`, `connect-scope-read`, `connect-allow`, `connect-deny`, `connect-progress`, `connect-error`, `connect-invalid`, `connect-back`(앱으로 돌아가기). `web/TESTIDS.md` 에 「앱 연결」 절로 더한다.
 - `web/src/App.tsx`: 경로가 `CONNECT_PATH` 면 로그인한 뒤 `ConnectPage` 만 그린다. 로그인하지 않았으면 `LoginView` 에 `notice="앱을 연결하려면 먼저 Google 로 로그인하세요."` 를 넘긴다(`notice` 의 testid 는 `login-notice`).
+- 로그인 복귀: Google 로그인은 `/` 로 돌아온다(`SecurityConfig` 의 `defaultSuccessUrl("/", true)`). 지금 `App.tsx` 는 돌아갈 주소(`returnToRef`)로 옮기는 일을 `api.ontology.get()` 성공 뒤에만 하고, 그 사이 `/` 가 `/map` 이 되며 첫 접속 가이드(`GuideProvider`)가 열릴 수 있다. `api.auth.me()` 성공 뒤 `takeReturnTo()` 의 값이 `CONNECT_PATH` 로 시작하면 온톨로지를 기다리지 않고 바로 `navigate(back, { replace: true })` 하고, 그 경로에서는 `GuideProvider` 의 자동 열기가 돌지 않게 한다. `/connect` 를 그릴 때 `returnToRef` 를 비워, 「첫 화면으로」 를 눌렀을 때 다시 `/connect` 로 끌려가지 않게 한다.
 
 ### 3. 「연동」 화면의 연결된 앱
 
@@ -54,16 +55,18 @@
 
 - `web/src/lib/connect.test.ts`: `readAuthorizationQuery` 가 모르는 칸을 버리고 여덟 칸을 읽는다. `consentSentence('Claude Code', 'READ')` 가 「… 조회하려 합니다.」 로 끝나고 `READ_WRITE` 는 「조회하고 기록하려 합니다.」 로 끝난다. `redirectNotice('HTTPS', 'app.example')` 가 「app.example 로 돌아갑니다」 를 담는다.
 - `web/src/routes.test.ts`: `isSafeReturnTo('/connect?client_id=x')` 가 참, `isSafeReturnTo('/connectx')` 는 거짓.
+- `web/src/lib/links.test.ts`: `/connect?…` 를 `rememberReturnTo` 로 두면 `takeReturnTo` 가 그대로 돌려준다.
 - `web/src/components/connect/ConnectPage.test.tsx`: preview 결과를 넣어 그린 HTML 에 앱 이름 문장, 「조회와 기록」 이 고른 상태, 두 단추가 있다. `requestedScope: 'READ'` 면 `connect-scope-write` 가 없다. `OAUTH_INVALID_CLIENT` 상태면 `connect-allow` 가 없다. 상태를 props 나 내보낸 순수 렌더 함수로 넣을 수 있게 컴포넌트를 나눈다(`TokensTab.test.tsx` 의 방식).
 - `web/src/components/tokens/ConnectionsSection.test.tsx`: 빈 목록이면 「아직 연결한 앱이 없습니다.」, 한 줄이면 앱 이름과 「조회만」 이 보인다.
 - `web/e2e/workbench.spec.ts` 에 「앱 연결 동의와 연결된 앱 끊기」 테스트: 로그인한 페이지에서 `page.request.post('/oauth/register', …)` 로 `redirect_uris: ['http://127.0.0.1:43210/callback']` 클라이언트를 등록하고, `page.route('http://127.0.0.1:43210/**', r => r.fulfill({ body: 'ok' }))` 로 돌아갈 곳을 받는다. PKCE 값을 만들어 `/oauth/authorize?…` 를 열고 `connect-allow` 를 눌러 `code` 가 붙은 주소로 이동하는지 본다. `page.request.post('/oauth/token', { form })` 로 토큰을 받고, `/tokens` 의 `connections-row` 에 앱이 보이며 「연결 끊기」 뒤 사라진다. 끊은 뒤 같은 갱신 토큰이 `400` 이다. 스크린샷을 `test-results/screenshots/` 에 남긴다(기존 테스트의 방식).
+- 같은 파일에 「로그아웃 상태에서 앱 연결」 테스트. `support.ts` 의 `loginAs` 는 로그인 뒤 머리글의 `current-user-name` 을 기다려 `/connect`(머리글 없음)에서 쓸 수 없다. `loginAs` 에서 가짜 OIDC 폼을 채우는 부분을 떼어 `export async function fillMockOidc(page, user)` 로 내보내고 `loginAs` 는 그것을 부르게 한다. 흐름: 관리자 페이지에서 `workbench.spec.ts` 의 지역 함수 `addUser(pageAdmin, 새 사용자, 'VIEWER')` → 새 브라우저 컨텍스트에서 `/oauth/authorize?…` 열기 → `login-notice` 가 「앱을 연결하려면」 을 담는다 → `login-google` → `fillMockOidc` → `connect-page` 가 보이고 `guide-bubble` 의 개수가 0. 첫 접속 가이드를 끝내지 않은 새 사용자라 가이드가 열리지 않는 것을 확인한다.
 - `web/e2e/mobile.spec.ts` 에 390px 폭에서 동의 화면과 연결된 앱 표가 가로 스크롤 없이 보이는 테스트를 더한다. 가로 스크롤 검사는 이 파일의 기존 도우미를 쓴다.
 - e2e 가 연결을 만들면 테스트 끝에 그 사용자의 연결을 모두 끊는다(`support.ts` 에 `revokeConnections(page)` 를 연동 토큰 정리 도우미 옆에 더한다).
 
 ## 검증
 
 ```bash
-cd web && npx vitest run src/lib/connect.test.ts src/routes.test.ts src/components/connect/ConnectPage.test.tsx src/components/tokens/ConnectionsSection.test.tsx src/components/tokens/TokensTab.test.tsx src/components/header/MoreMenu.test.tsx
+cd web && npx vitest run src/lib/connect.test.ts src/lib/links.test.ts src/routes.test.ts src/components/connect/ConnectPage.test.tsx src/components/tokens/ConnectionsSection.test.tsx src/components/tokens/TokensTab.test.tsx src/components/header/MoreMenu.test.tsx
 cd web && npm run typecheck && npm test && npm run build
 cd web && npx playwright test --list e2e/workbench.spec.ts e2e/mobile.spec.ts | grep -E '앱 연결|연결된 앱'
 ```
@@ -80,7 +83,9 @@ cd web && npx playwright test --list e2e/workbench.spec.ts e2e/mobile.spec.ts | 
 | `web/src/lib/connect.test.ts` | 신규 |
 | `web/src/routes.ts` | 수정 |
 | `web/src/routes.test.ts` | 수정 |
+| `web/src/lib/links.test.ts` | 수정 |
 | `web/src/App.tsx` | 수정 |
+| `web/src/components/guide/GuideProvider.tsx` | 수정 |
 | `web/src/components/connect/ConnectPage.tsx` | 신규 |
 | `web/src/components/connect/ConnectPage.test.tsx` | 신규 |
 | `web/src/components/tokens/ConnectionsSection.tsx` | 신규 |

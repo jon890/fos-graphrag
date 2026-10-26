@@ -15,6 +15,7 @@ MCP Java SDK 의 세션 없는 servlet 전송으로 `POST /mcp` 를 열고, 커�
 - 연동 토큰 인증은 `dev.fos.workbench.agent.IntegrationTokenService.authenticate` 와 `BearerTokenFilter` 다. 요청 한도는 `SecurityConfig` 의 `agentRateLimiter`, `agentWriteRateLimiter` 빈이다.
 - OAuth 연결 저장소는 phase 02 의 `dev.fos.workbench.oauth.OAuthGrantRepository` 다. 접근 토큰 해시 조회 조건은 `docs/data-schema.md` 「OAuth 연결」 이다(`accessExpiresAt > now`, `resource` 가 요청의 `{base}/mcp`, 주인 활성). `lastUsedAt` 은 연동 토큰과 같이 1분 넘게 지났을 때만 쓰고 실패해도 인증은 통과한다(`IntegrationTokenService.authenticate` 참고).
 - 예외를 `{code, message, details}` 로 바꾸는 규칙은 `dev.fos.workbench.web.GlobalExceptionHandler` 다. 도구 오류도 이 빈의 `api(ApiException)` 과 `unexpected(Exception)` 을 불러 같은 `ApiError` 를 얻는다. 검사 오류(`ValidationFailedException`)도 `ApiException` 이다.
+- `io.modelcontextprotocol.sdk:mcp:2.1.0` 이 Maven Central 에 없으면(첫 빌드에서 드러난다) 있는 최신 GA 를 쓰고, `docs/code-architecture.md` 「버전」 과 ADR-015 의 버전을 같은 커밋에서 고친다.
 - 테스트 클라이언트는 `io.modelcontextprotocol.sdk:mcp` 의 `McpClient.sync(HttpClientStreamableHttpTransport.builder(base).endpoint("/mcp")…)` 다. 요청 헤더는 transport builder 의 요청 사용자 지정(`customizeRequest` 또는 이름이 같은 2.1.0 의 메서드)으로 `Authorization` 을 넣는다. 정확한 메서드 이름은 받은 jar 에서 확인한다.
 - phase 02 의 테스트 도우미 `api/src/test/kotlin/dev/fos/workbench/support/OAuthFlow.kt` 의 `connect(session, grantedScope)` 로 접근 토큰을 얻는다. 연동 토큰은 `AgentAuthIntegrationTest` 처럼 `POST /api/me/tokens` 로 발급한다.
 
@@ -46,24 +47,24 @@ MCP Java SDK 의 세션 없는 servlet 전송으로 `POST /mcp` 를 열고, 커�
 ### 3. `oauth` 의 접근 토큰 확인
 
 - `OAuthGrantRepository.findActiveByAccess(hash, resource, now): ActiveGrant?` 와 `touchLastUsed(grantId, now)`.
-- `api/src/main/kotlin/dev/fos/workbench/oauth/OAuthAccessTokenService.kt`: `authenticate(raw: String, resource: String): AgentPrincipal?`. `fwa_` 형식이 아니면 null. 성공하면 `kind = OAUTH`.
+- `api/src/main/kotlin/dev/fos/workbench/oauth/OAuthAccessTokenService.kt`: `authenticate(raw: String, resource: String): ActiveGrant?`(연결 id, 클라이언트 이름, 범위, 주인 id, 표시 이름, 역할). `fwa_` 형식이 아니면 null. `AgentPrincipal` 은 만들지 않는다.
 
 ### 4. `api/src/main/kotlin/dev/fos/workbench/mcp/` 새 패키지
 
-- `McpAuthenticator.kt`: `authenticate(raw)` 가 `fwb_` 면 `IntegrationTokenService`, `fwa_` 면 `OAuthAccessTokenService`(자원은 `OAuthUrls.resource()`)로 보낸다. 둘 다 아니면 null.
+- `McpAuthenticator.kt`: `authenticate(raw)` 가 `fwb_` 면 `IntegrationTokenService`, `fwa_` 면 `OAuthAccessTokenService`(자원은 `OAuthUrls.resource()`)로 보낸다. 둘 다 아니면 null. `OAuthAccessTokenService` 가 돌려준 `ActiveGrant` 를 여기서 `AgentPrincipal` 로 바꾼다(`oauth` 가 `agent` 에 기대지 않게 한다. `docs/code-architecture.md` 「API 패키지」).
 - `McpSecurity.kt`: `/mcp` 의 인증 실패 응답(`401`, `WWW-Authenticate: Bearer resource_metadata="{base}/.well-known/oauth-protected-resource/mcp", scope="read write"`, 토큰을 보냈으면 `error="invalid_token"` 을 더한다. 본문은 `ApiError("UNAUTHENTICATED", "연결이 필요합니다. 앱에서 다시 로그인하세요.")`)과 `Origin` 검사 필터(헤더가 있고 `OAuthUrls.base()` 와 다르면 `403 FORBIDDEN`).
-- `McpTools.kt`: 계약의 도구 표의 도구를 `McpServerFeatures.SyncToolSpecification` 으로 만든다. 각 도구는 이름, 제목(`title`), 한국어 설명(무엇을 하는지, 언제 쓰는지. fos-assistant 커넥터의 설명에서 HTTP 와 토큰 이야기를 빼고 비개발자 대화 기준으로 다듬는다), 입력 JSON Schema, `ToolAnnotations`(계약의 힌트 규칙)를 가진다. 처리기는 `McpTransportContext` 에서 `AgentPrincipal` 을 꺼내 서비스를 부르고, 결과 객체를 `JsonMapper` 로 직렬화해 `TextContent` 하나로 돌려준다. 쓰기 도구는 `V1Inputs.requireWrite` 를 먼저 부르고, 통과하면 `agentWriteRateLimiter.tryAcquire(principal.tokenId)` 로 센다. 넘으면 `RATE_LIMITED` 도구 오류(`details.retryAfterSeconds`)다. `get_connection` 은 `McpConnection` 을 돌려준다(DTO 는 이 패키지의 `McpDtos.kt`).
+- `McpTools.kt`: 계약의 도구 표의 도구를 `McpStatelessServerFeatures.SyncToolSpecification` 으로 만든다(세션 없는 서버의 타입. 처리기는 `(McpTransportContext, CallToolRequest) -> CallToolResult`). 세션 있는 `McpServerFeatures` 를 쓰지 않는다. 각 도구는 이름, 제목(`title`), 한국어 설명(무엇을 하는지, 언제 쓰는지. fos-assistant 커넥터의 설명에서 HTTP 와 토큰 이야기를 빼고 비개발자 대화 기준으로 다듬는다), 입력 JSON Schema, `ToolAnnotations`(계약의 힌트 규칙)를 가진다. 처리기는 `McpTransportContext` 에서 `AgentPrincipal` 을 꺼내 서비스를 부르고, 결과 객체를 `JsonMapper` 로 직렬화해 `TextContent` 하나로 돌려준다. 쓰기 도구는 `V1Inputs.requireWrite` 를 먼저 부르고, 통과하면 `agentWriteRateLimiter.tryAcquire(principal.tokenId)` 로 센다. 넘으면 `RATE_LIMITED` 도구 오류(`details.retryAfterSeconds`)다. `get_connection` 은 `McpConnection` 을 돌려준다(DTO 는 이 패키지의 `McpDtos.kt`).
 - `McpToolErrors.kt`: 처리기의 예외를 `GlobalExceptionHandler` 로 `ApiError` 로 바꿔 `isError = true` 결과로 만든다. `INSUFFICIENT_SCOPE` 의 문장은 계약의 「도구 오류」 표의 문장으로 바꾼다(`/api/v1` 의 문장과 다르다).
-- `McpServerConfig.kt`: `HttpServletStatelessServerTransport.builder()` 에 Jackson 3 매퍼, 엔드포인트 `/mcp`, context extractor(요청 속성의 `AgentPrincipal` 을 담는다)를 준다. `McpServer.sync(transport)`(세션 없는 서버) 에 `serverInfo("valuation-ontology", 버전)`, 제목 「가치투자 온톨로지」, 도구들을 등록한다. `ServletRegistrationBean(transport, "/mcp")`. `GET`, `DELETE` 가 `405` 인지 SDK 동작을 확인하고, 아니면 `McpSecurity` 의 필터에서 `405` 로 막는다.
+- `McpServerConfig.kt`: `HttpServletStatelessServerTransport.builder()` 에 `jsonMapper(JacksonMcpJsonMapper(<Spring 의 JsonMapper>))`(`io.modelcontextprotocol.json.jackson3`), `messageEndpoint("/mcp")`, `contextExtractor`(요청 속성의 `AgentPrincipal` 을 `McpTransportContext` 에 담는다)를 준다. `McpServer.sync(transport)` 는 `StatelessSyncSpecification` 을 돌려준다. 여기 에 `serverInfo("valuation-ontology", 버전)`, 제목 「가치투자 온톨로지」, 도구들을 등록한다. `ServletRegistrationBean(transport, "/mcp")`. `GET`, `DELETE` 가 `405` 인지 SDK 동작을 확인하고, 아니면 `McpSecurity` 의 필터에서 `405` 로 막는다.
 
 ### 5. `api/src/main/kotlin/dev/fos/workbench/config/SecurityConfig.kt`
 
-`@Bean @Order(1) mcpFilterChain`: `securityMatcher("/mcp", "/mcp/**")`, `anyRequest().hasRole("VIEWER")`, CSRF 끄기, `STATELESS`, `RequestAttributeSecurityContextRepository`, `BearerTokenFilter(mcpAuthenticator::authenticate, agentRateLimiter, null, mapper)` 와 Origin 필터, 인증 실패 진입점은 `McpSecurity` 의 `401`, 권한 거절은 `403 FORBIDDEN`. 인증된 주체를 SDK context extractor 가 읽을 수 있게 요청 속성에도 둔다(`BearerTokenFilter` 가 `request.setAttribute(AgentPrincipal::class.java.name, principal)`).
+`@Bean @Order(1) mcpFilterChain`: `securityMatcher("/mcp", "/mcp/**")`, `anyRequest().hasRole("VIEWER")`, CSRF 끄기, `STATELESS`, `RequestAttributeSecurityContextRepository`, `BearerTokenFilter(mcpAuthenticator::authenticate, agentRateLimiter, null, mapper)` 와 Origin 필터(`SecurityContextHolderFilter` 뒤, `BearerTokenFilter` 앞. 토큰이 없어도 `Origin` 이 틀리면 `403` 이다), 인증 실패 진입점은 `McpSecurity` 의 `401`, 권한 거절은 `403 FORBIDDEN`. 인증된 주체를 SDK context extractor 가 읽을 수 있게 요청 속성에도 둔다(`BearerTokenFilter` 가 `request.setAttribute(AgentPrincipal::class.java.name, principal)`).
 
 ### 6. 이 phase 를 검증하는 테스트 `api/src/test/kotlin/dev/fos/workbench/mcp/McpIntegrationTest.kt`
 
 - 토큰 없이 `POST /mcp`(JSON-RPC `initialize`)는 `401` 이고 `WWW-Authenticate` 에 `resource_metadata="http://localhost:<port>/.well-known/oauth-protected-resource/mcp"` 와 `scope="read write"` 가 있다. 틀린 `fwa_` 토큰은 `error="invalid_token"` 이 더 있다.
-- `Origin: https://evil.example` 을 붙인 요청은 `403`. `GET /mcp` 는 `405`.
+- 토큰 없이 `Origin: https://evil.example` 을 붙인 요청은 `403`(Origin 검사가 인증보다 앞이다). 유효한 토큰을 붙인 `GET /mcp` 는 `405`(토큰이 없으면 체인이 먼저 `401` 을 낸다).
 - OAuth 접근 토큰으로 SDK 클라이언트가 `initialize` 하면 서버 이름이 `valuation-ontology` 다. `tools/list` 에 계약 표의 도구 이름이 모두 있고, 각 도구에 한국어 설명과 `annotations` 가 있다. `record_trades`, `submit_proposals` 는 `readOnlyHint == false`, `destructiveHint == false` 이고 나머지는 `readOnlyHint == true` 다. 도구 수를 상수로 단언하지 않는다.
 - `get_connection` 결과의 `connection.kind == "OAUTH"`, `connection.name` 이 등록한 앱 이름, `scope == "READ_WRITE"` 다.
 - 연동 토큰(`fwb_`)으로도 `tools/call get_connection` 이 되고 `kind == "INTEGRATION_TOKEN"` 이다.
@@ -72,7 +73,8 @@ MCP Java SDK 의 세션 없는 servlet 전송으로 `POST /mcp` 를 열고, 커�
 - 사용자 A 가 MCP 로 기록한 체결은 사용자 B 의 연결로 부른 `list_my_trades` 결과에 없다.
 - 연결을 끊은 뒤(`DELETE /api/me/connections/{id}`) 같은 접근 토큰은 `401` 이다. `accessExpiresAt` 을 과거로 고친 연결의 토큰도 `401` 이다.
 - `/api/v1/me` 에 OAuth 접근 토큰을 보내면 `401` 이다(`/api/v1` 은 연동 토큰만 받는다).
-- 요청 한도: `workbench.agent.rate-limit-per-minute` 를 낮춘 클래스에서 넘는 요청이 `429` 와 `Retry-After` 다. 기존 `agent` 테스트의 컨텍스트와 섞이지 않게 별도 클래스나 `@TestPropertySource` 로 둔다.
+- 요청 한도: `@Nested inner class` 와 `@TestPropertySource` 로 `workbench.agent.rate-limit-per-minute` 를 낮춘 곳에서 넘는 요청이 `429` 와 `Retry-After` 다.
+- 쓰기 한도: 다른 nested 클래스에서 `workbench.agent.write-rate-limit-per-minute=2` 로 두고, 조회 도구를 세 번 넘게 불러도 통과한다(`/mcp` 는 메서드로 쓰기 한도를 세지 않는다). 세 번째 `record_trades` 는 `isError == true`, `code == "RATE_LIMITED"`, `details.retryAfterSeconds` 가 있다.
 
 ## 검증
 
@@ -105,3 +107,5 @@ cd api && ./gradlew dependencies --configuration runtimeClasspath | grep -E 'io.
 | `api/src/main/kotlin/dev/fos/workbench/mcp/McpServerConfig.kt` | 신규 |
 | `api/src/main/kotlin/dev/fos/workbench/config/SecurityConfig.kt` | 수정 |
 | `api/src/test/kotlin/dev/fos/workbench/mcp/McpIntegrationTest.kt` | 신규 |
+| `docs/code-architecture.md` | 수정(SDK 버전을 바꿀 때만) |
+| `docs/adr/015-remote-mcp-oauth.md` | 수정(SDK 버전을 바꿀 때만) |

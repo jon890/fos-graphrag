@@ -1,6 +1,6 @@
 # Phase 01. OAuth 메타데이터와 클라이언트 동적 등록
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
@@ -39,7 +39,7 @@ MCP 클라이언트가 인가 서버를 찾고 스스로 등록할 수 있게 �
 
 - `OAuthUrls.kt`: `fun base(): String`(현재 요청의 `{base}`), `fun resource(): String = base() + "/mcp"`.
 - `OAuthSecrets.kt`: `generate(prefix: String)`(접두 뒤에 무작위 32바이트 base64url 43자를 붙인다), `isWellFormed(prefix, raw)`, `hash(raw)`(SHA-256 소문자 16진수. `IntegrationTokens.hash` 와 같은 결과), `s256(verifier)`(PKCE: SHA-256 의 base64url, 채움 없음). 접두 상수 `CODE = "fwc_"`, `ACCESS = "fwa_"`, `REFRESH = "fwr_"`.
-- `OAuthErrors.kt`: `class OAuthException(status: HttpStatus, error: String, description: String)` 과 `data class OAuthErrorBody(error, error_description)`. 응답 JSON 키는 `error`, `error_description` 이다. `@RestControllerAdvice(basePackageClasses = [OAuthMetadataController::class])` 같은 범위 지정으로 `oauth` 패키지 컨트롤러의 `OAuthException` 만 이 형식으로 쓴다. `/api/oauth/**` 컨트롤러(phase 02)는 기존 `ApiException` 을 쓰므로, 범위는 `/oauth/**` 컨트롤러 클래스들로 `assignableTypes` 를 준다.
+- `OAuthErrors.kt`: `class OAuthException(status: HttpStatus, error: String, description: String)` 과 `data class OAuthErrorBody(error, error_description)`. 응답 JSON 키는 `error`, `error_description` 이다. `@RestControllerAdvice(basePackageClasses = [OAuthMetadataController::class])` 같은 범위 지정으로 `oauth` 패키지 컨트롤러의 `OAuthException` 만 이 형식으로 쓴다. `/api/oauth/**` 컨트롤러(phase 02)는 기존 `ApiException` 을 쓰므로, 범위는 `/oauth/**` 컨트롤러 클래스들로 `assignableTypes` 를 준다. 전역 `GlobalExceptionHandler` 는 범위 없이 모든 컨트롤러에 걸리고 `Exception`, `MissingServletRequestParameterException`, `HttpMessageNotReadableException` 을 `{code, message}` 로 바꾼다. 그래서 OAuth advice 에 `@Order(Ordered.HIGHEST_PRECEDENCE)` 를 붙이고, 누락 파라미터, 읽을 수 없는 본문, 지원하지 않는 Content-Type(`HttpMediaTypeNotSupportedException`), 타입 불일치를 OAuth 형식으로 바꾸는 처리기를 함께 둔다. 등록 경로면 `invalid_client_metadata`, 토큰과 폐기 경로면 `invalid_request` 다. 처리기는 받은 값(코드, 토큰)을 `error_description` 에 담지 않는다.
 - `RedirectUris.kt`: `fun validate(uri: String): Boolean`(fragment 없음, 절대 주소, `http://127.0.0.1`·`http://localhost`·`http://[::1]` loopback 이거나 `https`), `fun matches(registered: String, requested: String): Boolean`(글자까지 같다), 길이 2000자 상한, `fun isLoopback(uri)`.
 - `OAuthClientRepository.kt`: `:OAuthClient` 저장. `create(name, redirectUris): OAuthClientRecord`, `find(id): OAuthClientRecord?`, `deleteStaleUnapproved(before: String): Long`(`approvedAt IS NULL AND createdAt < $before`), `markApproved(id, now)`(phase 02 가 쓴다. `approvedAt` 이 없을 때만 쓴다).
 - `OAuthClientService.kt`: `register(body: Map<String, Any?>): RegisteredClient`. 계약의 검사 순서와 기본값을 지킨다. 같은 트랜잭션에서 `deleteStaleUnapproved(지금 - 24시간)` 을 먼저 부른다.
@@ -54,14 +54,21 @@ MCP 클라이언트가 인가 서버를 찾고 스스로 등록할 수 있게 �
 
 ### 4. `api/src/main/kotlin/dev/fos/workbench/web/RequestSizeFilter.kt`
 
-`/oauth/` 로 시작하는 `POST` 도 검사한다. 상한은 `Limits.MAX_OAUTH_BODY_BYTES`. `/mcp` 의 `POST` 도 검사 대상에 넣고 상한은 `Limits.MAX_BODY_BYTES` 다(phase 03 이 쓴다). `/api/` 의 동작은 바꾸지 않는다. 클래스 주석을 고친다.
+`/oauth/` 로 시작하는 `POST` 도 검사한다. 상한은 `Limits.MAX_OAUTH_BODY_BYTES`. `/oauth/` 의 `413`, `411` 본문은 OAuth 형식 `{"error":"invalid_request","error_description":…}` 이다(계약: OAuth 경로의 오류 본문은 OAuth 형식). `/mcp` 의 `POST` 도 검사 대상에 넣고 상한은 `Limits.MAX_BODY_BYTES` 다(phase 03 이 쓴다). `/api/` 의 동작은 바꾸지 않는다. 클래스 주석을 고친다.
 
 ### 5. 제약 조건과 코드 소유 이름
 
 - `Neo4jSchemaInitializer.kt` 에 `docs/data-schema.md` 「제약 조건과 인덱스」 의 `oauth_client_id_unique`, `oauth_code_hash_unique`, `oauth_grant_id_unique`, `oauth_grant_access_hash_unique`, `oauth_grant_refresh_hash_unique`(유일 제약), `oauth_grant_previous_refresh`(인덱스, `CREATE INDEX … IF NOT EXISTS`)를 더한다.
 - `OntologyLoader.RESERVED_NODE_TYPES` 에 `OAuthClient`, `OAuthCode`, `OAuthGrant` 를 더한다. 이 집합의 원소를 하나하나 단언하는 기존 테스트가 있으면(`git grep -n "RESERVED_NODE_TYPES\|IntegrationToken" api/src/test`) 같은 커밋에서 고친다.
 
-### 6. 이 phase 를 검증하는 테스트
+### 6. 테스트의 요청 한도
+
+통합 테스트의 모든 요청은 `127.0.0.1` 에서 온다(테스트는 forward headers 를 읽지 않는다). 기본 한도를 그대로 두면 같은 Spring 컨텍스트를 쓰는 테스트 전체가 1분에 등록 10번, 토큰 30번을 나눠 써 `429` 가 난다.
+
+- `api/src/test/kotlin/dev/fos/workbench/support/IntegrationTest.kt` 의 `@SpringBootTest(properties = …)` 에 `workbench.oauth.register-rate-limit-per-minute=10000`, `workbench.oauth.token-rate-limit-per-minute=10000` 을 더한다.
+- 한도를 확인하는 테스트만 `ForwardedHeadersIntegrationTest` 처럼 `@Nested inner class` 에 `@TestPropertySource` 를 붙여 값을 낮춘다. 같은 클래스의 다른 테스트가 낮은 한도에 묶이지 않게 한다.
+
+### 7. 이 phase 를 검증하는 테스트
 
 - `api/src/test/kotlin/dev/fos/workbench/oauth/RedirectUrisTest.kt`(단위): `http://localhost:1234/callback` 등록에 `http://localhost:5678/callback`(포트만 다름), `http://localhost:1234/callback/extra`(접두 일치), `http://localhost:1234/callbackx` 는 맞지 않고 같은 글자만 맞는다. 2001자 주소는 `validate` 가 거절한다. `http://example.com/cb`, `custom://cb`, `http://localhost/cb#x` 는 `validate` 가 거절한다.
 - `api/src/test/kotlin/dev/fos/workbench/oauth/OAuthSecretsTest.kt`(단위): RFC 7636 부록 B 의 `code_verifier`(`dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk`)가 `E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM` 로 바뀐다. `generate("fwa_")` 가 `isWellFormed` 를 통과한다.
@@ -72,7 +79,9 @@ MCP 클라이언트가 인가 서버를 찾고 스스로 등록할 수 있게 �
   - 등록 성공은 `201` 이고 `client_id` 가 UUID, `token_endpoint_auth_method == "none"`, `client_name` 이 없으면 「이름 없는 앱」 이다.
   - `redirect_uris` 가 비었거나, `http://example.com/cb` 를 담으면 `400 invalid_redirect_uri` 다. `token_endpoint_auth_method: client_secret_basic`, 101자 `client_name`, 줄바꿈이 든 `client_name` 은 `400 invalid_client_metadata` 다. 오류 본문에 보낸 값이 그대로 실리지 않는다.
   - 승인받지 않은 `:OAuthClient` 의 `createdAt` 을 25시간 전으로 고쳐 두고 새로 등록하면 그 노드가 지워진다. 테스트가 `neo4j` 클라이언트로 그 `id` 의 노드 수가 0 인지 단언한다.
-  - 한도: `workbench.oauth.register-rate-limit-per-minute` 를 이 클래스의 `@TestPropertySource` 나 `properties` 로 3 으로 낮추고 네 번째 등록이 `429` 와 `Retry-After` 를 받는다. 다른 테스트 클래스의 컨텍스트와 섞이지 않게 한다.
+  - `redirect_uris` 11개, 2001자 주소는 `400 invalid_redirect_uri` 다. 16KiB 를 넘는 등록 본문은 `413` 이고 본문이 OAuth 형식(`error`)이다.
+  - JSON 이 아닌 본문, `Content-Type: text/plain` 은 `400 invalid_client_metadata` 다(전역 처리기의 `VALIDATION_FAILED` 가 아니다).
+  - 한도: 작업 항목 6 의 nested 클래스에서 `register-rate-limit-per-minute=3` 으로 두고 네 번째 등록이 `429` 와 `Retry-After` 를 받는다.
 
 ## 검증
 
@@ -105,4 +114,5 @@ cd api && ./gradlew test --rerun
 | `api/src/test/kotlin/dev/fos/workbench/oauth/OAuthSecretsTest.kt` | 신규 |
 | `api/src/test/kotlin/dev/fos/workbench/oauth/OAuthRegistrationIntegrationTest.kt` | 신규 |
 | `api/src/test/kotlin/dev/fos/workbench/ForwardedHeadersIntegrationTest.kt` | 수정 |
+| `api/src/test/kotlin/dev/fos/workbench/support/IntegrationTest.kt` | 수정 |
 | `api/src/test/kotlin/dev/fos/workbench/ontology/*.kt` | 수정 |
