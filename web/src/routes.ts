@@ -271,7 +271,7 @@ export function tradesSearch(q: TradesQuery): string {
 }
 
 export interface OntologyQuery {
-  view?: 'form' | 'yaml' | 'history'
+  view?: 'yaml' | 'history'
   version?: number
 }
 
@@ -280,7 +280,9 @@ export function parseOntologyQuery(search: string): OntologyQuery {
   const view = p.get('view')
   const version = p.get('version')
   const q: OntologyQuery = {}
-  if (view === 'form' || view === 'yaml' || view === 'history') q.view = view
+  // 예전 주소 view=form 은 yaml 로 읽는다
+  if (view === 'form' || view === 'yaml') q.view = 'yaml'
+  else if (view === 'history') q.view = 'history'
   if (version !== null && /^\d+$/.test(version)) q.version = Number(version)
   return q
 }

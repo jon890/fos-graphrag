@@ -15,6 +15,8 @@ interface Props {
   onRestart: () => void
   /** 다른 관리자가 먼저 저장했을 때 「내 초안을 최신 버전 위에 저장」. 초안 편집기만 넘긴다 */
   onRebase?: (currentVersion: number) => void
+  /** 오류 문장의 「(줄 N)」 을 누르면 편집칸이 그 줄로 간다. 초안 편집기만 넘긴다 */
+  onGoToLine?: (line: number) => void
 }
 
 const NOTE_MAX = 1000
@@ -33,12 +35,69 @@ function DiffList({ testId, title, paths }: { testId: string; title: string; pat
   )
 }
 
+const LINE_REF = /\(줄 (\d+)\)/
+
+/** 오류 문장. 「(줄 N)」 이 있고 이동할 수 있으면 그 부분을 단추로 그린다 */
+function ErrorText({ message, onGoToLine }: { message: string; onGoToLine?: (line: number) => void }) {
+  const match = onGoToLine ? LINE_REF.exec(message) : null
+  if (!match || !onGoToLine) return <>{message}</>
+  const line = Number(match[1])
+  return (
+    <>
+      {message.slice(0, match.index)}
+      <button
+        type="button"
+        className="cursor-pointer border-0 bg-transparent p-0 text-inherit underline"
+        data-testid="ontology-preview-error-line"
+        data-line={line}
+        onClick={() => onGoToLine(line)}
+      >
+        {match[0]}
+      </button>
+      {message.slice(match.index + match[0].length)}
+    </>
+  )
+}
+
 function detailsErrors(e: ApiError): string[] {
   const errors = e.details?.errors
   return Array.isArray(errors) ? errors.map(String) : [e.message]
 }
 
-export function OntologyPreviewPanel({ preview, onSave, onSaved, onRestart, onRebase }: Props) {
+/** 바뀐 점(더함, 뺌, 바뀜)과 기존 데이터에 미치는 영향. impacts 를 주지 않으면 미리보기의 영향을 보인다 */
+export function OntologyDiffSummary({ preview, impacts = preview.impacts }: { preview: OntologyPreview; impacts?: OntologyImpact[] }) {
+  const hasChanges = preview.added.length + preview.removed.length + preview.changed.length > 0
+  return (
+    <>
+      {hasChanges ? (
+        <>
+          <DiffList testId="ontology-diff-added" title="더함" paths={preview.added} />
+          <DiffList testId="ontology-diff-removed" title="뺌" paths={preview.removed} />
+          <DiffList testId="ontology-diff-changed" title="바뀜" paths={preview.changed} />
+        </>
+      ) : (
+        <p className="m-0 text-sm text-muted-foreground" data-testid="ontology-diff-empty">
+          바뀐 점이 없습니다
+        </p>
+      )}
+
+      {impacts.length > 0 && (
+        <div className="mt-2">
+          <h4 className="m-0 mb-1 text-sm font-bold">기존 데이터에 미치는 영향</h4>
+          <ul className="m-0 list-disc pl-5 text-sm">
+            {impacts.map((impact) => (
+              <li key={`${impact.path}:${impact.kind}`} data-testid="ontology-impact" data-kind={impact.kind}>
+                <span className="font-mono text-xs">{impact.path}</span> {impactText(impact.kind, impact.count)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  )
+}
+
+export function OntologyPreviewPanel({ preview, onSave, onSaved, onRestart, onRebase, onGoToLine }: Props) {
   const [impacts, setImpacts] = useState<OntologyImpact[]>(preview.impacts)
   const [confirm, setConfirm] = useState(false)
   const [note, setNote] = useState('')
@@ -64,7 +123,7 @@ export function OntologyPreviewPanel({ preview, onSave, onSaved, onRestart, onRe
             <ul className="m-0 list-disc pl-5">
               {preview.errors.map((message, i) => (
                 <li key={i} data-testid="ontology-preview-error">
-                  {message}
+                  <ErrorText message={message} onGoToLine={onGoToLine} />
                 </li>
               ))}
             </ul>
@@ -104,30 +163,7 @@ export function OntologyPreviewPanel({ preview, onSave, onSaved, onRestart, onRe
   return (
     <section className="mt-3 rounded-md border p-3" data-testid="ontology-preview-panel">
       <h3 className="m-0 mb-2 text-[15px] font-bold">저장 전에 확인</h3>
-      {hasChanges ? (
-        <>
-          <DiffList testId="ontology-diff-added" title="더함" paths={preview.added} />
-          <DiffList testId="ontology-diff-removed" title="뺌" paths={preview.removed} />
-          <DiffList testId="ontology-diff-changed" title="바뀜" paths={preview.changed} />
-        </>
-      ) : (
-        <p className="m-0 text-sm text-muted-foreground" data-testid="ontology-diff-empty">
-          바뀐 점이 없습니다
-        </p>
-      )}
-
-      {impacts.length > 0 && (
-        <div className="mt-2">
-          <h4 className="m-0 mb-1 text-sm font-bold">기존 데이터에 미치는 영향</h4>
-          <ul className="m-0 list-disc pl-5 text-sm">
-            {impacts.map((impact) => (
-              <li key={`${impact.path}:${impact.kind}`} data-testid="ontology-impact" data-kind={impact.kind}>
-                <span className="font-mono text-xs">{impact.path}</span> {impactText(impact.kind, impact.count)}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <OntologyDiffSummary preview={preview} impacts={impacts} />
 
       {preview.codeOwnedIgnored.length > 0 && (
         <div className="mt-2 text-sm">
@@ -146,7 +182,7 @@ export function OntologyPreviewPanel({ preview, onSave, onSaved, onRestart, onRe
             <ul className="m-0 list-disc pl-5">
               {saveErrors.map((message, i) => (
                 <li key={i} data-testid="ontology-preview-error">
-                  {message}
+                  <ErrorText message={message} onGoToLine={onGoToLine} />
                 </li>
               ))}
             </ul>
