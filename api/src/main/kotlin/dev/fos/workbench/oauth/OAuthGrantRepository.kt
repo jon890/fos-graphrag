@@ -88,13 +88,18 @@ class OAuthGrantRepository(private val client: Neo4jClient) {
         return created
     }
 
-    /** 연결 노드에 쓰기 잠금을 건 뒤 읽는다. 같은 갱신 토큰이 동시에 오면 여기서 줄을 선다 */
+    /**
+     * 연결 노드에 쓰기 잠금을 건 뒤 읽는다. 같은 갱신 토큰이 동시에 오면 여기서 줄을 선다.
+     * `MATCH` 의 조건은 잠금 전에 읽은 값이라, 앞선 요청이 갱신을 커밋했으면 잠금 뒤에 `refreshHash` 를 다시 확인해 null 을 돌려준다.
+     * 그러면 호출자는 이 토큰을 이전 갱신 토큰으로 다룬다.
+     */
     fun findByRefreshLocked(hash: String): OAuthGrantRecord? =
         client.query(
             """
             MATCH (u:User)-[:OWNS]->(g:OAuthGrant {refreshHash: ${'$'}hash})
             SET g._lock = true
             REMOVE g._lock
+            WITH g, u WHERE g.refreshHash = ${'$'}hash
             RETURN properties(g) AS g, u.id AS userId, (u.enabled = true AND u.email IS NOT NULL) AS active
             """,
         ).bind(hash).to("hash").fetch().one().map { record(it) }.orElse(null)

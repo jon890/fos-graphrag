@@ -35,7 +35,7 @@ flowchart LR
 - HSTS 는 앞단이 붙이는 것을 기본으로 한다. 앞단이 붙이지 않으면 `WORKBENCH_HSTS=true` 로 앱이 붙인다.
 - 에이전트 API(`/api/v1/**`)는 같은 공개 주소로 들어온다. 앞단은 `Authorization` 헤더를 지우지 않고 그대로 넘기고, 접근 로그에 이 헤더를 남기지 않는다. 앞단에서 경로를 따로 막지 않는다. 앱이 연동 토큰으로 인증하고 토큰마다 1분에 60번으로 막는다([ADR-012](adr/012-agent-integration-token.md)).
   앱의 한도는 인증에 성공한 요청만 센다. 형식만 맞춘 가짜 토큰은 요청마다 해시 조회를 한 번씩 일으키므로, 앞단이 IP 기준 요청 한도를 걸 수 있으면 `/api/v1/` 에도 건다. 토큰을 맞출 수는 없지만(무작위 256비트) 조회 부하를 앞단에서 줄인다.
-- 원격 MCP(`/mcp`)와 OAuth 인가 서버(`/oauth/**`, `/.well-known/oauth-protected-resource`, `/.well-known/oauth-authorization-server`)도 같은 공개 주소로 들어온다. 앞단은 이 경로를 막지 않고 `Authorization` 헤더를 그대로 넘긴다. `/oauth/token` 의 요청 본문(인가 코드, 갱신 토큰)을 접근 로그에 남기지 않는다. 메타데이터의 `issuer` 와 자원 주소는 `X-Forwarded-Proto`, `X-Forwarded-Host` 로 만들어지므로 위의 forward headers 설정이 맞아야 `https://<공개 origin>` 이 된다([ADR-015](adr/015-remote-mcp-oauth.md)).
+- 원격 MCP(`/mcp`)와 OAuth 인가 서버(`/oauth/**`, `/.well-known/oauth-protected-resource`, `/.well-known/oauth-authorization-server`)도 같은 공개 주소로 들어온다. 앞단은 이 경로를 막지 않고 `Authorization` 헤더를 그대로 넘긴다. `/oauth/token` 의 요청 본문(인가 코드, 갱신 토큰)을 접근 로그에 남기지 않는다. 메타데이터의 `issuer` 와 자원 주소는 `WORKBENCH_PUBLIC_URL` 이 있으면 그 값이고, 없으면 `X-Forwarded-Proto`, `X-Forwarded-Host` 로 만들어져 위의 forward headers 설정이 맞아야 `https://<공개 origin>` 이 된다. Host 헤더에 기대지 않도록 운영의 `.env` 에 `WORKBENCH_PUBLIC_URL=https://<공개 origin>` 을 넣는 것을 권한다([ADR-015](adr/015-remote-mcp-oauth.md)).
 - 실제 홈서버 주소, 계정, 키, 경로는 이 저장소에 넣지 않는다. 홈서버의 `.env` 에만 둔다. 공개 주소는 예외로 `scripts/deploy-prod.sh` 와 플러그인의 `plugin/.mcp.json` 에 있다.
 
 이번 작업에서는 홈서버에 배포하지 않았다. 아래 절차는 로컬 Compose 에서 확인했다(2026-10-20, macOS, Colima).
@@ -153,7 +153,7 @@ curl -sS -o /dev/null -D - -X POST -H 'Content-Type: application/json' -d '{}' h
 # HTTP/2 401 과 WWW-Authenticate: Bearer resource_metadata="https://<공개 origin>/.well-known/oauth-protected-resource/mcp", scope="read write"
 ```
 
-`resource` 나 `issuer` 가 `http://` 로 나오면 앞단의 `X-Forwarded-*` 를 app 이 믿지 않는 것이다. 위의 「기본 시나리오」 의 forward headers 설정을 확인한다.
+`resource` 나 `issuer` 가 `http://` 로 나오면 `WORKBENCH_PUBLIC_URL` 이 비어 있고 앞단의 `X-Forwarded-*` 를 app 이 믿지 않는 것이다. `WORKBENCH_PUBLIC_URL` 을 넣거나 위의 「기본 시나리오」 의 forward headers 설정을 확인한다.
 
 그다음 실제 Claude Code 로 붙는다. 플러그인을 설치하거나 `claude mcp add --transport http valuation-ontology https://<공개 origin>/mcp` 로 더한 뒤 `/mcp` 에서 로그인한다. 동의 화면에서 「조회만」 을 고르고 「가치투자 온톨로지 연결 확인해 줘」 로 `get_connection` 을 부른다. 확인이 끝나면 웹의 더보기 → 연동 → 「연결된 앱」 에서 그 연결을 끊는다. 쓰기 도구는 운영에 가짜 체결이 들어가므로 이 확인에서 부르지 않는다.
 

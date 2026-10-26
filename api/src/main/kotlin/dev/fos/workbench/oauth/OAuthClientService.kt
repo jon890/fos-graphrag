@@ -3,6 +3,7 @@ package dev.fos.workbench.oauth
 import com.fasterxml.jackson.annotation.JsonProperty
 import dev.fos.workbench.config.Limits
 import dev.fos.workbench.config.Timestamps
+import dev.fos.workbench.config.WorkbenchProperties
 import dev.fos.workbench.oauth.OAuthExceptionHandler.Companion.INVALID_CLIENT_METADATA
 import dev.fos.workbench.oauth.OAuthExceptionHandler.Companion.INVALID_REDIRECT_URI
 import org.springframework.http.HttpStatus
@@ -27,9 +28,12 @@ data class RegisteredClient(
  * 공개 클라이언트(`token_endpoint_auth_method: none`)만 받는다. 목록에 없는 필드는 읽지 않는다.
  */
 @Service
-class OAuthClientService(private val clients: OAuthClientRepository) {
+class OAuthClientService(private val clients: OAuthClientRepository, private val properties: WorkbenchProperties) {
 
-    /** 승인받지 않은 오래된 클라이언트를 같은 트랜잭션에서 먼저 지운다. 누구나 등록할 수 있어 쌓이지 않게 한다 */
+    /**
+     * 승인받지 않은 오래된 클라이언트를 같은 트랜잭션에서 먼저 지운다. 누구나 등록할 수 있어 쌓이지 않게 한다.
+     * 지운 뒤에도 승인받지 않은 클라이언트가 상한만큼 있으면 `503 temporarily_unavailable` 이다. IP 한도를 돌려 피하는 등록이 저장소를 채우지 못하게 한다.
+     */
     @Transactional(timeout = Limits.WRITE_TIMEOUT_SECONDS)
     fun register(body: Map<String, Any?>): RegisteredClient {
         val redirectUris = redirectUris(body["redirect_uris"])
@@ -44,6 +48,9 @@ class OAuthClientService(private val clients: OAuthClientRepository) {
         if (responseTypes != RESPONSE_TYPES) invalidMetadata("response_types 는 code 만 받습니다.")
 
         clients.deleteStaleUnapproved(Timestamps.system(Instant.now().minus(UNAPPROVED_RETENTION)))
+        if (clients.countUnapproved() >= properties.oauth.maxUnapprovedClients) {
+            throw OAuthException(HttpStatus.SERVICE_UNAVAILABLE, "temporarily_unavailable", "등록이 몰려 잠시 받지 않습니다. 잠시 뒤 다시 시도하세요.")
+        }
         val created = clients.create(name, redirectUris)
         return RegisteredClient(
             clientId = created.id,
@@ -62,10 +69,10 @@ class OAuthClientService(private val clients: OAuthClientRepository) {
             invalidRedirect("redirect_uris 는 1개 이상 ${MAX_REDIRECT_URIS}개 이하여야 합니다.")
         }
         return list.map { uri ->
-            if (uri !is String || !RedirectUris.validate(uri)) {
+            if (uri !is String || !RedirectUris.validate(uri, properties.oauth.allowedHttpsRedirectHosts)) {
                 invalidRedirect(
                     "redirect_uris 의 값은 fragment 가 없는 ${RedirectUris.MAX_LENGTH}자 이하의 절대 주소이고, " +
-                        "http://127.0.0.1, http://localhost, http://[::1] 의 loopback 이거나 https 여야 합니다.",
+                        "http://127.0.0.1, http://localhost, http://[::1] 의 loopback 이거나 서버가 허용한 host 의 https 여야 합니다.",
                 )
             }
             uri
@@ -102,7 +109,7 @@ class OAuthClientService(private val clients: OAuthClientRepository) {
         const val AUTH_METHOD_NONE = "none"
         val DEFAULT_GRANT_TYPES = listOf("authorization_code", "refresh_token")
         val RESPONSE_TYPES = listOf("code")
-        private val LINE_SEPARATORS = setOf(' ', ' ')
+        private val LINE_SEPARATORS = setOf('\u2028', '\u2029')
         private val UNAPPROVED_RETENTION: Duration = Duration.ofHours(24)
     }
 }

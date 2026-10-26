@@ -1,6 +1,6 @@
 package dev.fos.workbench.oauth
 
-import dev.fos.workbench.agent.TokenScope
+import dev.fos.workbench.auth.TokenScope
 import dev.fos.workbench.web.ApiException
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
@@ -42,7 +42,7 @@ data class ValidatedRequest(
  * 그 뒤에 걸리면 앱에 알릴 오류 주소를 `details.redirectUrl` 에 담은 `OAUTH_REDIRECT_ERROR` 다.
  */
 @Component
-class AuthorizationRequestValidator(private val clients: OAuthClientRepository) {
+class AuthorizationRequestValidator(private val clients: OAuthClientRepository, private val urls: OAuthUrls) {
 
     fun validate(request: AuthorizationRequest): ValidatedRequest {
         val client = request.clientId?.takeIf { it.isNotEmpty() }?.let { clients.find(it) } ?: throw invalidClient()
@@ -56,7 +56,7 @@ class AuthorizationRequestValidator(private val clients: OAuthClientRepository) 
         if (challenge == null || !CODE_CHALLENGE.matches(challenge) || request.codeChallengeMethod != CHALLENGE_METHOD) {
             reject(INVALID_REQUEST, "연결 요청에 PKCE(S256) 값이 없거나 올바르지 않습니다. 앱에서 연결을 다시 시작하세요.")
         }
-        val resource = OAuthUrls.resource()
+        val resource = urls.resource()
         if (!request.resource.isNullOrEmpty() && request.resource != resource) {
             reject("invalid_target", "연결 요청의 자원 주소가 이 서버와 다릅니다. 앱의 서버 주소를 확인하세요.")
         }
@@ -83,6 +83,21 @@ class AuthorizationRequestValidator(private val clients: OAuthClientRepository) 
         return if (values == setOf(READ_SCOPE)) TokenScope.READ else TokenScope.READ_WRITE
     }
 
+    /**
+     * 앱으로 돌아갈 주소. [values] 에서 null 은 빼고 끝에 `iss={base}` 를 붙인다(RFC 9207). 값은 URL 인코딩한다.
+     * redirect URI 에 이미 query 가 있으면 `&` 로 잇는다.
+     */
+    fun redirectUrl(redirectUri: String, values: Map<String, String?>): String {
+        val query = (values + ("iss" to urls.base())).entries.filter { it.value != null }
+            .joinToString("&") { "${it.key}=${URLEncoder.encode(it.value, Charsets.UTF_8)}" }
+        val separator = when {
+            redirectUri.endsWith('?') -> ""
+            redirectUri.contains('?') -> "&"
+            else -> "?"
+        }
+        return redirectUri + separator + query
+    }
+
     private fun invalidClient() =
         ApiException(HttpStatus.BAD_REQUEST, "OAUTH_INVALID_CLIENT", "연결 요청이 올바르지 않습니다. 앱에서 연결을 다시 시작하세요.")
 
@@ -102,20 +117,5 @@ class AuthorizationRequestValidator(private val clients: OAuthClientRepository) 
 
         /** SHA-256 32바이트를 채움 문자 없는 base64url 로 쓰면 43자다 */
         private val CODE_CHALLENGE = Regex("^[A-Za-z0-9_-]{43}$")
-
-        /**
-         * 앱으로 돌아갈 주소. [values] 에서 null 은 빼고 끝에 `iss={base}` 를 붙인다(RFC 9207). 값은 URL 인코딩한다.
-         * redirect URI 에 이미 query 가 있으면 `&` 로 잇는다.
-         */
-        fun redirectUrl(redirectUri: String, values: Map<String, String?>): String {
-            val query = (values + ("iss" to OAuthUrls.base())).entries.filter { it.value != null }
-                .joinToString("&") { "${it.key}=${URLEncoder.encode(it.value, Charsets.UTF_8)}" }
-            val separator = when {
-                redirectUri.endsWith('?') -> ""
-                redirectUri.contains('?') -> "&"
-                else -> "?"
-            }
-            return redirectUri + separator + query
-        }
     }
 }

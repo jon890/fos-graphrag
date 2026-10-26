@@ -1,7 +1,7 @@
 package dev.fos.workbench.oauth
 
 import com.fasterxml.jackson.annotation.JsonProperty
-import dev.fos.workbench.agent.TokenScope
+import dev.fos.workbench.auth.TokenScope
 import dev.fos.workbench.auth.UserRepository
 import dev.fos.workbench.config.Limits
 import dev.fos.workbench.config.Timestamps
@@ -72,7 +72,7 @@ class OAuthAuthorizationService(
     fun decide(userId: String, request: AuthorizationRequest, decision: String?, grantedScope: String?): String {
         val validated = validator.validate(request)
         when (decision) {
-            DENY -> return AuthorizationRequestValidator.redirectUrl(
+            DENY -> return validator.redirectUrl(
                 validated.redirectUri, linkedMapOf("error" to "access_denied", "state" to validated.state),
             )
             ALLOW -> Unit
@@ -101,7 +101,7 @@ class OAuthAuthorizationService(
             ),
             nowText,
         )
-        return AuthorizationRequestValidator.redirectUrl(validated.redirectUri, linkedMapOf("code" to raw, "state" to validated.state))
+        return validator.redirectUrl(validated.redirectUri, linkedMapOf("code" to raw, "state" to validated.state))
     }
 
     companion object {

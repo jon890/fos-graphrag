@@ -58,6 +58,9 @@ workbench:
     admin-name: ${WORKBENCH_BOOTSTRAP_ADMIN_NAME:관리자}
   seeds:
     enabled: ${WORKBENCH_SEEDS_ENABLED:true}
+  oauth:
+    # 비어 있으면 OAuth 주소(issuer, 자원 주소)를 요청의 scheme 과 host 로 만든다. 운영은 공개 주소로 고정한다
+    public-url: ${WORKBENCH_PUBLIC_URL:}
 
 logging:
   level:

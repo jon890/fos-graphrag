@@ -1,7 +1,6 @@
 package dev.fos.workbench.mcp
 
 import dev.fos.workbench.agent.AgentPrincipal
-import dev.fos.workbench.agent.RateLimiter
 import dev.fos.workbench.agent.v1.AgentQueryService
 import dev.fos.workbench.agent.v1.SecurityLookupService
 import dev.fos.workbench.agent.v1.V1Inputs
@@ -10,6 +9,7 @@ import dev.fos.workbench.agent.v1.V1MeUser
 import dev.fos.workbench.agent.v1.V1ProposalResult
 import dev.fos.workbench.agent.v1.V1Results
 import dev.fos.workbench.agent.v1.V1TradeResult
+import dev.fos.workbench.config.RateLimiter
 import dev.fos.workbench.config.WorkbenchProperties
 import dev.fos.workbench.proposal.ProposalService
 import dev.fos.workbench.trade.TradeService

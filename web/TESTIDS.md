@@ -395,7 +395,7 @@ ADMIN 에게만 나오는 요소다.
 | `users-row-enabled`, `users-row-linked` | 「활성」/「비활성」, 「로그인함」/「첫 로그인 전」 |
 | `users-row-history` | 그 사용자의 변경 이력 |
 
-## 연동 토큰 화면
+## 연동 화면
 
 「연동」 화면(`/tokens`)은 위의 「연결된 앱」 과 아래의 「연동 토큰」 이다. 확인 창과 발급 창은 Portal 로 `body` 아래에 그려진다.
 

@@ -1,6 +1,6 @@
 package dev.fos.workbench.oauth
 
-import dev.fos.workbench.agent.RateLimiter
+import dev.fos.workbench.config.RateLimiter
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.http.CacheControl
@@ -46,9 +46,9 @@ class OAuthTokenController(
         return noStore(ResponseEntity.ok()).build()
     }
 
-    /** IP 는 `remoteAddr` 다. 믿는 프록시 뒤에서는 Tomcat 이 클라이언트 주소로 바꿔 둔다 */
+    /** IP 는 `remoteAddr` 이고 IPv6 는 /64 로 묶는다([ClientIpKey]). 믿는 프록시 뒤에서는 Tomcat 이 클라이언트 주소로 바꿔 둔다 */
     private fun limited(request: HttpServletRequest): ResponseEntity<Any>? {
-        val decision = limiter.tryAcquire(request.remoteAddr)
+        val decision = limiter.tryAcquire(ClientIpKey.of(request.remoteAddr))
         if (decision.allowed) return null
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
             .header(HttpHeaders.RETRY_AFTER, decision.retryAfterSeconds.toString())

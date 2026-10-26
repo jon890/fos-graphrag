@@ -8,16 +8,16 @@ import java.time.Duration
 
 /**
  * 보호 자원 메타데이터(RFC 9728)와 인가 서버 메타데이터(RFC 8414). 본문은 docs/api-contract.md 「메타데이터」 그대로다.
- * 주소는 요청의 `{base}` 로 만든다.
+ * 주소는 [OAuthUrls] 의 `{base}` 다.
  */
 @RestController
-class OAuthMetadataController {
+class OAuthMetadataController(private val urls: OAuthUrls) {
 
     @GetMapping("/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp")
     fun protectedResource(): ResponseEntity<Map<String, Any>> = cached(
         linkedMapOf(
-            "resource" to OAuthUrls.resource(),
-            "authorization_servers" to listOf(OAuthUrls.base()),
+            "resource" to urls.resource(),
+            "authorization_servers" to listOf(urls.base()),
             "scopes_supported" to SCOPES,
             "bearer_methods_supported" to listOf("header"),
             "resource_name" to RESOURCE_NAME,
@@ -26,7 +26,7 @@ class OAuthMetadataController {
 
     @GetMapping("/.well-known/oauth-authorization-server")
     fun authorizationServer(): ResponseEntity<Map<String, Any>> {
-        val base = OAuthUrls.base()
+        val base = urls.base()
         return cached(
             linkedMapOf(
                 "issuer" to base,

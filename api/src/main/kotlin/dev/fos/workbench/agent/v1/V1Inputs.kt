@@ -1,7 +1,7 @@
 package dev.fos.workbench.agent.v1
 
 import dev.fos.workbench.agent.AgentPrincipal
-import dev.fos.workbench.agent.TokenScope
+import dev.fos.workbench.auth.TokenScope
 import dev.fos.workbench.config.Timestamps
 import dev.fos.workbench.trade.SecurityMarkets
 import dev.fos.workbench.trade.TradeFilter

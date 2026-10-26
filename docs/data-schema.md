@@ -398,10 +398,10 @@ MCP 클라이언트(Claude Code, Codex)가 OAuth 로그인으로 받은 연결�
 - 시각은 서버가 기록하는 시각 형식이다. 자릿수가 고정이라 끝나는 시각은 문자열로 비교한다.
 - 연결은 코드를 토큰으로 바꿀 때 생긴다. 그 트랜잭션은 주인 사용자 노드에 쓰기 잠금(`_lock`)을 건 뒤 같은 `clientId` 의 이전 연결을 지우고, 남은 연결이 20개를 넘으면 `coalesce(lastUsedAt, createdAt)` 가 가장 오래된 것부터 지운다. 같은 앱에서 다시 로그인하면 연결이 하나로 남는다.
 - 코드는 바꾸는 트랜잭션에서 코드 노드에 쓰기 잠금을 건 뒤 `usedAt` 을 확인한다. 같은 코드가 동시에 와도 하나만 바뀐다. 이미 쓴 코드가 다시 오면 `grantId` 의 연결을 지운다. 「연결 허용」 이 새 코드를 만들 때 그 사용자의 끝난 코드(`expiresAt` 이 지난 것)를 지운다.
-- 갱신은 연결 노드에 쓰기 잠금을 건 뒤 `refreshHash` 를 확인한다. 성공하면 접근 토큰과 갱신 토큰을 새로 쓰고 이전 갱신 해시를 `previousRefreshHash` 로 옮긴다. 같은 갱신 토큰이 동시에 두 번 오면 하나는 성공하고 다른 하나는 이전 토큰으로 읽혀 연결이 끊긴다. 갱신 토큰을 바꾸는 규칙(MCP 인증 규격)이 그렇게 정한다.
+- 갱신은 연결 노드에 쓰기 잠금을 건 뒤 `refreshHash` 를 다시 확인한다. 잠금을 기다리는 사이 다른 요청이 먼저 바꿨으면 이전 토큰의 재사용으로 본다. 성공하면 접근 토큰과 갱신 토큰을 새로 쓰고 이전 갱신 해시를 `previousRefreshHash` 로 옮긴다. 같은 갱신 토큰이 동시에 두 번 오면 하나는 성공하고 다른 하나는 이전 토큰으로 읽혀 연결이 끊긴다. 갱신 토큰을 바꾸는 규칙(MCP 인증 규격)이 그렇게 정한다.
 - 연결 끊기(「연결된 앱」 의 끊기, `/oauth/revoke`, 코드나 갱신 토큰의 재사용)는 `:OAuthGrant` 를 지운다(`DETACH DELETE`). 보관하지 않는다. 그 연결로 저장한 체결과 제안의 `tokenId` 는 남는다.
 - 인증은 요청마다 연결과 주인을 다시 읽는다. 주인이 비활성이거나 허용 목록에서 빠졌으면(`email` 이 없으면) 접근 토큰과 갱신 토큰이 막힌다. 역할은 요청마다 읽은 지금 값이다. 다시 활성화하면 끝나지 않은 토큰이 다시 통한다.
-- 클라이언트 등록은 누구나 할 수 있다. 등록하는 트랜잭션에서 `approvedAt` 이 없고 `createdAt` 이 24시간보다 오래된 `:OAuthClient` 를 지운다. 승인받은 클라이언트는 지우지 않는다.
+- 클라이언트 등록은 누구나 할 수 있다. 등록하는 트랜잭션에서 `approvedAt` 이 없고 `createdAt` 이 24시간보다 오래된 `:OAuthClient` 를 지운다. 승인받은 클라이언트는 지우지 않는다. 남은 미승인 클라이언트가 상한(`workbench.oauth.max-unapproved-clients`) 이상이면 새로 등록하지 않는다.
 - 세 노드와 `OWNS` 에 `archived` 를 두지 않는다. `:Knowledge` 가 아니어서 검색, 그래프, 근거 따라가기에 나오지 않는다.
 - 변경 이력(ChangeEvent)에 남기지 않는다. 개인 설정이고 이력 화면은 다른 사용자에게도 보이기 때문이다.
 
@@ -524,6 +524,7 @@ API 가 시작할 때, 웹 서버가 요청을 받기 전에 `IF NOT EXISTS` 로
 | `oauth_grant_access_hash_unique` | `(:OAuthGrant).accessHash` 유일 | `/mcp` 인증에서 접근 토큰을 해시로 찾는다 |
 | `oauth_grant_refresh_hash_unique` | `(:OAuthGrant).refreshHash` 유일 | 갱신 요청에서 갱신 토큰을 해시로 찾는다 |
 | `oauth_grant_previous_refresh` | `(:OAuthGrant).previousRefreshHash` 인덱스 | 이전 갱신 토큰의 재사용을 찾는다 |
+| `oauth_client_created` | `(:OAuthClient).createdAt` 인덱스 | 승인받지 못한 오래된 클라이언트를 지운다 |
 | `trade_id_unique` | `(:Trade).id` 유일 | 체결 ID |
 | `trade_owner_external_unique` | `(:Trade).(ownerId, broker, externalId)` 유일 | 같은 주인의 같은 체결을 하나로 둔다 |
 | `trade_owner_executed` | `(:Trade).(ownerId, executedAt)` 인덱스 | 내 체결을 최근 것부터 읽는다 |

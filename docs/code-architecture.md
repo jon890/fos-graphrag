@@ -15,7 +15,7 @@
   compose.e2e.yml                    브라우저 테스트용 override. 가짜 OIDC 공급자를 더한다
   docs/                              이 문서들
   plugin/                            Claude Code·Codex 플러그인. 원격 MCP 연결 설정(.mcp.json)과 비개발자용 스킬
-  .claude-plugin/marketplace.json    Claude Code 마켓플레이스 목록. ./plugin 을 가리킨다
+  .claude-plugin/marketplace.json    Claude Code·Codex 마켓플레이스 목록. ./plugin 을 가리킨다
   .github/workflows/                 GHCR 이미지를 올리는 workflow
 ```
 
@@ -92,7 +92,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `learning` | 근거 따라가기와 내 이해 표시의 서비스와 컨트롤러. 계약은 [API 계약](api-contract.md) 의 「근거 따라가기」, 「내 이해 표시」 다. `knowledge` 의 읽기 도우미로 노드 표현을 만든다 |
 | `history` | ChangeEvent 기록(`ChangeEventRecorder`)과 이력 조회 |
 | `agent` | 연동 토큰과 `/api/v1`, `/mcp` 의 Bearer 인증, 요청 한도. 결정은 [ADR-012](adr/012-agent-integration-token.md) 와 [ADR-013](adr/013-owner-trades-and-agent-proposals.md) 이다 |
-| `oauth` | OAuth 인가 서버. 메타데이터, 동적 등록, 동의 화면 API, 토큰 발급과 갱신과 폐기, 연결된 앱 API, 접근 토큰 확인. 결정은 [ADR-015](adr/015-remote-mcp-oauth.md), 계약은 [API 계약](api-contract.md) 의 「OAuth 인가 서버」, 「연결된 앱」 이다 |
+| `oauth` | OAuth 인가 서버와 연결된 앱 API. 경로는 [API 계약](api-contract.md) 의 「OAuth 인가 서버」, 「연결된 앱」 이 소유한다. 결정은 [ADR-015](adr/015-remote-mcp-oauth.md) 다 |
 | `mcp` | 원격 MCP(`/mcp`). MCP Java SDK 의 세션 없는 servlet 전송을 걸고, 도구 정의와 처리기를 둔다. 도구는 `agent.v1` 의 조회 서비스와 `trade`, `proposal` 의 서비스를 부른다. 계약은 [API 계약](api-contract.md) 의 「원격 MCP(`/mcp`)」 다 |
 | `agent.v1` | 에이전트 API(`/api/v1`)의 입출력과 v1 응답. 화면용 조회 서비스의 결과를 v1 으로 옮긴다. 쓰기는 범위를 확인한 뒤 `trade`, `proposal` 의 서비스를 부른다. 계약은 [API 계약](api-contract.md) 의 「에이전트 API」 절이다 |
 | `trade` | 주인 전용 체결 기록과 그 세션 API. 저장 모델은 [데이터 스키마](data-schema.md) 의 「체결 기록」, 결정은 [ADR-013](adr/013-owner-trades-and-agent-proposals.md) 이다 |
@@ -100,7 +100,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `web` | 오류 형식(`ApiError`), 예외 처리기, health, 화면 경로(`/workspace` 등)의 GET 을 `index.html` 로 넘기는 `SpaRouteController` |
 
 호출 방향은 `컨트롤러 → 서비스 → Neo4jClient` 다. 서비스가 트랜잭션 경계다.
-`knowledge` 서비스는 `ontology` 의 검증기와 `history` 의 기록기를 부른다. `agent.v1` 은 `knowledge`, `learning`, `graph` 의 조회 서비스를 부르고 그 결과를 v1 DTO 로 옮긴다. `proposal` 은 승인을 실행하려고 `knowledge`(노드와 관계 만들기), `learning`(이해 표시), `trade`(체결과 결정 잇기)를 부르고, `agent.v1` 과 `mcp` 는 `trade`, `proposal` 을 부르고, `mcp` 는 `agent.v1` 의 조회 서비스(`AgentQueryService`, `SecurityLookupService`, `V1Mapper`)도 부른다. `mcp` 와 `agent.v1` 은 서로 HTTP 로 부르지 않는다. `oauth` 는 `auth` 의 사용자 저장소만 부르고, `oauth` 를 부르는 패키지는 `mcp` 의 인증과 `config.SecurityConfig` 뿐이다. `trade` 는 노드 참조와 표시 이름을 만들려고 `knowledge`, `ontology` 를 부른다. `trade` 와 `proposal` 을 부르는 지식 패키지(`knowledge`, `graph`, `learning`, `history`)는 없다. `mcp` 밖의 어느 패키지도 `agent` 를 부르지 않는다. 보안 설정(`config.SecurityConfig`)이 `agent` 의 필터를 건다. `learning` 은 `knowledge` 의 읽기 도우미를 부르고, `knowledge` 는 `learning` 을 부르지 않는다. 노드 상세의 `concepts` 는 `knowledge` 가 직접 읽는다. 반대 방향 호출은 없다.
+`knowledge` 서비스는 `ontology` 의 검증기와 `history` 의 기록기를 부른다. `agent.v1` 은 `knowledge`, `learning`, `graph` 의 조회 서비스를 부르고 그 결과를 v1 DTO 로 옮긴다. `proposal` 은 승인을 실행하려고 `knowledge`(노드와 관계 만들기), `learning`(이해 표시), `trade`(체결과 결정 잇기)를 부르고, `agent.v1` 과 `mcp` 는 `trade`, `proposal` 을 부르고, `mcp` 는 `agent.v1` 의 조회 서비스(`AgentQueryService`, `SecurityLookupService`, `V1Mapper`)도 부른다. `mcp` 와 `agent.v1` 은 서로 HTTP 로 부르지 않는다. `oauth` 는 `auth`(사용자 저장소, 역할, 연결 범위 `TokenScope`, 세션 주체)와 `config`(설정, 요청 한도 `RateLimiter`), `web`(오류 분류)만 부른다. `oauth` 를 부르는 곳은 `mcp` 의 인증(`McpAuthenticator`, `McpSecurity`)과, 공개 주소(`OAuthUrls`)를 `/mcp` 체인에 넘기는 `config.SecurityConfig` 뿐이다. `agent` 와 `oauth` 는 서로 부르지 않는다. `trade` 는 노드 참조와 표시 이름을 만들려고 `knowledge`, `ontology` 를 부른다. `trade` 와 `proposal` 을 부르는 지식 패키지(`knowledge`, `graph`, `learning`, `history`)는 없다. `mcp` 와 보안 설정(`config.SecurityConfig`) 밖의 어느 패키지도 `agent` 를 부르지 않는다. 보안 설정이 `agent` 의 필터를 건다. `learning` 은 `knowledge` 의 읽기 도우미를 부르고, `knowledge` 는 `learning` 을 부르지 않는다. 노드 상세의 `concepts` 는 `knowledge` 가 직접 읽는다. 반대 방향 호출은 없다.
 
 온톨로지를 쓰는 코드는 `Ontology` 를 주입받지 않고 `OntologyHolder.current()` 로 최신 버전을 받는다. 서비스는 메서드 처음에 한 번 받아 끝까지 그 값을 쓴다. 검증기와 읽기 도우미는 따로 받으므로, 요청 도중에 저장이 끼면 한 요청이 두 버전을 읽을 수 있다. 결과는 대부분 거절 쪽이라 받아들인다.
 `OntologyHolder` 는 최신 버전을 메모리에 두고, 저장 트랜잭션이 커밋된 뒤 새 버전으로 바꾼다. 번호가 지금보다 클 때만 바꾼다. API 는 프로세스 하나로만 돈다. 여러 개로 늘리면 요청마다 `OntologyHead` 의 번호를 읽어 비교하도록 바꿔야 한다.
@@ -137,7 +137,10 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `workbench.agent.write-rate-limit-per-minute` | | 10 | 연동 토큰 하나가 1분에 부를 수 있는 `/api/v1` 쓰기 요청 수. 전체 한도에도 함께 센다. `/mcp` 의 연결마다의 한도도 이 두 값이다 |
 | `workbench.oauth.access-token-ttl`, `refresh-token-ttl`, `code-ttl` | | `1h`, `30d`, `60s` | OAuth 접근 토큰, 갱신 토큰, 인가 코드의 수명 |
 | `workbench.oauth.max-grants-per-user` | | 20 | 사용자마다 남기는 앱 연결 수. 넘으면 가장 오래 쓰지 않은 것부터 지운다 |
-| `workbench.oauth.register-rate-limit-per-minute`, `token-rate-limit-per-minute` | | 10, 30 | 같은 IP 가 1분에 부를 수 있는 `/oauth/register`, `/oauth/token`(과 `/oauth/revoke`) 수 |
+| `workbench.oauth.register-rate-limit-per-minute`, `token-rate-limit-per-minute` | | 10, 30 | 같은 IP 가 1분에 부를 수 있는 `/oauth/register`, `/oauth/token`(과 `/oauth/revoke`) 수. IPv6 는 /64 단위로 센다 |
+| `workbench.oauth.max-unapproved-clients` | | 1000 | 한 번도 승인받지 못한 클라이언트 전체 수. 넘으면 등록이 `503 temporarily_unavailable` 이다 |
+| `workbench.oauth.allowed-https-redirect-hosts` | | 없음 | 동적 등록이 받는 https redirect URI 의 host. 비어 있으면 loopback 만 받는다 |
+| `workbench.oauth.public-url` | `WORKBENCH_PUBLIC_URL` | 없음 | OAuth 발급 주소와 MCP 자원 주소, Origin 비교의 기준. 비어 있으면 요청의 scheme 과 host 로 만든다. 운영에서는 공개 origin 을 넣어 Host 헤더에 기대지 않게 한다 |
 | `spring.security.oauth2.client.registration.google.client-id`, `client-secret` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 없음 | 운영 프로필에서 비어 있으면 시작에 실패한다 |
 
 프로필은 아래와 같다.
@@ -216,12 +219,12 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 
 | 경로 | 책임 |
 | --- | --- |
-| `.claude-plugin/marketplace.json` | 저장소 루트의 마켓플레이스 목록. 마켓플레이스 이름 `fos-valuation-ontology`, 플러그인 `valuation-ontology` 의 `source` 는 `./plugin` 이다 |
+| `.claude-plugin/marketplace.json` | 저장소 루트의 마켓플레이스 목록. 이름과 경로는 파일이 소유한다 |
 | `plugin/.claude-plugin/plugin.json` | Claude Code 플러그인 정보(이름 `valuation-ontology`, 설명, 저장소) |
 | `plugin/.codex-plugin/plugin.json` | Codex 플러그인 정보. 같은 이름과 스킬 목록을 담는다. MCP 설정은 키로 가리키지 않아도 Codex 0.164.0 이 플러그인 루트의 `.mcp.json` 을 읽는다(2026-10-26 확인). Codex 는 이 파일이 있으면 `.claude-plugin/plugin.json` 을 읽지 않는다 |
-| `plugin/.mcp.json` | 원격 MCP 서버 `valuation-ontology`(`type: http`, `url` 은 운영 공개 주소의 `/mcp`) |
+| `plugin/.mcp.json` | 원격 MCP 연결 설정. 운영 공개 주소의 `/mcp` 를 가리킨다 |
 | `plugin/skills/ontology-start/` | 시작하기. 연결을 확인하고, 안 됐으면 로그인을 이끌고, 할 수 있는 일을 예시 질문으로 보인다 |
-| `plugin/skills/ontology-explore/` | 개념과 근거 찾기. 검색, 상세, 근거 따라가기, 이어진 개념 순으로 부르고 출처를 붙여 답한다 |
+| `plugin/skills/ontology-explore/` | 개념과 근거 찾기 스킬. 출처를 붙여 답한다 |
 | `plugin/skills/ontology-record/` | 기록과 제안. 체결 기록과 제안 올리기를 이끌고 승인은 웹의 「제안」 에서 한다고 안내한다 |
 | `plugin/README.md` | 비개발자용 설치와 연결 안내 |
 
@@ -234,7 +237,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | 온톨로지 단위 테스트 | `api/src/test/kotlin/.../ontology/` | 쓰지 않음 |
 | 통합 테스트 | `api/src/test/kotlin/.../` 의 `*IntegrationTest` | Testcontainers 로 `neo4j:5.26.30-community` 와 가짜 OIDC 공급자를 띄운다 |
 | 웹 단위 테스트 | `web/src/**/*.test.ts`, `*.test.tsx` | 쓰지 않음. 컴포넌트는 `react-dom/server` 로 렌더링해 확인한다 |
-| 플러그인 형식 검사 | `scripts/tests/test_plugin.py` | 쓰지 않음. 플러그인 JSON, 마켓플레이스 경로, 스킬 머리말, MCP 주소를 검사한다 |
+| 플러그인 형식 검사 | `scripts/tests/test_plugin.py` | 쓰지 않음. 검사 항목은 그 스크립트가 소유한다 |
 | 브라우저 테스트 | `web/e2e/` | 운영 Compose 와 `compose.e2e.yml`. 가짜 OIDC 공급자로 실제 OAuth 리다이렉트를 탄다. 넓은 화면(1440×900)과 휴대폰 폭(390×844) 두 project 로 돈다. 휴대폰 project 는 `mobile.spec.ts` 만 돈다 |
 
 mock 으로 Neo4j 를 대신한 테스트는 없다. 트랜잭션 일관성 테스트만 실패하는 `ChangeEventRecorder` 를 주입한다. 이때도 Neo4j 는 실제 컨테이너다.

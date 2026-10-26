@@ -1,7 +1,7 @@
 package dev.fos.workbench.oauth
 
 import com.fasterxml.jackson.annotation.JsonProperty
-import dev.fos.workbench.agent.TokenScope
+import dev.fos.workbench.auth.TokenScope
 import dev.fos.workbench.config.Limits
 import dev.fos.workbench.config.Timestamps
 import dev.fos.workbench.config.WorkbenchProperties
@@ -52,6 +52,7 @@ class OAuthTokenService(
     private val codes: OAuthCodeRepository,
     private val grants: OAuthGrantRepository,
     private val properties: WorkbenchProperties,
+    private val urls: OAuthUrls,
     transactionManager: PlatformTransactionManager,
 ) {
     private val write = TransactionTemplate(transactionManager).apply { timeout = Limits.WRITE_TIMEOUT_SECONDS }
@@ -125,6 +126,7 @@ class OAuthTokenService(
             val grant = grants.findByRefreshLocked(hash)
             if (grant == null) {
                 // 바로 앞의 갱신 토큰이 다시 왔으면 도난으로 보고 연결을 끊고 커밋한 뒤 거절한다
+                // client_id 는 보지 않는다. 도난 신호라 누가 보냈든 연결을 끊는다
                 grants.findByPreviousRefresh(hash)?.let { grants.delete(it) }
                 return@execute null
             }
@@ -154,7 +156,7 @@ class OAuthTokenService(
     }
 
     private fun requireResource(resource: String?) {
-        if (!resource.isNullOrEmpty() && resource != OAuthUrls.resource()) {
+        if (!resource.isNullOrEmpty() && resource != urls.resource()) {
             throw OAuthException(HttpStatus.BAD_REQUEST, "invalid_target", "resource 가 이 서버의 자원 주소와 다릅니다.")
         }
     }

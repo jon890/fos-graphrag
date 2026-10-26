@@ -1,5 +1,6 @@
 package dev.fos.workbench.agent
 
+import dev.fos.workbench.auth.TokenScope
 import dev.fos.workbench.config.Limits
 import dev.fos.workbench.config.Timestamps
 import dev.fos.workbench.config.WorkbenchProperties

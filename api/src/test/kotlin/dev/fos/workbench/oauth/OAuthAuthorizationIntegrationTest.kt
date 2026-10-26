@@ -7,6 +7,7 @@ import dev.fos.workbench.support.IntegrationTest
 import dev.fos.workbench.support.OAuthFlow
 import dev.fos.workbench.support.OAuthFlow.Companion.REDIRECT_URI
 import dev.fos.workbench.support.OAuthFlow.Companion.STATE
+import dev.fos.workbench.support.raceAll
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -341,6 +342,37 @@ class OAuthAuthorizationIntegrationTest : IntegrationTest() {
         assertOAuthError(flow.refresh(tokens.clientId, tokens.refresh), 400, "invalid_grant")
         assertOAuthError(flow.refresh(tokens.clientId, newRefresh), 400, "invalid_grant")
         assertThat(connections(session)).isEmpty()
+    }
+
+    @Test
+    fun `같은 코드를 동시에 두 번 바꾸면 토큰은 많아야 한 번 나간다`() {
+        val session = loggedIn(newUser(Role.VIEWER))
+        val flow = flow()
+        val clientId = flow.register()
+        val verifier = flow.newVerifier()
+        val code = flow.approve(session, clientId, verifier)
+
+        val results = raceAll({ flow().exchange(clientId, code, verifier) }, { flow().exchange(clientId, code, verifier) })
+
+        val statuses = results.map { it.status }
+        assertThat(statuses.count { it == 200 }).describedAs("응답 상태: $statuses").isLessThanOrEqualTo(1)
+        results.filter { it.status != 200 }.forEach { assertOAuthError(it, 400, "invalid_grant") }
+    }
+
+    @Test
+    fun `같은 갱신 토큰을 동시에 두 번 보내면 새 토큰은 많아야 한 번 나가고 늦은 요청은 재사용으로 연결을 끊는다`() {
+        val session = loggedIn(newUser(Role.VIEWER))
+        val tokens = flow().connect(session)
+
+        val results = raceAll({ flow().refresh(tokens.clientId, tokens.refresh) }, { flow().refresh(tokens.clientId, tokens.refresh) })
+
+        val statuses = results.map { it.status }
+        assertThat(statuses.count { it == 200 }).describedAs("응답 상태: $statuses").isLessThanOrEqualTo(1)
+        results.filter { it.status != 200 }.forEach { assertOAuthError(it, 400, "invalid_grant") }
+        if (statuses.contains(200)) {
+            // 잠금 뒤에 진 쪽은 이미 바뀐 토큰을 보낸 것이라 이전 갱신 토큰의 재사용으로 다룬다
+            assertThat(connections(session)).describedAs("재사용으로 끊은 연결").isEmpty()
+        }
     }
 
     @Test

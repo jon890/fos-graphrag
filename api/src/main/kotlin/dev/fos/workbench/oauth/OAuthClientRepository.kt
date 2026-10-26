@@ -56,6 +56,11 @@ class OAuthClientRepository(private val client: Neo4jClient) {
             """,
         ).bind(before).to("before").fetch().one().map { (it["n"] as Number).toLong() }.orElse(0L)
 
+    /** 승인받은 적 없는 클라이언트 전체 수 */
+    fun countUnapproved(): Long =
+        client.query("MATCH (c:OAuthClient) WHERE c.approvedAt IS NULL RETURN count(c) AS n")
+            .fetch().one().map { (it["n"] as Number).toLong() }.orElse(0L)
+
     /** 처음 승인받은 시각을 남긴다. 이미 있으면 그대로 둔다 */
     fun markApproved(id: String, now: String) {
         client.query("MATCH (c:OAuthClient {id: ${'$'}id}) WHERE c.approvedAt IS NULL SET c.approvedAt = ${'$'}now")

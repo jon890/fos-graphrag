@@ -1,6 +1,7 @@
 package dev.fos.workbench.agent
 
 import dev.fos.workbench.auth.Role
+import dev.fos.workbench.auth.TokenScope
 
 /**
  * 연동 토큰이나 OAuth 연결로 인증한 요청의 주인. 역할은 요청마다 Neo4j 에서 다시 읽은 값이다.

@@ -736,7 +736,7 @@ OAuth 로그인으로 연결한 앱(Claude Code, Codex 같은 MCP 클라이언�
 
 ### 인증
 
-- 모든 요청에 `Authorization: Bearer <연동 토큰>` 을 담는다. 토큰은 사용자가 웹의 더보기 메뉴 「연동 토큰」 에서 발급한다(「연동 토큰」).
+- 모든 요청에 `Authorization: Bearer <연동 토큰>` 을 담는다. 토큰은 사용자가 웹의 더보기 메뉴 「연동」 의 「연동 토큰」 에서 발급한다(「연동 토큰」).
 - 세션 쿠키는 읽지 않고, CSRF 토큰도 요구하지 않는다. 쿠키만 담은 요청은 `401` 이다.
 - 토큰은 발급한 사용자로 인증된다. 조회 경로는 모든 역할과 범위가 부른다. 쓰기 경로는 「조회와 기록」 범위의 토큰만 부른다(「쓰기」).
 - 아래 가운데 하나면 `401 UNAUTHENTICATED`(「연동 토큰이 없거나 올바르지 않습니다.」)다. 어느 경우인지는 응답에 드러내지 않는다.
@@ -1197,7 +1197,7 @@ OAuth 로그인으로 연결한 앱(Claude Code, Codex 같은 MCP 클라이언�
 Claude Code, Codex 같은 MCP 클라이언트가 사용자 대신 `/mcp` 를 부를 접근 토큰을 받는 경로다. MCP 인증 규격(보호 자원 메타데이터 RFC 9728, 인가 서버 메타데이터 RFC 8414, 동적 등록 RFC 7591, 인가 코드와 PKCE, resource 지시자 RFC 8707)을 따른다. 결정과 근거는 [ADR-015](adr/015-remote-mcp-oauth.md), 저장 모델은 [데이터 스키마](data-schema.md) 의 「OAuth 연결」, 화면 흐름은 [흐름](flow.md) 의 「앱 연결」 이다.
 
 이 절의 경로는 `/api` 밖에 있고 세션과 CSRF 를 쓰지 않는다. `/api/oauth/**` 의 두 경로만 동의 화면이 부르는 세션 API 다.
-아래에서 `{base}` 는 요청의 scheme 과 host(포트 포함)로 만든 주소다(예: `https://example.com`). 운영에서는 앞단이 넘긴 `X-Forwarded-*` 로 공개 주소가 된다. 자원 주소는 `{base}/mcp` 다.
+아래에서 `{base}` 는 설정 `workbench.oauth.public-url`(`WORKBENCH_PUBLIC_URL`)이고, 비어 있으면 요청의 scheme 과 host(포트 포함)로 만든 주소다(예: `https://example.com`). 비어 있을 때 운영에서는 앞단이 넘긴 `X-Forwarded-*` 로 공개 주소가 된다. 자원 주소는 `{base}/mcp` 다.
 OAuth 경로의 오류 본문은 이 문서의 `{code, message, details}` 가 아니라 OAuth 형식 `{"error": "...", "error_description": "..."}` 다.
 
 | 메서드 | 경로 | 인증 | 설명 |
@@ -1270,13 +1270,13 @@ OAuth 경로의 오류 본문은 이 문서의 `{code, message, details}` 가 �
 
 - `redirect_uris` 는 1개 이상 10개 이하다. 각 값은 fragment(`#`)가 없는 절대 주소이고 아래 가운데 하나여야 한다. 어기면 `400 invalid_redirect_uri` 다.
   - `http://127.0.0.1`, `http://localhost`, `http://[::1]` 의 loopback 주소. 포트는 주소에 적은 그대로 등록한다.
-  - `https://` 주소.
+  - `https://` 주소 가운데 host 가 설정 `workbench.oauth.allowed-https-redirect-hosts` 에 있는 것. 기본은 비어 있어 loopback 만 받는다. Claude Code 와 Codex 는 loopback 으로 돌아온다. 누구나 등록할 수 있어, 아무 https 주소를 받으면 동의 화면을 거쳐 코드를 다른 서버로 보내는 피싱이 된다.
 - 각 값은 2000자 이하다. 넘으면 `400 invalid_redirect_uri` 다.
 - `client_name` 은 앞뒤 공백을 지운 1자 이상 100자 이하이고 줄바꿈 같은 제어 문자가 없어야 한다. 없거나 공백뿐이면 「이름 없는 앱」 이다. 100자를 넘거나 제어 문자가 있으면 `400 invalid_client_metadata` 다.
 - `token_endpoint_auth_method` 는 `none` 만 받는다. 없으면 `none` 이다. 다른 값이면 `400 invalid_client_metadata` 다. 클라이언트 비밀은 발급하지 않는다.
 - `grant_types` 는 `authorization_code`, `refresh_token` 의 부분 집합, `response_types` 는 `["code"]` 만 받는다. 없으면 각각 두 값과 `["code"]` 다. 다른 값이나 빈 목록이면 `400 invalid_client_metadata` 다.
 - 그 밖의 필드(`client_uri`, `logo_uri`, `scope` 등)는 읽지 않고 응답에도 담지 않는다.
-- 본문은 16KiB 까지다. 넘으면 `413`, Content-Length 가 없으면 `411` 이고 본문은 OAuth 형식(`invalid_request`)이다. 같은 IP 에서 1분에 10번까지다. 넘으면 `429 {"error": "too_many_requests"}` 와 `Retry-After` 다.
+- 본문은 16KiB 까지다. 넘으면 `413`, Content-Length 가 없으면 `411` 이고 본문은 OAuth 형식(`invalid_request`)이다. 같은 IP 에서 1분에 10번까지다(IPv6 는 /64 단위). 넘으면 `429 {"error": "too_many_requests"}` 와 `Retry-After` 다. 한 번도 승인받지 못한 클라이언트가 이미 1000개면 `503 {"error": "temporarily_unavailable"}` 다.
 
 ### 인가 요청과 동의
 
@@ -1390,7 +1390,7 @@ Claude Code, Codex, Hermes 가 가치투자 온톨로지를 조회하고 기록�
 
 - 세션 쿠키는 읽지 않고 CSRF 를 요구하지 않는다.
 - `Origin` 헤더가 있고 `{base}` 와 다르면 `403 FORBIDDEN` 이다. 명령줄 클라이언트는 `Origin` 을 보내지 않는다.
-- 요청 한도는 연결(OAuth 연결이나 연동 토큰)마다 1분에 60번이다. `tools/list` 같은 요청도 센다. 넘으면 `429 RATE_LIMITED` 와 `Retry-After` 다. 인증에 실패한 요청은 세지 않는다.
+- 요청 한도는 연결(OAuth 연결이나 연동 토큰)마다 1분에 60번이다. `tools/list` 같은 요청도 센다. 연동 토큰은 `/api/v1` 과 같은 카운터를 써서 두 경로를 합쳐 1분에 60번, 쓰기 10번이다. 넘으면 `429 RATE_LIMITED` 와 `Retry-After` 다. 인증에 실패한 요청은 세지 않는다.
 - 요청 본문은 64KiB 까지다(`413 PAYLOAD_TOO_LARGE`, Content-Length 가 없으면 `411 LENGTH_REQUIRED`).
 
 ### 도구

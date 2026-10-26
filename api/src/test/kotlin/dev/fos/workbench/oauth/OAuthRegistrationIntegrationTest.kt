@@ -112,8 +112,11 @@ class OAuthRegistrationIntegrationTest : IntegrationTest() {
         assertOAuthError(register(mapOf("client_name" to "앱")), 400, "invalid_redirect_uri")
         assertOAuthError(register(mapOf("redirect_uris" to listOf("http://example.com/cb"))), 400, "invalid_redirect_uri", "example.com")
         assertOAuthError(register(mapOf("redirect_uris" to (1..11).map { "http://localhost:$it/cb" })), 400, "invalid_redirect_uri")
-        val long = "https://app.example.com/" + "a".repeat(2001 - "https://app.example.com/".length)
+        val long = "http://localhost:1/" + "a".repeat(2001 - "http://localhost:1/".length)
         assertOAuthError(register(mapOf("redirect_uris" to listOf(long))), 400, "invalid_redirect_uri", "aaaaaaaaaa")
+
+        assertOAuthError(register(mapOf("redirect_uris" to listOf("https://app.example.com/cb"))), 400, "invalid_redirect_uri", "app.example.com")
+        assertOAuthError(register(mapOf("redirect_uris" to listOf(callback, "https://localhost/cb"))), 400, "invalid_redirect_uri")
 
         val ten = register(mapOf("redirect_uris" to (1..10).map { "http://localhost:$it/cb" }))
         assertThat(ten.status).describedAs("10개는 받는다: ${ten.body}").isEqualTo(201)
@@ -128,6 +131,9 @@ class OAuthRegistrationIntegrationTest : IntegrationTest() {
         val longName = "가".repeat(101)
         assertOAuthError(register(mapOf("redirect_uris" to listOf(callback), "client_name" to longName)), 400, "invalid_client_metadata", longName)
         assertOAuthError(register(mapOf("redirect_uris" to listOf(callback), "client_name" to "악성\n앱")), 400, "invalid_client_metadata", "악성")
+        // 유니코드 줄 구분자(U+2028)와 문단 구분자(U+2029)도 줄바꿈이다
+        assertOAuthError(register(mapOf("redirect_uris" to listOf(callback), "client_name" to "악성\u2028앱")), 400, "invalid_client_metadata", "악성")
+        assertOAuthError(register(mapOf("redirect_uris" to listOf(callback), "client_name" to "악성\u2029앱")), 400, "invalid_client_metadata", "악성")
         assertOAuthError(register(mapOf("redirect_uris" to listOf(callback), "grant_types" to listOf("client_credentials"))), 400, "invalid_client_metadata")
         assertOAuthError(register(mapOf("redirect_uris" to listOf(callback), "response_types" to listOf("token"))), 400, "invalid_client_metadata")
 
@@ -187,6 +193,58 @@ class OAuthRegistrationIntegrationTest : IntegrationTest() {
             assertThat(denied.body["error"].asString()).isEqualTo("too_many_requests")
             val retryAfter = denied.header("Retry-After")?.toLongOrNull()
             assertThat(retryAfter).describedAs("Retry-After: ${denied.header("Retry-After")}").isNotNull().isBetween(1L, 60L)
+        }
+    }
+
+    @Nested
+    @TestPropertySource(properties = ["workbench.oauth.allowed-https-redirect-hosts=App.Example.com,second.example.com"])
+    inner class AllowedHttpsHosts : IntegrationTest() {
+        @Test
+        fun `설정에 넣은 host 의 https 는 대소문자와 상관없이 받고 다른 host 는 거절한다`() {
+            val client = anonymous()
+            val ok = client.send("POST", "/oauth/register", mapOf("redirect_uris" to listOf("https://app.example.COM/cb", "https://second.example.com/cb")), withCsrf = false)
+            assertThat(ok.status).describedAs(ok.body.toString()).isEqualTo(201)
+
+            val denied = client.send("POST", "/oauth/register", mapOf("redirect_uris" to listOf("https://evil.example.com/cb")), withCsrf = false)
+            assertThat(denied.status).describedAs(denied.body.toString()).isEqualTo(400)
+            assertThat(denied.body["error"].asString()).isEqualTo("invalid_redirect_uri")
+            val plain = client.send("POST", "/oauth/register", mapOf("redirect_uris" to listOf("http://app.example.com/cb")), withCsrf = false)
+            assertThat(plain.status).describedAs("https 가 아니면 허용 host 라도 거절: ${plain.body}").isEqualTo(400)
+        }
+    }
+
+    @Nested
+    @TestPropertySource(properties = ["workbench.oauth.max-unapproved-clients=1"])
+    inner class MaxUnapprovedClients : IntegrationTest() {
+        @Test
+        fun `오래된 것을 지운 뒤에도 승인받지 않은 클라이언트가 상한만큼 있으면 503 temporarily_unavailable 이다`() {
+            val id = UUID.randomUUID().toString()
+            neo4j.query("CREATE (c:OAuthClient {id: \$id, name: '쌓인 앱', redirectUris: ['http://localhost:1/cb'], createdAt: \$now})")
+                .bindAll(params("id" to id, "now" to Timestamps.now())).run()
+            try {
+                val denied = anonymous().send("POST", "/oauth/register", mapOf("redirect_uris" to listOf(callback)), withCsrf = false)
+                assertThat(denied.status).describedAs(denied.body.toString()).isEqualTo(503)
+                assertThat(denied.body["error"].asString()).isEqualTo("temporarily_unavailable")
+            } finally {
+                neo4j.query("MATCH (c:OAuthClient {id: \$id}) DETACH DELETE c").bind(id).to("id").run()
+            }
+        }
+    }
+
+    @Nested
+    @TestPropertySource(properties = ["workbench.oauth.public-url=https://graph.example.com/"])
+    inner class PublicUrl : IntegrationTest() {
+        @Test
+        fun `공개 주소를 설정하면 요청 주소 대신 그 값으로 issuer 와 자원 주소를 알린다`() {
+            val client = anonymous()
+            val server = client.get("/.well-known/oauth-authorization-server")
+            assertThat(server.status).isEqualTo(200)
+            assertThat(server.body["issuer"].asString()).isEqualTo("https://graph.example.com")
+            assertThat(server.body["token_endpoint"].asString()).isEqualTo("https://graph.example.com/oauth/token")
+
+            val resource = client.get("/.well-known/oauth-protected-resource/mcp")
+            assertThat(resource.body["resource"].asString()).isEqualTo("https://graph.example.com/mcp")
+            assertThat(resource.body["authorization_servers"].toList().map { it.asString() }).containsExactly("https://graph.example.com")
         }
     }
 }

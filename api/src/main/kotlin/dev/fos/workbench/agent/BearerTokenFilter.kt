@@ -1,5 +1,6 @@
 package dev.fos.workbench.agent
 
+import dev.fos.workbench.config.RateLimiter
 import dev.fos.workbench.web.ApiError
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest

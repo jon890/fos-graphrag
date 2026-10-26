@@ -2,12 +2,12 @@ package dev.fos.workbench.config
 
 import dev.fos.workbench.agent.BearerTokenFilter
 import dev.fos.workbench.agent.IntegrationTokenService
-import dev.fos.workbench.agent.RateLimiter
 import dev.fos.workbench.auth.AllowlistOidcUserService
 import dev.fos.workbench.auth.CurrentUserFilter
 import dev.fos.workbench.auth.UserRepository
 import dev.fos.workbench.mcp.McpAuthenticator
 import dev.fos.workbench.mcp.McpSecurity
+import dev.fos.workbench.oauth.OAuthUrls
 import dev.fos.workbench.web.ApiError
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Qualifier
@@ -125,6 +125,7 @@ class SecurityConfig {
         authenticator: McpAuthenticator,
         @Qualifier("agentRateLimiter") limiter: RateLimiter,
         properties: WorkbenchProperties,
+        urls: OAuthUrls,
     ): SecurityFilterChain {
         http
             .securityMatcher("/mcp", "/mcp/**")
@@ -132,10 +133,10 @@ class SecurityConfig {
             .csrf { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .securityContext { it.securityContextRepository(RequestAttributeSecurityContextRepository()) }
-            .addFilterAfter(McpSecurity.OriginFilter(mapper), SecurityContextHolderFilter::class.java)
+            .addFilterAfter(McpSecurity.OriginFilter(mapper, urls), SecurityContextHolderFilter::class.java)
             .addFilterAfter(BearerTokenFilter(authenticator::authenticate, limiter, null, mapper), McpSecurity.OriginFilter::class.java)
             .exceptionHandling {
-                it.authenticationEntryPoint(McpSecurity.entryPoint(mapper))
+                it.authenticationEntryPoint(McpSecurity.entryPoint(mapper, urls))
                 it.accessDeniedHandler { _, response, _ ->
                     write(mapper, response, 403, ApiError("FORBIDDEN", "이 작업을 할 권한이 없습니다."))
                 }

@@ -7,6 +7,8 @@ class RedirectUrisTest {
 
     private val registered = "http://localhost:1234/callback"
 
+    private val allowed = listOf("app.example.com")
+
     @Test
     fun `등록한 주소와 글자까지 같아야 맞는다`() {
         assertThat(RedirectUris.matches(registered, "http://localhost:1234/callback")).isTrue()
@@ -16,13 +18,21 @@ class RedirectUrisTest {
     }
 
     @Test
-    fun `loopback 의 http 와 https 만 받는다`() {
+    fun `loopback 의 http 와 허용한 host 의 https 만 받는다`() {
         for (uri in listOf("http://localhost:1234/callback", "http://127.0.0.1:53682/cb", "http://[::1]:8080/cb", "https://app.example.com/cb")) {
-            assertThat(RedirectUris.validate(uri)).describedAs(uri).isTrue()
+            assertThat(RedirectUris.validate(uri, allowed)).describedAs(uri).isTrue()
         }
-        for (uri in listOf("http://example.com/cb", "custom://cb", "http://localhost/cb#x", "/cb", "http://localhost@example.com/cb")) {
-            assertThat(RedirectUris.validate(uri)).describedAs(uri).isFalse()
+        for (uri in listOf("http://example.com/cb", "custom://cb", "http://localhost/cb#x", "/cb", "http://localhost@example.com/cb", "https://evil.example.com/cb")) {
+            assertThat(RedirectUris.validate(uri, allowed)).describedAs(uri).isFalse()
         }
+    }
+
+    @Test
+    fun `허용 host 가 없으면 https 는 모두 거절하고 host 는 대소문자를 가리지 않는다`() {
+        assertThat(RedirectUris.validate("https://app.example.com/cb", emptyList())).isFalse()
+        assertThat(RedirectUris.validate("https://localhost/cb", emptyList())).describedAs("loopback 이라도 https 는 허용 목록을 따른다").isFalse()
+        assertThat(RedirectUris.validate("http://localhost:1/cb", emptyList())).isTrue()
+        assertThat(RedirectUris.validate("https://APP.example.com/cb", listOf("app.EXAMPLE.com"))).isTrue()
     }
 
     @Test
@@ -30,8 +40,8 @@ class RedirectUrisTest {
         val prefix = "https://app.example.com/"
         val atLimit = prefix + "a".repeat(RedirectUris.MAX_LENGTH - prefix.length)
         assertThat(atLimit).hasSize(2000)
-        assertThat(RedirectUris.validate(atLimit)).isTrue()
-        assertThat(RedirectUris.validate(atLimit + "a")).isFalse()
+        assertThat(RedirectUris.validate(atLimit, allowed)).isTrue()
+        assertThat(RedirectUris.validate(atLimit + "a", allowed)).isFalse()
     }
 
     @Test

@@ -65,5 +65,11 @@ data class WorkbenchProperties(
         val registerRateLimitPerMinute: Int = 10,
         /** 같은 IP 가 1분에 부를 수 있는 /oauth/token 과 /oauth/revoke 수 */
         val tokenRateLimitPerMinute: Int = 30,
+        /** 이 서버의 공개 주소. 비어 있으면 요청의 scheme, host, 포트로 만든다. 값이 있으면 http(s) 절대 주소여야 시작한다 */
+        val publicUrl: String = "",
+        /** 등록에서 `https` redirect URI 로 받는 host. 소문자로 비교한다. 비어 있으면 loopback 의 `http` 만 받는다 */
+        val allowedHttpsRedirectHosts: List<String> = emptyList(),
+        /** 승인받지 못한 클라이언트 전체 수 상한. 오래된 것을 지운 뒤에도 이만큼 있으면 등록을 503 으로 거절한다 */
+        val maxUnapprovedClients: Int = 1000,
     )
 }

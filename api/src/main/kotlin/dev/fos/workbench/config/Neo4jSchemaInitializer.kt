@@ -86,6 +86,7 @@ class Neo4jSchemaInitializer(
             "CREATE INDEX change_event_at IF NOT EXISTS FOR (e:ChangeEvent) ON (e.at)",
             "CREATE INDEX trade_owner_executed IF NOT EXISTS FOR (t:Trade) ON (t.ownerId, t.executedAt)",
             "CREATE INDEX oauth_grant_previous_refresh IF NOT EXISTS FOR (g:OAuthGrant) ON (g.previousRefreshHash)",
+            "CREATE INDEX oauth_client_created IF NOT EXISTS FOR (c:OAuthClient) ON (c.createdAt)",
             "CREATE INDEX proposal_owner_status IF NOT EXISTS FOR (p:Proposal) ON (p.ownerId, p.status)",
             "CREATE TEXT INDEX $SEARCH_INDEX IF NOT EXISTS FOR (n:Knowledge) ON (n.searchText)",
         )
