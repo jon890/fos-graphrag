@@ -1269,9 +1269,10 @@ OAuth 경로의 오류 본문은 이 문서의 `{code, message, details}` 가 �
 ```
 
 - `redirect_uris` 는 1개 이상 10개 이하다. 각 값은 fragment(`#`)가 없는 절대 주소이고 아래 가운데 하나여야 한다. 어기면 `400 invalid_redirect_uri` 다.
-  - `http://127.0.0.1`, `http://localhost`, `http://[::1]` 로 시작하는 loopback 주소. 포트는 무엇이든 된다.
+  - `http://127.0.0.1`, `http://localhost`, `http://[::1]` 의 loopback 주소. 포트는 주소에 적은 그대로 등록한다.
   - `https://` 주소.
-- `client_name` 은 앞뒤 공백을 지운 1자 이상 100자 이하다. 없으면 「이름 없는 앱」 이다. 100자를 넘으면 `400 invalid_client_metadata` 다.
+- 각 값은 2000자 이하다. 넘으면 `400 invalid_redirect_uri` 다.
+- `client_name` 은 앞뒤 공백을 지운 1자 이상 100자 이하이고 줄바꿈 같은 제어 문자가 없어야 한다. 없으면 「이름 없는 앱」 이다. 100자를 넘거나 제어 문자가 있으면 `400 invalid_client_metadata` 다.
 - `token_endpoint_auth_method` 는 `none` 만 받는다. 없으면 `none` 이다. 다른 값이면 `400 invalid_client_metadata` 다. 클라이언트 비밀은 발급하지 않는다.
 - `grant_types` 는 `authorization_code`, `refresh_token` 의 부분 집합, `response_types` 는 `["code"]` 만 받는다. 없으면 각각 두 값과 `["code"]` 다. 다른 값이면 `400 invalid_client_metadata` 다.
 - 그 밖의 필드(`client_uri`, `logo_uri`, `scope` 등)는 읽지 않고 응답에도 담지 않는다.
@@ -1297,9 +1298,9 @@ OAuth 경로의 오류 본문은 이 문서의 `{code, message, details}` 가 �
 | 검사 | 실패 응답 |
 | --- | --- |
 | `client_id` 가 등록된 클라이언트다 | `400 OAUTH_INVALID_CLIENT`(「연결 요청이 올바르지 않습니다. 앱에서 연결을 다시 시작하세요.」) |
-| `redirect_uri` 가 등록한 값 가운데 하나와 같다. loopback 주소는 포트를 빼고 비교한다 | 위와 같다 |
+| `redirect_uri` 가 등록한 값 가운데 하나와 글자까지 같다. 접두 일치나 포트만 다른 loopback 주소는 받지 않는다 | 위와 같다 |
 | `response_type` 이 `code` 다 | `400 OAUTH_REDIRECT_ERROR`. `details.redirectUrl` 에 `redirect_uri?error=unsupported_response_type&state=…&iss={base}` 가 있다 |
-| `code_challenge` 가 43자 이상 128자 이하의 base64url 이고 `code_challenge_method` 가 `S256` 이다 | `400 OAUTH_REDIRECT_ERROR`, `error=invalid_request` |
+| `code_challenge` 가 43자의 base64url(SHA-256 의 base64url)이고 `code_challenge_method` 가 `S256` 이다. `plain` 이나 빈 값은 받지 않는다 | `400 OAUTH_REDIRECT_ERROR`, `error=invalid_request` |
 | `resource` 가 없거나 `{base}/mcp` 와 같다 | `400 OAUTH_REDIRECT_ERROR`, `error=invalid_target` |
 | `scope` 의 값이 모두 `read`, `write` 가운데 하나다 | `400 OAUTH_REDIRECT_ERROR`, `error=invalid_scope` |
 | `state` 가 500자 이하다 | `400 OAUTH_REDIRECT_ERROR`, `error=invalid_request` |
@@ -1321,7 +1322,8 @@ OAuth 경로의 오류 본문은 이 문서의 `{code, message, details}` 가 �
 - 서버는 같은 검사를 다시 한다. 검사에 걸리면 `GET` 과 같은 오류다.
 - `decision` 은 `ALLOW` 나 `DENY` 다. `DENY` 면 `redirectUrl` 은 `redirect_uri?error=access_denied&state=…&iss={base}` 다.
 - `grantedScope` 는 `ALLOW` 일 때 필수이고 `READ` 나 `READ_WRITE` 다. `requestedScope` 보다 넓으면 `400 VALIDATION_FAILED`(`details.fieldErrors.grantedScope`)다.
-- `ALLOW` 면 인가 코드를 만든다. 코드는 `fwc_` 뒤에 무작위 32바이트를 base64url 43자로 붙인 값이고 5분 동안 한 번만 쓴다. 서버는 해시만 저장한다.
+- `ALLOW` 면 인가 코드를 만든다. 코드는 `fwc_` 뒤에 무작위 32바이트를 base64url 43자로 붙인 값이고 60초 동안 한 번만 쓴다. 서버는 해시만 저장한다. 코드는 로그인한 사용자, `client_id`, `redirect_uri`, `resource`, `code_challenge` 와 묶여 저장된다.
+- 이 요청은 세션 API 라서 `X-XSRF-TOKEN` 이 필요하다(「인증과 CSRF」). 다른 사이트가 사용자 몰래 「연결 허용」 을 보내지 못한다.
 - `redirectUrl` 의 query 값은 URL 인코딩한다. `state` 가 없었으면 붙이지 않는다.
 - 이 요청은 변경 이력에 남지 않는다.
 
@@ -1347,8 +1349,10 @@ grant_type=refresh_token&refresh_token=fwr_…&client_id=…&resource={base}/mcp
 
 - 접근 토큰(`fwa_`)과 갱신 토큰(`fwr_`)은 연동 토큰과 같은 형식(앞자리 뒤에 무작위 32바이트 base64url 43자)이다. 서버는 SHA-256 해시만 저장한다.
 - 접근 토큰은 1시간, 갱신 토큰은 발급한 때부터 30일 뒤 끝난다.
+- 코드와 토큰은 원문의 SHA-256 으로 찾는다. 원문끼리 비교하지 않는다. PKCE 의 `code_verifier` 검사는 상수 시간 비교(`MessageDigest.isEqual`)로 한다.
+- 오류 응답과 로그에는 코드, 토큰, `code_verifier` 의 원문을 담지 않는다.
 - 인가 코드는 아래를 모두 만족해야 바뀐다. 하나라도 어기면 `400 invalid_grant` 다.
-  - 그 코드가 있고, 5분이 지나지 않았고, 아직 쓰지 않았다.
+  - 그 코드가 있고, 60초가 지나지 않았고, 아직 쓰지 않았다.
   - `client_id`, `redirect_uri` 가 코드를 만든 요청과 같다.
   - `code_verifier` 의 SHA-256 을 base64url 로 쓴 값이 `code_challenge` 와 같다. `code_verifier` 가 없으면 `400 invalid_request` 다.
   - `resource` 가 없거나 `{base}/mcp` 와 같다. 다르면 `400 invalid_target` 이다.

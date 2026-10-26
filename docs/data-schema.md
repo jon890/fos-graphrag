@@ -375,7 +375,7 @@ MCP 클라이언트(Claude Code, Codex)가 OAuth 로그인으로 받은 연결�
 | `scope` | String | 사용자가 고른 범위. `READ` 또는 `READ_WRITE` |
 | `codeChallenge` | String | PKCE `code_challenge`(S256) |
 | `resource` | String | 토큰의 자원 주소 `{base}/mcp` |
-| `createdAt`, `expiresAt` | String | 만든 시각과 그 5분 뒤 |
+| `createdAt`, `expiresAt` | String | 만든 시각과 그 60초 뒤 |
 | `usedAt` | String | 토큰으로 바꾼 시각. 쓰지 않았으면 속성이 없다 |
 | `grantId` | String | 이 코드로 만든 `:OAuthGrant` 의 `id`. 쓰지 않았으면 속성이 없다 |
 

@@ -816,7 +816,7 @@ sequenceDiagram
     A-->>B: 200 clientName, redirectKind, requestedScope
     B->>B: 동의 화면
     B->>A: POST /api/oauth/authorize {decision, grantedScope} (CSRF)
-    A->>N: ALLOW 면 OAuthCode 만들기(5분, 한 번)
+    A->>N: ALLOW 면 OAuthCode 만들기(60초, 한 번)
     A-->>B: 200 redirectUrl
     B->>C: redirect_uri?code&state&iss 로 이동
   end

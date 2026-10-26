@@ -43,7 +43,7 @@
 - `OAuthCodeRepository.kt`: `create(userId, code props)`(같은 트랜잭션에서 그 사용자의 `expiresAt < now` 인 코드를 지운다), `findLocked(hash)`(코드 노드에 `_lock` 을 걸고 주인 `userId` 와 함께 읽는다), `markUsed(hash, now, grantId)`.
 - `OAuthGrantRepository.kt`: `createReplacing(userId, grant props, maxPerUser)`(사용자 노드를 잠그고 같은 `clientId` 의 연결을 지우고 만든 뒤, 넘친 수만큼 `coalesce(lastUsedAt, createdAt)` 오래된 것부터 지운다), `findByRefreshLocked(hash)`, `findByPreviousRefresh(hash)`, `rotate(grantId, access, refresh, previousRefreshHash, now)`, `delete(grantId)`, `deleteOwned(userId, grantId): Boolean`, `list(userId): List<ConnectionView>`, `findByAccessOrRefresh(hash)`(폐기용). 주인 활성 조건은 컨텍스트의 것과 같다.
 - `OAuthAuthorizationService.kt`: `preview(userId, request): AuthorizationPreview`, `decide(userId, request, decision, grantedScope): String`(돌아갈 주소). `ALLOW` 면 `OAuthClientRepository.markApproved` 를 부르고 코드를 만든다. `grantedScope` 가 `requestedScope` 보다 넓거나 없으면 `ValidationFailedException(mapOf("grantedScope" to …))`.
-- `OAuthTokenService.kt`: `exchangeCode(form)`, `refresh(form)`, `revoke(token)`. 실패는 `OAuthException(400, "invalid_grant" | "invalid_request" | "invalid_target" | "unsupported_grant_type")`, 모르는 `client_id` 는 `OAuthException(401, "invalid_client")`. 코드 재사용이면 `grantId` 의 연결을 지운 뒤 `invalid_grant`. 이전 갱신 토큰 재사용이면 그 연결을 지운 뒤 `invalid_grant`. 수명은 `WorkbenchProperties.oauth`. 응답 `TokenResponse(access_token, token_type="Bearer", expires_in, refresh_token, scope)`. 코드 재사용과 이전 갱신 토큰 재사용으로 연결을 지우는 쓰기는 `invalid_grant` 를 던지기 전에 커밋돼야 한다. 예외로 롤백되지 않도록 지우는 쓰기를 별도 `TransactionTemplate` 으로 먼저 끝낸다.
+- `OAuthTokenService.kt`: PKCE 비교는 `MessageDigest.isEqual` 로 한다. `exchangeCode(form)`, `refresh(form)`, `revoke(token)`. 실패는 `OAuthException(400, "invalid_grant" | "invalid_request" | "invalid_target" | "unsupported_grant_type")`, 모르는 `client_id` 는 `OAuthException(401, "invalid_client")`. 코드 재사용이면 `grantId` 의 연결을 지운 뒤 `invalid_grant`. 이전 갱신 토큰 재사용이면 그 연결을 지운 뒤 `invalid_grant`. 수명은 `WorkbenchProperties.oauth`. 응답 `TokenResponse(access_token, token_type="Bearer", expires_in, refresh_token, scope)`. 코드 재사용과 이전 갱신 토큰 재사용으로 연결을 지우는 쓰기는 `invalid_grant` 를 던지기 전에 커밋돼야 한다. 예외로 롤백되지 않도록 지우는 쓰기를 별도 `TransactionTemplate` 으로 먼저 끝낸다.
 - `ConnectionService.kt`: `list(userId)`, `disconnect(userId, id)`(없으면 `NotFoundException(id)`).
 
 ### 3. 컨트롤러
@@ -70,7 +70,12 @@
 - 정상 흐름: VIEWER 가 `preview` 로 `clientName`, `redirectKind == "LOOPBACK"`, `requestedScope == "READ_WRITE"` 를 받고, `ALLOW` 로 받은 코드를 바꿔 `fwa_`, `fwr_` 로 시작하는 토큰과 `expires_in == 3600`, `scope == "read write"`, `Cache-Control: no-store` 를 받는다. `GET /api/me/connections` 에 `clientName`, `scope == "READ_WRITE"` 인 한 줄이 있다.
 - `scope=read` 로 요청하고 `grantedScope=READ_WRITE` 로 허용하면 `400 VALIDATION_FAILED`.
 - PKCE 없음(`code_challenge` 빠짐)과 `code_challenge_method=plain` 은 `400 OAUTH_REDIRECT_ERROR` 이고 `details.redirectUrl` 에 `error=invalid_request` 와 `state` 가 있다.
-- 등록하지 않은 redirect URI(`http://127.0.0.1:43210/other`)는 `400 OAUTH_INVALID_CLIENT`. 등록한 loopback 과 포트만 다른 주소는 통과한다.
+- 등록하지 않은 redirect URI(`http://127.0.0.1:43210/other`), 포트만 다른 주소(`http://127.0.0.1:43211/callback`), 접두 일치(`http://127.0.0.1:43210/callback/x`)는 모두 `400 OAUTH_INVALID_CLIENT`.
+- `code_challenge` 가 43자 base64url 이 아니면(빈 값, 42자) `OAUTH_REDIRECT_ERROR`.
+- `X-XSRF-TOKEN` 없이 보낸 `POST /api/oauth/authorize` 는 `403 CSRF_REJECTED` 이고 코드가 생기지 않는다. 다른 사용자의 세션으로 받은 코드는 그 사용자의 연결이 된다(코드는 결정한 세션의 사용자에 묶인다).
+- 코드는 60초 뒤 끝난다: 코드 노드의 `expiresAt` 을 과거로 고친 뒤 바꾸면 `invalid_grant`.
+- 코드를 만든 요청과 다른 `client_id`(다른 등록 클라이언트), 다른 `resource` 로 바꾸면 각각 `invalid_grant`, `invalid_target`.
+- 원문이 새지 않는다: 실패한 토큰 요청의 응답 본문에 보낸 코드, 갱신 토큰, `code_verifier` 문자열이 없다. 테스트 클래스에 `OutputCaptureExtension` 을 걸고 흐름 전체를 돈 뒤 캡처한 로그에 접근 토큰, 갱신 토큰, 코드 원문이 없다.
 - `resource=http://evil.example/mcp` 는 `OAUTH_REDIRECT_ERROR`, `error=invalid_target`.
 - `DENY` 의 `redirectUrl` 에 `error=access_denied` 가 있다.
 - 토큰 요청에서 `code_verifier` 가 틀리면 `400 invalid_grant`, `redirect_uri` 가 다르면 `400 invalid_grant`.

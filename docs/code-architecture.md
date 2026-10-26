@@ -135,7 +135,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | `workbench.agent.rate-limit-per-minute` | | 60 | 연동 토큰 하나가 1분에 부를 수 있는 `/api/v1` 요청 수 |
 | `workbench.agent.max-tokens-per-user` | | 5 | 사용자마다 폐기하지 않은 연동 토큰 수 |
 | `workbench.agent.write-rate-limit-per-minute` | | 10 | 연동 토큰 하나가 1분에 부를 수 있는 `/api/v1` 쓰기 요청 수. 전체 한도에도 함께 센다. `/mcp` 의 연결마다의 한도도 이 두 값이다 |
-| `workbench.oauth.access-token-ttl`, `refresh-token-ttl`, `code-ttl` | | `1h`, `30d`, `5m` | OAuth 접근 토큰, 갱신 토큰, 인가 코드의 수명 |
+| `workbench.oauth.access-token-ttl`, `refresh-token-ttl`, `code-ttl` | | `1h`, `30d`, `60s` | OAuth 접근 토큰, 갱신 토큰, 인가 코드의 수명 |
 | `workbench.oauth.max-grants-per-user` | | 20 | 사용자마다 남기는 앱 연결 수. 넘으면 가장 오래 쓰지 않은 것부터 지운다 |
 | `workbench.oauth.register-rate-limit-per-minute`, `token-rate-limit-per-minute` | | 10, 30 | 같은 IP 가 1분에 부를 수 있는 `/oauth/register`, `/oauth/token`(과 `/oauth/revoke`) 수 |
 | `spring.security.oauth2.client.registration.google.client-id`, `client-secret` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 없음 | 운영 프로필에서 비어 있으면 시작에 실패한다 |
