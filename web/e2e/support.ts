@@ -171,6 +171,8 @@ export async function revokeTokensExcept(page: Page, keep: string[]): Promise<vo
  */
 export async function issueToken(page: Page, name: string, scope: 'read' | 'write'): Promise<string> {
   await openScreen(page, 'tokens')
+  const advanced = page.getByTestId('tokens-advanced')
+  if (!(await advanced.evaluate((el) => (el as HTMLDetailsElement).open))) await advanced.locator('summary').click()
   await page.getByTestId('tokens-issue-open').click()
   await page.getByTestId('tokens-issue-name').fill(name)
   await page.getByTestId(`tokens-issue-scope-${scope}`).check()

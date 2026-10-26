@@ -23,6 +23,21 @@ import {
 // 로그인은 실제 Google 대신 가짜 OIDC 서버(navikt/mock-oauth2-server, interactiveLogin)를 거친다.
 // 데이터 이름과 이메일에 실행마다 다른 접미사를 붙여, 이전 실행이 남긴 데이터와 겹치지 않게 한다.
 
+/** 관리자 페이지로 온톨로지를 주어진 버전으로 되돌린다. 단계가 중간에 실패해도 다음 단계에 정의가 남지 않게 finally 에서 부른다. */
+async function restoreOntologyVersion(page: Page, version: number): Promise<void> {
+  const base = new URL(page.url()).origin
+  await page.request.get(`${base}/api/auth/csrf`)
+  const xsrf = (await page.context().cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value
+  const latest = ((await (await page.request.get(`${base}/api/ontology`)).json()) as { version: number }).version
+  if (latest === version) return
+  const res = await page.request.post(`${base}/api/ontology/versions/${version}/restore`, {
+    headers: { 'X-XSRF-TOKEN': xsrf ?? '', 'Content-Type': 'application/json' },
+    data: { baseVersion: latest, note: '테스트 정리', confirm: true },
+  })
+  // 이미 되돌려 바뀐 점이 없으면 서버가 400 으로 답한다.
+  expect([201, 400]).toContain(res.status())
+}
+
 const suffix = String(Date.now())
 const data = {
   company: `가상전자-${suffix}`,
@@ -1302,6 +1317,8 @@ test.describe('가치투자 온톨로지: 역할별 협업', () => {
     const kept = await tokenIds(pageA)
     try {
       // 발급하면 원문이 한 번만 보이고, 복사 단추가 클립보드에 그 값을 넣는다.
+      const advanced = pageA.getByTestId('tokens-advanced')
+      if (!(await advanced.evaluate((el) => (el as HTMLDetailsElement).open))) await advanced.locator('summary').click()
       await pageA.getByTestId('tokens-issue-open').click()
       await pageA.getByTestId('tokens-issue-name').fill('e2e 토큰')
       await pageA.getByTestId('tokens-issue-submit').click()
@@ -1337,7 +1354,9 @@ test.describe('가치투자 온톨로지: 역할별 협업', () => {
         expect(await pageA.evaluate(async () => (await fetch('/api/v1/ontology')).status)).toBe(401)
 
         // 쓴 뒤에는 마지막 사용 시각이 생긴다.
+        // 새로 읽으면 「고급: 개인 비서 연동」 이 다시 접힌다
         await pageA.reload()
+        await advanced.locator('summary').click()
         await expect(row.getByTestId('tokens-row-last-used')).not.toContainText('아직 쓰지 않음')
 
         // 다른 사용자(편집자 B)에게는 이 토큰이 목록에도 API 응답에도 없다.
@@ -1464,6 +1483,8 @@ test.describe('가치투자 온톨로지: 역할별 협업', () => {
     try {
       // 1. 「조회와 기록」 토큰과 「조회만」 토큰을 발급한다.
       await openScreen(pageA, 'tokens')
+      const advanced = pageA.getByTestId('tokens-advanced')
+      if (!(await advanced.evaluate((el) => (el as HTMLDetailsElement).open))) await advanced.locator('summary').click()
       await pageA.getByTestId('tokens-issue-open').click()
       await pageA.getByTestId('tokens-issue-scope-write').check()
       await expect(pageA.getByTestId('tokens-issue-scope-hint')).toBeVisible()
@@ -1915,7 +1936,7 @@ test.describe('가치투자 온톨로지: 역할별 협업', () => {
     }
   })
 
-  test('9b) 관리자가 폼으로 인물에 속성을 더하면 편집자의 고치기 폼에 그 칸이 나오고, 되돌린다', async () => {
+  test('9b) 관리자가 YAML 로 인물에 속성을 더하고 저장하면 편집자의 고치기 폼에 그 칸이 나오고, 되돌린다', async () => {
     const propKey = `nickname${suffix}`
     // 1. 관리자가 저장 전 버전 번호를 읽어 둔다.
     await openScreen(pageAdmin, 'ontology')
@@ -1924,21 +1945,23 @@ test.describe('가치투자 온톨로지: 역할별 협업', () => {
     expect(before, '저장 전 온톨로지 버전').toBeGreaterThan(0)
 
     try {
-      // 2. 폼에서 인물에 string 속성을 더하고 확인한 뒤 저장한다.
-      await pageAdmin.getByTestId('ontology-edit-form').click()
-      const person = pageAdmin.locator('[data-testid="ontology-form-type"][data-type="Person"]')
-      await expect(person).toBeVisible()
-      await person.getByTestId('ontology-form-prop-add').click()
-      await person.getByTestId('ontology-form-new-key').fill(propKey)
-      await person.getByTestId('ontology-form-new-label').fill('별명')
-      await person.getByTestId('ontology-form-new-submit').click()
-      await expect(person.locator(`[data-testid="ontology-form-prop"][data-prop="${propKey}"]`)).toBeVisible()
+      // 2. YAML 의 Person 타입 properties 아래에 string 속성을 더하고 확인한 뒤 저장한다.
+      await pageAdmin.getByTestId('ontology-edit-yaml').click()
+      const input = pageAdmin.getByTestId('ontology-yaml-input')
+      await expect(input).not.toHaveValue('')
+      const lines = (await input.inputValue()).split('\n')
+      const person = lines.findIndex((line) => line === '  Person:')
+      expect(person, '정규화된 YAML 의 Person 줄').toBeGreaterThanOrEqual(0)
+      const props = lines.findIndex((line, i) => i > person && line === '    properties:')
+      expect(props, 'Person 의 properties 줄').toBeGreaterThan(person)
+      lines.splice(props + 1, 0, `      ${propKey}:`, '        type: string', '        label: 별명')
+      await input.fill(lines.join('\n'))
       await pageAdmin.getByTestId('ontology-preview').click()
       await expect(pageAdmin.getByTestId('ontology-diff-added')).toContainText(`nodeTypes.Person.properties.${propKey}`)
-      await shotElement(pageAdmin.getByTestId('ontology-preview-panel'), '09b-ontology-form-preview')
+      await shotElement(pageAdmin.getByTestId('ontology-preview-panel'), '09b-ontology-yaml-preview')
       await pageAdmin.getByTestId('ontology-save').click()
       await expect(pageAdmin.getByTestId('ontology-message')).toHaveAttribute('data-kind', 'success')
-      await shot(pageAdmin, '09b-ontology-form')
+      await shot(pageAdmin, '09b-ontology-yaml')
 
       // 3. 편집자 A 가 API 를 부르는 동작을 하면 안내가 나오고, 다시 읽으면 인물의 고치기 폼에 「별명」 칸이 있다.
       await pageA.getByTestId('tab-workspace').click()
@@ -1953,32 +1976,112 @@ test.describe('가치투자 온톨로지: 역할별 협업', () => {
       await expect(pageA.getByTestId(`edit-prop-${propKey}`)).toBeVisible()
       await expect(pageA.getByTestId('node-edit-form')).toContainText('별명')
 
-      // 4. 관리자가 관계 종류의 문장 틀에서 {to} 를 빼면 입력 아래와 미리보기에 오류가 보인다. 저장하지 않고 초안을 버린다.
-      await openScreen(pageAdmin, 'ontology')
-      await pageAdmin.getByTestId('ontology-edit-form').click()
-      const issues = pageAdmin.locator('[data-testid="ontology-form-rel"][data-rel="ISSUES"]')
-      await expect(issues).toBeVisible()
-      await issues.getByTestId('ontology-form-rel-sentence').fill('{from} 테스트')
-      await expect(issues.getByTestId('ontology-form-error')).toHaveText('문장 틀에 {from} 과 {to} 를 한 번씩 넣습니다')
-      await pageAdmin.getByTestId('ontology-preview').click()
-      await expect(pageAdmin.getByTestId('ontology-preview-error')).toContainText(['ISSUES 의 sentence 는 {from} 과 {to} 를 한 번씩 담아야 한다'])
-      await expect(pageAdmin.getByTestId('ontology-save')).toHaveCount(0)
-      await pageAdmin.getByTestId('ontology-draft-discard').click()
-      await expect(pageAdmin.getByTestId('ontology-form')).toHaveCount(0)
+      // 4. 예전 주소 /ontology?view=form 을 열면 YAML 편집기로 열리고 주소가 view=yaml 이 된다.
+      await pageAdmin.goto('/ontology?view=form')
+      await expect(pageAdmin.getByTestId('ontology-yaml-editor')).toBeVisible()
+      await expect(pageAdmin).toHaveURL(/view=yaml/)
     } finally {
       // 단계가 중간에 실패해도 속성이 남지 않게 저장 전 버전으로 되돌린다.
-      const base = new URL(pageAdmin.url()).origin
-      await pageAdmin.request.get(`${base}/api/auth/csrf`)
-      const xsrf = (await pageAdmin.context().cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value
-      const latest = ((await (await pageAdmin.request.get(`${base}/api/ontology`)).json()) as { version: number }).version
-      if (latest !== before) {
-        const res = await pageAdmin.request.post(`${base}/api/ontology/versions/${before}/restore`, {
-          headers: { 'X-XSRF-TOKEN': xsrf ?? '', 'Content-Type': 'application/json' },
-          data: { baseVersion: latest, note: '테스트 정리', confirm: true },
-        })
-        // 이미 되돌려 바뀐 점이 없으면 서버가 400 으로 답한다.
-        expect([201, 400]).toContain(res.status())
-      }
+      await restoreOntologyVersion(pageAdmin, before)
+    }
+  })
+
+  test('9d) 긴 YAML 을 스크롤해도 툴바와 결과가 화면 안에 있고, 틀린 키의 줄 번호를 누르면 편집칸이 그 줄을 고른다', async () => {
+    // 앞 테스트가 편집기(view=yaml)에 두고 끝나므로 보기 화면 주소로 새로 연다. 편집기에서는 「YAML 로 편집」 이 숨는다
+    await pageAdmin.goto('/ontology')
+    await pageAdmin.getByTestId('ontology-edit-yaml').click()
+    const input = pageAdmin.getByTestId('ontology-yaml-input')
+    await expect(input).not.toHaveValue('')
+    const lines = (await input.inputValue()).split('\n')
+    const person = lines.findIndex((line) => line === '  Person:')
+    expect(person, '정규화된 YAML 의 Person 줄').toBeGreaterThanOrEqual(0)
+    const props = lines.findIndex((line, i) => i > person && line === '    properties:')
+    expect(props, 'Person 의 properties 줄').toBeGreaterThan(person)
+
+    // 1. 운영 크기를 흉내 내 속성을 많이 더해 편집칸을 늘린다. 저장하지 않는다.
+    const extra = Array.from({ length: 150 }, (_, i) => [`      long${i}${suffix}:`, '        type: string', `        label: 긴 속성 ${i}`]).flat()
+    lines.splice(props + 1, 0, ...extra)
+    await input.fill(lines.join('\n'))
+    await input.evaluate((el) => {
+      el.scrollTop = el.scrollHeight
+    })
+    await expect(pageAdmin.getByTestId('ontology-yaml-toolbar')).toBeInViewport()
+    await pageAdmin.getByTestId('ontology-preview').click()
+    await expect(pageAdmin.getByTestId('ontology-preview-panel')).toBeInViewport()
+    await expect(pageAdmin.getByTestId('ontology-yaml-toolbar')).toBeInViewport()
+
+    // 2. 알 수 없는 키를 Person 바로 아래에 넣고 확인하면 오류의 줄 번호 단추가 그 줄을 가리키고, 누르면 편집칸이 그 줄을 고른다.
+    const broken = (await input.inputValue()).split('\n')
+    broken.splice(person + 1, 0, `    nokey${suffix}: 1`)
+    await input.fill(broken.join('\n'))
+    await pageAdmin.getByTestId('ontology-preview').click()
+    const errorLine = pageAdmin.getByTestId('ontology-preview-error-line').first()
+    await expect(errorLine).toHaveAttribute('data-line', String(person + 2))
+    await errorLine.click()
+    const selectedLine = await input.evaluate((el) => {
+      const area = el as HTMLTextAreaElement
+      return area.value.slice(0, area.selectionStart).split('\n').length
+    })
+    expect(selectedLine).toBe(person + 2)
+    await shot(pageAdmin, '09d-ontology-yaml-error-line')
+
+    // 3. 고친 초안은 확인 창을 거쳐 버린다.
+    await pageAdmin.getByTestId('ontology-draft-discard').click()
+    await pageAdmin.getByTestId('ontology-discard-confirm-submit').click()
+    await expect(pageAdmin.getByTestId('ontology-yaml-editor')).toHaveCount(0)
+  })
+
+  test('9e) 연동 토큰으로 올린 온톨로지 변경 제안을 「제안」 에서 바뀐 점을 보고 승인하면 버전이 하나 오르고, 되돌린다', async () => {
+    const propKey = `proposed${suffix}`
+    await openScreen(pageAdmin, 'ontology')
+    await pageAdmin.reload()
+    const before = Number(/\d+/.exec(await pageAdmin.getByTestId('ontology-version').innerText())?.[0])
+    expect(before, '시작 전 온톨로지 버전').toBeGreaterThan(0)
+    const origin = new URL(pageAdmin.url()).origin
+    const keptAdmin = await tokenIds(pageAdmin)
+    const bare = await request.newContext({ baseURL: origin })
+    try {
+      // 1. 관리자의 「조회와 기록」 토큰으로 지금 정의에 속성을 더한 변경 제안을 올린다.
+      const token = await issueToken(pageAdmin, 'e2e 온톨로지 토큰', 'write')
+      const headers = { Authorization: `Bearer ${token}` }
+      const current = await (await bare.get('/api/v1/ontology/yaml', { headers })).json()
+      const lines = (current.yaml as string).split('\n')
+      const person = lines.findIndex((line) => line === '  Person:')
+      const props = lines.findIndex((line, i) => i > person && line === '    properties:')
+      expect(props, 'Person 의 properties 줄').toBeGreaterThan(person)
+      lines.splice(props + 1, 0, `      ${propKey}:`, '        type: string', '        label: 제안 속성')
+      const posted = await bare.post('/api/v1/proposals', {
+        headers,
+        data: {
+          proposals: [
+            {
+              kind: 'ONTOLOGY_CHANGE',
+              payload: { baseVersion: current.version, yaml: lines.join('\n') },
+              rationale: '인물에 제안 속성을 더한다.',
+              dedupeKey: `e2e-ontology-${suffix}`,
+            },
+          ],
+        },
+      })
+      expect(posted.status()).toBe(200)
+      const proposalId = (await posted.json()).results[0].proposal.id as string
+
+      // 2. 「제안」 의 카드에 바뀐 점이 보이고, 승인하면 버전이 하나 오른다.
+      await openScreen(pageAdmin, 'proposals')
+      const card = pageAdmin.locator(`[data-testid="proposal-card"][data-id="${proposalId}"]`)
+      await expect(card.getByTestId('proposal-ontology-preview')).toContainText(`nodeTypes.Person.properties.${propKey}`)
+      await shot(pageAdmin, '10-ontology-change-proposal')
+      const confirm = card.getByTestId('proposal-ontology-confirm')
+      if (await confirm.count()) await confirm.check()
+      await card.getByTestId('proposal-accept').click()
+      await expect(pageAdmin.getByTestId('proposals-message')).toHaveAttribute('data-kind', 'success')
+      await expect(card).toHaveCount(0)
+      await openScreen(pageAdmin, 'ontology')
+      await expect(pageAdmin.getByTestId('ontology-version')).toHaveText(`버전 ${before + 1}`)
+    } finally {
+      await bare.dispose()
+      await revokeTokensExcept(pageAdmin, keptAdmin)
+      await restoreOntologyVersion(pageAdmin, before)
     }
   })
 
@@ -2024,8 +2127,9 @@ test.describe('가치투자 온톨로지: 역할별 협업', () => {
     await expect(save).toBeEnabled()
     await shotElement(pageAdmin.getByTestId('ontology-preview-panel'), '09c-ontology-impact')
 
-    // 4. 초안을 버리면 버전이 그대로다.
+    // 4. 고친 초안을 버리면 확인 창이 먼저 열리고, 버리면 버전이 그대로다.
     await pageAdmin.getByTestId('ontology-draft-discard').click()
+    await pageAdmin.getByTestId('ontology-discard-confirm-submit').click()
     await expect(pageAdmin.getByTestId('ontology-version')).toHaveText(`버전 ${before}`)
   })
 })

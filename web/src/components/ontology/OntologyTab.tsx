@@ -1,5 +1,5 @@
 import { reloadSucceeded, savedMessage } from '../../lib/ontologyDraft'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { ONTOLOGY_EXPORT_URL } from '../../api/client'
 import type { OntologyVersionSummary } from '../../api/types'
@@ -10,7 +10,6 @@ import { TAB_PATHS, ontologySearch, parseOntologyQuery, type OntologyQuery } fro
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { OntologyHistory } from './OntologyHistory'
-import { OntologyFormEditor } from './OntologyFormEditor'
 import { OntologyView } from './OntologyView'
 import { OntologyYamlEditor } from './OntologyYamlEditor'
 
@@ -29,6 +28,12 @@ export function OntologyTab({ draft, onDraftChange, reloadOntology }: Props) {
   const isAdmin = user.role === 'ADMIN'
   // ADMIN 이 아니면 주소에 view 가 있어도 지금 버전 보기만 보인다. App 이 주소도 바꿔 연다.
   const query: OntologyQuery = isAdmin ? parseOntologyQuery(location.search) : {}
+
+  // 예전 주소 view=form 은 yaml 로 바꿔 연다
+  const legacyForm = isAdmin && new URLSearchParams(location.search).get('view') === 'form'
+  useEffect(() => {
+    if (legacyForm) navigate(TAB_PATHS.ontology + ontologySearch({ view: 'yaml' }), { replace: true })
+  }, [legacyForm, navigate])
 
   const open = (q: OntologyQuery) => {
     setMessage(null)
@@ -50,11 +55,9 @@ export function OntologyTab({ draft, onDraftChange, reloadOntology }: Props) {
       <p className="mb-2 mt-0.5 text-xs text-muted-foreground">
         {userName(ontology.versionCreatedBy)} · {formatDateTime(ontology.versionCreatedAt)}
       </p>
-      {isAdmin && (
+      {/* YAML 편집기에서는 같은 단추가 툴바에 있다 */}
+      {isAdmin && query.view !== 'yaml' && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <Button type="button" data-testid="ontology-edit-form" onClick={() => open({ view: 'form' })}>
-            폼으로 편집
-          </Button>
           <Button type="button" data-testid="ontology-edit-yaml" onClick={() => open({ view: 'yaml' })}>
             YAML 로 편집
           </Button>
@@ -75,16 +78,6 @@ export function OntologyTab({ draft, onDraftChange, reloadOntology }: Props) {
         </Alert>
       )}
 
-      {query.view === 'form' && (
-        <OntologyFormEditor
-          draft={draft}
-          onDraftChange={onDraftChange}
-          reloadOntology={reloadOntology}
-          onSaved={(s) => void saved(s)}
-          onClose={() => navigate(TAB_PATHS.ontology)}
-          onOpenYaml={() => open({ view: 'yaml' })}
-        />
-      )}
       {query.view === 'yaml' && (
         <OntologyYamlEditor
           draft={draft}
@@ -92,7 +85,7 @@ export function OntologyTab({ draft, onDraftChange, reloadOntology }: Props) {
           reloadOntology={reloadOntology}
           onSaved={(s) => void saved(s)}
           onClose={() => navigate(TAB_PATHS.ontology)}
-          onOpenForm={() => open({ view: 'form' })}
+          onOpenHistory={() => open({ view: 'history' })}
         />
       )}
       {query.view === 'history' && (

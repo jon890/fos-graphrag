@@ -1,7 +1,7 @@
-import type { NodeRef, Ontology, PropertyDef, PropertyValue, ProposalKind, ProposalView, TradeView } from '../api/types'
+import type { NodeRef, Ontology, PropertyDef, PropertyValue, ProposalKind, ProposalView, Role, TradeView } from '../api/types'
 import { formatDate } from './format'
 import { initialFormValues, type FormValues } from './formValues'
-import { typeLabel, valueLabel, withEulReul, withJosa } from './labels'
+import { claimSentenceParts, typeLabel, valueLabel, withEulReul, withJosa } from './labels'
 import { relationSentence } from './relationSentence'
 import { formatMoney, formatQuantity, sideLabel } from './trades'
 
@@ -12,7 +12,14 @@ const KIND_LABEL: Record<ProposalKind, string> = {
   CREATE_RELATIONSHIP: '관계 잇기',
   LINK_TRADE_DECISION: '체결과 결정 잇기',
   STUDY_NOTE: '공부 메모',
+  UPDATE_NODE: '항목 고치기',
+  ARCHIVE_NODE: '항목 보관',
+  ARCHIVE_RELATIONSHIP: '관계 보관',
+  CREATE_CLAIM: '주장 만들기',
+  ONTOLOGY_CHANGE: '온톨로지 바꾸기',
 }
+
+const ROLE_RANK: Record<Role, number> = { VIEWER: 0, EDITOR: 1, ADMIN: 2 }
 
 const LEVEL_LABEL: Record<string, string> = { KNOWN: '이해함', UNSURE: '잘 모름', LEARNING: '공부 중' }
 
@@ -53,6 +60,26 @@ function newNodeName(o: Ontology, type: string, properties: Record<string, unkno
   return name || '이름 없음'
 }
 
+/** 「{타입 표시 이름} 「{이름}」」. 노드가 refs 에 없으면 「찾을 수 없는 항목」 만 쓴다 */
+function typedNodeName(o: Ontology, p: ProposalView, id: string): string {
+  const ref = p.refs.nodes[id]
+  return ref ? `${typeLabel(o, ref.type)} 「${ref.label}」` : `「${MISSING}」`
+}
+
+/** CREATE_CLAIM 의 문장. 주장 종류의 문장 틀에 주체와 대상 이름을 넣는다 */
+function claimSentence(o: Ontology, p: ProposalView): string {
+  const names = { subject: nodeName(p, str(p.payload.subjectId)), object: nodeName(p, str(p.payload.objectId)) }
+  return claimSentenceParts(o, str(p.payload.predicate), names)
+    .map((part) => (part.kind === 'slot' ? names[part.slot] : part.text))
+    .join('')
+}
+
+/** UPDATE_NODE 가 바꿀 속성. 값이 null 이면 그 속성을 지운다 */
+export function updateNodeParts(p: ProposalView): { name: string; value: unknown }[] {
+  const props = p.payload.properties
+  return props && typeof props === 'object' ? Object.entries(props as Record<string, unknown>).map(([name, value]) => ({ name, value })) : []
+}
+
 /** 제안 한 줄 요약. 합니다체다 */
 export function proposalSummary(o: Ontology, p: ProposalView): string {
   switch (p.kind) {
@@ -66,6 +93,18 @@ export function proposalSummary(o: Ontology, p: ProposalView): string {
       return `체결 ${strings(p.payload.tradeIds).length}건을 「${nodeName(p, str(p.payload.decisionId))}」에 잇습니다`
     case 'STUDY_NOTE':
       return `${withEulReul(`「${nodeName(p, str(p.payload.nodeId))}」`)} ${withJosa(`「${levelLabel(str(p.payload.level))}」`, '으로(로)')} 표시합니다`
+    case 'UPDATE_NODE':
+      return `${typedNodeName(o, p, str(p.payload.nodeId))}의 속성을 고칩니다`
+    case 'ARCHIVE_NODE':
+      return `${withEulReul(typedNodeName(o, p, str(p.payload.nodeId)))} 보관합니다`
+    case 'ARCHIVE_RELATIONSHIP': {
+      const r = p.refs.relationships?.[str(p.payload.relationshipId)]
+      return `이 관계를 보관합니다: ${r ? relationSentence(o, r.type, r.from.label, r.to.label) : MISSING}`
+    }
+    case 'CREATE_CLAIM':
+      return claimSentence(o, p)
+    case 'ONTOLOGY_CHANGE':
+      return `${withEulReul(`버전 ${p.payload.baseVersion}`)} 바꾸는 제안입니다`
   }
 }
 
@@ -89,9 +128,14 @@ export function tradeLine(t: TradeView): string {
   return `${formatDate(t.executedAt)} ${security} ${sideLabel(t.side)} ${formatQuantity(t.quantity)}주 ${formatMoney(t.amount, t.currency)}`
 }
 
-/** 열람자는 공유 지식을 만드는 제안을 승인할 수 없다. 서버도 403 으로 막는다 */
-export function canAccept(role: string, p: ProposalView): boolean {
-  return !p.requiresEditor || role === 'EDITOR' || role === 'ADMIN'
+/** 내 역할이 제안의 requiredRole 이상이어야 승인할 수 있다. 서버도 403 으로 막는다 */
+export function canAccept(role: Role, p: ProposalView): boolean {
+  return ROLE_RANK[role] >= ROLE_RANK[p.requiredRole]
+}
+
+/** 온톨로지 변경 제안의 기준 버전이 지금 버전과 다르면 덮어쓰기가 되므로 승인할 수 없다 */
+export function isStaleOntologyChange(p: ProposalView, currentVersion: number): boolean {
+  return p.kind === 'ONTOLOGY_CHANGE' && p.payload.baseVersion !== currentVersion
 }
 
 /** 제안이 가리키는 체결 id. 항목 만들기의 tradeIds 와 체결과 결정 잇기의 tradeIds 다 */

@@ -2,6 +2,10 @@ package dev.fos.workbench.mcp
 
 import dev.fos.workbench.auth.Role
 import dev.fos.workbench.config.params
+import dev.fos.workbench.ontology.NodeTypeDef
+import dev.fos.workbench.ontology.OntologyLoader
+import dev.fos.workbench.ontology.PropertyDef
+import dev.fos.workbench.ontology.PropertyType
 import dev.fos.workbench.support.ApiClient
 import dev.fos.workbench.support.Fixtures
 import dev.fos.workbench.support.IntegrationTest
@@ -28,10 +32,11 @@ class McpIntegrationTest : IntegrationTest() {
 
     /** docs/api-contract.md 「원격 MCP(`/mcp`)」 의 도구 표 */
     private val contractTools = listOf(
-        "get_connection", "get_ontology", "search_nodes", "get_node", "trace_node", "get_neighborhood", "lookup_security",
-        "list_my_knowledge", "record_trades", "list_my_trades", "submit_proposals", "list_my_proposals",
+        "get_connection", "get_ontology", "get_ontology_yaml", "search_nodes", "get_node", "trace_node", "get_neighborhood", "lookup_security",
+        "list_my_knowledge", "record_trades", "list_my_trades", "submit_proposals", "propose_ontology_change",
+        "list_my_proposals",
     )
-    private val writeTools = setOf("record_trades", "submit_proposals")
+    private val writeTools = setOf("record_trades", "submit_proposals", "propose_ontology_change")
 
     @Test
     fun `토큰이 없거나 틀리면 401 과 보호 자원 메타데이터를 가리키는 WWW-Authenticate 다`() {
@@ -182,6 +187,63 @@ class McpIntegrationTest : IntegrationTest() {
             assertThat(stored["tokenId"]).describedAs("체결의 tokenId").isEqualTo(grantId)
             assertThat(stored["createdVia"]).isEqualTo("AGENT")
         }
+    }
+
+    @Test
+    fun `조회만 연결은 온톨로지 변경을 제안하지 못하고 조회와 기록 연결은 받은 YAML 을 고쳐 올린다`() {
+        val mcp = Mcp(this)
+        val readSession = loggedIn(newUser(Role.VIEWER))
+        mcp.client(mcp.connect(readSession, "READ").access).use { client ->
+            val got = mcp.ok(client, "get_ontology_yaml")
+            val denied = mcp.call(
+                client, "propose_ontology_change",
+                mapOf("baseVersion" to got["version"].asInt(), "yaml" to withType(got["yaml"].asString()), "rationale" to "합성 근거"),
+            )
+            assertThat(denied.isError).describedAs(denied.body.toString()).isTrue()
+            assertThat(denied.body["code"].asString()).isEqualTo("INSUFFICIENT_SCOPE")
+            assertThat(mcp.ok(client, "list_my_proposals")["totalItems"].asLong()).isZero()
+        }
+
+        mcp.client(mcp.connect(loggedIn(newUser(Role.EDITOR)), "READ_WRITE").access).use { client ->
+            val got = mcp.ok(client, "get_ontology_yaml")
+            val result = mcp.ok(
+                client, "propose_ontology_change",
+                mapOf(
+                    "baseVersion" to got["version"].asInt(), "yaml" to withType(got["yaml"].asString()), "rationale" to "합성 근거",
+                    "note" to "MCP 메모",
+                ),
+            )
+            assertThat(result["status"].asString()).isEqualTo("created")
+            assertThat(result["proposal"]["kind"].asString()).isEqualTo("ONTOLOGY_CHANGE")
+            assertThat(result["proposal"]["payload"]["baseVersion"].asInt()).isEqualTo(got["version"].asInt())
+            assertThat(result["proposal"]["payload"]["note"].asString()).isEqualTo("MCP 메모")
+        }
+    }
+
+    @Test
+    fun `64KiB 를 넘는 온톨로지 변경 제안도 MCP 로 올린다`() {
+        val mcp = Mcp(this)
+        mcp.client(mcp.connect(loggedIn(newUser(Role.EDITOR)), "READ_WRITE").access).use { client ->
+            val got = mcp.ok(client, "get_ontology_yaml")
+            val yaml = withType(got["yaml"].asString(), description = "긴 설명 ".repeat(20_000))
+            assertThat(yaml.toByteArray().size).describedAs("YAML 크기").isBetween(64 * 1024, 400 * 1024)
+
+            val result = mcp.call(client, "propose_ontology_change", mapOf("baseVersion" to got["version"].asInt(), "yaml" to yaml, "rationale" to "합성 근거"))
+
+            assertThat(result.isError).describedAs(result.body.toString()).isFalse()
+            assertThat(result.body["status"].asString()).isEqualTo("created")
+        }
+    }
+
+    /** 받은 YAML 에 테스트마다 다른 노드 타입 하나를 더한다 */
+    private fun withType(yaml: String, description: String = "x"): String {
+        val o = OntologyLoader.parse(yaml)
+        val type = "Mcp${UUID.randomUUID().toString().filter { it.isLetter() }.take(6).uppercase()}"
+        val def = NodeTypeDef(
+            label = "테스트 타입", description = description, labelProperty = "title",
+            properties = mapOf("title" to PropertyDef(PropertyType.STRING, label = "제목", required = true)),
+        )
+        return OntologyLoader.toYaml(o.copy(nodeTypes = o.nodeTypes + (type to def)))
     }
 
     @Test

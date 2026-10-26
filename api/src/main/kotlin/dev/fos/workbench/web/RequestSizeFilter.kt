@@ -32,7 +32,7 @@ class RequestSizeFilter(private val mapper: JsonMapper) : OncePerRequestFilter()
         val chunked = request.getHeader("Transfer-Encoding")?.contains("chunked", ignoreCase = true) == true
         val max = when {
             isOAuth(uri) -> Limits.MAX_OAUTH_BODY_BYTES
-            request.method == "POST" && uri.startsWith("/api/ontology/") -> Limits.MAX_ONTOLOGY_BODY_BYTES
+            request.method == "POST" && carriesOntology(uri) -> Limits.MAX_ONTOLOGY_BODY_BYTES
             else -> Limits.MAX_BODY_BYTES
         }
         val tooLarge = "요청 본문이 ${max / 1024}KiB 를 넘습니다."
@@ -45,6 +45,10 @@ class RequestSizeFilter(private val mapper: JsonMapper) : OncePerRequestFilter()
     }
 
     private fun isOAuth(uri: String) = uri.startsWith("/oauth/")
+
+    /** 정의 전체를 담는 요청. 온톨로지 편집과, 온톨로지 변경 제안을 올리는 에이전트 API 와 MCP 다 */
+    private fun carriesOntology(uri: String) =
+        uri.startsWith("/api/ontology/") || uri == "/api/v1/proposals" || uri == "/mcp" || uri.startsWith("/mcp/")
 
     /** OAuth 경로의 오류 본문(docs/api-contract.md 「OAuth 인가 서버」). web 이 oauth 패키지를 부르지 않도록 모양만 같게 만든다 */
     private fun oauthError(description: String) = mapOf("error" to "invalid_request", "error_description" to description)

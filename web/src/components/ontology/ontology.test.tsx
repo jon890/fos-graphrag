@@ -2,10 +2,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { CurrentUser, OntologyPreview } from '../../api/types'
 import { testOntology, withApp } from '../testSupport'
-import { toDefinition } from '../../lib/ontologyDraft'
-import { OntologyFormEditor } from './OntologyFormEditor'
 import { OntologyPreviewPanel } from './OntologyPreviewPanel'
 import { OntologyTab } from './OntologyTab'
+import { OntologyYamlEditor } from './OntologyYamlEditor'
 
 const admin: CurrentUser = { id: 'u0', email: 'admin@example.com', displayName: '관리자', role: 'ADMIN', guideDoneAt: null }
 const viewer: CurrentUser = { id: 'u9', email: 'v@example.com', displayName: '열람자', role: 'VIEWER', guideDoneAt: null }
@@ -32,9 +31,9 @@ const renderPanel = (p: OntologyPreview) =>
   renderToStaticMarkup(<OntologyPreviewPanel preview={p} onSave={async () => Promise.reject(new Error('unused'))} onSaved={() => {}} onRestart={() => {}} />)
 
 describe('온톨로지 탭의 편집 단추', () => {
-  it('관리자에게는 편집, 버전 기록, 내려받기가 있고 버전 번호를 보인다', () => {
+  it('관리자에게는 YAML 편집, 버전 기록, 내려받기가 있고 버전 번호를 보인다', () => {
     const html = renderTab(admin)
-    expect(html).toContain('data-testid="ontology-edit-form"')
+    expect(html).not.toContain('ontology-edit-form')
     expect(html).toContain('data-testid="ontology-edit-yaml"')
     expect(html).toContain('data-testid="ontology-history-open"')
     expect(html).toMatch(/<a[^>]*data-testid="ontology-export"[^>]*href="\/api\/ontology\/export"/)
@@ -95,39 +94,54 @@ describe('OntologyPreviewPanel', () => {
     expect(html).toContain('data-testid="ontology-diff-empty"')
     expect(html).not.toContain('data-testid="ontology-save"')
   })
+  it('줄 번호가 든 오류는 줄 이동 단추로 그린다', () => {
+    const html = renderToStaticMarkup(
+      <OntologyPreviewPanel
+        preview={preview({ valid: false, errors: ['nodeTypes.Fund 가 틀렸습니다 (줄 7)'], added: [] })}
+        onSave={async () => Promise.reject(new Error('unused'))}
+        onSaved={() => {}}
+        onRestart={() => {}}
+        onGoToLine={() => {}}
+      />,
+    )
+    expect(html).toMatch(/<button[^>]*data-testid="ontology-preview-error-line"[^>]*data-line="7"[^>]*>\(줄 7\)<\/button>/)
+  })
+
+  it('이동 방법을 받지 못하면 줄 번호는 글자로 남는다', () => {
+    const html = renderPanel(preview({ valid: false, errors: ['틀렸습니다 (줄 7)'], added: [] }))
+    expect(html).not.toContain('ontology-preview-error-line')
+    expect(html).toContain('(줄 7)')
+  })
 })
 
-describe('OntologyFormEditor', () => {
+describe('OntologyYamlEditor', () => {
   const html = renderToStaticMarkup(
     withApp(
-      <OntologyFormEditor
-        draft={{ baseVersion: 1, source: 'form', yaml: null, definition: toDefinition(testOntology), removed: [], dirty: false }}
+      <OntologyYamlEditor
+        draft={{ baseVersion: 1, yaml: 'nodeTypes: {}\nrelationshipTypes: {}', dirty: true }}
         onDraftChange={() => {}}
         reloadOntology={async () => {}}
         onSaved={() => {}}
         onClose={() => {}}
-        onOpenYaml={() => {}}
+        onOpenHistory={() => {}}
       />,
       testOntology,
       admin,
-      '/ontology?view=form',
+      '/ontology?view=yaml',
     ),
   )
+  const toolbar = /data-testid="ontology-yaml-toolbar"[\s\S]*?(?=data-testid="ontology-yaml-gutter")/.exec(html)?.[0] ?? ''
 
-  it('Claim 을 뺀 노드 타입 카드를 그린다', () => {
-    expect(html).toContain('data-testid="ontology-form"')
-    expect(html).toContain('data-type="Company"')
-    expect(html).not.toContain('data-type="Claim"')
+  it('툴바에 확인, 버리기, 버전 기록, 내려받기, 초안 상태가 있다', () => {
+    for (const id of ['ontology-preview', 'ontology-draft-discard', 'ontology-toolbar-history', 'ontology-toolbar-export', 'ontology-draft-status']) {
+      expect(toolbar, id).toContain(`data-testid="${id}"`)
+    }
+    expect(toolbar).toMatch(/data-testid="ontology-draft-status"[^>]*data-dirty="true"[^>]*>버전 1 에서 시작 · 고침/)
   })
 
-  it('관계 종류마다 문장 틀 입력이 있다', () => {
-    const row = /<div[^>]*data-testid="ontology-form-rel"[^>]*data-rel="ISSUES"[\s\S]*$/.exec(html)?.[0] ?? ''
-    expect(row).toContain('문장 틀(예: {from}이(가) {to}을(를) 발행한다)')
-    expect(row).toMatch(/<input[^>]*data-testid="ontology-form-rel-sentence"[^>]*value=""/)
-  })
-
-  it('코드가 읽는 속성은 빼기 단추가 꺼져 있다', () => {
-    const row = /<div[^>]*data-testid="ontology-form-prop"[^>]*data-prop="url"[\s\S]*?<\/div><div class="mt-2/.exec(html)?.[0] ?? ''
-    expect(row).toMatch(/<button[^>]*data-testid="ontology-form-remove"[^>]*disabled/)
+  it('줄 번호 칸과 줄을 접지 않는 입력칸이 있고 폼 단추는 없다', () => {
+    expect(html).toContain('data-testid="ontology-yaml-gutter"')
+    expect(html).toMatch(/<textarea[^>]*wrap="off"[^>]*data-testid="ontology-yaml-input"/)
+    expect(html).not.toContain('ontology-yaml-to-form')
   })
 })

@@ -126,7 +126,16 @@ export interface TradeView {
   decisions: NodeRef[]
 }
 
-export type ProposalKind = 'CREATE_NODE' | 'CREATE_RELATIONSHIP' | 'LINK_TRADE_DECISION' | 'STUDY_NOTE'
+export type ProposalKind =
+  | 'CREATE_NODE'
+  | 'CREATE_RELATIONSHIP'
+  | 'LINK_TRADE_DECISION'
+  | 'STUDY_NOTE'
+  | 'UPDATE_NODE'
+  | 'ARCHIVE_NODE'
+  | 'ARCHIVE_RELATIONSHIP'
+  | 'CREATE_CLAIM'
+  | 'ONTOLOGY_CHANGE'
 export type ProposalStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED'
 
 /** GET /api/me/proposals 의 한 행. payload 의 모양은 kind 마다 다르다(docs/api-contract.md 「제안 내용」) */
@@ -142,11 +151,13 @@ export interface ProposalView {
   token: { id: string | null; name: string | null } | null
   decidedAt: string | null
   decisionNote: string | null
-  result: { nodeIds: string[]; relationshipIds: string[]; tradeIds: string[] } | null
+  result: { nodeIds: string[]; relationshipIds: string[]; tradeIds: string[]; ontologyVersion: number | null } | null
   lastError: { code: string; message: string; at: string } | null
   /** 공유 지식을 만드는 제안이면 true. 열람자는 승인할 수 없다 */
   requiresEditor: boolean
-  refs: { nodes: Record<string, NodeRef>; trades: Record<string, TradeView> }
+  /** 승인에 필요한 역할. 이보다 낮은 역할은 승인 단추가 꺼진다 */
+  requiredRole: Role
+  refs: { nodes: Record<string, NodeRef>; relationships: Record<string, RelationshipView>; trades: Record<string, TradeView> }
 }
 
 /** GET /api/me/proposals/summary */

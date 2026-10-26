@@ -62,8 +62,8 @@
 | 역할 | 할 수 있는 일 |
 | --- | --- |
 | `VIEWER` | 모든 `GET` 조회(검색, 상세, 주변 그래프, 근거 따라가기, 목록, 변경 이력, 온톨로지), `/api/me/knowledge` 의 내 이해 표시 쓰기, `/api/me/tokens` 의 내 연동 토큰 발급과 폐기, 앱 연결 동의(`/api/oauth/authorize`)와 `/api/me/connections` 의 내 연결 끊기, `/api/me/trades` 의 내 체결 지우기, `/api/me/proposals` 의 내 제안 거절과 개인 기록 제안(`LINK_TRADE_DECISION`, `STUDY_NOTE`)의 승인 |
-| `EDITOR` | VIEWER 권한과 노드, 관계, Claim 의 생성, 수정, 검토, 보관, 복원, 공유 지식을 만드는 제안(`CREATE_NODE`, `CREATE_RELATIONSHIP`)의 승인 |
-| `ADMIN` | EDITOR 권한과 `/api/users` 의 사용자 관리, `/api/ontology` 아래의 온톨로지 편집(버전 목록, 내보내기, 미리보기, 저장, 되돌리기) |
+| `EDITOR` | VIEWER 권한과 노드, 관계, Claim 의 생성, 수정, 검토, 보관, 복원, 공유 지식을 바꾸는 제안(`CREATE_NODE`, `CREATE_RELATIONSHIP`, `UPDATE_NODE`, `ARCHIVE_NODE`, `ARCHIVE_RELATIONSHIP`, `CREATE_CLAIM`)의 승인 |
+| `ADMIN` | EDITOR 권한과 `/api/users` 의 사용자 관리, `/api/ontology` 아래의 온톨로지 편집(버전 목록, 내보내기, 미리보기, 저장, 되돌리기), 온톨로지 변경 제안(`ONTOLOGY_CHANGE`)의 승인 |
 
 역할이 모자라면 `403 FORBIDDEN` 이다.
 온톨로지 정의(타입, 관계, 속성)는 Neo4j 에 버전으로 쌓이고 `ADMIN` 만 웹에서 바꾼다. 저장소의 YAML 은 첫 버전과 서버 코드가 소유하는 부분의 원본이다(「온톨로지」, [데이터 스키마](data-schema.md) 의 「온톨로지 버전」).
@@ -92,7 +92,7 @@
 | 400 | `OAUTH_INVALID_CLIENT` | 동의 화면의 인가 요청에서 클라이언트나 돌아갈 주소가 등록되지 않았다(「OAuth 인가 서버」) |
 | 400 | `OAUTH_REDIRECT_ERROR` | 동의 화면의 인가 요청이 틀렸다. `details.redirectUrl` 에 앱으로 알릴 오류 주소가 있다(「OAuth 인가 서버」) |
 | 411 | `LENGTH_REQUIRED` | 본문이 있는 `/api` 요청에 Content-Length 가 없다(chunked 전송) |
-| 413 | `PAYLOAD_TOO_LARGE` | 요청 본문이 64KiB 를 넘는다. 온톨로지 미리보기, 저장, 되돌리기는 512KiB 다 |
+| 413 | `PAYLOAD_TOO_LARGE` | 요청 본문이 64KiB 를 넘는다. 온톨로지 미리보기, 저장, 되돌리기와 에이전트의 제안 올리기, 원격 MCP 는 512KiB 다 |
 | 403 | `SELF_REVIEW_FORBIDDEN` | 자기가 작성한 Claim 을 검토하려 했다 |
 | 404 | `NOT_FOUND` | 그 ID 의 노드나 관계가 없다. 온톨로지 버전 조회와 되돌리기에서는 그 버전 번호가 없다. 없는 `/api` 경로도 같다 |
 | 405 | `METHOD_NOT_ALLOWED` | 경로는 있지만 그 메서드를 받지 않는다. `/api/v1` 에서는 `POST /api/v1/trades`, `POST /api/v1/proposals` 밖의 `POST`, `PUT`, `PATCH`, `DELETE` 가 여기 해당한다 |
@@ -189,7 +189,7 @@ Neo4j 예외는 시간 초과(`QUERY_TIMEOUT`), 연결 불가(`DATABASE_UNAVAILA
 
 | 항목 | 상한 | 넘으면 |
 | --- | --- | --- |
-| 요청 본문 | 64KiB, 온톨로지 미리보기와 저장, 되돌리기(`POST /api/ontology/**`)는 512KiB. Content-Length 필수 | `413 PAYLOAD_TOO_LARGE`, `411 LENGTH_REQUIRED` |
+| 요청 본문 | 64KiB, 온톨로지 미리보기와 저장, 되돌리기(`POST /api/ontology/**`), 에이전트의 제안 올리기(`POST /api/v1/proposals`), 원격 MCP(`POST /mcp`)는 512KiB. 온톨로지 변경 제안이 정의 전체를 담기 때문이다. Content-Length 필수 | `413 PAYLOAD_TOO_LARGE`, `411 LENGTH_REQUIRED` |
 | 검색어 `q` | 100자 | `400 VALIDATION_FAILED` |
 | Claim 의 `documentIds` | 20개 | `400 VALIDATION_FAILED` |
 | 페이지 크기 `size` | 100 | `400 VALIDATION_FAILED` |
@@ -534,7 +534,8 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 }
 ```
 
-- `yaml` 과 `definition` 은 보낸 정의를 정규화하고 코드 소유 부분을 저장소 값으로 바꾼 결과다. 화면은 폼과 YAML 편집기를 오갈 때 이것으로 바꾼다. `valid` 가 거짓이고 YAML 을 읽지도 못했으면 둘 다 `null` 이다.
+- `yaml` 과 `definition` 은 보낸 정의를 정규화하고 코드 소유 부분을 저장소 값으로 바꾼 결과다. 온톨로지 변경 제안은 이 `yaml` 을 저장한다. `valid` 가 거짓이고 YAML 을 읽지도 못했으면 둘 다 `null` 이다.
+- `errors` 의 문장 끝에 `(줄 N)` 이 붙으면 YAML 의 N 번째 줄(1부터)이다. YAML 을 읽지 못했거나 알 수 없는 키, 값 형식 오류일 때 붙는다. 정의 사이의 검사 오류와 JSON 정의에는 없다.
 - `added`, `removed`, `changed` 는 `baseVersion` 이 아니라 최신 버전과 비교한 경로다.
 
 - `valid` 가 거짓이면 `errors` 에 로더 검사 오류가 있고 저장할 수 없다(`400 ONTOLOGY_INVALID`, `details.errors`).
@@ -661,21 +662,22 @@ OAuth 로그인으로 연결한 앱(Claude Code, Codex 같은 MCP 클라이언�
 
 ## 제안
 
-에이전트가 올린 해석(투자 결정 만들기, 관계 잇기, 체결과 결정 잇기, 공부 메모)을 사람이 보고 승인하거나 거절한다. 제안은 올린 연동 토큰의 주인만 본다. 모든 역할이 부르고 쓰기는 CSRF 토큰이 필요하다. 저장 모델은 [데이터 스키마](data-schema.md) 의 「제안」, 결정은 [ADR-013](adr/013-owner-trades-and-agent-proposals.md) 이다.
+에이전트가 올린 해석(항목 만들기와 고치기와 보관, 관계 잇기와 보관, 주장 만들기, 온톨로지 바꾸기, 체결과 결정 잇기, 공부 메모)을 사람이 보고 승인하거나 거절한다. 제안은 올린 연동 토큰이나 연결의 주인만 본다. 모든 역할이 부르고 쓰기는 CSRF 토큰이 필요하다. 저장 모델은 [데이터 스키마](data-schema.md) 의 「제안」, 결정은 [ADR-013](adr/013-owner-trades-and-agent-proposals.md) 과 [ADR-017](adr/017-agent-ontology-and-instance-proposals.md) 이다.
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | GET | `/api/me/proposals` | 내 제안. 쿼리: `status`(`PENDING`, `ACCEPTED`, `REJECTED` 가운데 하나. 없으면 전체), `page`, `size`. 대기는 오래된 것부터, 그 밖은 결정한 시각이 늦은 것부터. 전체면 대기를 앞에 둔다. 응답 `Page<ProposalView>` |
 | GET | `/api/me/proposals/summary` | 대기 수. 응답 `{"pending": 3}`. 머리글의 배지가 쓴다 |
-| POST | `/api/me/proposals/{id}/accept` | 승인. 본문 `{"payload"}`. `payload` 는 선택이고, 있으면 고친 내용으로 바꿔 실행한다. 응답 `ProposalView`(`ACCEPTED`) |
+| POST | `/api/me/proposals/{id}/accept` | 승인. 본문 `{"payload", "confirm"}`. 둘 다 선택이다. `payload` 가 있으면 고친 내용으로 바꿔 실행한다. `confirm` 은 온톨로지 변경의 영향 확인이고 기본 `false` 다. 응답 `ProposalView`(`ACCEPTED`) |
 | POST | `/api/me/proposals/{id}/reject` | 거절. 본문 `{"reason"}`. `reason` 은 선택이고 1000자까지. 응답 `ProposalView`(`REJECTED`) |
 
 - `status` 가 세 값 밖이면 `400 VALIDATION_FAILED` 다.
 - 내 제안이 아니거나 없으면 `404 NOT_FOUND` 다. 대기가 아니면 `409 PROPOSAL_NOT_PENDING`(`details.status`)이다.
-- `CREATE_NODE`, `CREATE_RELATIONSHIP` 은 공유 지식을 만든다. 승인하는 사람의 역할이 `EDITOR` 이상이 아니면 `403 FORBIDDEN` 이다. 거절은 모든 역할이 한다.
+- 종류마다 승인에 필요한 역할(`requiredRole`)이 있다. 공유 지식을 바꾸는 `CREATE_NODE`, `CREATE_RELATIONSHIP`, `UPDATE_NODE`, `ARCHIVE_NODE`, `ARCHIVE_RELATIONSHIP`, `CREATE_CLAIM` 은 `EDITOR`, `ONTOLOGY_CHANGE` 는 `ADMIN`, 나머지는 `VIEWER` 다. 모자라면 `403 FORBIDDEN`(「편집 권한이 있어야 승인할 수 있습니다.」, 「관리자만 승인할 수 있습니다.」)이고 `lastError` 에 남기지 않는다. 거절은 모든 역할이 한다.
 - 승인은 「제안 내용」 의 종류별 실행을 한 트랜잭션에서 하고 상태를 `ACCEPTED` 로 바꾼다. 실행이 실패하면 그 오류(`400 ONTOLOGY_VIOLATION`, `404 NOT_FOUND`, `409 DUPLICATE`, `409 ARCHIVED` 등)로 답하고 아무것도 바꾸지 않는다. 제안은 `PENDING` 으로 남고 `lastError` 에 그 오류가 남는다.
-- 고친 `payload` 는 그 종류의 모양과 규칙으로 다시 검사한다. 종류는 바꿀 수 없다.
-- 승인으로 만든 노드와 관계는 지금처럼 변경 이력에 남는다. 작업자는 승인한 사람이고 `note` 는 「에이전트 제안을 승인했다」 다. 제안 자체의 승인과 거절은 이력에 남지 않는다.
+- 고친 `payload` 는 그 종류의 모양과 규칙으로 다시 검사한다. 종류는 바꿀 수 없다. `ONTOLOGY_CHANGE` 는 고쳐서 승인할 수 없다(`400 VALIDATION_FAILED`, `details.fieldErrors.payload`). 기준 버전을 바꿔 남의 저장을 덮어쓰지 않게 하려는 것이다.
+- 승인으로 만들거나 바꾼 노드, 관계, 주장, 온톨로지 버전은 지금처럼 변경 이력에 남는다. 작업자는 승인한 사람이고 `note` 는 「에이전트 제안을 승인했다」 다. 온톨로지 버전의 메모는 `payload.note` 가 있으면 그것이다. 제안 자체의 승인과 거절은 이력에 남지 않는다.
+- `ONTOLOGY_CHANGE` 를 승인한 응답에는 새 버전 번호의 `X-Ontology-Version` 헤더가 붙는다. 화면은 응답을 받은 뒤 온톨로지를 다시 읽는다.
 
 `ProposalView`
 
@@ -695,8 +697,10 @@ OAuth 로그인으로 연결한 앱(Claude Code, Codex 같은 MCP 클라이언�
   "result": null,
   "lastError": null,
   "requiresEditor": true,
+  "requiredRole": "EDITOR",
   "refs": {
     "nodes": { "uuid": { "id": "uuid", "type": "Security", "label": "Fluence Energy 보통주", "archived": false } },
+    "relationships": {},
     "trades": { "uuid": "TradeView" }
   }
 }
@@ -707,10 +711,11 @@ OAuth 로그인으로 연결한 앱(Claude Code, Codex 같은 MCP 클라이언�
 | `payload` | 종류별 내용. 「제안 내용」 의 모양이다. 승인할 때 고쳤으면 고친 값이다 |
 | `evidence` | 에이전트가 붙인 근거 참조. 셋 다 빈 배열일 수 있다 |
 | `token` | 올린 연동 토큰의 `id` 와 그때의 이름. 토큰을 폐기해도 남는다 |
-| `result` | 승인으로 생긴 것 `{"nodeIds", "relationshipIds", "tradeIds"}`. 승인 전과 거절은 `null` 이다. 이해 표시는 `nodeIds` 에 그 항목을 담는다 |
+| `result` | 승인으로 생기거나 바뀐 것 `{"nodeIds", "relationshipIds", "tradeIds", "ontologyVersion"}`. 승인 전과 거절은 `null` 이다. 이해 표시와 고치기, 보관은 `nodeIds` 나 `relationshipIds` 에 그 대상을 담는다. `ontologyVersion` 은 `ONTOLOGY_CHANGE` 가 만든 버전이고 다른 종류는 `null` 이다 |
 | `lastError` | 마지막 승인 실패 `{"code", "message", "at"}`. 없으면 `null`. 승인에 성공하면 지운다 |
-| `requiresEditor` | `CREATE_NODE`, `CREATE_RELATIONSHIP` 이면 `true` 다. 화면은 열람자에게 승인 단추를 끈다 |
-| `refs` | `payload`, `evidence`, `result` 가 가리키는 노드와 체결을 지금 값으로 담은 맵. 찾지 못한 id 는 빠진다. 노드는 보관된 것도 담는다. 체결은 내 체결만 담는다 |
+| `requiresEditor` | `requiredRole` 이 `EDITOR` 나 `ADMIN` 이면 `true` 다. 예전 화면과의 호환을 위해 남긴다 |
+| `requiredRole` | 승인에 필요한 역할. `VIEWER`, `EDITOR`, `ADMIN` 가운데 하나다. 화면은 역할이 모자란 사람에게 승인 단추를 끈다 |
+| `refs` | `payload`, `evidence`, `result` 가 가리키는 노드, 관계, 체결을 지금 값으로 담은 맵 `{"nodes", "relationships", "trades"}`. 찾지 못한 id 는 빠진다. 노드와 관계는 보관된 것도 담는다. 관계는 `RelationshipView` 이고 양 끝 노드도 `nodes` 에 담는다. 체결은 내 체결만 담는다 |
 
 ### 제안 내용
 
@@ -722,11 +727,22 @@ OAuth 로그인으로 연결한 앱(Claude Code, Codex 같은 MCP 클라이언�
 | `CREATE_RELATIONSHIP` | `{"type", "fromId", "toId"}` | `POST /api/relationships` 와 같다 |
 | `LINK_TRADE_DECISION` | `{"tradeIds", "decisionId"}` | 체결마다 결정과 `EXECUTES` 로 잇는다. 이미 이어져 있으면 그대로 둔다 |
 | `STUDY_NOTE` | `{"nodeId", "level", "note"}` | `PUT /api/me/knowledge/{nodeId}` 와 같이 승인한 사람의 이해 표시를 쓴다 |
+| `UPDATE_NODE` | `{"nodeId", "expectedRevision", "properties"}` | `PATCH /api/nodes/{nodeId}` 와 같다. `properties` 의 `null` 은 그 속성을 지운다 |
+| `ARCHIVE_NODE` | `{"nodeId", "expectedRevision", "reason"}` | `POST /api/nodes/{nodeId}/archive` 와 같다 |
+| `ARCHIVE_RELATIONSHIP` | `{"relationshipId", "reason"}` | `POST /api/relationships/{relationshipId}/archive` 와 같다. `expectedRevision` 은 승인할 때 읽은 지금 값이다 |
+| `CREATE_CLAIM` | `{"predicate", "subjectId", "objectId", "documentIds", "description", "evidenceText", "validFrom", "validTo"}` | `POST /api/claims` 와 같이 만든다. `authoringMethod` 는 `AI` 다 |
+| `ONTOLOGY_CHANGE` | `{"baseVersion", "yaml", "note"}` 또는 `{"baseVersion", "definition", "note"}` | `POST /api/ontology/versions` 와 같이 새 버전을 저장한다. 저장하는 정의는 올릴 때 정규화한 `yaml` 이다 |
 
 - `CREATE_NODE`: `type` 과 `properties` 는 `POST /api/nodes` 의 규칙(온톨로지 검증, `managedBy` 가 있는 타입 거절, 같은 시장과 종목 코드의 Security 거절)과 같다. `links` 는 선택이고 10개까지다. 항목은 `{"type", "fromId"}` 나 `{"type", "toId"}` 하나다. `fromId` 를 주면 그 노드에서 새 노드로, `toId` 를 주면 새 노드에서 그 노드로 잇는다. 둘 다 주거나 둘 다 없으면 `400 VALIDATION_FAILED` 다. `tradeIds` 는 선택이고 50개까지이며 `type` 이 `Decision` 일 때만 받는다.
 - `CREATE_RELATIONSHIP`: 관계 API 의 규칙(온톨로지의 관계 종류와 양 끝 타입, 보관된 끝 거절, 같은 활성 관계 거절)과 같다.
 - `LINK_TRADE_DECISION`: `tradeIds` 는 1개 이상 50개 이하의 내 체결이다. `decisionId` 는 타입이 `Decision` 인 보관되지 않은 노드다. 타입이 다르면 `400 ONTOLOGY_VIOLATION`(`details.rule = "decision-type"`), 보관됐으면 `409 ARCHIVED` 다.
 - `STUDY_NOTE`: `level` 은 `KNOWN`, `UNSURE`, `LEARNING`, `note` 는 1000자까지다. 「내 이해 표시」 와 같다.
+- `UPDATE_NODE`: `expectedRevision` 은 에이전트가 읽은 노드의 `revision`(`V1NodeHeader.revision`)이다. `properties` 는 1개 이상이고 `PATCH /api/nodes/{id}` 의 규칙(온톨로지 검증, Claim 거절, 같은 시장과 종목 코드 거절)과 같다. Claim 이면 `400 ONTOLOGY_VIOLATION`(`details.rule = "claim-via-claims-api"`), 보관된 노드면 `409 ARCHIVED` 다.
+- `ARCHIVE_NODE`: `expectedRevision` 은 `UPDATE_NODE` 와 같다. `reason` 은 선택이고 1000자까지다. 이미 보관됐으면 `409 ARCHIVED`, 그 문서가 어떤 활성 주장의 유일한 근거면 승인할 때 `409 LAST_EVIDENCE` 다.
+- `ARCHIVE_RELATIONSHIP`: `relationshipId` 는 일반 관계(`V1Relation.relationshipId`)다. 주장 관계면 `400 ONTOLOGY_VIOLATION`(`details.rule = "claim-relationship"`), 없으면 `404 NOT_FOUND` 다. 이미 보관됐으면 `409 ARCHIVED` 다. `reason` 은 `ARCHIVE_NODE` 와 같다.
+- `CREATE_CLAIM`: `POST /api/claims` 의 규칙(온톨로지 `claimPredicates`, 근거 문서 1개 이상 20개 이하, 유효 기간 순서)과 같다. `authoringMethod`, `extractionConfidence` 는 받지 않는다. 만든 주장은 `DRAFT` 이고 작성자는 승인한 사람이라, 다른 사람이 검토한다.
+- `UPDATE_NODE`, `ARCHIVE_NODE` 는 올릴 때와 승인할 때 `expectedRevision` 을 지금 값과 비교한다. 다르면 `409 REVISION_CONFLICT` 다. 에이전트는 노드를 다시 읽고 새로 올린다.
+- `ONTOLOGY_CHANGE`: `baseVersion` 은 정수이고 `yaml` 과 `definition` 가운데 하나만 준다. `note` 는 선택이고 1000자까지이며 새 버전의 메모가 된다. 올릴 때 `POST /api/ontology/preview` 와 같은 검사를 한다. 정의가 틀리면 `400 ONTOLOGY_INVALID`(`details.errors`), 바뀐 점이 없으면 `400 ONTOLOGY_INVALID`(「바뀐 점이 없습니다.」), `baseVersion` 이 지금 버전이 아니면 `409 REVISION_CONFLICT`(`details.expectedRevision`, `details.currentRevision` 에 버전 번호)다. 승인할 때도 같은 검사를 다시 하고, 기존 데이터에 영향이 있는데 `confirm` 이 없으면 `409 ONTOLOGY_IMPACT_UNCONFIRMED`(`details.impacts`)다. 기준 버전이 바뀌었으면 `409 REVISION_CONFLICT` 이고 덮어쓰지 않는다. 승인할 사람은 `POST /api/ontology/preview` 로 지금 버전과 비교한 바뀐 점과 영향을 본다.
 - 가리키는 노드가 없으면 `404 NOT_FOUND`, 내 체결이 아니거나 없으면 `404 NOT_FOUND` 다. 올릴 때 한 번, 승인할 때 다시 확인한다. 그 사이 노드가 보관되거나 온톨로지가 바뀌면 승인이 실패한다.
 
 ## 에이전트 API(`/api/v1`)
@@ -823,6 +839,7 @@ OAuth 로그인으로 연결한 앱(Claude Code, Codex 같은 MCP 클라이언�
 | --- | --- | --- |
 | `/api/v1/me` | 없음 | `V1Me`. 연결 확인용 |
 | `/api/v1/ontology` | 없음 | `V1Ontology` |
+| `/api/v1/ontology/yaml` | 없음 | `V1OntologyYaml`. 지금 버전의 저장된 YAML |
 | `/api/v1/nodes` | `q`, `types`, `page`, `size` | `Page<V1NodeSummary>` |
 | `/api/v1/nodes/{id}` | 없음 | `V1NodeDetail` |
 | `/api/v1/nodes/{id}/trace` | 없음 | `V1Trace` |
@@ -869,6 +886,14 @@ OAuth 로그인으로 연결한 앱(Claude Code, Codex 같은 MCP 클라이언�
 
 - 순서는 온톨로지 정의의 순서다. `type` 은 `string`, `text`, `url`, `enum`, `date`, `datetime`, `number`, `integer`, `boolean` 가운데 하나다.
 - `values` 는 `enum` 일 때만 있고 그 밖에는 `null` 이다. `sentence` 는 틀이 없으면 `null` 이다.
+
+#### `GET /api/v1/ontology/yaml`
+
+```json
+{ "version": 7, "yaml": "nodeTypes:\n  Company:\n …" }
+```
+
+`GET /api/ontology/export` 가 내려 주는 지금 버전의 YAML 과 같다. 모든 역할과 범위가 읽는다. 에이전트는 이것을 고쳐 `ONTOLOGY_CHANGE` 제안을 올리고, `version` 을 `baseVersion` 으로 담는다. 주석은 남지 않는다. 키의 뜻은 `GET /api/v1/ontology` 의 `description` 을 본다.
 
 #### `GET /api/v1/nodes`
 
@@ -1050,10 +1075,10 @@ OAuth 로그인으로 연결한 앱(Claude Code, Codex 같은 MCP 클라이언�
 
 - 쓰기(`POST`)는 「조회와 기록」 범위(`scope = READ_WRITE`)로 발급한 토큰만 한다. 「조회만」 토큰이면 `403 INSUFFICIENT_SCOPE`(「이 토큰은 조회만 할 수 있습니다. 「조회와 기록」 토큰을 새로 발급하세요.」)다. 범위는 `GET /api/v1/me` 의 `token.scope` 로 확인한다. 범위 확인은 본문 검사보다 먼저다. 다만 JSON 으로 읽을 수 없는 본문은 범위와 상관없이 `400 VALIDATION_FAILED` 다.
 - 두 `GET`(`/api/v1/trades`, `/api/v1/proposals`)은 모든 범위가 부른다.
-- 토큰 주인의 역할과 상관없이 쓴다. 열람자의 토큰도 체결을 넣고 제안을 올린다. 공유 지식을 만드는 제안의 승인만 편집 권한이 필요하다(「제안」).
+- 토큰 주인의 역할과 상관없이 쓴다. 열람자의 토큰도 체결을 넣고 제안을 올린다. 승인할 때만 종류마다 정한 역할이 필요하다(「제안」 의 `requiredRole`).
 - 한 요청은 전부 저장되거나 전부 거절된다. 항목 하나라도 틀리면 아무것도 저장하지 않고 오류로 답한다. `details.fieldErrors` 의 키는 `trades[2].quantity`, `proposals[0].payload.type` 처럼 몇 번째 항목의 어느 칸인지 담는다. 온톨로지 위반은 `400 ONTOLOGY_VIOLATION` 에 `details.index`(몇 번째 항목)를 더한다. 가리키는 노드나 체결이 없으면 `404 NOT_FOUND` 에 `details.index` 를 더한다.
 - 같은 요청을 다시 보내도 된다. 체결은 `(broker, externalId)`, 제안은 `dedupeKey` 로 이미 있는 것을 찾아 새로 만들지 않고 돌려준다. 응답은 항목마다 `created` 나 `existing` 이다.
-- 요청 본문은 64KiB 까지다(`413 PAYLOAD_TOO_LARGE`). 쓰기 경로는 토큰마다 1분에 10번까지다(`429 RATE_LIMITED`). 이 요청도 1분 60번 한도에 함께 센다.
+- 요청 본문은 체결이 64KiB, 제안이 512KiB 까지다(`413 PAYLOAD_TOO_LARGE`). 쓰기 경로는 토큰마다 1분에 10번까지다(`429 RATE_LIMITED`). 이 요청도 1분 60번 한도에 함께 센다.
 
 | 메서드 | 경로 | 본문이나 쿼리 | 응답 |
 | --- | --- | --- | --- |
@@ -1153,7 +1178,7 @@ OAuth 로그인으로 연결한 앱(Claude Code, Codex 같은 MCP 클라이언�
 
 | 필드 | 필수 | 규칙 |
 | --- | --- | --- |
-| `kind` | 예 | `CREATE_NODE`, `CREATE_RELATIONSHIP`, `LINK_TRADE_DECISION`, `STUDY_NOTE` |
+| `kind` | 예 | `CREATE_NODE`, `CREATE_RELATIONSHIP`, `UPDATE_NODE`, `ARCHIVE_NODE`, `ARCHIVE_RELATIONSHIP`, `CREATE_CLAIM`, `ONTOLOGY_CHANGE`, `LINK_TRADE_DECISION`, `STUDY_NOTE` |
 | `payload` | 예 | 「제안」 의 「제안 내용」 의 모양과 규칙 |
 | `rationale` | 예 | 사람이 승인할지 판단할 까닭. 앞뒤 공백을 지운 1자 이상 2000자 이하 |
 | `evidence` | 아니오 | `{"nodeIds", "tradeIds", "urls"}`. 각각 20개, 50개, 10개까지. `urls` 는 `http`, `https` 절대 주소 2000자까지. `nodeIds` 는 있는 노드, `tradeIds` 는 내 체결이어야 한다 |
@@ -1391,7 +1416,7 @@ Claude Code, Codex, Hermes 가 가치투자 온톨로지를 조회하고 기록�
 - 세션 쿠키는 읽지 않고 CSRF 를 요구하지 않는다.
 - `Origin` 헤더가 있고 `{base}` 와 다르면 `403 FORBIDDEN` 이다. 명령줄 클라이언트는 `Origin` 을 보내지 않는다.
 - 요청 한도는 연결(OAuth 연결이나 연동 토큰)마다 1분에 60번이다. `tools/list` 같은 요청도 센다. 연동 토큰은 `/api/v1` 과 같은 카운터를 써서 두 경로를 합쳐 1분에 60번, 쓰기 10번이다. 넘으면 `429 RATE_LIMITED` 와 `Retry-After` 다. 인증에 실패한 요청은 세지 않는다.
-- 요청 본문은 64KiB 까지다(`413 PAYLOAD_TOO_LARGE`, Content-Length 가 없으면 `411 LENGTH_REQUIRED`).
+- 요청 본문은 512KiB 까지다(`413 PAYLOAD_TOO_LARGE`, Content-Length 가 없으면 `411 LENGTH_REQUIRED`). 온톨로지 변경 제안이 정의 전체를 담기 때문이다.
 
 ### 도구
 
@@ -1401,6 +1426,7 @@ Claude Code, Codex, Hermes 가 가치투자 온톨로지를 조회하고 기록�
 | --- | --- | --- | --- | --- |
 | `get_connection` | 연결 확인하기 | 없음 | `McpConnection` | `GET /api/v1/me` |
 | `get_ontology` | 온톨로지 요약 보기 | 없음 | `V1Ontology` | `GET /api/v1/ontology` |
+| `get_ontology_yaml` | 온톨로지 정의 받기 | 없음 | `V1OntologyYaml` | `GET /api/v1/ontology/yaml` |
 | `search_nodes` | 항목 찾기 | `q`, `types`(문자열 배열), `page`, `size` | `Page<V1NodeSummary>` | `GET /api/v1/nodes` |
 | `get_node` | 항목 자세히 보기 | `id` | `V1NodeDetail` | `GET /api/v1/nodes/{id}` |
 | `trace_node` | 근거 따라가기 | `id` | `V1Trace` | `GET /api/v1/nodes/{id}/trace` |
@@ -1410,10 +1436,12 @@ Claude Code, Codex, Hermes 가 가치투자 온톨로지를 조회하고 기록�
 | `record_trades` | 체결 기록하기 | `trades`(`V1TradeInput` 1~50개) | `{"results": [V1TradeResult]}` | `POST /api/v1/trades` |
 | `list_my_trades` | 내 체결 보기 | `ticker`, `from`, `to`, `page`, `size` | `Page<V1Trade>` | `GET /api/v1/trades` |
 | `submit_proposals` | 제안 올리기 | `proposals`(`V1ProposalInput` 1~20개) | `{"results": [V1ProposalResult]}` | `POST /api/v1/proposals` |
+| `propose_ontology_change` | 온톨로지 변경 제안하기 | `baseVersion`(정수), `yaml`, `rationale`, `note`, `dedupeKey` | `V1ProposalResult` | `POST /api/v1/proposals` 에 `ONTOLOGY_CHANGE` 한 건 |
 | `list_my_proposals` | 내 제안 보기 | `status`, `page`, `size` | `Page<V1Proposal>` | `GET /api/v1/proposals` |
 
 - 입력 칸의 뜻, 기본값, 상한은 같은 경로의 쿼리와 본문과 같다. `types`, `level` 만 쉼표로 이은 문자열 대신 배열로 받는다. 입력 스키마(JSON Schema)는 칸의 타입과 필수 여부를 담고, 값의 검사는 서비스가 한다.
 - 도구 설명은 비개발자와의 대화에서 모델이 고를 수 있게 「무엇을 하는지」 와 「언제 쓰는지」 를 한국어로 쓴다. 쓰기 도구의 설명은 체결이 나만 보는 기록이고, 제안은 워크벤치의 「제안」 에서 내가 승인해야 반영된다고 밝힌다.
+- `propose_ontology_change` 는 `submit_proposals` 에 `ONTOLOGY_CHANGE` 한 건을 담은 것과 같다. 정의 전체를 `proposals` 배열 안에 넣으면 모델이 칸을 틀리기 쉬워 도구를 따로 둔다. `submit_proposals` 도 `ONTOLOGY_CHANGE` 를 받는다.
 - 결과는 `content` 의 `text` 하나에 결과 객체의 JSON 을 담는다.
 - 체결과 제안, 이해 표시는 그 연결이나 토큰 주인의 것만 읽고 쓴다. 다른 사람의 체결은 어떤 도구에도 나오지 않는다.
 - 쓰기 도구로 저장한 체결과 제안의 `tokenId`, `tokenName` 은 OAuth 연결이면 그 연결의 `id` 와 `clientName`, 연동 토큰이면 그 토큰의 `id` 와 `name` 이다. `createdVia` 는 둘 다 `AGENT` 다.
@@ -1434,7 +1462,7 @@ Claude Code, Codex, Hermes 가 가치투자 온톨로지를 조회하고 기록�
 | --- | --- |
 | `INSUFFICIENT_SCOPE` | 「조회만」 연결이나 토큰으로 쓰기 도구를 불렀다. 문장은 「조회만 허락된 연결입니다. 기록하려면 더보기 → 연동에서 이 연결을 끊고 앱에서 다시 로그인해 「조회와 기록」 을 고르세요.」 다 |
 | `RATE_LIMITED` | 쓰기 도구를 연결마다 1분에 10번 넘게 불렀다. `details.retryAfterSeconds` 가 있다 |
-| `VALIDATION_FAILED`, `ONTOLOGY_VIOLATION`, `NOT_FOUND`, `PROPOSAL_LIMIT`, `TRANSIENT_CONFLICT`, `QUERY_TIMEOUT`, `DATABASE_UNAVAILABLE`, `INTERNAL_ERROR` | 같은 경로의 오류와 같다. `details` 도 같다 |
+| `VALIDATION_FAILED`, `ONTOLOGY_VIOLATION`, `ONTOLOGY_INVALID`, `REVISION_CONFLICT`, `ARCHIVED`, `NOT_FOUND`, `PROPOSAL_LIMIT`, `TRANSIENT_CONFLICT`, `QUERY_TIMEOUT`, `DATABASE_UNAVAILABLE`, `INTERNAL_ERROR` | 같은 경로의 오류와 같다. `details` 도 같다 |
 
 모르는 도구 이름은 JSON-RPC 오류(`-32602`)다.
 

@@ -54,3 +54,5 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=가치투자 온톨로지
+            org.opencontainers.image.description=투자 논리와 근거를 Neo4j 지식그래프에 함께 쌓고 웹에서 탐색하는 가치투자 온톨로지 (Kotlin, Spring Boot, React)

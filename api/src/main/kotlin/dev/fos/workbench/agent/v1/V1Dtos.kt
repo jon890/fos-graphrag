@@ -25,6 +25,10 @@ data class V1Ontology(
     val claimPredicates: List<V1ClaimPredicate>,
 )
 
+/** 지금 버전의 저장된 YAML. `GET /api/ontology/export` 와 같다 */
+@JsonInclude(JsonInclude.Include.ALWAYS)
+data class V1OntologyYaml(val version: Int, val yaml: String)
+
 @JsonInclude(JsonInclude.Include.ALWAYS)
 data class V1NodeType(
     val key: String,

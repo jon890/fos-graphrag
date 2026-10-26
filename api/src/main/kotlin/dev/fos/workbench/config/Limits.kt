@@ -14,7 +14,10 @@ object Limits {
     /** JSON 요청 본문 크기(바이트). 가장 긴 속성(text 4000자)을 여럿 담아도 넉넉하다. */
     const val MAX_BODY_BYTES = 64 * 1024L
 
-    /** 온톨로지 미리보기, 저장, 되돌리기(`POST /api/ontology/` 아래)의 요청 본문 크기(바이트). 정의 전체를 YAML 이나 JSON 으로 보낸다. */
+    /**
+     * 온톨로지 미리보기, 저장, 되돌리기(`POST /api/ontology/` 아래)와 에이전트의 제안 올리기(`POST /api/v1/proposals`),
+     * 원격 MCP(`POST /mcp`)의 요청 본문 크기(바이트). 정의 전체를 YAML 이나 JSON 으로 보내고, 온톨로지 변경 제안도 정의 전체를 담는다.
+     */
     const val MAX_ONTOLOGY_BODY_BYTES = 512 * 1024L
 
     /** OAuth 등록, 토큰, 폐기(`POST /oauth/` 아래)의 요청 본문 크기(바이트). */

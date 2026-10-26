@@ -42,6 +42,9 @@ class AgentV1Controller(
     @GetMapping("/ontology")
     fun ontology(): V1Ontology = mapper.ontology()
 
+    @GetMapping("/ontology/yaml")
+    fun ontologyYaml(): V1OntologyYaml = queries.ontologyYaml()
+
     @GetMapping("/nodes")
     fun search(
         @RequestParam(required = false) q: String?,
