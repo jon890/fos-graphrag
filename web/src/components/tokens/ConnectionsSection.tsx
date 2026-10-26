@@ -49,7 +49,8 @@ export function ConnectionsList({ connections, onDisconnect }: ListProps) {
             <TableCell className="hidden lg:table-cell" data-testid="connections-row-scope" data-scope={c.scope}>
               {scopeLabel(c.scope)}
             </TableCell>
-            <TableCell>
+            {/* 좁은 화면에서 「연결 끊기」 가 밀려나지 않게 날짜는 줄을 바꿔 쌓는다 */}
+            <TableCell className="whitespace-normal">
               <div data-testid="connections-row-created">{formatDateTime(c.createdAt)}</div>
               <div className="text-xs text-muted-foreground" data-testid="connections-row-last-used">
                 {c.lastUsedAt ? formatDateTime(c.lastUsedAt) : '아직 쓰지 않음'}
