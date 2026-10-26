@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import type { CurrentUser, ProposalView } from '../../api/types'
+import type { CurrentUser, OntologyPreview, ProposalView } from '../../api/types'
 import { testOntology, withApp } from '../testSupport'
 import { ProposalCard } from './ProposalsTab'
 
@@ -19,13 +19,40 @@ const base: ProposalView = {
   result: null,
   lastError: null,
   requiresEditor: true,
-  refs: { nodes: { s1: { id: 's1', type: 'Security', label: '삼성전자', archived: false } }, trades: {} },
+  requiredRole: 'EDITOR',
+  refs: { nodes: { s1: { id: 's1', type: 'Security', label: '삼성전자', archived: false } }, relationships: {}, trades: {} },
 }
 
 const viewer: CurrentUser = { id: 'u2', email: 'v@example.com', displayName: 'V', role: 'VIEWER', guideDoneAt: null }
 
-const render = (p: ProposalView, user?: CurrentUser, error: string | null = null) =>
-  renderToStaticMarkup(withApp(<ProposalCard proposal={p} error={error} onOpenNode={() => {}} onAccept={async () => {}} onReject={async () => {}} />, testOntology, user))
+const admin: CurrentUser = { ...viewer, id: 'u3', displayName: 'Ad', role: 'ADMIN' }
+
+const render = (p: ProposalView, user?: CurrentUser, error: string | null = null, initialPreview?: OntologyPreview) =>
+  renderToStaticMarkup(
+    withApp(<ProposalCard proposal={p} error={error} initialPreview={initialPreview} onOpenNode={() => {}} onAccept={async () => {}} onReject={async () => {}} />, testOntology, user),
+  )
+
+const ontologyChange: ProposalView = {
+  ...base,
+  id: 'p2',
+  kind: 'ONTOLOGY_CHANGE',
+  payload: { baseVersion: testOntology.version, yaml: 'version: 1\nnodeTypes: {}', note: '이름을 바꿉니다' },
+  requiredRole: 'ADMIN',
+}
+
+const preview = (impacts: OntologyPreview['impacts']): OntologyPreview => ({
+  valid: true,
+  errors: [],
+  added: ['nodeTypes.Memo'],
+  removed: [],
+  changed: [],
+  impacts,
+  codeOwnedIgnored: [],
+  yaml: null,
+  definition: null,
+})
+
+const acceptDisabled = /data-testid="proposal-accept"[^>]*disabled|disabled=""[^>]*data-testid="proposal-accept"/
 
 describe('ProposalCard', () => {
   it('대기 중인 항목 만들기 카드에 내용과 세 단추가 있다', () => {
@@ -67,5 +94,43 @@ describe('ProposalCard', () => {
 
   it('실패 이유가 없으면 카드 오류가 없다', () => {
     expect(render(base)).not.toContain('proposal-card-error')
+  })
+
+  it('편집자가 본 온톨로지 변경 카드에는 관리자 안내가 있고 승인이 꺼져 있다', () => {
+    const html = render(ontologyChange)
+    expect(html).toContain('data-testid="proposal-admin-required"')
+    expect(html).not.toContain('proposal-editor-required')
+    expect(html).toMatch(acceptDisabled)
+    expect(html).toContain('data-testid="proposal-ontology-yaml"')
+    expect(html).not.toContain('proposal-ontology-preview"')
+  })
+
+  it('관리자가 본 카드는 바뀐 점을 보이고 영향이 있으면 확인란을 켜야 승인할 수 있다', () => {
+    const html = render(ontologyChange, admin, null, preview([{ path: 'nodeTypes.Memo.properties.x', kind: 'REMOVED_PROPERTY', count: 2 }]))
+    expect(html).toContain('data-testid="proposal-ontology-preview"')
+    expect(html).toContain('data-testid="ontology-impact"')
+    expect(html).toContain('data-testid="proposal-ontology-confirm"')
+    expect(html).toMatch(acceptDisabled)
+    expect(html).not.toContain('proposal-admin-required')
+  })
+
+  it('영향이 없으면 확인란이 없고 승인할 수 있다', () => {
+    const html = render(ontologyChange, admin, null, preview([]))
+    expect(html).not.toContain('proposal-ontology-confirm')
+    expect(html).not.toMatch(acceptDisabled)
+  })
+
+  it('기준 버전이 다르면 안내를 보이고 승인이 꺼져 있다', () => {
+    const stale = { ...ontologyChange, payload: { ...ontologyChange.payload, baseVersion: testOntology.version - 1 } }
+    const html = render(stale, admin, null, preview([]))
+    expect(html).toContain('data-testid="proposal-ontology-stale"')
+    expect(html).toMatch(acceptDisabled)
+  })
+
+  it('새 종류에는 고쳐서 승인이 없다', () => {
+    const update = { ...base, kind: 'UPDATE_NODE' as const, payload: { nodeId: 's1', expectedRevision: 1, properties: { name: '새 이름' } } }
+    expect(render(update)).not.toContain('proposal-edit-open')
+    expect(render(ontologyChange, admin, null, preview([]))).not.toContain('proposal-edit-open')
+    expect(render(base)).toContain('proposal-edit-open')
   })
 })

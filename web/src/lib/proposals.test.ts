@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { NodeRef, ProposalKind, ProposalView, TradeView } from '../api/types'
 import { testOntology } from '../components/testSupport'
 import { formatDate } from './format'
-import { canAccept, editInitialValues, kindLabel, nodeName, proposalLinkSentences, proposalSummary, tradeLine } from './proposals'
+import { canAccept, editInitialValues, isStaleOntologyChange, kindLabel, nodeName, proposalLinkSentences, proposalSummary, tradeLine, updateNodeParts } from './proposals'
 
 const ref = (id: string, type: string, label: string): NodeRef => ({ id, type, label, archived: false })
 
@@ -42,8 +42,12 @@ function proposal(kind: ProposalKind, payload: Record<string, unknown>, extra: P
     result: null,
     lastError: null,
     requiresEditor: kind === 'CREATE_NODE' || kind === 'CREATE_RELATIONSHIP',
+    requiredRole: kind === 'ONTOLOGY_CHANGE' ? 'ADMIN' : kind === 'STUDY_NOTE' || kind === 'LINK_TRADE_DECISION' ? 'VIEWER' : 'EDITOR',
     refs: {
       nodes: { s1: ref('s1', 'Security', '삼성전자'), d1: ref('d1', 'Decision', 'FLNC 첫 매수'), c1: ref('c1', 'Company', 'Apple'), b1: ref('b1', 'Bottleneck', '전력 병목') },
+      relationships: {
+        r1: { id: 'r1', type: 'HAS_DECISION', from: ref('s1', 'Security', '삼성전자'), to: ref('d1', 'Decision', 'FLNC 첫 매수'), revision: 1, archived: false, createdAt: '2026-10-24T00:00:00Z', createdBy: null },
+      },
       trades: { t1: trade },
     },
     ...extra,
@@ -56,6 +60,39 @@ describe('제안 문장', () => {
     expect(kindLabel('CREATE_RELATIONSHIP')).toBe('관계 잇기')
     expect(kindLabel('LINK_TRADE_DECISION')).toBe('체결과 결정 잇기')
     expect(kindLabel('STUDY_NOTE')).toBe('공부 메모')
+    expect(kindLabel('UPDATE_NODE')).toBe('항목 고치기')
+    expect(kindLabel('ARCHIVE_NODE')).toBe('항목 보관')
+    expect(kindLabel('ARCHIVE_RELATIONSHIP')).toBe('관계 보관')
+    expect(kindLabel('CREATE_CLAIM')).toBe('주장 만들기')
+    expect(kindLabel('ONTOLOGY_CHANGE')).toBe('온톨로지 바꾸기')
+  })
+
+  it('항목 고치기와 보관은 타입 표시 이름과 이름이 든 문장이다', () => {
+    expect(proposalSummary(testOntology, proposal('UPDATE_NODE', { nodeId: 'd1', expectedRevision: 1, properties: { title: '새 이름' } }))).toBe('투자 결정 「FLNC 첫 매수」의 속성을 고칩니다')
+    expect(proposalSummary(testOntology, proposal('ARCHIVE_NODE', { nodeId: 'd1', expectedRevision: 1, reason: '중복' }))).toBe('투자 결정 「FLNC 첫 매수」를 보관합니다')
+  })
+
+  it('고칠 속성 목록에서 null 은 지우는 속성이다', () => {
+    const p = proposal('UPDATE_NODE', { nodeId: 'd1', expectedRevision: 1, properties: { title: '새 이름', reason: null } })
+    expect(updateNodeParts(p)).toEqual([
+      { name: 'title', value: '새 이름' },
+      { name: 'reason', value: null },
+    ])
+  })
+
+  it('관계 보관은 보관할 관계의 문장이다', () => {
+    const p = proposal('ARCHIVE_RELATIONSHIP', { relationshipId: 'r1', reason: '잘못 이음' })
+    expect(proposalSummary(testOntology, p)).toBe('이 관계를 보관합니다: FLNC 첫 매수는 삼성전자에 대한 결정입니다')
+    expect(proposalSummary(testOntology, proposal('ARCHIVE_RELATIONSHIP', { relationshipId: 'zz' }))).toBe('이 관계를 보관합니다: 찾을 수 없는 항목')
+  })
+
+  it('주장 만들기는 문장 틀에 주체와 대상 이름을 넣는다', () => {
+    const p = proposal('CREATE_CLAIM', { predicate: 'SUPPLIES_TO', subjectId: 's1', objectId: 'b1', documentIds: [], description: '', evidenceText: '' })
+    expect(proposalSummary(testOntology, p)).toBe('삼성전자가 전력 병목에 공급한다')
+  })
+
+  it('온톨로지 바꾸기는 기준 버전을 말한다', () => {
+    expect(proposalSummary(testOntology, proposal('ONTOLOGY_CHANGE', { baseVersion: 3, yaml: 'a: 1' }))).toBe('버전 3을 바꾸는 제안입니다')
   })
 
   it('항목 만들기는 받침이 없는 이름 뒤에 를, 있는 이름 뒤에 을 붙인다', () => {
@@ -111,6 +148,20 @@ describe('승인할 수 있는 역할', () => {
     expect(canAccept('VIEWER', create)).toBe(false)
     expect(canAccept('EDITOR', create)).toBe(true)
     expect(canAccept('ADMIN', create)).toBe(true)
+  })
+
+  it('온톨로지 변경은 관리자만 승인한다', () => {
+    const change = proposal('ONTOLOGY_CHANGE', { baseVersion: 3 })
+    expect(canAccept('VIEWER', change)).toBe(false)
+    expect(canAccept('EDITOR', change)).toBe(false)
+    expect(canAccept('ADMIN', change)).toBe(true)
+  })
+
+  it('기준 버전이 지금 버전과 다른 온톨로지 변경만 낡았다고 본다', () => {
+    const change = proposal('ONTOLOGY_CHANGE', { baseVersion: 3 })
+    expect(isStaleOntologyChange(change, 3)).toBe(false)
+    expect(isStaleOntologyChange(change, 4)).toBe(true)
+    expect(isStaleOntologyChange(proposal('CREATE_NODE', { baseVersion: 3 }), 4)).toBe(false)
   })
 
   it('열람자도 자기 이해 표시나 체결 잇기는 승인한다', () => {

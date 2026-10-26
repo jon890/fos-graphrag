@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { ConnectionsSection } from './ConnectionsSection'
+import { InstallGuide } from './InstallGuide'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
@@ -148,95 +149,99 @@ export function TokensTab() {
   return (
     <div className="min-h-full bg-card px-3 py-4 lg:px-6" data-testid="tokens-tab">
       <h1 className="m-0 mb-4 text-xl font-bold">연동</h1>
+      <InstallGuide />
       <ConnectionsSection />
-      <div className="mt-8 mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="m-0 mr-2 text-lg font-bold">연동 토큰</h2>
-        <Button data-testid="tokens-issue-open" disabled={atLimit} onClick={openIssue}>
-          ＋ 토큰 발급
-        </Button>
-        {loading && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
-      </div>
-      <p className="my-2 text-xs text-muted-foreground" data-testid="tokens-guide">
-        Hermes 같은 개인 비서가 가치투자 온톨로지를 조회하고 내 체결을 기록할 때 쓰는 토큰입니다. 「조회만」 토큰은 조회만 하고, 「조회와 기록」 토큰은 내 체결을 저장하고 제안을 올립니다. fos-assistant 의 `financial-workbench` 커넥터 설정에 토큰을 넣으면 연결됩니다.
-      </p>
-      {atLimit && (
-        <p className="my-2 text-xs text-amber-800" data-testid="tokens-limit">
-          {LIMIT_TEXT}
+      <details className="mt-8" data-testid="tokens-advanced">
+        <summary className="cursor-pointer text-lg font-bold">고급: 개인 비서 연동</summary>
+        <div className="mt-3 mb-3 flex flex-wrap items-center gap-2">
+          <h2 className="m-0 mr-2 text-lg font-bold">연동 토큰</h2>
+          <Button data-testid="tokens-issue-open" disabled={atLimit} onClick={openIssue}>
+            ＋ 토큰 발급
+          </Button>
+          {loading && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
+        </div>
+        <p className="my-2 text-xs text-muted-foreground" data-testid="tokens-guide">
+          Hermes 같은 개인 비서가 가치투자 온톨로지를 조회하고 내 체결을 기록할 때 쓰는 토큰입니다. 「조회만」 토큰은 조회만 하고, 「조회와 기록」 토큰은 내 체결을 저장하고 제안을 올립니다. fos-assistant 의 `financial-workbench` 커넥터 설정에 토큰을 넣으면 연결됩니다.
         </p>
-      )}
+        {atLimit && (
+          <p className="my-2 text-xs text-amber-800" data-testid="tokens-limit">
+            {LIMIT_TEXT}
+          </p>
+        )}
 
-      {message && (
-        <Alert
-          role="status"
-          variant={message.kind === 'error' ? 'destructive' : 'default'}
-          className={cn('my-2', message.kind === 'success' && 'border-emerald-300 bg-emerald-50')}
-          data-testid="tokens-message"
-          data-kind={message.kind}
-        >
-          <AlertDescription className={cn(message.kind === 'success' && 'text-emerald-900')}>{message.text}</AlertDescription>
-        </Alert>
-      )}
+        {message && (
+          <Alert
+            role="status"
+            variant={message.kind === 'error' ? 'destructive' : 'default'}
+            className={cn('my-2', message.kind === 'success' && 'border-emerald-300 bg-emerald-50')}
+            data-testid="tokens-message"
+            data-kind={message.kind}
+          >
+            <AlertDescription className={cn(message.kind === 'success' && 'text-emerald-900')}>{message.text}</AlertDescription>
+          </Alert>
+        )}
 
-      {loadError !== null && (
-        <Alert variant="destructive" className="my-2" data-testid="tokens-error">
-          <AlertDescription className="flex flex-wrap items-center gap-2">
-            {loadError}
-            <Button variant="outline" size="sm" data-testid="tokens-retry" onClick={() => void load()}>
-              다시 시도
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
+        {loadError !== null && (
+          <Alert variant="destructive" className="my-2" data-testid="tokens-error">
+            <AlertDescription className="flex flex-wrap items-center gap-2">
+              {loadError}
+              <Button variant="outline" size="sm" data-testid="tokens-retry" onClick={() => void load()}>
+                다시 시도
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
-      {tokens !== null && tokens.length === 0 && (
-        <p className="my-3 text-sm text-muted-foreground" data-testid="tokens-empty">
-          아직 발급한 토큰이 없습니다.
-        </p>
-      )}
+        {tokens !== null && tokens.length === 0 && (
+          <p className="my-3 text-sm text-muted-foreground" data-testid="tokens-empty">
+            아직 발급한 토큰이 없습니다.
+          </p>
+        )}
 
-      {tokens !== null && tokens.length > 0 && (
-        <Table data-testid="tokens-table">
-          <TableHeader>
-            <TableRow className="bg-slate-50 hover:bg-slate-50">
-              <TableHead>이름</TableHead>
-              <TableHead className="hidden lg:table-cell">범위</TableHead>
-              <TableHead>만든 때 / 마지막 사용</TableHead>
-              <TableHead>끝 네 자리</TableHead>
-              <TableHead>관리</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tokens.map((t) => (
-              <TableRow key={t.id} data-testid="tokens-row" data-id={t.id} data-name={t.name}>
-                <TableCell className="break-all">
-                  <div data-testid="tokens-row-name">{t.name}</div>
-                  {/* 좁은 화면에서는 범위 칸이 없고 이름 아래 작은 글자로 보인다 */}
-                  <div className="text-xs text-muted-foreground lg:hidden" aria-hidden="true">
-                    {scopeLabel(t.scope)}
-                  </div>
-                </TableCell>
-                <TableCell className="hidden lg:table-cell" data-testid="tokens-row-scope" data-scope={t.scope}>
-                  {scopeLabel(t.scope)}
-                </TableCell>
-                <TableCell>
-                  <div data-testid="tokens-row-created">{formatDateTime(t.createdAt)}</div>
-                  <div className="text-xs text-muted-foreground" data-testid="tokens-row-last-used">
-                    {t.lastUsedAt ? formatDateTime(t.lastUsedAt) : '아직 쓰지 않음'}
-                  </div>
-                </TableCell>
-                <TableCell className="font-mono" data-testid="tokens-row-last4">
-                  {maskedLast4(t.last4)}
-                </TableCell>
-                <TableCell>
-                  <Button variant="destructive" size="sm" data-testid="tokens-row-revoke" onClick={() => setRevokeTarget(t)}>
-                    폐기
-                  </Button>
-                </TableCell>
+        {tokens !== null && tokens.length > 0 && (
+          <Table data-testid="tokens-table">
+            <TableHeader>
+              <TableRow className="bg-slate-50 hover:bg-slate-50">
+                <TableHead>이름</TableHead>
+                <TableHead className="hidden lg:table-cell">범위</TableHead>
+                <TableHead>만든 때 / 마지막 사용</TableHead>
+                <TableHead>끝 네 자리</TableHead>
+                <TableHead>관리</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
+            </TableHeader>
+            <TableBody>
+              {tokens.map((t) => (
+                <TableRow key={t.id} data-testid="tokens-row" data-id={t.id} data-name={t.name}>
+                  <TableCell className="break-all">
+                    <div data-testid="tokens-row-name">{t.name}</div>
+                    {/* 좁은 화면에서는 범위 칸이 없고 이름 아래 작은 글자로 보인다 */}
+                    <div className="text-xs text-muted-foreground lg:hidden" aria-hidden="true">
+                      {scopeLabel(t.scope)}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell" data-testid="tokens-row-scope" data-scope={t.scope}>
+                    {scopeLabel(t.scope)}
+                  </TableCell>
+                  <TableCell>
+                    <div data-testid="tokens-row-created">{formatDateTime(t.createdAt)}</div>
+                    <div className="text-xs text-muted-foreground" data-testid="tokens-row-last-used">
+                      {t.lastUsedAt ? formatDateTime(t.lastUsedAt) : '아직 쓰지 않음'}
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-mono" data-testid="tokens-row-last4">
+                    {maskedLast4(t.last4)}
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="destructive" size="sm" data-testid="tokens-row-revoke" onClick={() => setRevokeTarget(t)}>
+                      폐기
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </details>
 
       <Dialog open={issueOpen} onOpenChange={(open) => !open && closeIssue()}>
         <DialogContent data-testid="tokens-issue-dialog" onCloseAutoFocus={clearIssue}>

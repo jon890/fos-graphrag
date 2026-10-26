@@ -370,7 +370,7 @@ export default function App() {
           {activeTab === 'ontology' && <OntologyTab draft={ontologyDraft} onDraftChange={setOntologyDraft} reloadOntology={reloadOntology} />}
           {activeTab === 'users' && user.role === 'ADMIN' && <UsersTab onOpenHistory={openHistory} />}
           {activeTab === 'tokens' && <TokensTab />}
-          {activeTab === 'proposals' && <ProposalsTab onOpenNode={focusNode} />}
+          {activeTab === 'proposals' && <ProposalsTab onOpenNode={focusNode} reloadOntology={reloadOntology} />}
           {activeTab === 'trades' && <TradesTab onOpenNode={focusNode} />}
         </ErrorBoundary>
       )}

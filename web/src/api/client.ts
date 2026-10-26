@@ -222,8 +222,8 @@ export const api = {
     list: (status: ProposalStatus, page: number) =>
       request<Page<ProposalView>>('GET', `/api/me/proposals${buildQuery({ status, page, size: 20 })}`),
     summary: () => request<ProposalSummary>('GET', '/api/me/proposals/summary'),
-    accept: (id: string, payload?: Record<string, unknown>) =>
-      request<ProposalView>('POST', `/api/me/proposals/${enc(id)}/accept`, payload === undefined ? undefined : { payload }),
+    accept: (id: string, body?: { payload?: Record<string, unknown>; confirm?: boolean }) =>
+      request<ProposalView>('POST', `/api/me/proposals/${enc(id)}/accept`, body && (body.payload !== undefined || body.confirm !== undefined) ? body : undefined),
     reject: (id: string, reason?: string) => request<ProposalView>('POST', `/api/me/proposals/${enc(id)}/reject`, reason ? { reason } : undefined),
   },
   trades: {
