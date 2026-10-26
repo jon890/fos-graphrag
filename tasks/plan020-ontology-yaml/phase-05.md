@@ -59,7 +59,7 @@
 
 ### 5. e2e `web/e2e/workbench.spec.ts`, `web/e2e/mobile.spec.ts`, `web/e2e/support.ts`
 
-- phase 04 가 토큰 발급을 접힌 `tokens-advanced` 안으로 옮겼다. `web/e2e/support.ts` 의 `issueToken` 은 시그니처를 그대로 두고 본문에서 먼저 `tokens-advanced` 를 펼친다(`open` 이 없을 때만 `summary` 를 누른다). `tokens-issue-open` 을 바로 누르는 다른 호출부(`git grep -n "tokens-issue-open" web/e2e` 로 찾는다. `mobile.spec.ts` 두 곳, `workbench.spec.ts` 세 곳이다)도 먼저 펼치게 고친다.
+- phase 04 가 토큰 발급을 접힌 `tokens-advanced` 안으로 옮겼다. `web/e2e/support.ts` 의 `issueToken` 은 시그니처를 그대로 두고 본문에서 먼저 `tokens-advanced` 를 펼친다(`open` 이 없을 때만 `summary` 를 누른다). `tokens-issue-open` 을 바로 누르는 다른 호출부(`git grep -n "tokens-issue-open" web/e2e` 로 찾는다.)도 먼저 펼치게 고친다.
 - 고친 초안에서 `ontology-draft-discard` 를 누르는 기존 테스트(`workbench.spec.ts` 의 9c)는 이제 확인 창이 먼저 열리므로 `ontology-discard-confirm-submit` 을 누르게 고친다.
 - 온톨로지를 저장하거나 제안을 승인하는 새 테스트는 기존 9b 처럼 `finally` 에서 시작 버전으로 되돌린다(`POST /api/ontology/versions/{N}/restore`).
 
