@@ -983,7 +983,7 @@ flowchart LR
 ## 온톨로지 편집
 
 온톨로지 상세 화면(더보기의 「온톨로지 상세」)은 모든 역할에게 지금 버전을 보여 준다. 머리에 버전 번호와 저장한 사람, 시각이 있다.
-ADMIN 에게만 「YAML 로 편집」, 「버전 기록」, 「YAML 내려받기」 단추가 보인다. 편집기는 YAML 편집기 하나다([ADR-016](adr/016-ontology-yaml-only-editor.md)). 버전 저장의 결정과 근거는 [ADR-008](adr/008-ontology-versions-in-db.md), 저장 규칙은 [데이터 스키마](data-schema.md) 의 「온톨로지 버전」 이다.
+ADMIN 에게만 「YAML 로 편집」, 「버전 기록」, 「YAML 내려받기」 단추가 보인다. YAML 편집기(`view=yaml`)에서는 이 단추 줄을 숨기고 편집기의 툴바가 같은 일을 맡는다. 편집기는 YAML 편집기 하나다([ADR-016](adr/016-ontology-yaml-only-editor.md)). 버전 저장의 결정과 근거는 [ADR-008](adr/008-ontology-versions-in-db.md), 저장 규칙은 [데이터 스키마](data-schema.md) 의 「온톨로지 버전」 이다.
 에이전트가 대화로 고친 정의는 「제안」 으로 올라오고 ADMIN 이 그 화면에서 승인한다(「제안」, [ADR-017](adr/017-agent-ontology-and-instance-proposals.md)).
 
 ```mermaid

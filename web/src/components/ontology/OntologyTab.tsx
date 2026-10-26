@@ -55,7 +55,8 @@ export function OntologyTab({ draft, onDraftChange, reloadOntology }: Props) {
       <p className="mb-2 mt-0.5 text-xs text-muted-foreground">
         {userName(ontology.versionCreatedBy)} · {formatDateTime(ontology.versionCreatedAt)}
       </p>
-      {isAdmin && (
+      {/* YAML 편집기에서는 같은 단추가 툴바에 있다 */}
+      {isAdmin && query.view !== 'yaml' && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Button type="button" data-testid="ontology-edit-yaml" onClick={() => open({ view: 'yaml' })}>
             YAML 로 편집
