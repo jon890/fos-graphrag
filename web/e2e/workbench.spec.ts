@@ -162,7 +162,7 @@ async function pick(page: Page, prefix: string, label: string): Promise<void> {
 
 test.describe.configure({ mode: 'serial' })
 
-test.describe('금융 온톨로지 워크벤치: 역할별 협업', () => {
+test.describe('가치투자 온톨로지: 역할별 협업', () => {
   const contexts: BrowserContext[] = []
   let pageAdmin: Page
   let pageA: Page

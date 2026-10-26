@@ -24,7 +24,7 @@ export const BROWSE_STEPS: GuideStep[] = [
     target: [],
     pane: null,
     route: 'workspace',
-    title: '워크벤치 둘러보기',
+    title: '가치투자 온톨로지 둘러보기',
     body: '투자 판단을 근거와 함께 쌓는 온톨로지입니다. 화면을 차례로 둘러봅니다.',
   },
   {
@@ -33,7 +33,7 @@ export const BROWSE_STEPS: GuideStep[] = [
     pane: null,
     route: 'map',
     title: '개념 지도',
-    body: '워크벤치가 담는 지식의 종류와 서로의 관계입니다. 상자를 누르면 그 종류의 항목을 봅니다.',
+    body: '이 온톨로지가 담는 지식의 종류와 서로의 관계입니다. 상자를 누르면 그 종류의 항목을 봅니다.',
   },
   { id: 'search', target: ['search-input'], pane: 'search', route: 'workspace', title: '검색', body: '기업, 인물, 개념의 이름으로 찾습니다.' },
   {
@@ -94,7 +94,7 @@ export function practiceSteps(labels: GuideLabels, plan: PracticePlan): GuideSte
       target: [],
       pane: null,
       route: 'workspace',
-      title: '워크벤치 따라하기',
+      title: '가치투자 온톨로지 따라하기',
       body: '투자 판단을 근거와 함께 쌓는 온톨로지입니다. 연습 항목 세 개를 직접 만들어 봅니다. 끝나면 연습 항목은 보관되어 검색에 나오지 않습니다.',
     },
     // 기업과 근거 문서는 어느 화면에서나 「＋ 추가」 로 만든다. 창이 열려 있으면 창의 만들기 단추를 가리킨다.

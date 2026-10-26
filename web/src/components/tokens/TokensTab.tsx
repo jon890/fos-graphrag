@@ -156,7 +156,7 @@ export function TokensTab() {
         {loading && <span className="text-xs text-muted-foreground">불러오는 중…</span>}
       </div>
       <p className="my-2 text-xs text-muted-foreground" data-testid="tokens-guide">
-        Hermes 같은 개인 비서가 이 워크벤치를 조회하고 내 체결을 기록할 때 쓰는 토큰입니다. 「조회만」 토큰은 조회만 하고, 「조회와 기록」 토큰은 내 체결을 저장하고 제안을 올립니다. fos-assistant 의 워크벤치 커넥터 설정에 토큰을 넣으면 연결됩니다.
+        Hermes 같은 개인 비서가 가치투자 온톨로지를 조회하고 내 체결을 기록할 때 쓰는 토큰입니다. 「조회만」 토큰은 조회만 하고, 「조회와 기록」 토큰은 내 체결을 저장하고 제안을 올립니다. fos-assistant 의 `financial-workbench` 커넥터 설정에 토큰을 넣으면 연결됩니다.
       </p>
       {atLimit && (
         <p className="my-2 text-xs text-amber-800" data-testid="tokens-limit">

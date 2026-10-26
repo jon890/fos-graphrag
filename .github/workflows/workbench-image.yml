@@ -1,4 +1,4 @@
-# 금융 온톨로지 워크벤치 컨테이너 이미지를 GHCR 에 올린다.
+# 가치투자 온톨로지 컨테이너 이미지를 GHCR 에 올린다.
 # GitHub-hosted runner 에서 Buildx 로 linux/amd64 이미지를 빌드한다.
 # 공개 저장소이므로 홈서버 runner 를 쓰지 않는다(사용자 결정: 2026-10-24).
 # 이미지 이름, 태그(latest, sha-<7자리>), OCI label 과 provenance 설정을 아래에 명시한다.

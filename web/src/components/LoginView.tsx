@@ -15,7 +15,7 @@ export function LoginView({ denied, notice }: Props) {
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-[360px]" data-testid="login-form">
         <CardHeader>
-          <h1 className="text-lg font-bold">금융 온톨로지 워크벤치</h1>
+          <h1 className="text-lg font-bold">가치투자 온톨로지</h1>
           <CardDescription>관리자가 허용한 Google 계정으로만 로그인할 수 있습니다.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">

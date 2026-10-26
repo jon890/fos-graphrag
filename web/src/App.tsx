@@ -257,7 +257,7 @@ export default function App() {
   const header = (
     // 넓은 화면은 한 줄, 좁은 화면은 두 줄(제목과 사용자 상자 / 탭 셋과 더보기, 「＋ 추가」)이다
     <header className="flex shrink-0 flex-wrap items-center gap-x-2 bg-slate-900 px-2 text-slate-200 lg:h-12 lg:flex-nowrap lg:gap-x-6 lg:px-4">
-      <div className="min-w-0 flex-1 truncate py-2 font-bold lg:flex-none lg:py-0">금융 온톨로지 워크벤치</div>
+      <div className="min-w-0 flex-1 truncate py-2 font-bold lg:flex-none lg:py-0">가치투자 온톨로지</div>
       <nav className="order-3 flex min-w-0 basis-full flex-nowrap items-center lg:order-none lg:flex-1 lg:basis-auto">
         <TopTabs activeTab={activeTab} onOpen={openTab} />
         {/* 「＋ 추가」 는 오른쪽 끝, 「더보기」 왼쪽이다. 온톨로지를 받기 전에는 그리지 않는다 */}
