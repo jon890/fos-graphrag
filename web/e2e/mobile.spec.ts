@@ -175,13 +175,24 @@ test('휴대폰 폭에서 노드를 만들고 그래프에서 골라 상세를 �
   await expect(page).toHaveURL(new RegExp('/workspace\\?node=' + companyId))
 })
 
-test('휴대폰 폭에서 온톨로지 폼 편집기가 가로 스크롤 없이 열린다', async ({ page }) => {
+test('휴대폰 폭에서 온톨로지 YAML 편집기가 가로 스크롤 없이 열리고 결과 칸이 편집칸 아래에 놓인다', async ({ page }) => {
   await loginAs(page, admin)
   await openScreen(page, 'ontology')
-  await page.getByTestId('ontology-edit-form').click()
-  await expect(page.getByTestId('ontology-form')).toBeVisible()
+  await page.getByTestId('ontology-edit-yaml').click()
+  await expect(page.getByTestId('ontology-yaml-editor')).toBeVisible()
   await expectNoHorizontalOverflow(page)
-  await shot(page, 'm-ontology-form')
+  await page.getByTestId('ontology-preview').click()
+  await expect(page.getByTestId('ontology-preview-side')).toHaveAttribute('data-layout', 'below')
+  await expectNoHorizontalOverflow(page)
+  await shot(page, 'm-ontology-yaml')
+})
+
+test('휴대폰 폭에서 연동 화면의 설치 안내가 가로 스크롤 없이 보인다', async ({ page }) => {
+  await loginAs(page, admin)
+  await openScreen(page, 'tokens')
+  await expect(page.getByTestId('integrations-install')).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await shot(page, 'm-integrations')
 })
 
 test('휴대폰 폭에서 사용법 따라하기가 아래쪽 카드로 열리고 만들기 창을 가리지 않는다', async ({ page }) => {
@@ -291,7 +302,9 @@ test('휴대폰 폭에서 연동 토큰을 발급하고 폐기해도 가로 스�
   // 중간에 실패해도 이 테스트가 발급한 토큰이 남지 않게, 시작 전 목록에 없던 토큰을 끝에 폐기한다.
   const kept = await tokenIds(page)
   try {
-    // 기본 이름 그대로 발급한다.
+    // 기본 이름 그대로 발급한다. 발급 단추는 접힌 고급 칸 안에 있다.
+    const advanced = page.getByTestId('tokens-advanced')
+    if (!(await advanced.evaluate((el) => (el as HTMLDetailsElement).open))) await advanced.locator('summary').click()
     await page.getByTestId('tokens-issue-open').click()
     await page.getByTestId('tokens-issue-submit').click()
     await expect(page.getByTestId('tokens-issued-value')).toBeVisible()

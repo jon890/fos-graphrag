@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 REPO = Path(__file__).resolve().parents[2]
-TOOL_NAME = re.compile(r"`((?:get|search|trace|lookup|list|record|submit)_[a-z_]+)`")
+TOOL_NAME = re.compile(r"`((?:get|search|trace|lookup|list|record|submit|propose)_[a-z_]+)`")
 
 
 def load_json(path, errors):
