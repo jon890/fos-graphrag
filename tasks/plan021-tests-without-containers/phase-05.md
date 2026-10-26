@@ -55,7 +55,7 @@ phase 04 와 같은 규칙이다. 토큰으로 `/api/v1` 부르기와 폐기 뒤
 
 ### 5. 문서
 
-- `README.md`: 「구성」 표의 `compose.e2e.yml` 줄을 지운다. 「검증」 의 Compose 브라우저 블록을 지우고 phase 03 이 더한 `npm run test:e2e` 줄만 남긴다.
+- `README.md`: 「구성」 표의 `compose*.yml` 줄에서 브라우저 테스트(`compose.e2e.yml`)를 뺀다. 「검증」 의 Compose 브라우저 블록을 지우고 phase 03 이 더한 `npm run test:e2e` 줄만 남긴다.
 - `docs/deployment.md`: 「브라우저 테스트」 절을 「화면 테스트는 Docker 없이 가짜 API 로 돈다」 와 명령 한 블록으로 바꾸고, 「검증」 의 Compose 줄을 지운다.
 - `docs/code-architecture.md`: 「전체 배치」 의 `compose.e2e.yml` 줄과 `web/e2e/` 설명을 「Playwright 화면 테스트와 가짜 API, 응답 스냅샷(`fixtures/`)」 으로 고친다. 「설정」 표의 `e2e` 줄 설명을 「쓰지 않는다. 정리는 다음 작업」 으로 고치고 `mockoidc` 줄의 용도에서 e2e 를 뺀다. 「결정」 의 「브라우저 테스트는 `prod` 를 켜지 않고 `e2e` 프로필 ...」 두 줄을 지운다.
 - `docs/prd.md` 의 그 문장을 「서버 자동 테스트는 가짜 OIDC 공급자를, 화면 테스트는 가짜 API 를 쓴다」 로 고친다.
