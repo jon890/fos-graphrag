@@ -129,6 +129,8 @@ class SecurityConfig {
                     .requestMatchers("/api/ontology/versions", "/api/ontology/versions/**", "/api/ontology/export", "/api/ontology/preview").hasRole("ADMIN")
                     // 내 이해 표시는 열람자도 쓴다(docs/adr/011-learning-marks-and-trace.md)
                     .requestMatchers("/api/me/**").hasRole("VIEWER")
+                    // 앱 연결 동의는 모든 역할이 한다. 아래 /api/** 의 EDITOR 규칙보다 앞에 둔다
+                    .requestMatchers("/api/oauth/**").hasRole("VIEWER")
                     .requestMatchers(HttpMethod.GET, "/api/**").hasRole("VIEWER")
                     .requestMatchers("/api/auth/logout").authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/auth/me/guide-done").authenticated()

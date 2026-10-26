@@ -46,6 +46,21 @@ class ApiClient(private val baseUrl: String, private val mapper: JsonMapper) {
     fun bearer(method: String, path: String, token: String?, body: Any? = null): Response =
         sendWith(cookieless, method, path, body, withCsrf = false, headers = token?.let { mapOf("Authorization" to "Bearer $it") }.orEmpty())
 
+    /**
+     * 쿠키 없이 `application/x-www-form-urlencoded` 본문으로 `POST` 한다. OAuth 토큰과 폐기를 부르는 앱과 같다.
+     * 값이 null 인 필드는 본문에서 뺀다.
+     */
+    fun form(path: String, fields: Map<String, String?>, headers: Map<String, String> = emptyMap()): Response {
+        val body = fields.entries.filter { it.value != null }.joinToString("&") { "${enc(it.key)}=${enc(it.value!!)}" }
+        val builder = HttpRequest.newBuilder(URI.create(baseUrl + path)).timeout(Duration.ofSeconds(30))
+            .header("Content-Type", "application/x-www-form-urlencoded").header("Accept", "application/json")
+        headers.forEach { (k, v) -> builder.header(k, v) }
+        val response = cookieless.send(builder.POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString())
+        val text = response.body()
+        val json = runCatching { if (text.isNullOrBlank()) null else mapper.readTree(text) }.getOrNull() ?: mapper.createObjectNode()
+        return Response(response.statusCode(), json, response.headers().map())
+    }
+
     private fun sendWith(client: HttpClient, method: String, path: String, body: Any?, withCsrf: Boolean, headers: Map<String, String>): Response {
         val builder = HttpRequest.newBuilder(URI.create(baseUrl + path)).timeout(Duration.ofSeconds(30))
             .header("Accept", "application/json")

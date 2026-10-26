@@ -31,7 +31,9 @@ data class OAuthErrorBody(
  * 본문을 읽기 전에 난 오류(누락 파라미터, 읽을 수 없는 본문, Content-Type, 타입 불일치)도 여기서 바꾼다.
  * 받은 값(코드, 토큰, 주소)은 `error_description` 과 로그에 담지 않는다.
  */
-@RestControllerAdvice(assignableTypes = [OAuthMetadataController::class, OAuthRegisterController::class])
+@RestControllerAdvice(
+    assignableTypes = [OAuthMetadataController::class, OAuthRegisterController::class, OAuthAuthorizeController::class, OAuthTokenController::class],
+)
 @Order(Ordered.HIGHEST_PRECEDENCE)
 class OAuthExceptionHandler {
 

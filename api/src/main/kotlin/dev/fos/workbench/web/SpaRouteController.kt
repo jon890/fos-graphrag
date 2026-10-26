@@ -7,6 +7,6 @@ import org.springframework.web.bind.annotation.GetMapping
 @Controller
 class SpaRouteController {
 
-    @GetMapping("/map", "/workspace", "/list", "/review", "/changes", "/ontology", "/users", "/tokens", "/proposals", "/trades", "/study", "/trace")
+    @GetMapping("/map", "/workspace", "/list", "/review", "/changes", "/ontology", "/users", "/tokens", "/proposals", "/trades", "/study", "/trace", "/connect")
     fun route(): String = "forward:/index.html"
 }
