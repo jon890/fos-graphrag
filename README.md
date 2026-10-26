@@ -1,29 +1,149 @@
 # 가치투자 온톨로지
 
-친구와 함께 만드는 가치투자 온톨로지를 관리하는 공개 저장소다. 앱 코드, 온톨로지 정의와 초기 데이터, 문서를 모두 이 저장소에서 관리한다.
-저장소는 공개라서 운영 주소, 홈서버 경로, 계정 같은 운영 값은 적지 않는다. 공개 주소는 예외로 `scripts/deploy-prod.sh` 와 `plugin/.mcp.json` 에 둔다. 저장소를 앱 하나로 줄인 까닭은 [ADR-014](docs/adr/014-single-app-repository.md) 다.
+투자 논리와 근거를 지식그래프에 쌓고, 사람과 AI 가 함께 읽고 고치는 도구예요.
 
-두 사람이 각자의 투자 논리(세상의 변화, 병목, 산업, 기업, 시나리오 밸류에이션, 투자 결정)와 근거를 Neo4j 에 저장하고 웹에서 함께 탐색, 추가, 수정, 검토하는 도구다.
-근거가 있는 지식그래프를 사람이 관리하는 첫 마일스톤이다. GraphRAG 검색이나 자동매매는 아직 없다.
+- 웹 앱과 Claude Code·Codex 플러그인으로 써요.
+- 두 사람이 함께 쓰고 있어요.
+- 최종 목표는 토스증권과 이어서 실제 매매까지 가는 거예요.
 
-## 구성
+처음 오셨다면 아래 순서로 읽으면 돼요.
+
+1. [무엇을 만드나요](#무엇을-만드나요)
+2. [왜 만드나요](#왜-만드나요)
+3. [최종 목표](#최종-목표)
+4. [바로 써 보기](#바로-써-보기)
+5. [개발자용 안내](#개발자용-안내)
+
+<br>
+
+## 무엇을 만드나요
+
+투자 논리를 하나의 흐름으로 이어 저장해요.
+
+> 세상의 변화 → 병목 → 산업 → 기업 → 시나리오 밸류에이션 → 투자 결정
+
+여기에 두 가지 층이 있어요.
+
+| 층 | 뜻 | 예시 |
+| --- | --- | --- |
+| 온톨로지 | 무엇을 어떻게 적을지 정한 틀 | 「기업」 타입, 「병목을 푼다」 관계 |
+| 인스턴스 | 그 틀 위에 쌓인 실제 데이터 | 「A 기업이 전력 병목을 푼다」 와 그 근거 |
+
+지금 할 수 있는 일이에요.
+
+- **둘러보기**: 개념 지도로 온톨로지를 보고, 항목을 찾아요.
+- **근거 따라가기**: 투자 결정이 기댄 근거를 세상의 변화까지 거슬러 올라가요.
+- **공부**: 잘 모르는 개념을 「잘 모르겠어요」 로 표시해 모아 봐요.
+- **AI 와 함께 쓰기**: Claude Code 나 Codex 에게 말로 찾고, 데이터를 더해요.
+
+AI 가 올린 내용은 바로 반영되지 않아요.
+**제안**으로 올라오고, 사람이 웹에서 승인해야 반영돼요.
+
+<br>
+
+## 왜 만드나요
+
+투자 판단은 대개 머릿속이나 흩어진 메모에 남아요.
+시간이 지나면 이런 질문에 답하기 어려워요.
+
+- 이 종목을 왜 샀지?
+- 그때 믿었던 근거가 아직 유효한가?
+- 친구는 같은 종목을 어떤 논리로 보고 있지?
+
+그래서 세 가지를 하려고 해요.
+
+1. **같은 틀로 적어요.**
+   온톨로지가 정한 타입과 관계로 적으면, 두 사람의 논리를 같은 구조에서 비교할 수 있어요.
+2. **근거를 끝까지 이어요.**
+   투자 결정에서 근거, 세상의 변화까지 따라갈 수 있어야 판단을 다시 점검할 수 있어요.
+3. **AI 가 같은 구조를 읽고 쓰게 해요.**
+   입력은 AI 가 돕고, 판단과 승인은 사람이 해요.
+
+<br>
+
+## 최종 목표
+
+토스증권 계좌와 가치투자 온톨로지를 이어서, **근거가 있는 투자 결정이 실제 매매까지 닿게** 하는 거예요.
+
+- 「왜 이 종목을 이만큼 사는가」 가 그래프에 남아요.
+- 체결 결과가 다시 그 결정에 붙어요.
+- 나중에 판단이 맞았는지 되돌아볼 수 있어요.
+
+한 번에 가지 않고 단계를 밟고 있어요.
+
+| 단계 | 내용 | 상태 |
+| --- | --- | --- |
+| 1 | 웹에서 투자 논리와 근거를 쌓고 함께 검토 | ✅ 운영 중 |
+| 2 | Claude Code·Codex 로 조회하고, 온톨로지와 데이터를 고치기 | 🚧 진행 중 |
+| 3 | 개인 비서가 토스증권 체결을 기록하고 해석을 제안 | ⏸ 기능만 있음 |
+| 4 | 증권사 연동과 실제 매매 | 🎯 다음 목표 |
+
+자세한 요구사항은 [제품 요구사항](docs/prd.md)에 있어요.
+
+<br>
+
+## 바로 써 보기
+
+로그인은 Google 계정으로 해요.
+관리자가 웹의 「더보기 → 사용자」 에서 Gmail 을 먼저 더해 줘야 해요.
+
+### Claude Code
+
+1. 아래 두 줄을 차례로 입력해요.
+
+   ```
+   /plugin marketplace add jon890/fos-valuation-ontology
+   /plugin install valuation-ontology@fos-valuation-ontology
+   ```
+
+2. 「가치투자 온톨로지 연결해 줘」 라고 말해요.
+3. 브라우저가 열리면 Google 로 로그인하고 「연결 허용」 을 눌러요.
+   데이터를 더하거나 고치려면 「조회와 기록」 을 골라요.
+
+### Codex
+
+1. 터미널에서 아래 두 줄을 차례로 실행해요.
+
+   ```bash
+   codex plugin marketplace add jon890/fos-valuation-ontology
+   codex plugin add valuation-ontology@fos-valuation-ontology
+   ```
+
+2. Codex 에서 「가치투자 온톨로지 연결해 줘」 라고 말해요.
+3. 브라우저가 열리지 않으면 `codex mcp login valuation-ontology` 를 실행해요.
+
+### 이렇게 말해 보세요
+
+- 「안전마진이 뭐야」
+- 「FLNC 투자 근거 보여줘」
+- 「내 공부 목록 보여줘」
+
+막혔을 때와 연결을 끊는 방법은 [플러그인 안내](plugin/README.md)에 있어요.
+
+<br>
+
+## 개발자용 안내
+
+### 저장소 구성
 
 | 경로 | 내용 |
 | --- | --- |
-| `ontology/financial-ontology.yaml` | 온톨로지의 첫 버전과 서버 코드가 소유하는 부분(검토 상태, 이력 이름, 주장 관계, Claim 타입). 그 뒤의 버전은 DB 에 쌓이고 ADMIN 이 웹에서 고친다 |
-| `ontology/seeds/` | 시작할 때 한 번 넣는 초기 데이터. key 마다 한 번만 적용한다 |
-| `api/` | Kotlin, Spring Boot 4.1, Neo4jClient. Google 로그인과 역할, 검증, 변경 이력, 조회 제한, 연동 토큰, 에이전트 API(조회, 체결 기록, 제안) |
-| `plugin/` | Claude Code·Codex 플러그인. 원격 MCP 연결 설정(`.mcp.json`)과 비개발자용 스킬 |
-| `.claude-plugin/marketplace.json` | Claude Code 와 Codex 가 읽는 마켓플레이스 목록. 플러그인은 `plugin/` 하나다 |
-| `web/` | React, TypeScript, Vite, Cytoscape.js |
-| `compose.yml` | 운영 Compose. Neo4j 포트를 호스트에 열지 않는다 |
-| `compose.dev.yml` | 개발용 Neo4j(`127.0.0.1:7476`, `127.0.0.1:7689`)와 가짜 OIDC 공급자(`127.0.0.1:8090`) |
-| `compose.e2e.yml` | 브라우저 테스트용 override. 가짜 OIDC 공급자를 더한다 |
-| `scripts/` | 백업, 복원, Compose 설정 검사 |
+| `api/` | 서버. Kotlin, Spring Boot 4.1, Neo4j |
+| `web/` | 웹 앱. React, TypeScript, Vite, Cytoscape.js |
+| `plugin/` | Claude Code·Codex 플러그인과 스킬 |
+| `ontology/` | 온톨로지 첫 버전(`financial-ontology.yaml`)과 초기 데이터(`seeds/`) |
 | `docs/` | 요구사항, 흐름, API 계약, 데이터 스키마, 배포, ADR |
-| `.github/workflows/` | GHCR 이미지를 올리는 workflow |
+| `scripts/` | 배포, 백업, 복원, 설정 검사 |
+| `compose*.yml` | 운영(`compose.yml`), 개발(`compose.dev.yml`), 브라우저 테스트(`compose.e2e.yml`) |
+| `.github/workflows/` | GHCR 이미지 빌드 |
 
-## 실행
+온톨로지는 첫 버전만 파일에 있어요.
+그 뒤의 버전은 DB 에 쌓이고 웹에서 고쳐요.
+
+공개 저장소라서 운영 주소, 홈서버 경로, 계정은 적지 않아요.
+공개 주소만 `scripts/deploy-prod.sh` 와 `plugin/.mcp.json` 에 있어요.
+
+### 직접 띄우기
 
 ```bash
 # cwd: 저장소 루트
@@ -31,39 +151,50 @@ cp .env.example .env    # NEO4J_PASSWORD, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 docker compose up -d --build --wait
 ```
 
-로그인은 Google 계정으로만 한다. 첫 관리자가 오른쪽 위 「더보기」 메뉴의 「사용자」 에서 다른 사람의 Gmail 과 역할(VIEWER, EDITOR, ADMIN)을 추가한다.
-처음 열면 온톨로지의 타입과 관계를 그린 개념 지도가 보인다. 항목은 어느 화면에서나 오른쪽 위 「＋ 추가」 로 만든다.
-항목 상세의 「근거 따라가기」 는 그 항목이 기댄 근거를 변화까지 거슬러 보이고, 「공부」 탭은 내가 「잘 모르겠어요」 로 표시한 항목을 모은다.
-개인 비서 Hermes 가 이 앱을 조회하게 하려면 「더보기」 의 「연동」 에서 토큰을 발급해 커넥터에 넣는다. 에이전트는 그 토큰으로 `/api/v1` 을 부른다. 「조회와 기록」 으로 발급한 토큰이면 Hermes 가 토스증권 체결을 「내 체결」 에 넣고, 투자 결정 만들기 같은 해석은 「더보기」 의 「제안」 에 올려 내가 승인한다. 체결은 나만 본다. 계약은 [API 계약](docs/api-contract.md) 의 「에이전트 API」 절이다.
-Claude Code 나 Codex 로 쓰려면 플러그인을 설치한다. Claude Code 는 `/plugin marketplace add jon890/fos-valuation-ontology` 와 `/plugin install valuation-ontology@fos-valuation-ontology` 다. 로그인과 Codex 설치는 [플러그인 안내](plugin/README.md) 를 본다.
-Google OAuth client 만들기, 공개 HTTPS 배포, 백업과 복원, 개발 환경 실행은 [배포 문서](docs/deployment.md)에 있다.
+- `WORKBENCH_BOOTSTRAP_ADMIN_EMAIL` 의 계정이 첫 관리자가 돼요.
+- 역할은 VIEWER, EDITOR, ADMIN 셋이에요.
+- Google OAuth client 만들기, HTTPS 배포, 백업과 복원은 [배포 문서](docs/deployment.md)에 있어요.
 
-## 검증
+### 검증
 
 ```bash
 # cwd: 저장소 루트
-bash scripts/tests/test_scripts.sh          # 스크립트 문법, 포트, cap_drop, digest 고정 규칙
+bash scripts/tests/test_scripts.sh          # 스크립트 문법, 포트, cap_drop, digest 고정
 
 # cwd: api
-./gradlew test                               # Testcontainers 로 Neo4j 와 가짜 OIDC 공급자를 띄운다
+./gradlew test                               # Testcontainers 로 Neo4j 와 가짜 OIDC 를 띄워요
 
 # cwd: web
 npm ci && npm run typecheck && npm test && npm run build
+```
 
-# 브라우저 흐름. 운영 Compose 에 가짜 OIDC override 를 겹쳐 띄운 뒤 실행한다
+브라우저 테스트는 운영 Compose 에 가짜 OIDC 를 겹쳐 띄운 뒤 돌려요.
+
+```bash
 COMPOSE_FILE=compose.yml:compose.e2e.yml docker compose up -d --build --wait   # cwd: 저장소 루트
 WORKBENCH_URL=http://127.0.0.1:8081 E2E_ADMIN_NAME=관리자 npx playwright test  # cwd: web
 ```
 
-Colima 처럼 Docker 소켓이 VM 안에 있는 환경에서는 `api/build.gradle.kts` 가 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` 를 `/var/run/docker.sock` 으로 둔다.
-`DOCKER_HOST` 에 `.colima` 가 들어 있을 때만 적용한다.
+Colima 를 쓰면 `api/build.gradle.kts` 가 Testcontainers 의 Docker 소켓을 알아서 맞춰요.
 
-## 문서
+### 개인 비서 연동(고급)
 
-- [제품 요구사항과 다음 GraphRAG 마일스톤](docs/prd.md)
-- [흐름](docs/flow.md)
-- [코드 구조와 결정](docs/code-architecture.md)
-- [API 계약](docs/api-contract.md)
-- [데이터 스키마](docs/data-schema.md)
-- [배포와 백업](docs/deployment.md)
-- [이미지 workflow](.github/workflows/workbench-image.yml): GitHub-hosted runner(`ubuntu-latest`)에서 Buildx 로 `linux/amd64` 이미지를 GHCR 에 올린다. 공개 저장소이므로 홈서버 runner 를 쓰지 않는다(사용자 결정: 2026-10-24). 로컬 확인은 `docker buildx build --platform linux/amd64 .` 로 한다.
+아직 쓰지 않는 기능이에요.
+
+- 「더보기 → 연동」 에서 토큰을 발급해 fos-assistant 커넥터에 넣어요.
+- 에이전트는 그 토큰으로 `/api/v1` 을 불러요.
+- 계약은 [API 계약](docs/api-contract.md)의 「에이전트 API」 절에 있어요.
+
+### 문서
+
+| 문서 | 내용 |
+| --- | --- |
+| [제품 요구사항](docs/prd.md) | 무엇을, 어디까지 만드는지 |
+| [흐름](docs/flow.md) | 화면과 사용자 흐름 |
+| [코드 구조와 결정](docs/code-architecture.md) | 모듈 구조와 설계 결정 |
+| [API 계약](docs/api-contract.md) | 서버 API 와 에이전트 API |
+| [데이터 스키마](docs/data-schema.md) | Neo4j 노드와 관계 |
+| [배포와 백업](docs/deployment.md) | 운영 배포, 백업, 복원 |
+| [ADR](docs/adr/) | 주요 결정의 기록 |
+
+이미지는 GitHub-hosted runner 에서 `linux/amd64` 로 빌드해 GHCR 에 올려요([workflow](.github/workflows/workbench-image.yml)).
