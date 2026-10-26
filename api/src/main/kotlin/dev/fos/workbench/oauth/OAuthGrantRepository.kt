@@ -1,6 +1,7 @@
 package dev.fos.workbench.oauth
 
 import com.fasterxml.jackson.annotation.JsonInclude
+import dev.fos.workbench.auth.Role
 import dev.fos.workbench.config.params
 import org.springframework.data.neo4j.core.Neo4jClient
 import org.springframework.stereotype.Repository
@@ -35,6 +36,20 @@ data class OAuthGrantRecord(
     val refreshExpiresAt: String,
     val userId: String,
     val ownerActive: Boolean,
+)
+
+/**
+ * `/mcp` 인증에 쓰는 연결 하나와 그 주인. [scope] 는 `READ` 또는 `READ_WRITE` 다.
+ * 역할은 요청마다 읽은 지금 값이다(docs/data-schema.md 「OAuth 연결」).
+ */
+data class ActiveGrant(
+    val grantId: String,
+    val clientName: String,
+    val scope: String,
+    val lastUsedAt: String?,
+    val userId: String,
+    val displayName: String,
+    val role: Role,
 )
 
 /** `(:User)-[:OWNS]->(:OAuthGrant)`. 토큰 원문은 저장하지 않고 해시로 찾는다(docs/data-schema.md 「OAuth 연결」) */
@@ -129,6 +144,36 @@ class OAuthGrantRepository(private val client: Neo4jClient) {
             RETURN properties(g) AS g ORDER BY g.createdAt, g.id
             """,
         ).bind(userId).to("userId").fetch().all().map { ConnectionView.from(it["g"] as Map<String, Any?>) }
+
+    /**
+     * 끝나지 않았고 자원이 [resource] 인 접근 토큰의 연결을 찾는다. 주인이 비활성이거나 허용 목록에서 빠졌으면 찾지 않는다.
+     * 시각은 자릿수가 고정인 서버 기록 형식이라 문자열로 비교한다.
+     */
+    fun findActiveByAccess(hash: String, resource: String, now: String): ActiveGrant? =
+        client.query(
+            """
+            MATCH (u:User)-[:OWNS]->(g:OAuthGrant {accessHash: ${'$'}hash})
+            WHERE g.accessExpiresAt > ${'$'}now AND g.resource = ${'$'}resource AND u.enabled = true AND u.email IS NOT NULL
+            RETURN g.id AS grantId, g.clientName AS clientName, g.scope AS scope, g.lastUsedAt AS lastUsedAt,
+                   u.id AS userId, u.displayName AS displayName, u.role AS role
+            LIMIT 1
+            """,
+        ).bindAll(params("hash" to hash, "resource" to resource, "now" to now)).fetch().one().map {
+            ActiveGrant(
+                grantId = it["grantId"] as String,
+                clientName = it["clientName"] as String,
+                scope = it["scope"] as String,
+                lastUsedAt = it["lastUsedAt"] as String?,
+                userId = it["userId"] as String,
+                displayName = it["displayName"] as String,
+                role = Role.parse(it["role"] as String?) ?: Role.VIEWER,
+            )
+        }.orElse(null)
+
+    fun touchLastUsed(grantId: String, now: String) {
+        client.query("MATCH (g:OAuthGrant {id: ${'$'}id}) SET g.lastUsedAt = ${'$'}now")
+            .bindAll(params("id" to grantId, "now" to now)).run()
+    }
 
     /** 폐기(RFC 7009)가 받은 토큰이 접근 토큰이든 갱신 토큰이든 그 연결의 id 를 찾는다 */
     fun findByAccessOrRefresh(hash: String): String? =

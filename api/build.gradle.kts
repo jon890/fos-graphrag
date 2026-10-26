@@ -29,6 +29,7 @@ dependencies {
     implementation(libs.jackson.kotlin)
     implementation(libs.jackson.yaml)
     implementation(libs.kotlin.reflect)
+    implementation(libs.mcp)
 
     testImplementation(libs.spring.boot.test)
     testImplementation(libs.spring.boot.testcontainers)

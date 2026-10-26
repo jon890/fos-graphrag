@@ -6,6 +6,8 @@ import dev.fos.workbench.agent.RateLimiter
 import dev.fos.workbench.auth.AllowlistOidcUserService
 import dev.fos.workbench.auth.CurrentUserFilter
 import dev.fos.workbench.auth.UserRepository
+import dev.fos.workbench.mcp.McpAuthenticator
+import dev.fos.workbench.mcp.McpSecurity
 import dev.fos.workbench.web.ApiError
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Qualifier
@@ -93,11 +95,47 @@ class SecurityConfig {
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             // STATELESS 만으로는 세션 저장소가 바뀌지 않는 버전이 있어 요청 범위 저장소를 직접 둔다
             .securityContext { it.securityContextRepository(RequestAttributeSecurityContextRepository()) }
-            .addFilterAfter(BearerTokenFilter(tokens, limiter, writeLimiter, mapper), SecurityContextHolderFilter::class.java)
+            .addFilterAfter(BearerTokenFilter(tokens::authenticate, limiter, writeLimiter, mapper), SecurityContextHolderFilter::class.java)
             .exceptionHandling {
                 it.authenticationEntryPoint { _, response, _ ->
                     write(mapper, response, 401, ApiError("UNAUTHENTICATED", "연동 토큰이 없거나 올바르지 않습니다."))
                 }
+                it.accessDeniedHandler { _, response, _ ->
+                    write(mapper, response, 403, ApiError("FORBIDDEN", "이 작업을 할 권한이 없습니다."))
+                }
+            }
+            .headers { securityHeaders(it, properties) }
+            .formLogin { it.disable() }
+            .httpBasic { it.disable() }
+            .logout { it.disable() }
+            .requestCache { it.disable() }
+        return http.build()
+    }
+
+    /**
+     * 원격 MCP(`/mcp`)만 맡고 [filterChain] 보다 먼저 돈다. OAuth 접근 토큰과 연동 토큰을 `Authorization: Bearer` 로 받는다.
+     * 세션을 읽지도 만들지도 않고 CSRF 를 쓰지 않는다(docs/adr/015-remote-mcp-oauth.md). `Origin` 검사가 인증보다 먼저다.
+     * 모든 요청이 `POST` 라 필터는 전체 한도만 세고, 쓰기 한도는 쓰기 도구가 센다.
+     */
+    @Bean
+    @Order(1)
+    fun mcpFilterChain(
+        http: HttpSecurity,
+        mapper: JsonMapper,
+        authenticator: McpAuthenticator,
+        @Qualifier("agentRateLimiter") limiter: RateLimiter,
+        properties: WorkbenchProperties,
+    ): SecurityFilterChain {
+        http
+            .securityMatcher("/mcp", "/mcp/**")
+            .authorizeHttpRequests { it.anyRequest().hasRole("VIEWER") }
+            .csrf { it.disable() }
+            .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
+            .securityContext { it.securityContextRepository(RequestAttributeSecurityContextRepository()) }
+            .addFilterAfter(McpSecurity.OriginFilter(mapper), SecurityContextHolderFilter::class.java)
+            .addFilterAfter(BearerTokenFilter(authenticator::authenticate, limiter, null, mapper), McpSecurity.OriginFilter::class.java)
+            .exceptionHandling {
+                it.authenticationEntryPoint(McpSecurity.entryPoint(mapper))
                 it.accessDeniedHandler { _, response, _ ->
                     write(mapper, response, 403, ApiError("FORBIDDEN", "이 작업을 할 권한이 없습니다."))
                 }
