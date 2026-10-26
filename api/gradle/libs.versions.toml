@@ -3,6 +3,8 @@
 kotlin = "2.3.21"
 spring-boot = "4.1.0"
 mcp = "2.1.0"
+neo4j-harness = "5.26.30"
+mock-oauth2-server = "3.0.1"
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
@@ -21,7 +23,6 @@ jackson-yaml = { module = "tools.jackson.dataformat:jackson-dataformat-yaml" }
 kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect" }
 mcp = { module = "io.modelcontextprotocol.sdk:mcp", version.ref = "mcp" }
 spring-boot-test = { module = "org.springframework.boot:spring-boot-starter-test" }
-spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
-testcontainers-neo4j = { module = "org.testcontainers:testcontainers-neo4j" }
-testcontainers-junit = { module = "org.testcontainers:testcontainers-junit-jupiter" }
+neo4j-harness = { module = "org.neo4j.test:neo4j-harness", version.ref = "neo4j-harness" }
+mock-oauth2-server = { module = "no.nav.security:mock-oauth2-server", version.ref = "mock-oauth2-server" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }

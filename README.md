@@ -162,7 +162,7 @@ docker compose up -d --build --wait
 bash scripts/tests/test_scripts.sh          # 스크립트 문법, 포트, cap_drop, digest 고정
 
 # cwd: api
-./gradlew test                               # Testcontainers 로 Neo4j 와 가짜 OIDC 를 띄워요
+./gradlew test                               # Docker 없이 테스트 JVM 안에 Neo4j 와 가짜 OIDC 공급자를 띄워요
 
 # cwd: web
 npm ci && npm run typecheck && npm test && npm run build
@@ -174,8 +174,6 @@ npm ci && npm run typecheck && npm test && npm run build
 COMPOSE_FILE=compose.yml:compose.e2e.yml docker compose up -d --build --wait   # cwd: 저장소 루트
 WORKBENCH_URL=http://127.0.0.1:8081 E2E_ADMIN_NAME=관리자 npx playwright test  # cwd: web
 ```
-
-Colima 를 쓰면 `api/build.gradle.kts` 가 Testcontainers 의 Docker 소켓을 알아서 맞춰요.
 
 ### 개인 비서 연동(고급)
 

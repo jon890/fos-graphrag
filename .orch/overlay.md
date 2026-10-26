@@ -12,7 +12,7 @@
 
 코드(`api/`, `web/`, `scripts/`, `ontology/`, Compose, Dockerfile, workflow)를 고친 PR 은 아래를 모두 통과해야 머지한다. 오래 걸리므로 백그라운드로 돌린다.
 
-- 서버: `cd api && ./gradlew test --rerun`(Gradle 이 이전 결과를 재사용하지 않게 `--rerun` 을 붙인다)
+- 서버: `cd api && ./gradlew test --rerun`(Gradle 이 이전 결과를 재사용하지 않게 `--rerun` 을 붙인다). Docker 없이 돈다
 - 웹: `cd web && npm run typecheck && npm test && npm run build`
 - 스크립트: `bash scripts/tests/test_scripts.sh`(저장소 루트에서)
 - 브라우저: `COMPOSE_PROJECT_NAME=<작업 이름>-verify NEO4J_PASSWORD=e2e-local-password COMPOSE_FILE=compose.yml:compose.e2e.yml` 로 `docker compose up -d --build --wait` 한 뒤 `cd web && WORKBENCH_URL=http://127.0.0.1:8081 E2E_ADMIN_NAME=관리자 npm run test:e2e -- e2e/workbench.spec.ts e2e/mobile.spec.ts --project=chromium --project=mobile`, 끝나면 그 스택만 `docker compose down -v`. 스크린샷은 `web/test-results/screenshots/` 에 있고 직접 열어 본다.

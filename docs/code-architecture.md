@@ -42,7 +42,8 @@ flowchart LR
 | Spring Boot | 4.1.0 | `api/gradle/libs.versions.toml` |
 | Kotlin | 2.3.21 | Spring Boot 4.1.0 BOM 의 `kotlin.version` |
 | Neo4j Java Driver | 6.1.0 | Spring Boot 4.1.0 BOM 의 `neo4j-java-driver.version` |
-| Testcontainers | 2.0.5 | Spring Boot 4.1.0 BOM 의 `testcontainers.version` |
+| Neo4j 테스트 하네스(neo4j-harness) | 5.26.30 | 운영 이미지와 같은 패치. BOM 밖의 Gradle 설정 `neo4jHarness` |
+| 가짜 OIDC 공급자 라이브러리(mock-oauth2-server) | 3.0.1 | 개발 Compose 의 이미지와 같은 버전 |
 | MCP Java SDK(`io.modelcontextprotocol.sdk:mcp`) | 2.1.0 | 최신 GA. `mcp-core` 와 Jackson 3 모듈(`mcp-json-jackson3`)을 묶은 것이다. MCP `2025-11-25` 까지 말한다. 테스트의 MCP 클라이언트도 같은 jar 다 |
 | Neo4j | `neo4j:5.26.30-community` | 5.26 LTS |
 | Gradle | 8.14.3 | `api/gradle/wrapper/gradle-wrapper.properties` |
@@ -75,7 +76,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 - Claude Code 의 원격 MCP 와 플러그인 마켓플레이스: https://code.claude.com/docs/en/mcp , https://code.claude.com/docs/en/plugin-marketplaces
 - Codex 의 원격 MCP 와 OAuth 로그인: https://learn.chatgpt.com/docs/extend/mcp?surface=cli , https://learn.chatgpt.com/docs/config-file/config-reference
 
-드라이버 6.1.0 과 Neo4j 5.26.30 의 조합은 Testcontainers 통합 테스트와 Compose 실행으로 실제 확인했다.
+드라이버 6.1.0 과 Neo4j 5.26.30 의 조합은 JUnit 안의 Neo4j 통합 테스트와 Compose 실행으로 실제 확인했다.
 
 ## API 패키지
 
