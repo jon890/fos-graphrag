@@ -1,7 +1,7 @@
 {
   "name": "plan021-tests-without-containers",
   "description": "테스트에서 컨테이너를 없앤다: 서버는 JUnit 안의 Neo4j 와 가짜 OIDC, 화면은 서버가 남긴 응답 스냅샷을 주는 가짜 API 로 돈다",
-  "pr_scope": "서버, 웹 단위, 화면 테스트와 운영 확인이 Docker 없이 돌게 바꾸고 Compose 브라우저 테스트 스택을 지운다.",
+  "pr_scope": "서버, 웹 단위, 화면 테스트와 운영 확인이 Docker 없이 돌게 바꾸고, Compose 브라우저 테스트 스택을 지우고, 이 검사를 PR 마다 도는 GitHub Actions 테스트 workflow 를 둔다.",
   "deferred": [
     {
       "what": "api 의 application.yaml 에서 쓰지 않게 된 e2e 프로필 그룹과 ProdStartupGuard 의 e2e 안내 문구를 정리한다",
@@ -14,11 +14,35 @@
   "total_phases": 6,
   "current_phase": 1,
   "phases": [
-    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
-    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
-    { "number": 3, "file": "phase-03.md", "execution_profile": "deep" },
-    { "number": 4, "file": "phase-04.md", "execution_profile": "standard" },
-    { "number": 5, "file": "phase-05.md", "execution_profile": "deep" },
-    { "number": 6, "file": "phase-06.md", "execution_profile": "standard" }
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 4,
+      "file": "phase-04.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 5,
+      "file": "phase-05.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 6,
+      "file": "phase-06.md",
+      "execution_profile": "standard"
+    }
   ]
 }

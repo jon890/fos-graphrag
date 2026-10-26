@@ -60,8 +60,8 @@
 ### 5. `api/src/test/kotlin/dev/fos/workbench/support/IntegrationTest.kt`
 
 - `@Import(TestcontainersConfig::class)` 를 지운다.
-- `properties` 의 `NEO4J_PASSWORD=placeholder-overridden-by-service-connection` 은 `NEO4J_PASSWORD=unused-auth-disabled` 로 바꾸고 주석을 「하네스는 인증을 끈다. placeholder 만 채운다」 로 고친다.
-- `@DynamicPropertySource` 에 `spring.neo4j.uri` = `EmbeddedServers.neo4jUri`, `spring.neo4j.authentication.kind` = `none` 을 더하고 OIDC 두 값은 `EmbeddedServers.mockOidcUrl()` 로 바꾼다.
+- `properties` 의 `NEO4J_PASSWORD=placeholder-overridden-by-service-connection` 은 `NEO4J_PASSWORD=unused-auth-disabled` 로 바꾸고 주석을 「하네스는 인증이 꺼져 있어(`dbms.security.auth_enabled` 기본값 false) 이 비밀번호를 무시한다. placeholder 만 채운다」 로 고친다.
+- `@DynamicPropertySource` 에 `spring.neo4j.uri` = `EmbeddedServers.neo4jUri` 를 더하고 OIDC 두 값은 `EmbeddedServers.mockOidcUrl()` 로 바꾼다. `spring.neo4j.authentication.kind` 같은 속성은 Spring Boot 4.1 에 없으니 넣지 않는다.
 - 클래스 주석의 「실제 Neo4j, 가짜 OIDC 공급자」 를 「테스트 JVM 안의 Neo4j 와 가짜 OIDC 공급자」 로 고친다.
 
 ### 6. 기존 테스트가 그대로 통과하는지 본다
@@ -72,7 +72,7 @@
 ### 7. 문서
 
 - `docs/code-architecture.md` 의 「버전」 표에서 `Testcontainers` 줄을 지우고 `Neo4j 테스트 하네스(neo4j-harness) | 5.26.30 | 운영 이미지와 같은 패치. BOM 밖의 Gradle 설정 neo4jHarness` 와 `가짜 OIDC 공급자 라이브러리(mock-oauth2-server) | 3.0.1 | 개발 Compose 의 이미지와 같은 버전` 줄을 더한다. 표 아래 「드라이버 6.1.0 과 Neo4j 5.26.30 의 조합은 Testcontainers 통합 테스트와 ...」 문장의 `Testcontainers 통합 테스트` 를 `JUnit 안의 Neo4j 통합 테스트` 로 고친다.
-- `README.md` 와 `docs/deployment.md` 의 「검증」 블록에서 `./gradlew test` 주석을 `# Docker 없이 테스트 JVM 안에 Neo4j 와 가짜 OIDC 공급자를 띄운다` 로 고치고, Colima 와 Testcontainers 소켓을 설명하는 문장을 지운다(`git grep -n "TESTCONTAINERS\|Colima"` 로 남은 곳을 찾는다). `README.md` 는 해요체로 쓰여 있으니 같은 문체로 고친다.
+- `README.md` 의 「검증」 블록에서 `./gradlew test` 주석을 `# Docker 없이 테스트 JVM 안에 Neo4j 와 가짜 OIDC 공급자를 띄운다` 로 고치고, Colima 와 Testcontainers 소켓을 설명하는 문장을 지운다(`git grep -n "TESTCONTAINERS\|Colima"` 로 남은 곳을 찾는다). `README.md` 는 해요체로 쓰여 있으니 같은 문체로 고친다.
 - `.orch/overlay.md` 의 「검증 명령」 서버 줄에 「Docker 없이 돈다」 를 덧붙인다.
 
 ## 검증
@@ -97,6 +97,5 @@ bash scripts/tests/test_scripts.sh
 | `api/src/test/kotlin/dev/fos/workbench/support/TestcontainersConfig.kt` | 삭제 |
 | `api/src/test/kotlin/dev/fos/workbench/support/IntegrationTest.kt` | 수정 |
 | `docs/code-architecture.md` | 수정 |
-| `docs/deployment.md` | 수정 |
 | `README.md` | 수정 |
 | `.orch/overlay.md` | 수정 |

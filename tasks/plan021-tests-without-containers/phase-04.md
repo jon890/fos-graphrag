@@ -26,6 +26,7 @@
 - 화면 테스트는 화면이 무엇을 보이고 무엇을 보내는지만 본다. 「A 가 만든 것을 B 가 본다」 는 B 의 역할로 같은 스냅샷을 보이는 화면 테스트와, 저장 뒤 다른 사용자가 읽는 서버 JUnit 테스트로 나눈다.
 - 409 같은 실패 응답은 `api.on` 으로 준다. 응답 본문은 서버가 실제로 주는 모양이어야 하므로 스냅샷에 실패 응답(예: `node-patch-conflict`)을 더해 쓴다.
 - 시나리오 사이의 순서 의존을 없앤다. 각 테스트는 스냅샷 상태에서 시작한다.
+- id 는 코드에 적지 않고 `api.fixture(name).id` 로 읽는다. 스냅샷을 더할 때는 `ApiSnapshotTest` 흐름의 끝에 붙인다. 중간에 끼우면 뒤의 자리표시가 모두 바뀐다.
 
 ## 작업 항목
 
@@ -44,7 +45,7 @@
 
 ### 4. 스냅샷 더하기
 
-필요한 응답이 없으면 `ApiSnapshotTest` 에 만들고 `./gradlew test --rerun --tests '*ApiSnapshotTest'` 로 다시 쓴다. 기존 스냅샷의 diff 는 새 데이터로 생긴 것만 있어야 한다.
+필요한 응답이 없으면 `ApiSnapshotTest` 흐름의 끝에 만들고 `./gradlew test --rerun --tests '*ApiSnapshotTest'` 로 다시 쓴다. 기존 스냅샷의 diff 는 새 데이터로 생긴 것만 있어야 한다.
 
 ## 검증
 

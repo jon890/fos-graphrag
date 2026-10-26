@@ -28,20 +28,21 @@ Playwright 가 Vite 개발 서버를 띄우고 가짜 API 로 도는 기반을 �
 
 ### 1. `web/e2e/mock/api.ts`(신규)
 
-`class MockApi` 와 `async function mockApi(page: Page, options: { role?: 'VIEWER' | 'EDITOR' | 'ADMIN' | null }): Promise<MockApi>`.
+`class MockApi` 와 `async function mockApi(page: Page, options: MockOptions): Promise<MockApi>`.
+`type MockOptions = { role?: Role | null; signedInRole?: Role; loginResult?: 'success' | 'denied' }`, `type Role = 'VIEWER' | 'EDITOR' | 'ADMIN'`. `role` 기본값은 `'EDITOR'`(로그인 상태), `null` 이면 로그아웃 상태다.
 
-- 시작할 때 `web/e2e/fixtures/*.json` 을 읽어 `METHOD path?query` 를 키로 둔다. 요청의 query 는 `URLSearchParams` 순서 그대로 비교한다.
+- 시작할 때 `web/e2e/fixtures/*.json` 을 읽어 `METHOD path?query` 를 키로 둔다. 요청의 query 는 `URLSearchParams` 순서 그대로 비교한다. 같은 키의 스냅샷이 둘 이상이면 읽을 때 실패한다. 예외는 `auth-me-*` 넷(모두 `GET /api/auth/me`)이고 아래 로그인 규칙이 고른다. 같은 요청의 다른 상태는 테스트가 `on` 과 `fixture(name)` 으로만 준다.
 - `page.route` 로 `/api/**`, `/oauth2/**`, `/login/oauth2/**`, `/oauth/**`, `/.well-known/**`, `/mcp` 를 받는다. Vite 의 모듈 요청(`/src/**`, `/@vite/**`, `/node_modules/**`)은 건드리지 않는다.
 - 응답 고르는 순서: 테스트가 `on(method, path, response | handler)` 로 준 덮어쓰기, 그다음 스냅샷. 둘 다 없으면 501 과 `{"code":"MOCK_MISSING","request":"..."}` 로 답하고 `missing` 에 쌓는다.
 - 로그인: `role` 이 `null` 이면 `/api/auth/me` 가 `auth-me-anonymous` 다. `/oauth2/authorization/google` 를 받으면 `options.loginResult` 가 `'denied'` 이면 `/?login=denied` 로, 아니면 `signedInRole`(기본 `EDITOR`)로 로그인 상태를 바꾸고 `/` 로 302 한다. 로그인 상태면 `/api/auth/me` 는 `auth-me-<role 소문자>` 다.
-- CSRF: `/api/auth/csrf` 는 `XSRF-TOKEN=mock-csrf` 쿠키를 심고 204 다. `POST`, `PUT`, `PATCH`, `DELETE` 요청의 `X-XSRF-TOKEN` 이 쿠키와 다르면 403 `{"code":"CSRF"}` 로 답한다. `/oauth/token`, `/oauth/register` 처럼 서버가 CSRF 를 보지 않는 경로는 `docs/api-contract.md` 를 따라 뺀다.
+- CSRF 는 `docs/api-contract.md` 의 계약을 따른다. `/api/auth/csrf` 는 `XSRF-TOKEN=mock-csrf` 쿠키를 심고 `200 {"headerName":"X-XSRF-TOKEN","cookieName":"XSRF-TOKEN"}` 이다. `/api` 아래 `POST`, `PUT`, `PATCH`, `DELETE` 요청의 `X-XSRF-TOKEN` 이 쿠키와 다르면 `403 {"code":"CSRF_REJECTED","message":"..."}` 로 답한다. 화면은 이 코드를 받으면 토큰을 새로 받아 한 번 다시 보낸다(`web/src/api/client.ts`). `/oauth/token`, `/oauth/register` 처럼 서버가 CSRF 를 보지 않는 경로는 계약을 따라 뺀다.
 - `requests: { method, path, query, body }[]` 에 받은 요청을 쌓는다. `lastRequest(method, path)` 를 둔다.
 - `fixture(name)` 은 스냅샷의 `body` 를 깊은 복사로 돌려준다. 테스트는 이것을 고쳐 `on` 에 넘긴다.
 - `assertNoMissing()` 은 `missing` 이 비어 있지 않으면 요청 목록과 함께 실패한다.
 
 ### 2. `web/e2e/mock/test.ts`(신규)
 
-`@playwright/test` 의 `test` 를 `extend` 해 `api` fixture 를 준다. 각 테스트는 `test.use({ role: 'EDITOR' })` 처럼 역할을 고르고, fixture 가 끝날 때 `api.assertNoMissing()` 을 부른다. 스크린샷 도우미 `shot` 은 기존 `web/e2e/support.ts` 의 것을 다시 내보낸다.
+`@playwright/test` 의 `test` 를 `extend` 해 `api` fixture 와 옵션 fixture 셋(`role`, `signedInRole`, `loginResult`, 기본값은 `MockOptions` 와 같다)을 준다. 각 테스트는 `test.use({ role: 'EDITOR' })`, `test.use({ role: null, loginResult: 'denied' })` 처럼 고르고, fixture 가 끝날 때 `api.assertNoMissing()` 을 부른다. 스크린샷 도우미 `shot` 은 기존 `web/e2e/support.ts` 의 것을 다시 내보낸다.
 
 ### 3. `web/playwright.config.ts`
 
@@ -62,10 +63,14 @@ Playwright 가 Vite 개발 서버를 띄우고 가짜 API 로 도는 기반을 �
 가짜 API 자체를 확인한다. `chromium` project 에서 돈다.
 
 - 정상: 열람자로 `/` 를 열면 머리글의 `current-user-role` 이 `VIEWER` 다. 로그아웃 상태에서 `login-google` 을 누르면 로그인되어 `current-user-name` 이 보인다.
-- 실패: `X-XSRF-TOKEN` 없이 `page.evaluate` 로 `POST /api/nodes` 를 보내면 403 이다. 스냅샷에 없는 `GET /api/unknown` 은 501 이고 `missing` 에 남는다(이 테스트는 끝에 `missing` 을 비워 fixture 의 실패 검사를 피한다).
+- 실패: `X-XSRF-TOKEN` 없이 `page.evaluate` 로 `POST /api/nodes` 를 보내면 `403 CSRF_REJECTED` 다. `/api/auth/csrf` 는 200 과 계약의 본문을 준다. 스냅샷에 없는 `GET /api/unknown` 은 501 이고 `missing` 에 남는다(이 테스트는 끝에 `missing` 을 비워 fixture 의 실패 검사를 피한다).
 - `loginResult: 'denied'` 이면 `login-denied` 가 보인다.
 
-### 6. 문서와 TESTIDS
+### 6. `web/e2e/support.ts`
+
+옛 시나리오가 쓰는 export 는 지우지 않는다. 화면 테스트가 함께 쓰는 순수 도우미(`shot`, `shotElement`, `exact`, `escapeRegExp`, `openScreen`, `OAUTH_CALLBACK`)는 그대로 두고, 새 spec 은 이것만 가져다 쓴다. 로그인 도우미는 `mock/test.ts` 가 맡는다. 바꿀 것이 없으면 이 파일은 고치지 않는다.
+
+### 7. 문서와 TESTIDS
 
 - `web/TESTIDS.md` 머리말의 「e2e 테스트가 기대는 셀렉터다. 이름을 바꾸면 `e2e/workbench.spec.ts` 와 `e2e/mobile.spec.ts` 도 함께 고친다」 를 「화면 테스트(`e2e/*.spec.ts`)가 기대는 셀렉터다. 이름을 바꾸면 그 테스트도 함께 고친다」 로 바꾼다.
 - `README.md` 「검증」 에 `cd web && npx playwright install chromium && npm run test:e2e   # 가짜 API 로 1440px, 390px 화면 테스트` 를 더한다. Compose 줄은 phase 05 에서 지운다.
