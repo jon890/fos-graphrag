@@ -45,6 +45,8 @@ object EmbeddedServers {
         var builder = loader.loadClass("org.neo4j.harness.Neo4jBuilders").getMethod("newInProcessBuilder").invoke(null)
         builder = withConfig.invoke(builder, settings.getField("transaction_timeout").get(null), Duration.ofSeconds(10))
         builder = withConfig.invoke(builder, settings.getField("lock_acquisition_timeout").get(null), Duration.ofSeconds(5))
+        // 하네스 기본 pagecache(8MiB)에서는 실행 계획과 초기 데이터 적용 시간이 실행마다 흔들렸다. 운영 Compose(512m)에 가깝게 올린다.
+        builder = withConfig.invoke(builder, settings.getField("pagecache_memory").get(null), 256L * 1024 * 1024)
         builder = builderType.getMethod("withDisabledServer").invoke(builder)
         val neo4j = builderType.getMethod("build").invoke(builder) as AutoCloseable
 

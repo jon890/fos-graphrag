@@ -250,7 +250,8 @@ mock 으로 Neo4j 를 대신한 서버 테스트는 없다. 트랜잭션 일관�
 ### JUnit 안의 Neo4j
 
 - 테스트 JVM 하나에 Neo4j 하나를 띄워 모든 통합 테스트가 나눠 쓴다. 띄우는 코드는 `api/src/test/kotlin/dev/fos/workbench/support/EmbeddedServers.kt` 다.
-  운영 Compose 와 같은 서버 상한(`db.transaction.timeout` 10s, `db.lock.acquisition.timeout` 5s)을 준다. bolt 로 붙는다. 하네스는 인증이 꺼져 있어(`dbms.security.auth_enabled` 기본값 false) 설정의 placeholder 비밀번호를 무시한다.
+  운영 Compose 와 같은 서버 상한(`db.transaction.timeout` 10s, `db.lock.acquisition.timeout` 5s)을 준다. bolt 로 붙는다.
+  pagecache 는 운영 Compose(512m)에 가깝게 256MiB 를 준다. 하네스 기본값(8MiB)에서는 관계 인덱스를 쓰는 실행 계획이 실행마다 달라진 적이 있다. 하네스는 인증이 꺼져 있어(`dbms.security.auth_enabled` 기본값 false) 설정의 placeholder 비밀번호를 무시한다.
 - Neo4j 5.26 서버는 Netty 4.1 을 쓰고, 앱의 Neo4j Java Driver 6.1 은 Spring Boot BOM 이 고른 Netty 4.2 를 쓴다. 한 클래스로더에 두면 서버가 내부 채널을 열지 못한다.
   그래서 하네스는 BOM 을 받지 않는 Gradle 설정 `neo4jHarness` 로 받는다. `test` task 가 그 jar 경로를 시스템 속성 `neo4j.harness.classpath` 로 넘기고, `EmbeddedServers` 가 그 jar 만 담은 클래스로더(부모는 platform 클래스로더)에서 하네스를 리플렉션으로 띄운다.
   하네스는 자기 SLF4J provider 를 들고 오지만 격리 클래스로더 안에만 있어 앱의 Logback 과 부딪히지 않는다.

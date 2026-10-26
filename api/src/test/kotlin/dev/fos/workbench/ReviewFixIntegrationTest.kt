@@ -56,9 +56,10 @@ class ReviewFixIntegrationTest : IntegrationTest() {
         // 검색 쿼리가 TEXT 인덱스를 쓴다
         val plan = neo4j.query("EXPLAIN MATCH (n:Knowledge) WHERE n.searchText CONTAINS 'abc' RETURN n").run().plan()
         assertThat(plan.toString()).contains("NodeIndexContainsScan").contains("TEXT INDEX n:Knowledge(searchText)")
-        // 관계 id 조회가 타입별 인덱스를 쓴다
+        // 관계 id 조회가 타입별 인덱스를 쓴다. 플래너는 통계에 따라 Seek 와 Scan 중 하나를 고르므로 인덱스 이름으로 본다
+        neo4j.query("CALL db.awaitIndexes()").run()
         val relPlan = neo4j.query("EXPLAIN MATCH (:Knowledge)-[r:ISSUES {id: 'x'}]->(:Knowledge) RETURN r").run().plan()
-        assertThat(relPlan.toString()).contains("RelationshipIndexSeek")
+        assertThat(relPlan.toString()).contains("ISSUES(id)")
     }
 
     @Test
