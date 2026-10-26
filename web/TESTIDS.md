@@ -51,7 +51,7 @@
 
 ## 첫 접속 가이드
 
-`guideDoneAt` 이 없는 사용자가 개념 지도나 작업 공간에 들어오거나 「사용법」(`guide-open`)을 누르면 열린다. `e2e/support.ts` 의 `loginAs` 는 기본으로 가이드를 건너뛴다. 가이드를 확인하는 테스트만 `{ guide: 'keep' }` 을 넘긴다.
+`guideDoneAt` 이 없는 사용자가 개념 지도나 작업 공간에 들어오거나 「사용법」(`guide-open`)을 누르면 열린다. 화면 테스트의 `auth-me-*` 스냅샷은 가이드를 끝낸 사용자라 가이드가 열리지 않는다. 가이드를 확인하는 테스트(`e2e/guide.spec.ts`)만 `GET /api/auth/me` 를 덮어써 `guideDoneAt` 을 비운다.
 
 | testid | 요소 |
 | --- | --- |
@@ -71,7 +71,7 @@
 
 ## 개념 지도
 
-첫 화면(`/map`)이다. `e2e/support.ts` 의 `loginAs` 는 `/` 로 들어오면 `tab-map` 과 `concept-map` 이 보일 때까지 기다린다.
+첫 화면(`/map`)이다.
 
 | testid | 요소 |
 | --- | --- |

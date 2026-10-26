@@ -48,7 +48,10 @@ object EmbeddedServers {
         builder = builderType.getMethod("withDisabledServer").invoke(builder)
         val neo4j = builderType.getMethod("build").invoke(builder) as AutoCloseable
 
-        Runtime.getRuntime().addShutdownHook(Thread { neo4j.close() })
+        Runtime.getRuntime().addShutdownHook(Thread {
+            neo4j.close()
+            loader.close()
+        })
         return (neo4jType.getMethod("boltURI").invoke(neo4j) as URI).toString()
     }
 }

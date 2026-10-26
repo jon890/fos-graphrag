@@ -262,6 +262,7 @@ mock 으로 Neo4j 를 대신한 서버 테스트는 없다. 트랜잭션 일관�
 - `ApiSnapshotTest` 가 화면 테스트에 필요한 대표 데이터를 API 로 만들고, 대표 응답을 정규화해 `web/e2e/fixtures/<이름>.json` 에 쓴다. 테스트를 돌릴 때마다 다시 쓰고, 바뀌었으면 `git diff` 로 드러난다.
   스냅샷 테스트는 초기 데이터를 넣지 않는다. 화면 테스트의 데이터는 이 테스트가 만든 것뿐이다.
 - 파일 하나가 응답 하나다. `request`(`method`, `path`, `query`), `status`, `body` 를 담는다. 화면 테스트의 가짜 API 는 이 `request` 로 응답을 고른다.
+  같은 요청의 다른 상태(예: 온톨로지 미리보기 여러 개, 승인 전후의 제안 목록)를 남길 때는 `namedOnly: true` 를 붙인다. 가짜 API 는 그 파일을 요청으로 고르지 않고, 테스트가 이름으로 골라 덮어쓴다.
 - 정규화 규칙은 `api/src/test/kotlin/dev/fos/workbench/snapshot/SnapshotNormalizer.kt` 가 소유한다. 모든 응답을 모은 뒤 한 번에 바꾼다. UUID 는 저장한 순서에서 처음 나온 순서대로 `00000000-0000-4000-8000-<12자리 순번>` 으로, 시각은 실제 시각 순서대로 `2026-01-01T00:00:00` 부터 1초씩 늘린 값으로, 토큰 원문과 `last4`, `client_id`, 인가 코드는 고정 문자열로 바꾼다.
   OAuth 주소의 origin 은 `workbench.oauth.public-url` 을 가짜 API 와 같은 `http://127.0.0.1:5180` 으로 고정해 실행마다 같게 한다. PKCE 검증값도 고정 문자열을 쓴다.
   새 데이터와 새 저장은 기존 흐름의 끝에 붙인다. 중간에 끼우면 뒤의 자리표시가 모두 바뀐다. 화면 테스트는 id 를 코드에 적지 않고 스냅샷에서 읽는다.
@@ -272,10 +273,11 @@ mock 으로 Neo4j 를 대신한 서버 테스트는 없다. 트랜잭션 일관�
 ### 가짜 API
 
 - `web/e2e/mock/` 의 가짜 API 는 스냅샷을 읽어 `request` 가 같은 요청에 그 응답을 준다. 경로가 같고 query 가 다른 요청은 query 없는 스냅샷으로 답하지 않고 실패로 돌린다.
-  같은 요청을 가리키는 스냅샷이 둘 이상이면 읽을 때 실패한다. 예외는 역할마다 다른 `GET /api/auth/me`(`auth-me-*`)다. 같은 요청의 다른 상태는 테스트가 덮어쓴다.
+  같은 요청을 가리키는 스냅샷이 둘 이상이면 읽을 때 실패한다. 예외는 역할마다 다른 `GET /api/auth/me`(`auth-me-*`)와 `namedOnly` 스냅샷이다. 같은 요청의 다른 상태는 테스트가 덮어쓴다.
   테스트가 응답을 바꿔야 하면 그 테스트 안에서 덮어쓴다. 스냅샷에도 덮어쓰기에도 없는 요청은 501 로 답하고 테스트를 실패시킨다.
 - 로그인 상태와 역할(VIEWER, EDITOR, ADMIN)은 테스트가 고른다. 「Google 로 로그인」 이 여는 `/oauth2/authorization/google` 을 가짜 API 가 받아 로그인 상태로 바꾸고 `/` 로 돌려보낸다.
   `/api/auth/csrf` 는 서버 계약대로 `XSRF-TOKEN` 쿠키를 심고, 쓰기 요청의 `X-XSRF-TOKEN` 헤더가 그 값과 다르면 `403 CSRF_REJECTED` 로 답한다.
+- Cytoscape 는 실행 중에 컨테이너 스타일(`position: relative`)을 `<style>` 로 넣는데, 운영은 CSP `style-src 'self'` 가 이를 막는다. 개발 서버에는 CSP 가 없어 그래프 칸 높이가 0 이 되므로, `web/e2e/mock/test.ts` 의 `emulateProductionStyleCsp` 가 같은 id 의 빈 `<style>` 을 먼저 두어 운영과 같게 만든다. Cytoscape 를 올린 뒤 화면 테스트의 그래프 칸 높이가 0 이면 이 우회부터 본다.
 - 가짜 API 는 받은 요청을 기록한다. 화면 테스트는 화면이 보낸 요청의 경로와 본문을 확인하고, 저장 뒤 다른 사용자에게 보이는지 같은 서버 동작은 서버 JUnit 테스트가 확인한다.
 
 ## 결정

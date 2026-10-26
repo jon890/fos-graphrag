@@ -25,6 +25,17 @@ function pageOf<T>(items: T[]): { items: T[]; page: number; size: number; totalI
   return { items, page: 0, size: 20, totalItems: items.length, totalPages: items.length === 0 ? 0 : 1 }
 }
 
+/** 지금까지 받은 GET /api/ontology 요청 수 */
+function ontologyRequestCount(api: MockApi): number {
+  return api.requests.filter((r) => r.method === 'GET' && r.path === '/api/ontology').length
+}
+
+/** 새로고침 뒤 온톨로지 요청이 들어오고, 그 응답을 화면이 그릴 시간(두 프레임)이 지날 때까지 기다린다 */
+async function waitOntologyRendered(page: Page, api: MockApi, before: number): Promise<void> {
+  await expect.poll(() => ontologyRequestCount(api), { message: '새로고침 뒤 온톨로지 요청' }).toBeGreaterThan(before)
+  await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))))
+}
+
 /** 노드 하나뿐인 주변 그래프. 스냅샷 그래프의 모양에 중심만 바꿔 넣는다 */
 function graphOf(api: MockApi, node: NodeRef): Record<string, unknown> {
   return { ...api.fixture('graph-company'), centerId: node.id, nodes: [{ id: node.id, type: node.type, label: node.label, reviewStatus: null, predicate: null }], edges: [] }
@@ -180,10 +191,11 @@ test.describe('열람자', () => {
     api.lastRequest('POST', '/api/auth/me/guide-done')
 
     // 끝낸 기록이 남은 뒤에는 새로고침해도 열리지 않는다.
+    const ontologyBefore = ontologyRequestCount(api)
     await page.reload()
     await expect(page.getByTestId('search-input')).toBeVisible()
-    // 가이드는 온톨로지를 받은 직후에 열린다. 열리지 않는 것을 보려면 그 시점이 지나도록 잠시 둔다.
-    await page.waitForTimeout(1000)
+    // 가이드는 온톨로지를 받은 직후에 열린다. 새로고침 뒤 응답을 받고 화면이 그린 시점까지 기다린 다음 없음을 확인한다.
+    await waitOntologyRendered(page, api, ontologyBefore)
     await expect(bubble).toHaveCount(0)
 
     // 「사용법」 은 끝낸 기록과 상관없이 처음부터 다시 연다.
@@ -266,10 +278,11 @@ test('11) 편집자는 처음 로그인하면 연습 기업, 근거 문서, 주�
   await page.getByTestId('search-submit').click()
   await expect(page.getByTestId('search-empty')).toBeVisible()
 
+  const ontologyBefore = ontologyRequestCount(api)
   await page.reload()
   await expect(page.getByTestId('search-input')).toBeVisible()
-  // 가이드는 온톨로지를 받은 직후에 열린다. 열리지 않는 것을 보려면 그 시점이 지나도록 잠시 둔다.
-  await page.waitForTimeout(1000)
+  // 가이드는 온톨로지를 받은 직후에 열린다. 새로고침 뒤 응답을 받고 화면이 그린 시점까지 기다린 다음 없음을 확인한다.
+  await waitOntologyRendered(page, api, ontologyBefore)
   await expect(bubble).toHaveCount(0)
 })
 
