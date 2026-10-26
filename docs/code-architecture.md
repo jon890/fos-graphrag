@@ -241,7 +241,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | 통합 테스트 | `api/src/test/kotlin/.../` 의 `*IntegrationTest` | 실제 서버 포트와 테스트 JVM 안의 Neo4j 5.26(`neo4j-harness`), 같은 JVM 안의 가짜 OIDC 공급자(`mock-oauth2-server` 라이브러리) |
 | 응답 스냅샷 | `api/src/test/kotlin/.../snapshot/ApiSnapshotTest.kt` 가 `web/e2e/fixtures/*.json` 을 쓴다 | 통합 테스트와 같다. 다만 Neo4j 는 다른 테스트의 데이터가 섞이지 않게 따로 띄운다 |
 | 웹 단위 테스트 | `web/src/**/*.test.ts`, `*.test.tsx` | 쓰지 않음. 컴포넌트는 `react-dom/server` 로 렌더링해 확인한다 |
-| 화면 테스트 | `web/e2e/` | Playwright 가 Vite 개발 서버를 띄우고, `web/e2e/mock/` 의 가짜 API 가 `page.route` 로 응답한다. 넓은 화면(1440×900)과 휴대폰 폭(390×844) 두 project 로 돈다. 휴대폰 project 는 `mobile.spec.ts` 만 돈다 |
+| 화면 테스트 | `web/e2e/` | Playwright 가 웹을 빌드해 Vite preview 서버로 띄우고(운영과 같은 CSP 헤더), `web/e2e/mock/` 의 가짜 API 가 `page.route` 로 응답한다. 넓은 화면(1440×900)과 휴대폰 폭(390×844) 두 project 로 돈다. 휴대폰 project 는 `mobile.spec.ts` 만 돈다 |
 | 플러그인 형식 검사 | `scripts/tests/test_plugin.py` | 쓰지 않음. 검사 항목은 그 스크립트가 소유한다 |
 | 운영 확인 | `scripts/smoke-prod.ts`, 검사는 `scripts/tests/smoke-prod.test.ts` | 배포 뒤 운영 주소에 읽기 요청만 보낸다. 검사는 Node 가 띄운 가짜 HTTP 서버로 한다 |
 
@@ -277,7 +277,7 @@ mock 으로 Neo4j 를 대신한 서버 테스트는 없다. 트랜잭션 일관�
   테스트가 응답을 바꿔야 하면 그 테스트 안에서 덮어쓴다. 스냅샷에도 덮어쓰기에도 없는 요청은 501 로 답하고 테스트를 실패시킨다.
 - 로그인 상태와 역할(VIEWER, EDITOR, ADMIN)은 테스트가 고른다. 「Google 로 로그인」 이 여는 `/oauth2/authorization/google` 을 가짜 API 가 받아 로그인 상태로 바꾸고 `/` 로 돌려보낸다.
   `/api/auth/csrf` 는 서버 계약대로 `XSRF-TOKEN` 쿠키를 심고, 쓰기 요청의 `X-XSRF-TOKEN` 헤더가 그 값과 다르면 `403 CSRF_REJECTED` 로 답한다.
-- Cytoscape 는 실행 중에 컨테이너 스타일(`position: relative`)을 `<style>` 로 넣는데, 운영은 CSP `style-src 'self'` 가 이를 막는다. 개발 서버에는 CSP 가 없어 그래프 칸 높이가 0 이 되므로, `web/e2e/mock/test.ts` 의 `emulateProductionStyleCsp` 가 같은 id 의 빈 `<style>` 을 먼저 두어 운영과 같게 만든다. Cytoscape 를 올린 뒤 화면 테스트의 그래프 칸 높이가 0 이면 이 우회부터 본다.
+- 화면 테스트의 서버는 `web/vite.config.ts` 의 `preview.headers` 로 운영 API(`SecurityConfig`)와 같은 CSP 를 건다. 그래서 Cytoscape 가 실행 중에 넣는 컨테이너 스타일(`position: relative`)이 운영처럼 막히고, 그래프 칸은 `legacy.css` 의 배치를 따른다. 두 CSP 값은 함께 고친다.
 - 가짜 API 는 받은 요청을 기록한다. 화면 테스트는 화면이 보낸 요청의 경로와 본문을 확인하고, 저장 뒤 다른 사용자에게 보이는지 같은 서버 동작은 서버 JUnit 테스트가 확인한다.
 
 ## 결정

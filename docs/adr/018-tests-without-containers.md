@@ -3,7 +3,7 @@
 - **status**: `accepted`
 - **결정**: 자동 테스트는 Docker 없이 돈다(사용자 결정 2026-10-26).
   서버 통합 테스트는 Neo4j 5.26 을 `org.neo4j.test:neo4j-harness` 로 테스트 JVM 안에 띄우고, 가짜 OIDC 공급자는 `no.nav.security:mock-oauth2-server` 라이브러리로 같은 JVM 안에 띄운다.
-  화면 테스트(Playwright)는 Vite 개발 서버를 띄우고 `page.route` 로 가짜 API 응답을 준다. 가짜 API 의 응답은 서버 JUnit 테스트가 실제 응답을 정규화해 남긴 JSON 스냅샷(`web/e2e/fixtures/`)이다.
+  화면 테스트(Playwright)는 웹을 빌드해 Vite preview 서버로 띄우고 `page.route` 로 가짜 API 응답을 준다. 가짜 API 의 응답은 서버 JUnit 테스트가 실제 응답을 정규화해 남긴 JSON 스냅샷(`web/e2e/fixtures/`)이다.
   서버 동작에만 기대는 검사(저장 뒤 다른 사용자에게 보이는가, 권한, 동시 수정)는 서버 JUnit 테스트가 맡는다.
   PR 과 main push 에서 GitHub-hosted runner 가 서버, 웹 단위, 화면 테스트와 스크립트 검사를 돌린다(`.github/workflows/test.yml`). 예전에는 테스트 workflow 를 두지 않기로 했으나 이 결정으로 바꾼다(사용자 결정 2026-10-26).
 - **맥락**: 서버 테스트는 Testcontainers 로 Neo4j 와 가짜 OIDC 컨테이너를 띄웠고, 브라우저 테스트는 Compose 로 앱 이미지를 빌드해 띄운 뒤 돌았다.
@@ -25,7 +25,7 @@
 
 - **결과**:
   - 얻는 것: 서버, 웹 단위, 화면 테스트를 Docker 없이 단계마다 돌린다. 화면 테스트는 서로 상태를 공유하지 않아 순서에 기대지 않는다. 서버 응답 모양이 바뀌면 스냅샷 파일의 diff 로 리뷰에 드러난다.
-  - 감당할 것: 화면 테스트는 실제 서버를 거치지 않는다. 보안 헤더와 CSP, 세션 쿠키, 실제 OIDC 리다이렉트, 이미지 안의 정적 파일 제공은 서버 JUnit 테스트와 배포 뒤 운영 확인(`scripts/smoke-prod.ts`)이 맡는다.
+  - 감당할 것: 화면 테스트는 실제 서버를 거치지 않는다. CSP 는 preview 서버가 운영과 같은 값을 걸어 화면 테스트가 거친다. 나머지 보안 헤더, 세션 쿠키, 실제 OIDC 리다이렉트, 이미지 안의 정적 파일 제공은 서버 JUnit 테스트와 배포 뒤 운영 확인(`scripts/smoke-prod.ts`)이 맡는다.
     가짜 API 는 스냅샷에 없는 요청을 실패로 돌려 빠진 계약을 드러낸다. 스냅샷은 서버 테스트가 다시 만들고, 갱신한 파일을 함께 커밋해야 한다.
     운영 이미지와 Compose 설정은 자동 테스트로 띄워 보지 않는다. `scripts/tests/test_scripts.sh` 의 Compose 설정 검사와 배포 뒤 확인이 맡는다.
 - **적용 범위**: 테스트 배치와 의존성 충돌 해결은 [코드 구조](../code-architecture.md) 의 「테스트」, 운영 확인은 [배포 문서](../deployment.md) 의 「배포 뒤 확인」 이 소유한다.

@@ -23,6 +23,16 @@ export default defineConfig({
       '/mcp': { target: 'http://127.0.0.1:8080', changeOrigin: false },
     },
   },
+  // 화면 테스트(playwright.config.ts)가 빌드 결과를 이 preview 서버로 띄운다.
+  // 운영 API 가 주는 CSP 를 그대로 걸어 Cytoscape 가 넣는 <style> 이 막히는 것까지 운영과 같게 한다.
+  // 값은 api 의 SecurityConfig.securityHeaders 와 같아야 한다.
+  preview: {
+    headers: {
+      'Content-Security-Policy':
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; " +
+        "connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+    },
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
