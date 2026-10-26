@@ -1,0 +1,51 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/me/knowledge",
+    "query": "level=UNSURE%2CLEARNING&page=0&size=20"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "node": {
+          "id": "00000000-0000-4000-8000-000000000016",
+          "type": "Bottleneck",
+          "label": "HBM 생산과 고적층 패키징",
+          "archived": false
+        },
+        "level": "UNSURE",
+        "note": "고적층이 왜 어려운지 모르겠다",
+        "updatedAt": "2026-01-01T00:00:53.000000Z",
+        "contexts": [
+          {
+            "decision": {
+              "id": "00000000-0000-4000-8000-000000000014",
+              "type": "Decision",
+              "label": "가상전자 첫 매수",
+              "archived": false
+            },
+            "depth": 3
+          }
+        ],
+        "documents": [
+          {
+            "id": "00000000-0000-4000-8000-000000000010",
+            "title": "가상전자 2026 사업보고서",
+            "url": "https://example.com/virtual-electronics-2026",
+            "publisher": "가상공시",
+            "documentType": "FILING",
+            "publishedAt": "2026-03-15",
+            "collectedAt": "2026-10-20T03:00:00Z",
+            "archived": false
+          }
+        ],
+        "concepts": []
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}

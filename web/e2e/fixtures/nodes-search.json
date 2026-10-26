@@ -1,0 +1,177 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/nodes",
+    "query": "q=%EA%B0%80%EC%83%81%EC%A0%84%EC%9E%90&page=0&size=20"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000005",
+        "type": "Company",
+        "label": "가상전자",
+        "properties": {
+          "name": "가상전자",
+          "country": "KR"
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:19.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "updatedAt": "2026-01-01T00:00:19.000000Z",
+        "updatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "reviewStatus": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "type": "Document",
+        "label": "가상전자 2026 사업보고서",
+        "properties": {
+          "title": "가상전자 2026 사업보고서",
+          "url": "https://example.com/virtual-electronics-2026",
+          "publisher": "가상공시",
+          "documentType": "FILING",
+          "publishedAt": "2026-03-15",
+          "collectedAt": "2026-10-20T03:00:00Z"
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:42.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "updatedAt": "2026-01-01T00:00:42.000000Z",
+        "updatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "reviewStatus": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000011",
+        "type": "Valuation",
+        "label": "가상전자 2026-10-20",
+        "properties": {
+          "title": "가상전자 2026-10-20",
+          "currentPrice": 50000.0,
+          "currency": "KRW",
+          "method": "PER"
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:23.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "updatedAt": "2026-01-01T00:00:23.000000Z",
+        "updatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "reviewStatus": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000012",
+        "type": "Scenario",
+        "label": "가상전자 기준",
+        "properties": {
+          "title": "가상전자 기준",
+          "kind": "BASE",
+          "valuePerShare": 65000.0
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:25.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "updatedAt": "2026-01-01T00:00:25.000000Z",
+        "updatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "reviewStatus": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000013",
+        "type": "Security",
+        "label": "가상전자 보통주",
+        "properties": {
+          "market": "KRX_KOSPI",
+          "ticker": "900100",
+          "name": "가상전자 보통주",
+          "securityType": "COMMON",
+          "currency": "KRW"
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:21.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "updatedAt": "2026-01-01T00:00:21.000000Z",
+        "updatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "reviewStatus": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000014",
+        "type": "Decision",
+        "label": "가상전자 첫 매수",
+        "properties": {
+          "title": "가상전자 첫 매수",
+          "action": "BUY",
+          "decidedAt": "2026-10-24"
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:27.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "updatedAt": "2026-01-01T00:00:27.000000Z",
+        "updatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "reviewStatus": null
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalItems": 6,
+    "totalPages": 1
+  }
+}

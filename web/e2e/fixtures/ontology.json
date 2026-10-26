@@ -1,0 +1,1315 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/ontology",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "schemaVersion": "1",
+    "nodeTypes": {
+      "Company": {
+        "label": "기업",
+        "description": "사업을 하는 법인이다. 상장 여부와 관계없이 담는다.",
+        "labelProperty": "name",
+        "properties": {
+          "name": {
+            "type": "string",
+            "label": "기업 이름",
+            "required": true,
+            "maxLength": 200,
+            "description": "기업의 공식 이름. 예: 삼성전자"
+          },
+          "country": {
+            "type": "enum",
+            "label": "국가",
+            "required": false,
+            "values": [
+              "KR",
+              "US",
+              "JP",
+              "CN",
+              "TW",
+              "HK",
+              "NL",
+              "DE",
+              "GB",
+              "FR",
+              "OTHER"
+            ],
+            "valueLabels": {
+              "KR": "대한민국 (KR)",
+              "US": "미국 (US)",
+              "JP": "일본 (JP)",
+              "CN": "중국 (CN)",
+              "TW": "대만 (TW)",
+              "HK": "홍콩 (HK)",
+              "NL": "네덜란드 (NL)",
+              "DE": "독일 (DE)",
+              "GB": "영국 (GB)",
+              "FR": "프랑스 (FR)",
+              "OTHER": "기타"
+            },
+            "valueAliases": {
+              "KR": [
+                "한국",
+                "대한민국",
+                "남한",
+                "KOR",
+                "Korea",
+                "South Korea"
+              ],
+              "US": [
+                "미국",
+                "USA",
+                "United States"
+              ],
+              "JP": [
+                "일본",
+                "JPN",
+                "Japan"
+              ],
+              "CN": [
+                "중국",
+                "CHN",
+                "China"
+              ],
+              "TW": [
+                "대만",
+                "TWN",
+                "Taiwan"
+              ],
+              "HK": [
+                "홍콩",
+                "HKG",
+                "Hong Kong"
+              ],
+              "NL": [
+                "네덜란드",
+                "NLD",
+                "Netherlands"
+              ],
+              "DE": [
+                "독일",
+                "DEU",
+                "Germany"
+              ],
+              "GB": [
+                "영국",
+                "GBR",
+                "UK",
+                "United Kingdom"
+              ],
+              "FR": [
+                "프랑스",
+                "FRA",
+                "France"
+              ]
+            },
+            "description": "기업이 등록된 나라"
+          },
+          "registrationNumber": {
+            "type": "string",
+            "label": "법인등록번호",
+            "required": false,
+            "maxLength": 64,
+            "description": "기업을 구분하는 공적 번호. 모르면 비워 둔다"
+          },
+          "description": {
+            "type": "text",
+            "label": "메모",
+            "required": false,
+            "maxLength": 4000,
+            "description": "기업에 대해 남겨 둘 메모"
+          }
+        },
+        "hintProperties": [
+          "country"
+        ],
+        "searchProperties": [],
+        "display": {
+          "color": "#2563eb",
+          "shape": "ellipse"
+        }
+      },
+      "Security": {
+        "label": "종목",
+        "description": "시장에서 거래되는 종목이다. 같은 기업의 여러 상장과 이름이 같은 종목을 시장과 종목 코드로 구분한다.",
+        "labelProperty": "name",
+        "properties": {
+          "market": {
+            "type": "enum",
+            "label": "상장 시장",
+            "required": true,
+            "values": [
+              "KRX_KOSPI",
+              "KRX_KOSDAQ",
+              "NASDAQ",
+              "NYSE",
+              "OTHER"
+            ],
+            "valueLabels": {
+              "KRX_KOSPI": "코스피",
+              "KRX_KOSDAQ": "코스닥",
+              "NASDAQ": "나스닥",
+              "NYSE": "뉴욕증권거래소",
+              "OTHER": "기타"
+            },
+            "description": "종목이 거래되는 시장"
+          },
+          "ticker": {
+            "type": "string",
+            "label": "종목 코드",
+            "required": true,
+            "maxLength": 32,
+            "description": "시장 안에서 쓰는 종목 코드. 예: 005930"
+          },
+          "name": {
+            "type": "string",
+            "label": "종목 이름",
+            "required": true,
+            "maxLength": 200,
+            "description": "종목의 이름. 예: 삼성전자 보통주"
+          },
+          "securityType": {
+            "type": "enum",
+            "label": "종목 종류",
+            "required": false,
+            "values": [
+              "COMMON",
+              "PREFERRED",
+              "ETF",
+              "ADR",
+              "OTHER"
+            ],
+            "valueLabels": {
+              "COMMON": "보통주",
+              "PREFERRED": "우선주",
+              "ETF": "ETF",
+              "ADR": "예탁증서(ADR)",
+              "OTHER": "기타"
+            },
+            "description": "주식의 종류"
+          },
+          "currency": {
+            "type": "enum",
+            "label": "거래 통화",
+            "required": false,
+            "values": [
+              "KRW",
+              "USD",
+              "JPY",
+              "CNY",
+              "TWD",
+              "HKD",
+              "EUR",
+              "GBP"
+            ],
+            "valueLabels": {
+              "KRW": "원 (KRW)",
+              "USD": "미국 달러 (USD)",
+              "JPY": "엔 (JPY)",
+              "CNY": "위안 (CNY)",
+              "TWD": "대만 달러 (TWD)",
+              "HKD": "홍콩 달러 (HKD)",
+              "EUR": "유로 (EUR)",
+              "GBP": "파운드 (GBP)"
+            },
+            "valueAliases": {
+              "KRW": [
+                "원",
+                "원화",
+                "₩",
+                "한국 원"
+              ],
+              "USD": [
+                "달러",
+                "미국 달러",
+                "미화",
+                "$",
+                "US$"
+              ],
+              "JPY": [
+                "엔",
+                "엔화",
+                "¥"
+              ],
+              "CNY": [
+                "위안",
+                "위안화",
+                "RMB"
+              ],
+              "TWD": [
+                "대만 달러",
+                "NT$"
+              ],
+              "HKD": [
+                "홍콩 달러",
+                "HK$"
+              ],
+              "EUR": [
+                "유로",
+                "€"
+              ],
+              "GBP": [
+                "파운드",
+                "£"
+              ]
+            },
+            "description": "종목이 거래되는 통화"
+          }
+        },
+        "hintProperties": [
+          "market",
+          "ticker"
+        ],
+        "searchProperties": [],
+        "display": {
+          "color": "#0d9488",
+          "shape": "ellipse"
+        }
+      },
+      "Sector": {
+        "label": "산업",
+        "description": "기업이 속하고 병목이 생기는 산업이다.",
+        "labelProperty": "name",
+        "properties": {
+          "name": {
+            "type": "string",
+            "label": "산업 이름",
+            "required": true,
+            "maxLength": 200,
+            "description": "산업의 이름. 예: 반도체"
+          },
+          "scheme": {
+            "type": "string",
+            "label": "분류 체계",
+            "required": false,
+            "maxLength": 64,
+            "description": "산업을 나눈 기준의 이름. 예: GICS, KSIC"
+          },
+          "code": {
+            "type": "string",
+            "label": "분류 코드",
+            "required": false,
+            "maxLength": 32,
+            "description": "분류 체계 안에서 쓰는 코드"
+          }
+        },
+        "hintProperties": [
+          "scheme",
+          "code"
+        ],
+        "searchProperties": [],
+        "display": {
+          "color": "#9333ea",
+          "shape": "hexagon"
+        }
+      },
+      "Document": {
+        "label": "근거 문서",
+        "description": "판단과 주장의 근거가 되는 자료다. 서버가 주소를 읽어 오지 않으므로 사람이 자료 정보를 직접 등록한다.",
+        "labelProperty": "title",
+        "properties": {
+          "title": {
+            "type": "string",
+            "label": "제목",
+            "required": true,
+            "maxLength": 300,
+            "description": "자료의 제목"
+          },
+          "url": {
+            "type": "url",
+            "label": "주소",
+            "required": true,
+            "maxLength": 2000,
+            "description": "자료 주소. https:// 를 빼고 적으면 저장할 때 붙인다"
+          },
+          "publisher": {
+            "type": "string",
+            "label": "발행처",
+            "required": false,
+            "maxLength": 200,
+            "description": "자료를 낸 곳. 예: 금융감독원, 한국경제"
+          },
+          "documentType": {
+            "type": "enum",
+            "label": "자료 종류",
+            "required": false,
+            "values": [
+              "FILING",
+              "NEWS",
+              "REPORT",
+              "IR",
+              "BOOK",
+              "LETTER",
+              "SPEECH",
+              "OTHER"
+            ],
+            "valueLabels": {
+              "FILING": "공시",
+              "NEWS": "뉴스",
+              "REPORT": "보고서",
+              "IR": "IR 자료",
+              "BOOK": "책",
+              "LETTER": "서한",
+              "SPEECH": "강연과 인터뷰",
+              "OTHER": "기타"
+            },
+            "description": "자료의 성격"
+          },
+          "publishedAt": {
+            "type": "date",
+            "label": "공개일",
+            "required": false,
+            "description": "자료가 공개된 날. 모르면 비워 둔다"
+          },
+          "collectedAt": {
+            "type": "datetime",
+            "label": "수집 시각",
+            "required": true,
+            "description": "이 자료를 확인한 시각"
+          }
+        },
+        "hintProperties": [
+          "publisher",
+          "publishedAt"
+        ],
+        "searchProperties": [],
+        "display": {
+          "color": "#d97706",
+          "shape": "round-rectangle"
+        }
+      },
+      "Person": {
+        "label": "인물",
+        "description": "투자자, 경영자, 경제학자 같은 인물이다.",
+        "labelProperty": "name",
+        "properties": {
+          "name": {
+            "type": "string",
+            "label": "이름",
+            "required": true,
+            "maxLength": 200,
+            "description": "인물의 이름. 예: 워런 버핏"
+          },
+          "englishName": {
+            "type": "string",
+            "label": "영문 이름",
+            "required": false,
+            "maxLength": 200,
+            "description": "영문 이름. 검색에 쓴다. 예: Warren Buffett"
+          },
+          "role": {
+            "type": "enum",
+            "label": "구분",
+            "required": false,
+            "values": [
+              "INVESTOR",
+              "EXECUTIVE",
+              "ECONOMIST",
+              "OTHER"
+            ],
+            "valueLabels": {
+              "INVESTOR": "투자자",
+              "EXECUTIVE": "경영자",
+              "ECONOMIST": "경제학자",
+              "OTHER": "기타"
+            },
+            "description": "인물이 주로 한 일"
+          },
+          "country": {
+            "type": "enum",
+            "label": "국가",
+            "required": false,
+            "values": [
+              "KR",
+              "US",
+              "JP",
+              "CN",
+              "TW",
+              "HK",
+              "NL",
+              "DE",
+              "GB",
+              "FR",
+              "OTHER"
+            ],
+            "valueLabels": {
+              "KR": "대한민국 (KR)",
+              "US": "미국 (US)",
+              "JP": "일본 (JP)",
+              "CN": "중국 (CN)",
+              "TW": "대만 (TW)",
+              "HK": "홍콩 (HK)",
+              "NL": "네덜란드 (NL)",
+              "DE": "독일 (DE)",
+              "GB": "영국 (GB)",
+              "FR": "프랑스 (FR)",
+              "OTHER": "기타"
+            },
+            "description": "주로 활동한 나라"
+          },
+          "birthYear": {
+            "type": "integer",
+            "label": "태어난 해",
+            "required": false,
+            "min": 1000.0,
+            "max": 2100.0,
+            "description": "태어난 해. 예: 1930"
+          },
+          "deathYear": {
+            "type": "integer",
+            "label": "세상을 떠난 해",
+            "required": false,
+            "min": 1000.0,
+            "max": 2100.0,
+            "description": "살아 있으면 비워 둔다"
+          },
+          "description": {
+            "type": "text",
+            "label": "소개",
+            "required": false,
+            "maxLength": 4000,
+            "description": "인물을 소개하는 글"
+          }
+        },
+        "hintProperties": [
+          "role",
+          "country"
+        ],
+        "searchProperties": [
+          "englishName"
+        ],
+        "display": {
+          "color": "#db2777",
+          "shape": "round-tag"
+        }
+      },
+      "Concept": {
+        "label": "개념",
+        "description": "안전마진, 경제적 해자 같은 투자 개념과 원칙이다.",
+        "labelProperty": "name",
+        "properties": {
+          "name": {
+            "type": "string",
+            "label": "개념 이름",
+            "required": true,
+            "maxLength": 200,
+            "description": "개념의 이름. 예: 안전마진"
+          },
+          "englishName": {
+            "type": "string",
+            "label": "영문 이름",
+            "required": false,
+            "maxLength": 200,
+            "description": "영문 이름. 검색에 쓴다. 예: Margin of Safety"
+          },
+          "category": {
+            "type": "enum",
+            "label": "분류",
+            "required": false,
+            "values": [
+              "VALUATION",
+              "BUSINESS",
+              "RISK",
+              "BEHAVIOR",
+              "STRATEGY",
+              "OTHER"
+            ],
+            "valueLabels": {
+              "VALUATION": "가치 평가",
+              "BUSINESS": "사업의 질",
+              "RISK": "위험 관리",
+              "BEHAVIOR": "투자 심리",
+              "STRATEGY": "투자 방식",
+              "OTHER": "기타"
+            },
+            "description": "개념이 다루는 영역"
+          },
+          "summary": {
+            "type": "string",
+            "label": "한 줄 정의",
+            "required": true,
+            "maxLength": 300,
+            "description": "개념을 한 문장으로 정의한다"
+          },
+          "description": {
+            "type": "text",
+            "label": "설명",
+            "required": false,
+            "maxLength": 4000,
+            "description": "더 자세한 설명"
+          }
+        },
+        "hintProperties": [
+          "category"
+        ],
+        "searchProperties": [
+          "englishName"
+        ],
+        "display": {
+          "color": "#475569",
+          "shape": "round-pentagon"
+        }
+      },
+      "Change": {
+        "label": "세상의 변화",
+        "description": "투자 판단에 영향을 주는 세상의 변화다.",
+        "labelProperty": "title",
+        "properties": {
+          "title": {
+            "type": "string",
+            "label": "변화",
+            "required": true,
+            "maxLength": 300,
+            "description": "변화를 한 문장으로 적는다. 예: AI 서버가 늘면서 고성능 메모리 수요가 커진다"
+          },
+          "category": {
+            "type": "enum",
+            "label": "분류",
+            "required": true,
+            "values": [
+              "TECHNOLOGY",
+              "DEMOGRAPHIC",
+              "SOCIOCULTURAL",
+              "OTHER"
+            ],
+            "valueLabels": {
+              "TECHNOLOGY": "기술",
+              "DEMOGRAPHIC": "인구",
+              "SOCIOCULTURAL": "사회와 문화",
+              "OTHER": "기타"
+            },
+            "description": ""
+          },
+          "since": {
+            "type": "string",
+            "label": "언제부터",
+            "required": false,
+            "maxLength": 64,
+            "description": "예: 2023년부터. 모르면 비워 둔다"
+          },
+          "durability": {
+            "type": "text",
+            "label": "오래 가는 이유",
+            "required": false,
+            "maxLength": 4000,
+            "description": ""
+          },
+          "description": {
+            "type": "text",
+            "label": "메모",
+            "required": false,
+            "maxLength": 4000,
+            "description": ""
+          }
+        },
+        "hintProperties": [
+          "category"
+        ],
+        "searchProperties": [],
+        "display": {
+          "color": "#0891b2",
+          "shape": "round-pentagon"
+        }
+      },
+      "Bottleneck": {
+        "label": "병목",
+        "description": "수요를 공급이 따라가지 못하는 구간이다.",
+        "labelProperty": "title",
+        "properties": {
+          "title": {
+            "type": "string",
+            "label": "병목",
+            "required": true,
+            "maxLength": 300,
+            "description": "수요를 공급이 따라가지 못하는 구간. 예: HBM 생산과 고적층 패키징"
+          },
+          "status": {
+            "type": "enum",
+            "label": "상태",
+            "required": true,
+            "values": [
+              "HYPOTHESIS",
+              "CONFIRMED",
+              "RESOLVED"
+            ],
+            "valueLabels": {
+              "HYPOTHESIS": "가설",
+              "CONFIRMED": "확인",
+              "RESOLVED": "해소"
+            },
+            "description": ""
+          },
+          "demandEvidence": {
+            "type": "text",
+            "label": "수요 근거",
+            "required": false,
+            "maxLength": 4000,
+            "description": ""
+          },
+          "supplyConstraint": {
+            "type": "text",
+            "label": "공급 제약",
+            "required": false,
+            "maxLength": 4000,
+            "description": ""
+          },
+          "resolutionPath": {
+            "type": "text",
+            "label": "해소 경로",
+            "required": false,
+            "maxLength": 4000,
+            "description": "증설, 대체 기술처럼 병목이 풀릴 길"
+          },
+          "expectedResolution": {
+            "type": "string",
+            "label": "예상 해소 시점",
+            "required": false,
+            "maxLength": 64,
+            "description": "예: 2027년 하반기. 모르면 비워 둔다"
+          },
+          "description": {
+            "type": "text",
+            "label": "메모",
+            "required": false,
+            "maxLength": 4000,
+            "description": ""
+          }
+        },
+        "hintProperties": [
+          "status"
+        ],
+        "searchProperties": [],
+        "display": {
+          "color": "#dc2626",
+          "shape": "hexagon"
+        }
+      },
+      "Valuation": {
+        "label": "밸류에이션",
+        "description": "한 기업의 가치를 한 기준일에 평가한 기록이다.",
+        "labelProperty": "title",
+        "properties": {
+          "title": {
+            "type": "string",
+            "label": "이름",
+            "required": true,
+            "maxLength": 200,
+            "description": "예: FLNC 2026-09-14"
+          },
+          "asOf": {
+            "type": "date",
+            "label": "기준일",
+            "required": false,
+            "description": "평가한 날. 모르면 비워 둔다"
+          },
+          "currentPrice": {
+            "type": "number",
+            "label": "현재가",
+            "required": true,
+            "min": 0.0,
+            "description": "기준일의 주가"
+          },
+          "currency": {
+            "type": "enum",
+            "label": "통화",
+            "required": false,
+            "values": [
+              "KRW",
+              "USD",
+              "JPY",
+              "CNY",
+              "TWD",
+              "HKD",
+              "EUR",
+              "GBP"
+            ],
+            "valueLabels": {
+              "KRW": "원 (KRW)",
+              "USD": "미국 달러 (USD)",
+              "JPY": "엔 (JPY)",
+              "CNY": "위안 (CNY)",
+              "TWD": "대만 달러 (TWD)",
+              "HKD": "홍콩 달러 (HKD)",
+              "EUR": "유로 (EUR)",
+              "GBP": "파운드 (GBP)"
+            },
+            "description": ""
+          },
+          "method": {
+            "type": "enum",
+            "label": "방법",
+            "required": false,
+            "values": [
+              "PER",
+              "PBR",
+              "EV_SALES",
+              "EV_EBITDA",
+              "DCF",
+              "REVERSE_DCF",
+              "OTHER"
+            ],
+            "valueLabels": {
+              "PER": "PER",
+              "PBR": "PBR",
+              "EV_SALES": "EV/매출",
+              "EV_EBITDA": "EV/EBITDA",
+              "DCF": "DCF",
+              "REVERSE_DCF": "역DCF",
+              "OTHER": "기타"
+            },
+            "description": ""
+          },
+          "description": {
+            "type": "text",
+            "label": "메모",
+            "required": false,
+            "maxLength": 4000,
+            "description": ""
+          }
+        },
+        "hintProperties": [
+          "asOf",
+          "method"
+        ],
+        "searchProperties": [],
+        "display": {
+          "color": "#16a34a",
+          "shape": "round-rectangle"
+        }
+      },
+      "Scenario": {
+        "label": "시나리오",
+        "description": "비관, 기준, 낙관 가운데 한 가정으로 계산한 주당 가치다.",
+        "labelProperty": "title",
+        "properties": {
+          "title": {
+            "type": "string",
+            "label": "이름",
+            "required": true,
+            "maxLength": 200,
+            "description": "예: FLNC 비관"
+          },
+          "kind": {
+            "type": "enum",
+            "label": "종류",
+            "required": true,
+            "values": [
+              "BEAR",
+              "BASE",
+              "BULL"
+            ],
+            "valueLabels": {
+              "BEAR": "비관",
+              "BASE": "기준",
+              "BULL": "낙관"
+            },
+            "description": ""
+          },
+          "valuePerShare": {
+            "type": "number",
+            "label": "주당 가치",
+            "required": true,
+            "min": 0.0,
+            "description": "밸류에이션과 같은 통화. 범위로 받았으면 중간값을 넣고 범위는 메모에 적는다"
+          },
+          "assumptions": {
+            "type": "text",
+            "label": "핵심 가정",
+            "required": false,
+            "maxLength": 4000,
+            "description": ""
+          },
+          "description": {
+            "type": "text",
+            "label": "메모",
+            "required": false,
+            "maxLength": 4000,
+            "description": ""
+          }
+        },
+        "hintProperties": [
+          "kind",
+          "valuePerShare"
+        ],
+        "searchProperties": [],
+        "display": {
+          "color": "#65a30d",
+          "shape": "round-tag"
+        }
+      },
+      "Decision": {
+        "label": "투자 결정",
+        "description": "종목에 대해 내린 투자 행동의 기록이다.",
+        "labelProperty": "title",
+        "properties": {
+          "title": {
+            "type": "string",
+            "label": "이름",
+            "required": true,
+            "maxLength": 200,
+            "description": "예: FLNC 첫 매수"
+          },
+          "action": {
+            "type": "enum",
+            "label": "행동",
+            "required": true,
+            "values": [
+              "WATCH",
+              "BUY",
+              "ADD",
+              "TRIM",
+              "EXIT",
+              "HOLD"
+            ],
+            "valueLabels": {
+              "WATCH": "관심 등록",
+              "BUY": "매수",
+              "ADD": "추가 매수",
+              "TRIM": "일부 매도",
+              "EXIT": "전량 매도",
+              "HOLD": "보류"
+            },
+            "description": ""
+          },
+          "decidedAt": {
+            "type": "date",
+            "label": "결정일",
+            "required": false,
+            "description": "모르면 비워 둔다"
+          },
+          "reason": {
+            "type": "text",
+            "label": "이유",
+            "required": false,
+            "maxLength": 4000,
+            "description": ""
+          }
+        },
+        "hintProperties": [
+          "action",
+          "decidedAt"
+        ],
+        "searchProperties": [],
+        "display": {
+          "color": "#7c3aed",
+          "shape": "round-diamond"
+        }
+      },
+      "Claim": {
+        "label": "주장",
+        "description": "근거 문서와 함께 등록하고 다른 편집자가 검토하는 주장이다.",
+        "labelProperty": "predicate",
+        "managedBy": "claims",
+        "properties": {
+          "predicate": {
+            "type": "enum",
+            "label": "관계 종류",
+            "required": true,
+            "values": [
+              "BELONGS_TO_SECTOR",
+              "ADVOCATES",
+              "CRITICIZES"
+            ],
+            "valueLabels": {
+              "BELONGS_TO_SECTOR": "속한다",
+              "ADVOCATES": "강조한다",
+              "CRITICIZES": "비판한다"
+            },
+            "description": "주장이 말하는 관계의 종류"
+          },
+          "description": {
+            "type": "text",
+            "label": "설명",
+            "required": true,
+            "maxLength": 4000,
+            "description": "주장을 한두 문장으로 풀어 쓴 글"
+          },
+          "evidenceText": {
+            "type": "text",
+            "label": "근거 문장",
+            "required": true,
+            "maxLength": 4000,
+            "description": "근거 문서에서 그대로 옮긴 문장"
+          },
+          "validFrom": {
+            "type": "date",
+            "label": "시작일",
+            "required": false,
+            "description": "관계가 시작된 날. 모르면 비워 두고 미상으로 표시한다"
+          },
+          "validTo": {
+            "type": "date",
+            "label": "종료일",
+            "required": false,
+            "description": "관계가 끝난 날. 모르면 비워 두고 미상으로 표시한다"
+          },
+          "authoringMethod": {
+            "type": "enum",
+            "label": "작성 방식",
+            "required": true,
+            "values": [
+              "MANUAL",
+              "AI"
+            ],
+            "valueLabels": {
+              "MANUAL": "직접 작성",
+              "AI": "AI 추출"
+            },
+            "description": "사람이 직접 썼는지 AI 가 뽑았는지"
+          },
+          "extractionConfidence": {
+            "type": "number",
+            "label": "확신도",
+            "required": false,
+            "min": 0.0,
+            "max": 1.0,
+            "description": "AI 가 뽑은 내용이 맞을 가능성을 0 에서 1 사이로 적는다. 투자 성공 확률이 아니다"
+          }
+        },
+        "hintProperties": [],
+        "searchProperties": [],
+        "display": {
+          "color": "#dc2626",
+          "shape": "round-diamond"
+        }
+      }
+    },
+    "relationshipTypes": {
+      "ISSUES": {
+        "label": "발행한다",
+        "description": "기업이 종목을 발행한다. 근거가 필요 없는 식별 관계다.",
+        "from": [
+          "Company"
+        ],
+        "to": [
+          "Security"
+        ],
+        "sentence": "{from}이(가) {to}을(를) 발행한다",
+        "createPicker": {
+          "label": "발행 기업",
+          "description": "이 종목을 발행한 기업. 고르면 종목을 만든 뒤 발행 관계를 함께 만든다. 몰라도 비워 둘 수 있다"
+        }
+      },
+      "AUTHORED": {
+        "label": "썼다",
+        "description": "인물이 책, 서한, 강연 같은 자료를 썼다.",
+        "from": [
+          "Person"
+        ],
+        "to": [
+          "Document"
+        ],
+        "sentence": "{from}이(가) {to}을(를) 썼다",
+        "createPicker": {
+          "label": "저자",
+          "description": "이 자료를 쓴 인물. 고르면 자료를 만든 뒤 「썼다」 관계를 함께 만든다"
+        }
+      },
+      "RELATED_TO": {
+        "label": "관련된다",
+        "description": "두 개념이 서로 관련된다. 근거가 필요 없는 식별 관계다.",
+        "from": [
+          "Concept"
+        ],
+        "to": [
+          "Concept"
+        ],
+        "sentence": "{from}은(는) {to}와(과) 관련된다",
+        "createPicker": null
+      },
+      "CREATES": {
+        "label": "만든다",
+        "description": "변화가 병목을 만든다.",
+        "from": [
+          "Change"
+        ],
+        "to": [
+          "Bottleneck"
+        ],
+        "sentence": "{from}이(가) {to}을(를) 만든다",
+        "createPicker": {
+          "label": "이 병목을 만든 변화",
+          "description": "이 병목을 만든 변화를 고른다. 몰라도 비워 둘 수 있다"
+        }
+      },
+      "HAS_BOTTLENECK": {
+        "label": "병목이 있다",
+        "description": "산업에 병목이 있다.",
+        "from": [
+          "Sector"
+        ],
+        "to": [
+          "Bottleneck"
+        ],
+        "sentence": "{to}은(는) {from}에 있는 병목이다",
+        "createPicker": {
+          "label": "병목이 있는 산업",
+          "description": "이 병목이 있는 산업을 고른다. 몰라도 비워 둘 수 있다"
+        }
+      },
+      "BENEFITS": {
+        "label": "이익을 준다",
+        "description": "병목이 기업에 이익을 준다.",
+        "from": [
+          "Bottleneck"
+        ],
+        "to": [
+          "Company"
+        ],
+        "sentence": "{from}이(가) {to}에 이익을 준다",
+        "createPicker": {
+          "label": "이익을 가져가는 병목",
+          "description": "이 기업이 이익을 가져가는 병목을 고른다. 몰라도 비워 둘 수 있다"
+        }
+      },
+      "HAS_VALUATION": {
+        "label": "밸류에이션",
+        "description": "기업에 밸류에이션이 있다.",
+        "from": [
+          "Company"
+        ],
+        "to": [
+          "Valuation"
+        ],
+        "sentence": "{to}은(는) {from}의 가치를 평가한다",
+        "createPicker": {
+          "label": "평가한 기업",
+          "description": "이 밸류에이션으로 평가한 기업을 고른다. 몰라도 비워 둘 수 있다"
+        }
+      },
+      "HAS_SCENARIO": {
+        "label": "시나리오",
+        "description": "밸류에이션에 시나리오가 있다.",
+        "from": [
+          "Valuation"
+        ],
+        "to": [
+          "Scenario"
+        ],
+        "sentence": "{to}은(는) {from}의 시나리오 가운데 하나다",
+        "createPicker": {
+          "label": "시나리오가 속한 밸류에이션",
+          "description": "이 시나리오가 속한 밸류에이션을 고른다. 몰라도 비워 둘 수 있다"
+        }
+      },
+      "HAS_DECISION": {
+        "label": "결정",
+        "description": "종목에 투자 결정이 있다.",
+        "from": [
+          "Security"
+        ],
+        "to": [
+          "Decision"
+        ],
+        "sentence": "{to}은(는) {from}에 대한 결정이다",
+        "createPicker": {
+          "label": "결정한 종목",
+          "description": "이 투자 결정을 내린 종목을 고른다. 몰라도 비워 둘 수 있다"
+        }
+      },
+      "BASED_ON": {
+        "label": "결정의 근거",
+        "description": "밸류에이션이 투자 결정의 근거다.",
+        "from": [
+          "Valuation"
+        ],
+        "to": [
+          "Decision"
+        ],
+        "sentence": "{to}은(는) {from}을(를) 근거로 한다",
+        "createPicker": {
+          "label": "결정에 쓴 밸류에이션",
+          "description": "이 투자 결정에 쓴 밸류에이션을 고른다. 몰라도 비워 둘 수 있다"
+        }
+      },
+      "EVIDENCED_BY": {
+        "label": "근거 자료",
+        "description": "변화와 병목과 밸류에이션이 자료로 뒷받침된다.",
+        "from": [
+          "Change",
+          "Bottleneck",
+          "Valuation"
+        ],
+        "to": [
+          "Document"
+        ],
+        "sentence": "{to}이(가) {from}을(를) 뒷받침한다",
+        "createPicker": {
+          "label": "이 자료가 근거인 항목",
+          "description": "이 자료가 근거인 변화, 병목, 밸류에이션을 고른다. 몰라도 비워 둘 수 있다"
+        }
+      },
+      "USES_CONCEPT": {
+        "label": "쓰는 개념",
+        "description": "투자 온톨로지 항목이 판단에 쓴 투자 개념이다. 근거가 필요 없는 식별 관계다.",
+        "from": [
+          "Change",
+          "Bottleneck",
+          "Company",
+          "Valuation",
+          "Scenario",
+          "Decision"
+        ],
+        "to": [
+          "Concept"
+        ],
+        "sentence": "{from}은(는) {to} 개념을 쓴다",
+        "createPicker": null
+      }
+    },
+    "claimRelationships": {
+      "SUBJECT": {
+        "label": "주체",
+        "description": "주장의 주어",
+        "from": [
+          "Claim"
+        ],
+        "to": []
+      },
+      "OBJECT": {
+        "label": "대상",
+        "description": "주장의 목적어",
+        "from": [
+          "Claim"
+        ],
+        "to": []
+      },
+      "SUPPORTED_BY": {
+        "label": "근거 문서",
+        "description": "주장의 근거 자료",
+        "from": [
+          "Claim"
+        ],
+        "to": [
+          "Document"
+        ]
+      }
+    },
+    "claimPredicates": {
+      "BELONGS_TO_SECTOR": {
+        "label": "속한다",
+        "description": "주체가 대상 산업에 속한다.",
+        "subjectTypes": [
+          "Company",
+          "Security"
+        ],
+        "objectTypes": [
+          "Sector"
+        ],
+        "sentence": "{subject}이(가) {object}에 속한다"
+      },
+      "ADVOCATES": {
+        "label": "강조한다",
+        "description": "인물이 개념이나 원칙을 강조한다. 짧은 인용과 출처를 근거로 붙인다.",
+        "subjectTypes": [
+          "Person"
+        ],
+        "objectTypes": [
+          "Concept"
+        ],
+        "sentence": "{subject}이(가) {object}을(를) 강조한다"
+      },
+      "CRITICIZES": {
+        "label": "비판한다",
+        "description": "인물이 개념이나 관행을 비판한다.",
+        "subjectTypes": [
+          "Person"
+        ],
+        "objectTypes": [
+          "Concept"
+        ],
+        "sentence": "{subject}이(가) {object}을(를) 비판한다"
+      }
+    },
+    "reviewStatuses": {
+      "DRAFT": {
+        "label": "초안",
+        "description": "아직 다른 편집자가 확인하지 않았다"
+      },
+      "REVIEWED": {
+        "label": "검토 완료",
+        "description": "다른 편집자가 근거를 확인했다"
+      },
+      "REJECTED": {
+        "label": "반려",
+        "description": "다른 편집자가 받아들이지 않았다"
+      }
+    },
+    "changeActions": {
+      "CREATE": {
+        "label": "만들기"
+      },
+      "UPDATE": {
+        "label": "수정"
+      },
+      "REVIEW": {
+        "label": "검토"
+      },
+      "ARCHIVE": {
+        "label": "보관"
+      },
+      "RESTORE": {
+        "label": "복원"
+      }
+    },
+    "changeFields": {
+      "subjectId": {
+        "label": "주체"
+      },
+      "objectId": {
+        "label": "대상"
+      },
+      "documentIds": {
+        "label": "근거 문서"
+      },
+      "fromId": {
+        "label": "시작"
+      },
+      "toId": {
+        "label": "끝"
+      },
+      "reviewStatus": {
+        "label": "검토 상태"
+      },
+      "reviewedBy": {
+        "label": "검토자"
+      },
+      "reviewedAt": {
+        "label": "검토 시각"
+      },
+      "reviewNote": {
+        "label": "검토 메모"
+      },
+      "archived": {
+        "label": "보관"
+      },
+      "email": {
+        "label": "이메일"
+      },
+      "displayName": {
+        "label": "표시 이름"
+      },
+      "role": {
+        "label": "역할"
+      },
+      "enabled": {
+        "label": "활성"
+      },
+      "added": {
+        "label": "더한 항목"
+      },
+      "removed": {
+        "label": "뺀 항목"
+      },
+      "changed": {
+        "label": "바뀐 항목"
+      }
+    },
+    "version": 1,
+    "versionCreatedAt": "2026-01-01T00:00:00.000000Z",
+    "versionCreatedBy": null
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/ontology/versions",
+    "query": "page=0&size=20"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "version": 1,
+        "createdAt": "2026-01-01T00:00:00.000000Z",
+        "createdBy": null,
+        "note": "저장소 YAML 로 만든 첫 버전",
+        "restoredFrom": null
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}

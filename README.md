@@ -164,6 +164,10 @@ bash scripts/tests/test_scripts.sh          # 스크립트 문법, 포트, cap_d
 # cwd: api
 ./gradlew test                               # Docker 없이 테스트 JVM 안에 Neo4j 와 가짜 OIDC 공급자를 띄워요
 
+# cwd: api
+./gradlew test --rerun --tests '*ApiSnapshotTest'   # web/e2e/fixtures/*.json 을 다시 써요. 바뀐 파일은 함께 커밋해요
+git diff --stat -- ../web/e2e/fixtures
+
 # cwd: web
 npm ci && npm run typecheck && npm test && npm run build
 ```

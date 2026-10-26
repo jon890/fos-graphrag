@@ -1,0 +1,197 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/nodes/00000000-0000-4000-8000-000000000010",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "node": {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "type": "Document",
+      "label": "가상전자 2026 사업보고서",
+      "properties": {
+        "title": "가상전자 2026 사업보고서",
+        "url": "https://example.com/virtual-electronics-2026",
+        "publisher": "가상공시",
+        "documentType": "FILING",
+        "publishedAt": "2026-03-15",
+        "collectedAt": "2026-10-20T03:00:00Z"
+      },
+      "revision": 1,
+      "archived": false,
+      "archivedAt": null,
+      "createdAt": "2026-01-01T00:00:42.000000Z",
+      "createdBy": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "email": "alice@example.com",
+        "displayName": "Alice"
+      },
+      "updatedAt": "2026-01-01T00:00:42.000000Z",
+      "updatedBy": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "email": "alice@example.com",
+        "displayName": "Alice"
+      },
+      "reviewStatus": null
+    },
+    "claim": null,
+    "relationships": [
+      {
+        "id": "00000000-0000-4000-8000-000000000025",
+        "type": "EVIDENCED_BY",
+        "from": {
+          "id": "00000000-0000-4000-8000-000000000016",
+          "type": "Bottleneck",
+          "label": "HBM 생산과 고적층 패키징",
+          "archived": false
+        },
+        "to": {
+          "id": "00000000-0000-4000-8000-000000000010",
+          "type": "Document",
+          "label": "가상전자 2026 사업보고서",
+          "archived": false
+        },
+        "revision": 1,
+        "archived": false,
+        "createdAt": "2026-01-01T00:00:44.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        }
+      }
+    ],
+    "claims": [
+      {
+        "id": "00000000-0000-4000-8000-000000000019",
+        "type": "Claim",
+        "label": "가상전자 → 가상 메모리 반도체 속한다",
+        "properties": {
+          "predicate": "BELONGS_TO_SECTOR",
+          "description": "가상전자는 메모리 반도체 산업에 속한다.",
+          "evidenceText": "당사는 D램과 낸드 플래시를 주력으로 생산한다.",
+          "authoringMethod": "MANUAL"
+        },
+        "revision": 2,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:46.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "updatedAt": "2026-01-01T00:00:49.000000Z",
+        "updatedBy": {
+          "id": "00000000-0000-4000-8000-000000000020",
+          "email": "bob@example.com",
+          "displayName": "Bob"
+        },
+        "reviewStatus": "REVIEWED",
+        "reviewedBy": {
+          "id": "00000000-0000-4000-8000-000000000020",
+          "email": "bob@example.com",
+          "displayName": "Bob"
+        },
+        "reviewedAt": "2026-01-01T00:00:48.000000Z",
+        "reviewNote": "사업보고서와 맞다",
+        "contentUpdatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "subject": {
+          "id": "00000000-0000-4000-8000-000000000005",
+          "type": "Company",
+          "label": "가상전자",
+          "archived": false
+        },
+        "object": {
+          "id": "00000000-0000-4000-8000-000000000021",
+          "type": "Sector",
+          "label": "가상 메모리 반도체",
+          "archived": false
+        },
+        "documents": [
+          {
+            "id": "00000000-0000-4000-8000-000000000010",
+            "title": "가상전자 2026 사업보고서",
+            "url": "https://example.com/virtual-electronics-2026",
+            "publisher": "가상공시",
+            "documentType": "FILING",
+            "publishedAt": "2026-03-15",
+            "collectedAt": "2026-10-20T03:00:00Z",
+            "archived": false
+          }
+        ]
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000023",
+        "type": "Claim",
+        "label": "가상전자 보통주 → 가상 메모리 반도체 속한다",
+        "properties": {
+          "predicate": "BELONGS_TO_SECTOR",
+          "description": "가상전자 보통주는 메모리 반도체 산업에 속한다.",
+          "evidenceText": "당사는 D램과 낸드 플래시를 주력으로 생산한다.",
+          "authoringMethod": "MANUAL"
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:51.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "updatedAt": "2026-01-01T00:00:51.000000Z",
+        "updatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "reviewStatus": "DRAFT",
+        "reviewedBy": null,
+        "reviewedAt": null,
+        "reviewNote": null,
+        "contentUpdatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "subject": {
+          "id": "00000000-0000-4000-8000-000000000013",
+          "type": "Security",
+          "label": "가상전자 보통주",
+          "archived": false
+        },
+        "object": {
+          "id": "00000000-0000-4000-8000-000000000021",
+          "type": "Sector",
+          "label": "가상 메모리 반도체",
+          "archived": false
+        },
+        "documents": [
+          {
+            "id": "00000000-0000-4000-8000-000000000010",
+            "title": "가상전자 2026 사업보고서",
+            "url": "https://example.com/virtual-electronics-2026",
+            "publisher": "가상공시",
+            "documentType": "FILING",
+            "publishedAt": "2026-03-15",
+            "collectedAt": "2026-10-20T03:00:00Z",
+            "archived": false
+          }
+        ]
+      }
+    ],
+    "concepts": [],
+    "relationshipsTruncated": false,
+    "claimsTruncated": false,
+    "limits": {
+      "maxRelationships": 100,
+      "maxClaims": 50
+    }
+  }
+}

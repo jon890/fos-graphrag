@@ -1,0 +1,20 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/me/knowledge/summary",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "counts": {
+      "KNOWN": 0,
+      "UNSURE": 1,
+      "LEARNING": 0
+    },
+    "decisions": {
+      "total": 5,
+      "understood": 0
+    },
+    "decisionsTruncated": false
+  }
+}

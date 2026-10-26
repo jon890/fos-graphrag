@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/auth/me",
+    "query": ""
+  },
+  "status": 401,
+  "body": {
+    "code": "UNAUTHENTICATED",
+    "message": "로그인이 필요합니다.",
+    "details": {}
+  }
+}

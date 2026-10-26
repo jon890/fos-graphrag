@@ -1,0 +1,110 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/nodes",
+    "query": "types=Company&sort=recent&size=5"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000005",
+        "type": "Company",
+        "label": "가상전자",
+        "properties": {
+          "name": "가상전자",
+          "country": "KR"
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:19.000000Z",
+        "createdBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "updatedAt": "2026-01-01T00:00:19.000000Z",
+        "updatedBy": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "reviewStatus": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000006",
+        "type": "Company",
+        "label": "PoET Technologies",
+        "properties": {
+          "name": "PoET Technologies",
+          "country": "OTHER",
+          "description": "캐나다 기업"
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:04.000000Z",
+        "createdBy": null,
+        "updatedAt": "2026-01-01T00:00:04.000000Z",
+        "updatedBy": null,
+        "reviewStatus": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000007",
+        "type": "Company",
+        "label": "Fluence Energy",
+        "properties": {
+          "name": "Fluence Energy",
+          "country": "US"
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:03.000000Z",
+        "createdBy": null,
+        "updatedAt": "2026-01-01T00:00:03.000000Z",
+        "updatedBy": null,
+        "reviewStatus": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000008",
+        "type": "Company",
+        "label": "Micron Technology",
+        "properties": {
+          "name": "Micron Technology",
+          "country": "US"
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:02.000000Z",
+        "createdBy": null,
+        "updatedAt": "2026-01-01T00:00:02.000000Z",
+        "updatedBy": null,
+        "reviewStatus": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000009",
+        "type": "Company",
+        "label": "SK하이닉스",
+        "properties": {
+          "name": "SK하이닉스",
+          "country": "KR"
+        },
+        "revision": 1,
+        "archived": false,
+        "archivedAt": null,
+        "createdAt": "2026-01-01T00:00:01.000000Z",
+        "createdBy": null,
+        "updatedAt": "2026-01-01T00:00:01.000000Z",
+        "updatedBy": null,
+        "reviewStatus": null
+      }
+    ],
+    "page": 0,
+    "size": 5,
+    "totalItems": 5,
+    "totalPages": 1
+  }
+}

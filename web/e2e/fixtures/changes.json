@@ -1,0 +1,791 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/changes",
+    "query": "page=0&size=20"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000032",
+        "at": "2026-01-01T00:00:58.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "ARCHIVE",
+        "targetId": "00000000-0000-4000-8000-000000000026",
+        "targetKind": "NODE",
+        "targetType": "Company",
+        "targetLabel": "보관한 가상기업",
+        "revision": 2,
+        "changes": {
+          "archived": {
+            "before": false,
+            "after": true
+          }
+        },
+        "refs": {},
+        "note": "중복 등록"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000033",
+        "at": "2026-01-01T00:00:55.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000026",
+        "targetKind": "NODE",
+        "targetType": "Company",
+        "targetLabel": "보관한 가상기업",
+        "revision": 1,
+        "changes": {
+          "name": {
+            "before": null,
+            "after": "보관한 가상기업"
+          },
+          "country": {
+            "before": null,
+            "after": "KR"
+          }
+        },
+        "refs": {},
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000034",
+        "at": "2026-01-01T00:00:52.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000023",
+        "targetKind": "NODE",
+        "targetType": "Claim",
+        "targetLabel": "가상전자 보통주 → 가상 메모리 반도체 속한다",
+        "revision": 1,
+        "changes": {
+          "predicate": {
+            "before": null,
+            "after": "BELONGS_TO_SECTOR"
+          },
+          "description": {
+            "before": null,
+            "after": "가상전자 보통주는 메모리 반도체 산업에 속한다."
+          },
+          "evidenceText": {
+            "before": null,
+            "after": "당사는 D램과 낸드 플래시를 주력으로 생산한다."
+          },
+          "authoringMethod": {
+            "before": null,
+            "after": "MANUAL"
+          },
+          "subjectId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000013"
+          },
+          "objectId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000021"
+          },
+          "documentIds": {
+            "before": null,
+            "after": [
+              "00000000-0000-4000-8000-000000000010"
+            ]
+          }
+        },
+        "refs": {
+          "00000000-0000-4000-8000-000000000010": {
+            "id": "00000000-0000-4000-8000-000000000010",
+            "type": "Document",
+            "label": "가상전자 2026 사업보고서",
+            "archived": false
+          },
+          "00000000-0000-4000-8000-000000000013": {
+            "id": "00000000-0000-4000-8000-000000000013",
+            "type": "Security",
+            "label": "가상전자 보통주",
+            "archived": false
+          },
+          "00000000-0000-4000-8000-000000000021": {
+            "id": "00000000-0000-4000-8000-000000000021",
+            "type": "Sector",
+            "label": "가상 메모리 반도체",
+            "archived": false
+          }
+        },
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000035",
+        "at": "2026-01-01T00:00:50.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000020",
+          "email": "bob@example.com",
+          "displayName": "Bob"
+        },
+        "action": "REVIEW",
+        "targetId": "00000000-0000-4000-8000-000000000019",
+        "targetKind": "NODE",
+        "targetType": "Claim",
+        "targetLabel": "가상전자 → 가상 메모리 반도체 속한다",
+        "revision": 2,
+        "changes": {
+          "reviewStatus": {
+            "before": "DRAFT",
+            "after": "REVIEWED"
+          }
+        },
+        "refs": {},
+        "note": "사업보고서와 맞다"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000036",
+        "at": "2026-01-01T00:00:47.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000019",
+        "targetKind": "NODE",
+        "targetType": "Claim",
+        "targetLabel": "가상전자 → 가상 메모리 반도체 속한다",
+        "revision": 1,
+        "changes": {
+          "predicate": {
+            "before": null,
+            "after": "BELONGS_TO_SECTOR"
+          },
+          "description": {
+            "before": null,
+            "after": "가상전자는 메모리 반도체 산업에 속한다."
+          },
+          "evidenceText": {
+            "before": null,
+            "after": "당사는 D램과 낸드 플래시를 주력으로 생산한다."
+          },
+          "authoringMethod": {
+            "before": null,
+            "after": "MANUAL"
+          },
+          "subjectId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000005"
+          },
+          "objectId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000021"
+          },
+          "documentIds": {
+            "before": null,
+            "after": [
+              "00000000-0000-4000-8000-000000000010"
+            ]
+          }
+        },
+        "refs": {
+          "00000000-0000-4000-8000-000000000005": {
+            "id": "00000000-0000-4000-8000-000000000005",
+            "type": "Company",
+            "label": "가상전자",
+            "archived": false
+          },
+          "00000000-0000-4000-8000-000000000010": {
+            "id": "00000000-0000-4000-8000-000000000010",
+            "type": "Document",
+            "label": "가상전자 2026 사업보고서",
+            "archived": false
+          },
+          "00000000-0000-4000-8000-000000000021": {
+            "id": "00000000-0000-4000-8000-000000000021",
+            "type": "Sector",
+            "label": "가상 메모리 반도체",
+            "archived": false
+          }
+        },
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000037",
+        "at": "2026-01-01T00:00:45.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000025",
+        "targetKind": "RELATIONSHIP",
+        "targetType": "EVIDENCED_BY",
+        "targetLabel": "HBM 생산과 고적층 패키징 → 가상전자 2026 사업보고서",
+        "revision": 1,
+        "changes": {
+          "fromId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000016"
+          },
+          "toId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000010"
+          }
+        },
+        "refs": {
+          "00000000-0000-4000-8000-000000000010": {
+            "id": "00000000-0000-4000-8000-000000000010",
+            "type": "Document",
+            "label": "가상전자 2026 사업보고서",
+            "archived": false
+          },
+          "00000000-0000-4000-8000-000000000016": {
+            "id": "00000000-0000-4000-8000-000000000016",
+            "type": "Bottleneck",
+            "label": "HBM 생산과 고적층 패키징",
+            "archived": false
+          }
+        },
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000038",
+        "at": "2026-01-01T00:00:43.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000010",
+        "targetKind": "NODE",
+        "targetType": "Document",
+        "targetLabel": "가상전자 2026 사업보고서",
+        "revision": 1,
+        "changes": {
+          "title": {
+            "before": null,
+            "after": "가상전자 2026 사업보고서"
+          },
+          "url": {
+            "before": null,
+            "after": "https://example.com/virtual-electronics-2026"
+          },
+          "publisher": {
+            "before": null,
+            "after": "가상공시"
+          },
+          "documentType": {
+            "before": null,
+            "after": "FILING"
+          },
+          "publishedAt": {
+            "before": null,
+            "after": "2026-03-15"
+          },
+          "collectedAt": {
+            "before": null,
+            "after": "2026-10-20T03:00:00Z"
+          }
+        },
+        "refs": {},
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000039",
+        "at": "2026-01-01T00:00:41.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000024",
+        "targetKind": "RELATIONSHIP",
+        "targetType": "BASED_ON",
+        "targetLabel": "가상전자 2026-10-20 → 가상전자 첫 매수",
+        "revision": 1,
+        "changes": {
+          "fromId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000011"
+          },
+          "toId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000014"
+          }
+        },
+        "refs": {
+          "00000000-0000-4000-8000-000000000011": {
+            "id": "00000000-0000-4000-8000-000000000011",
+            "type": "Valuation",
+            "label": "가상전자 2026-10-20",
+            "archived": false
+          },
+          "00000000-0000-4000-8000-000000000014": {
+            "id": "00000000-0000-4000-8000-000000000014",
+            "type": "Decision",
+            "label": "가상전자 첫 매수",
+            "archived": false
+          }
+        },
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000040",
+        "at": "2026-01-01T00:00:39.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000022",
+        "targetKind": "RELATIONSHIP",
+        "targetType": "HAS_DECISION",
+        "targetLabel": "가상전자 보통주 → 가상전자 첫 매수",
+        "revision": 1,
+        "changes": {
+          "fromId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000013"
+          },
+          "toId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000014"
+          }
+        },
+        "refs": {
+          "00000000-0000-4000-8000-000000000013": {
+            "id": "00000000-0000-4000-8000-000000000013",
+            "type": "Security",
+            "label": "가상전자 보통주",
+            "archived": false
+          },
+          "00000000-0000-4000-8000-000000000014": {
+            "id": "00000000-0000-4000-8000-000000000014",
+            "type": "Decision",
+            "label": "가상전자 첫 매수",
+            "archived": false
+          }
+        },
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000041",
+        "at": "2026-01-01T00:00:37.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000042",
+        "targetKind": "RELATIONSHIP",
+        "targetType": "HAS_SCENARIO",
+        "targetLabel": "가상전자 2026-10-20 → 가상전자 기준",
+        "revision": 1,
+        "changes": {
+          "fromId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000011"
+          },
+          "toId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000012"
+          }
+        },
+        "refs": {
+          "00000000-0000-4000-8000-000000000011": {
+            "id": "00000000-0000-4000-8000-000000000011",
+            "type": "Valuation",
+            "label": "가상전자 2026-10-20",
+            "archived": false
+          },
+          "00000000-0000-4000-8000-000000000012": {
+            "id": "00000000-0000-4000-8000-000000000012",
+            "type": "Scenario",
+            "label": "가상전자 기준",
+            "archived": false
+          }
+        },
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000043",
+        "at": "2026-01-01T00:00:36.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000018",
+        "targetKind": "RELATIONSHIP",
+        "targetType": "HAS_VALUATION",
+        "targetLabel": "가상전자 → 가상전자 2026-10-20",
+        "revision": 1,
+        "changes": {
+          "fromId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000005"
+          },
+          "toId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000011"
+          }
+        },
+        "refs": {
+          "00000000-0000-4000-8000-000000000005": {
+            "id": "00000000-0000-4000-8000-000000000005",
+            "type": "Company",
+            "label": "가상전자",
+            "archived": false
+          },
+          "00000000-0000-4000-8000-000000000011": {
+            "id": "00000000-0000-4000-8000-000000000011",
+            "type": "Valuation",
+            "label": "가상전자 2026-10-20",
+            "archived": false
+          }
+        },
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000044",
+        "at": "2026-01-01T00:00:34.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000017",
+        "targetKind": "RELATIONSHIP",
+        "targetType": "ISSUES",
+        "targetLabel": "가상전자 → 가상전자 보통주",
+        "revision": 1,
+        "changes": {
+          "fromId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000005"
+          },
+          "toId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000013"
+          }
+        },
+        "refs": {
+          "00000000-0000-4000-8000-000000000005": {
+            "id": "00000000-0000-4000-8000-000000000005",
+            "type": "Company",
+            "label": "가상전자",
+            "archived": false
+          },
+          "00000000-0000-4000-8000-000000000013": {
+            "id": "00000000-0000-4000-8000-000000000013",
+            "type": "Security",
+            "label": "가상전자 보통주",
+            "archived": false
+          }
+        },
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000045",
+        "at": "2026-01-01T00:00:32.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000015",
+        "targetKind": "RELATIONSHIP",
+        "targetType": "BENEFITS",
+        "targetLabel": "HBM 생산과 고적층 패키징 → 가상전자",
+        "revision": 1,
+        "changes": {
+          "fromId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000016"
+          },
+          "toId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000005"
+          }
+        },
+        "refs": {
+          "00000000-0000-4000-8000-000000000005": {
+            "id": "00000000-0000-4000-8000-000000000005",
+            "type": "Company",
+            "label": "가상전자",
+            "archived": false
+          },
+          "00000000-0000-4000-8000-000000000016": {
+            "id": "00000000-0000-4000-8000-000000000016",
+            "type": "Bottleneck",
+            "label": "HBM 생산과 고적층 패키징",
+            "archived": false
+          }
+        },
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000046",
+        "at": "2026-01-01T00:00:30.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000029",
+        "targetKind": "RELATIONSHIP",
+        "targetType": "HAS_BOTTLENECK",
+        "targetLabel": "가상 메모리 반도체 → HBM 생산과 고적층 패키징",
+        "revision": 1,
+        "changes": {
+          "fromId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000021"
+          },
+          "toId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000016"
+          }
+        },
+        "refs": {
+          "00000000-0000-4000-8000-000000000016": {
+            "id": "00000000-0000-4000-8000-000000000016",
+            "type": "Bottleneck",
+            "label": "HBM 생산과 고적층 패키징",
+            "archived": false
+          },
+          "00000000-0000-4000-8000-000000000021": {
+            "id": "00000000-0000-4000-8000-000000000021",
+            "type": "Sector",
+            "label": "가상 메모리 반도체",
+            "archived": false
+          }
+        },
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000047",
+        "at": "2026-01-01T00:00:29.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000028",
+        "targetKind": "RELATIONSHIP",
+        "targetType": "CREATES",
+        "targetLabel": "AI 서버가 늘면서 고성능 메모리 수요가 커진다 → HBM 생산과 고적층 패키징",
+        "revision": 1,
+        "changes": {
+          "fromId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000027"
+          },
+          "toId": {
+            "before": null,
+            "after": "00000000-0000-4000-8000-000000000016"
+          }
+        },
+        "refs": {
+          "00000000-0000-4000-8000-000000000016": {
+            "id": "00000000-0000-4000-8000-000000000016",
+            "type": "Bottleneck",
+            "label": "HBM 생산과 고적층 패키징",
+            "archived": false
+          },
+          "00000000-0000-4000-8000-000000000027": {
+            "id": "00000000-0000-4000-8000-000000000027",
+            "type": "Change",
+            "label": "AI 서버가 늘면서 고성능 메모리 수요가 커진다",
+            "archived": false
+          }
+        },
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000048",
+        "at": "2026-01-01T00:00:28.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000014",
+        "targetKind": "NODE",
+        "targetType": "Decision",
+        "targetLabel": "가상전자 첫 매수",
+        "revision": 1,
+        "changes": {
+          "title": {
+            "before": null,
+            "after": "가상전자 첫 매수"
+          },
+          "action": {
+            "before": null,
+            "after": "BUY"
+          },
+          "decidedAt": {
+            "before": null,
+            "after": "2026-10-24"
+          }
+        },
+        "refs": {},
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000049",
+        "at": "2026-01-01T00:00:26.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000012",
+        "targetKind": "NODE",
+        "targetType": "Scenario",
+        "targetLabel": "가상전자 기준",
+        "revision": 1,
+        "changes": {
+          "title": {
+            "before": null,
+            "after": "가상전자 기준"
+          },
+          "kind": {
+            "before": null,
+            "after": "BASE"
+          },
+          "valuePerShare": {
+            "before": null,
+            "after": 65000.0
+          }
+        },
+        "refs": {},
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000050",
+        "at": "2026-01-01T00:00:24.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000011",
+        "targetKind": "NODE",
+        "targetType": "Valuation",
+        "targetLabel": "가상전자 2026-10-20",
+        "revision": 1,
+        "changes": {
+          "title": {
+            "before": null,
+            "after": "가상전자 2026-10-20"
+          },
+          "currentPrice": {
+            "before": null,
+            "after": 50000.0
+          },
+          "currency": {
+            "before": null,
+            "after": "KRW"
+          },
+          "method": {
+            "before": null,
+            "after": "PER"
+          }
+        },
+        "refs": {},
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000051",
+        "at": "2026-01-01T00:00:22.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000013",
+        "targetKind": "NODE",
+        "targetType": "Security",
+        "targetLabel": "가상전자 보통주",
+        "revision": 1,
+        "changes": {
+          "market": {
+            "before": null,
+            "after": "KRX_KOSPI"
+          },
+          "ticker": {
+            "before": null,
+            "after": "900100"
+          },
+          "name": {
+            "before": null,
+            "after": "가상전자 보통주"
+          },
+          "securityType": {
+            "before": null,
+            "after": "COMMON"
+          },
+          "currency": {
+            "before": null,
+            "after": "KRW"
+          }
+        },
+        "refs": {},
+        "note": null
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000052",
+        "at": "2026-01-01T00:00:20.000000Z",
+        "actor": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "email": "alice@example.com",
+          "displayName": "Alice"
+        },
+        "action": "CREATE",
+        "targetId": "00000000-0000-4000-8000-000000000005",
+        "targetKind": "NODE",
+        "targetType": "Company",
+        "targetLabel": "가상전자",
+        "revision": 1,
+        "changes": {
+          "name": {
+            "before": null,
+            "after": "가상전자"
+          },
+          "country": {
+            "before": null,
+            "after": "KR"
+          }
+        },
+        "refs": {},
+        "note": null
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalItems": 133,
+    "totalPages": 7
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/me/proposals/summary",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "pending": 1
+  }
+}

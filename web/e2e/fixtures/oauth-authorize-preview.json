@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/oauth/authorize",
+    "query": "response_type=code&client_id=fixed-client-id-1&redirect_uri=http%3A%2F%2F127.0.0.1%3A43210%2Fcallback&code_challenge=kmsoiiSWSdWZaUw5oYn2fY3guDxIY7SY0Il8Yc1LKG4&code_challenge_method=S256&state=st-%ED%85%8C%EC%8A%A4%ED%8A%B8+%26%EA%B0%92"
+  },
+  "status": 200,
+  "body": {
+    "clientName": "Claude Code",
+    "redirectKind": "LOOPBACK",
+    "redirectHost": "127.0.0.1",
+    "requestedScope": "READ_WRITE",
+    "user": {
+      "displayName": "Alice"
+    }
+  }
+}

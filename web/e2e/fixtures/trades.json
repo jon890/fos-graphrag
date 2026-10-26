@@ -1,0 +1,40 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/me/trades",
+    "query": "page=0&size=20"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000055",
+        "broker": "TOSS",
+        "externalId": "20261024-000001",
+        "side": "BUY",
+        "market": "KR",
+        "ticker": "900100",
+        "name": "가상전자 보통주",
+        "quantity": 10.0,
+        "price": 50000.0,
+        "currency": "KRW",
+        "amount": 500000.0,
+        "fee": 100.0,
+        "executedAt": "2026-10-24T01:00:00Z",
+        "createdAt": "2026-01-01T00:01:01.000000Z",
+        "createdVia": "AGENT",
+        "security": {
+          "id": "00000000-0000-4000-8000-000000000013",
+          "type": "Security",
+          "label": "가상전자 보통주",
+          "archived": false
+        },
+        "decisions": []
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}

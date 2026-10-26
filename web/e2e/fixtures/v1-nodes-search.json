@@ -1,0 +1,70 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/nodes",
+    "query": "q=%EA%B0%80%EC%83%81%EC%A0%84%EC%9E%90"
+  },
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000005",
+        "type": "Company",
+        "typeLabel": "기업",
+        "label": "가상전자",
+        "reviewStatus": null,
+        "revision": 1,
+        "updatedAt": "2026-01-01T00:00:19.000000Z"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "type": "Document",
+        "typeLabel": "근거 문서",
+        "label": "가상전자 2026 사업보고서",
+        "reviewStatus": null,
+        "revision": 1,
+        "updatedAt": "2026-01-01T00:00:42.000000Z"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000011",
+        "type": "Valuation",
+        "typeLabel": "밸류에이션",
+        "label": "가상전자 2026-10-20",
+        "reviewStatus": null,
+        "revision": 1,
+        "updatedAt": "2026-01-01T00:00:23.000000Z"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000012",
+        "type": "Scenario",
+        "typeLabel": "시나리오",
+        "label": "가상전자 기준",
+        "reviewStatus": null,
+        "revision": 1,
+        "updatedAt": "2026-01-01T00:00:25.000000Z"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000013",
+        "type": "Security",
+        "typeLabel": "종목",
+        "label": "가상전자 보통주",
+        "reviewStatus": null,
+        "revision": 1,
+        "updatedAt": "2026-01-01T00:00:21.000000Z"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000014",
+        "type": "Decision",
+        "typeLabel": "투자 결정",
+        "label": "가상전자 첫 매수",
+        "reviewStatus": null,
+        "revision": 1,
+        "updatedAt": "2026-01-01T00:00:27.000000Z"
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalItems": 6,
+    "totalPages": 1
+  }
+}

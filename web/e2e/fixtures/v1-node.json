@@ -1,0 +1,119 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/nodes/00000000-0000-4000-8000-000000000005",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "node": {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "type": "Company",
+      "typeLabel": "기업",
+      "label": "가상전자",
+      "revision": 1,
+      "createdAt": "2026-01-01T00:00:19.000000Z",
+      "createdBy": "Alice",
+      "updatedAt": "2026-01-01T00:00:19.000000Z",
+      "updatedBy": "Alice"
+    },
+    "properties": [
+      {
+        "key": "name",
+        "label": "기업 이름",
+        "type": "string",
+        "value": "가상전자",
+        "valueLabel": null
+      },
+      {
+        "key": "country",
+        "label": "국가",
+        "type": "enum",
+        "value": "KR",
+        "valueLabel": "대한민국 (KR)"
+      }
+    ],
+    "relations": [
+      {
+        "relationshipId": "00000000-0000-4000-8000-000000000015",
+        "type": "BENEFITS",
+        "label": "이익을 준다",
+        "direction": "IN",
+        "sentence": "HBM 생산과 고적층 패키징이(가) 가상전자에 이익을 준다",
+        "other": {
+          "id": "00000000-0000-4000-8000-000000000016",
+          "type": "Bottleneck",
+          "typeLabel": "병목",
+          "label": "HBM 생산과 고적층 패키징"
+        }
+      },
+      {
+        "relationshipId": "00000000-0000-4000-8000-000000000017",
+        "type": "ISSUES",
+        "label": "발행한다",
+        "direction": "OUT",
+        "sentence": "가상전자이(가) 가상전자 보통주을(를) 발행한다",
+        "other": {
+          "id": "00000000-0000-4000-8000-000000000013",
+          "type": "Security",
+          "typeLabel": "종목",
+          "label": "가상전자 보통주"
+        }
+      },
+      {
+        "relationshipId": "00000000-0000-4000-8000-000000000018",
+        "type": "HAS_VALUATION",
+        "label": "밸류에이션",
+        "direction": "OUT",
+        "sentence": "가상전자 2026-10-20은(는) 가상전자의 가치를 평가한다",
+        "other": {
+          "id": "00000000-0000-4000-8000-000000000011",
+          "type": "Valuation",
+          "typeLabel": "밸류에이션",
+          "label": "가상전자 2026-10-20"
+        }
+      }
+    ],
+    "claim": null,
+    "claims": [
+      {
+        "id": "00000000-0000-4000-8000-000000000019",
+        "label": "가상전자 → 가상 메모리 반도체 속한다",
+        "predicate": "BELONGS_TO_SECTOR",
+        "predicateLabel": "속한다",
+        "reviewStatus": "REVIEWED",
+        "subject": {
+          "id": "00000000-0000-4000-8000-000000000005",
+          "type": "Company",
+          "typeLabel": "기업",
+          "label": "가상전자"
+        },
+        "object": {
+          "id": "00000000-0000-4000-8000-000000000021",
+          "type": "Sector",
+          "typeLabel": "산업",
+          "label": "가상 메모리 반도체"
+        },
+        "description": "가상전자는 메모리 반도체 산업에 속한다.",
+        "evidenceText": "당사는 D램과 낸드 플래시를 주력으로 생산한다.",
+        "validFrom": null,
+        "validTo": null,
+        "documents": [
+          {
+            "id": "00000000-0000-4000-8000-000000000010",
+            "title": "가상전자 2026 사업보고서",
+            "url": "https://example.com/virtual-electronics-2026",
+            "publisher": "가상공시",
+            "documentType": "FILING",
+            "publishedAt": "2026-03-15",
+            "collectedAt": "2026-10-20T03:00:00Z"
+          }
+        ]
+      }
+    ],
+    "documents": [],
+    "concepts": [],
+    "relationsTruncated": false,
+    "claimsTruncated": false
+  }
+}
