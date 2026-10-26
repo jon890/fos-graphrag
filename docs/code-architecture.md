@@ -232,15 +232,45 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 
 ## 테스트
 
-| 종류 | 위치 | Neo4j |
+모든 자동 테스트는 Docker 없이 돈다([ADR-018](adr/018-tests-without-containers.md)).
+
+| 종류 | 위치 | 서버와 Neo4j |
 | --- | --- | --- |
 | 온톨로지 단위 테스트 | `api/src/test/kotlin/.../ontology/` | 쓰지 않음 |
-| 통합 테스트 | `api/src/test/kotlin/.../` 의 `*IntegrationTest` | Testcontainers 로 `neo4j:5.26.30-community` 와 가짜 OIDC 공급자를 띄운다 |
+| 통합 테스트 | `api/src/test/kotlin/.../` 의 `*IntegrationTest` | 실제 서버 포트와 테스트 JVM 안의 Neo4j 5.26(`neo4j-harness`), 같은 JVM 안의 가짜 OIDC 공급자(`mock-oauth2-server` 라이브러리) |
+| 응답 스냅샷 | `api/src/test/kotlin/.../snapshot/ApiSnapshotTest.kt` 가 `web/e2e/fixtures/*.json` 을 쓴다 | 통합 테스트와 같다. 다만 Neo4j 는 다른 테스트의 데이터가 섞이지 않게 따로 띄운다 |
 | 웹 단위 테스트 | `web/src/**/*.test.ts`, `*.test.tsx` | 쓰지 않음. 컴포넌트는 `react-dom/server` 로 렌더링해 확인한다 |
+| 화면 테스트 | `web/e2e/` | Playwright 가 Vite 개발 서버를 띄우고, `web/e2e/mock/` 의 가짜 API 가 `page.route` 로 응답한다. 넓은 화면(1440×900)과 휴대폰 폭(390×844) 두 project 로 돈다. 휴대폰 project 는 `mobile.spec.ts` 만 돈다 |
 | 플러그인 형식 검사 | `scripts/tests/test_plugin.py` | 쓰지 않음. 검사 항목은 그 스크립트가 소유한다 |
-| 브라우저 테스트 | `web/e2e/` | 운영 Compose 와 `compose.e2e.yml`. 가짜 OIDC 공급자로 실제 OAuth 리다이렉트를 탄다. 넓은 화면(1440×900)과 휴대폰 폭(390×844) 두 project 로 돈다. 휴대폰 project 는 `mobile.spec.ts` 만 돈다 |
+| 운영 확인 | `scripts/smoke-prod.ts`, 검사는 `scripts/tests/smoke-prod.test.ts` | 배포 뒤 운영 주소에 읽기 요청만 보낸다. 검사는 Node 가 띄운 가짜 HTTP 서버로 한다 |
 
-mock 으로 Neo4j 를 대신한 테스트는 없다. 트랜잭션 일관성 테스트만 실패하는 `ChangeEventRecorder` 를 주입한다. 이때도 Neo4j 는 실제 컨테이너다.
+mock 으로 Neo4j 를 대신한 서버 테스트는 없다. 트랜잭션 일관성 테스트만 실패하는 `ChangeEventRecorder` 를 주입한다. 이때도 Neo4j 는 실제 서버다.
+
+### JUnit 안의 Neo4j
+
+- 테스트 JVM 하나에 Neo4j 하나를 띄워 모든 통합 테스트가 나눠 쓴다. 띄우는 코드는 `api/src/test/kotlin/dev/fos/workbench/support/EmbeddedServers.kt` 다.
+  운영 Compose 와 같은 서버 상한(`db.transaction.timeout` 10s, `db.lock.acquisition.timeout` 5s)을 준다. bolt 로 붙고 인증은 끈다(`spring.neo4j.authentication.kind=none`).
+- Neo4j 5.26 서버는 Netty 4.1 을 쓰고, 앱의 Neo4j Java Driver 6.1 은 Spring Boot BOM 이 고른 Netty 4.2 를 쓴다. 한 클래스로더에 두면 서버가 내부 채널을 열지 못한다.
+  그래서 하네스는 BOM 을 받지 않는 Gradle 설정 `neo4jHarness` 로 받는다. `test` task 가 그 jar 경로를 시스템 속성 `neo4j.harness.classpath` 로 넘기고, `EmbeddedServers` 가 그 jar 만 담은 클래스로더(부모는 platform 클래스로더)에서 하네스를 리플렉션으로 띄운다.
+  하네스는 자기 SLF4J provider 를 들고 오지만 격리 클래스로더 안에만 있어 앱의 Logback 과 부딪히지 않는다.
+- 가짜 OIDC 공급자 `mock-oauth2-server` 는 개발 Compose 와 같은 3.0.1 이다. 6.x 는 Jackson 3.2 를 요구해 BOM 의 Jackson 3.1 과 어긋난다. 3.0.1 은 Jackson 2 를 써 앱의 Jackson 3 과 패키지가 다르다.
+- 버전은 `api/gradle/libs.versions.toml` 이 소유한다. Neo4j 하네스는 운영 이미지와 같은 5.26 패치 버전으로 올린다.
+
+### 응답 스냅샷
+
+- `ApiSnapshotTest` 가 화면 테스트에 필요한 대표 데이터를 API 로 만들고, 대표 응답을 정규화해 `web/e2e/fixtures/<이름>.json` 에 쓴다. 테스트를 돌릴 때마다 다시 쓰고, 바뀌었으면 `git diff` 로 드러난다.
+- 파일 하나가 응답 하나다. `request`(`method`, `path`, `query`), `status`, `body` 를 담는다. 화면 테스트의 가짜 API 는 이 `request` 로 응답을 고른다.
+- 정규화 규칙은 `api/src/test/kotlin/dev/fos/workbench/snapshot/SnapshotNormalizer.kt` 가 소유한다. 한 번의 실행 안에서 처음 나온 순서대로 UUID 는 `00000000-0000-4000-8000-<12자리 순번>` 으로, 시각은 `2026-01-01T00:00:00` 부터 1초씩 늘린 값으로, 토큰 원문과 해시, `client_id` 는 고정 문자열로 바꾼다.
+  같은 실제 값은 모든 파일에서 같은 자리표시로 바뀌어, 검색 결과의 id 로 상세 응답을 찾을 수 있다.
+- 갱신 명령은 `README.md` 의 「검증」 에 있다.
+
+### 가짜 API
+
+- `web/e2e/mock/` 의 가짜 API 는 스냅샷을 읽어 `request` 가 같은 요청에 그 응답을 준다. 경로가 같고 query 가 다른 요청은 query 없는 스냅샷으로 답하지 않고 실패로 돌린다.
+  테스트가 응답을 바꿔야 하면 그 테스트 안에서 덮어쓴다. 스냅샷에도 덮어쓰기에도 없는 요청은 501 로 답하고 테스트를 실패시킨다.
+- 로그인 상태와 역할(VIEWER, EDITOR, ADMIN)은 테스트가 고른다. 「Google 로 로그인」 이 여는 `/oauth2/authorization/google` 을 가짜 API 가 받아 로그인 상태로 바꾸고 `/` 로 돌려보낸다.
+  `/api/auth/csrf` 는 `XSRF-TOKEN` 쿠키를 심고, 쓰기 요청의 `X-XSRF-TOKEN` 헤더가 그 값과 다르면 403 으로 답한다.
+- 가짜 API 는 받은 요청을 기록한다. 화면 테스트는 화면이 보낸 요청의 경로와 본문을 확인하고, 저장 뒤 다른 사용자에게 보이는지 같은 서버 동작은 서버 JUnit 테스트가 확인한다.
 
 ## 결정
 
@@ -259,6 +289,7 @@ mock 으로 Neo4j 를 대신한 테스트는 없다. 트랜잭션 일관성 테�
 | [013](adr/013-owner-trades-and-agent-proposals.md) | 체결 기록은 주인만 보는 코드 소유 모델(`:Trade`)로 지식 그래프와 나눈다. 에이전트 쓰기는 체결 사실은 바로, 해석은 제안으로 받고 승인은 기존 서비스를 거친다 |
 | [014](adr/014-single-app-repository.md) | 저장소에는 가치투자 온톨로지 앱 하나만 두고 앱을 루트에 둔다. 운영 서비스 키 `financial-workbench` 는 그대로 둔다 |
 | [015](adr/015-remote-mcp-oauth.md) | 서버가 원격 MCP(`/mcp`)를 직접 제공하고 OAuth 인가 서버를 겸한다. 비개발자는 플러그인 설치와 OAuth 로그인으로 Claude Code, Codex 를 붙이고, Hermes 는 연동 토큰으로 같은 `/mcp` 를 부른다 |
+| [018](adr/018-tests-without-containers.md) | 테스트에서 컨테이너를 띄우지 않는다. 서버는 JUnit 안의 Neo4j 로, 화면은 서버가 남긴 응답 스냅샷을 주는 가짜 API 로 테스트한다 |
 
 대체된 ADR 은 `adr/superseded/` 에 있다. 당시 맥락을 읽을 때만 본다.
 
