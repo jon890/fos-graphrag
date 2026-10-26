@@ -35,9 +35,18 @@
 - `description` 과 본문에 항목 고치기, 보관, 관계 보관, 주장 만들기를 더한다. 고치기와 보관은 먼저 `get_node` 로 `node.revision` 과 관계의 `relationshipId` 를 읽는다. 주장은 근거 문서가 하나 이상 필요하고, 없으면 먼저 근거 문서를 만드는 제안을 올린다. `REVISION_CONFLICT` 면 다시 읽고 새로 올린다.
 - 「제안」 에서 승인할 사람이 본인(친구)이고 주장 검토는 다른 사람이 한다고 알린다.
 
-### 3. `plugin/skills/ontology-start/SKILL.md`, `plugin/README.md`, 두 `plugin.json` 의 `description`
+### 3. 처음 시작 스킬 `plugin/skills/ontology-start/SKILL.md`, `plugin/README.md`, 두 `plugin.json` 의 `description`
 
-- 할 수 있는 일 예시에 「이 기업 설명 고쳐 줘」, 「온톨로지에 새 종류 더해 줘」 를 더한다.
+`ontology-start` 를 처음 시작을 끝까지 이끄는 스킬로 넓힌다. 새 스킬을 만들지 않는다(`docs/code-architecture.md` 「플러그인」). 순서 표와 단계:
+
+1. 연결 확인: `get_connection`. 인증이 필요하면 지금의 로그인 안내.
+2. 누구로 붙었는지: 표시 이름, 역할(`user.role` 을 「열람자」, 「편집자」, 「관리자」 로), 범위(「조회만」, 「조회와 기록」).
+3. 범위가 `READ` 면 「더보기 → 연동」 에서 연결을 끊고 다시 로그인해 「조회와 기록」 을 고르라고 안내하고, 다시 연결하면 1 단계부터 한다.
+4. 지금 온톨로지 한눈에 보기: `get_ontology` 로 버전, 항목 종류 몇 가지(표시 이름), 관계 몇 가지(문장 틀)를 다섯 줄 안으로 보인다.
+5. 할 수 있는 일 세 가지와 예시 문장: 조회(「안전마진이 뭐야」), 데이터 추가(「FLNC 에 근거 문서를 이어 줘」), 온톨로지 수정(「온톨로지에 새 종류 더해 줘」). 역할 때문에 승인할 수 없는 일이 있으면 그 일 옆에 「관리자 승인이 필요합니다」 처럼 적는다.
+6. 첫 데이터 추가를 함께 해 보기: 사용자가 원하면 `ontology-record` 의 순서로 항목 하나(예: 개념 하나)를 제안으로 올리고 「더보기 → 제안」 에서 승인하는 위치까지 안내한다. 원하지 않으면 건너뛴다.
+
+토큰, 인증 방식, OAuth 같은 내부 말은 쓰지 않는다. 두 `plugin.json` 과 `README.md` 의 설명을 「찾아보고, 데이터와 온톨로지 정의를 고치는 제안을 올립니다」 로 맞춘다.
 - `plugin/README.md` 첫 문단을 「찾아보고, 항목과 온톨로지 정의를 고치는 제안을 올리는」 으로 고친다.
 
 ### 4. 이미지 라벨 `.github/workflows/workbench-image.yml`
@@ -54,6 +63,7 @@
 - 연동 화면 테스트: `integrations-install` 이 보이고 `tokens-advanced` 가 접혀 있으며, 펼친 뒤 지금의 토큰 발급 흐름이 된다.
 - `mobile.spec.ts`: `m-ontology-form` 을 YAML 편집기 스크린샷 `m-ontology-yaml` 로 바꾸고 결과 칸이 `data-layout="below"` 인지 본다. 연동 화면의 설치 안내 스크린샷 `m-integrations`.
 - e2e 실행은 통합 검증에서 한 번만 한다. 이 phase 에서는 타입 검사로 문법만 본다.
+- 테스트 지원 파일(`api/src/test/kotlin/dev/fos/workbench/support/`, `web/e2e/support.ts` 의 기존 함수 시그니처), `web/playwright.config.ts`, `compose*.yml` 은 고치지 않는다. 테스트 구조를 바꾸는 다른 plan 이 나란히 돈다.
 
 ## 검증
 
