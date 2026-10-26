@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto'
 import path from 'node:path'
 import { expect, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
 
@@ -37,6 +38,19 @@ export function exact(text: string): RegExp {
 }
 
 /**
+ * 「Google 로 로그인」 을 누른 뒤 열린 가짜 OIDC 서버(http://localhost:8090/default/authorize?...)의 interactiveLogin 폼을 채워 보낸다.
+ * 머리글이 없는 화면(`/connect`)에서도 쓸 수 있도록 로그인 뒤 화면은 기다리지 않는다.
+ */
+export async function fillMockOidc(page: Page, user: TestUser): Promise<void> {
+  await page.waitForURL(/\/authorize/)
+  await page.locator('input[name=username]').fill(user.sub)
+  await page
+    .locator('textarea[name=claims]')
+    .fill(JSON.stringify({ email: user.email, email_verified: user.emailVerified ?? true, name: user.name }))
+  await page.locator('input[type=submit]').click()
+}
+
+/**
  * 앱의 「Google 로 로그인」 을 눌러 가짜 OIDC 서버의 로그인 폼을 채운다.
  * expect 가 success 면 앱에 로그인된 것을, denied 면 「접근 권한이 없습니다」 화면을 확인한다.
  * 첫 접속 가이드가 열리면 기본으로 건너뛴다. 가이드를 확인하는 테스트만 guide: 'keep' 으로 남긴다.
@@ -50,13 +64,7 @@ export async function loginAs(
 ): Promise<void> {
   await page.goto(startPath)
   await page.getByTestId('login-google').click()
-  // 가짜 서버(http://localhost:8090/default/authorize?...)의 interactiveLogin 폼이다.
-  await page.waitForURL(/\/authorize/)
-  await page.locator('input[name=username]').fill(user.sub)
-  await page
-    .locator('textarea[name=claims]')
-    .fill(JSON.stringify({ email: user.email, email_verified: user.emailVerified ?? true, name: user.name }))
-  await page.locator('input[type=submit]').click()
+  await fillMockOidc(page, user)
 
   if (expectResult === 'denied') {
     await expect(page.getByTestId('login-denied')).toBeVisible()
@@ -173,4 +181,72 @@ export async function issueToken(page: Page, name: string, scope: 'read' | 'writ
   await page.getByTestId('tokens-issued-close').click()
   await expect(page.getByTestId('tokens-issue-dialog')).toHaveCount(0)
   return token
+}
+
+/**
+ * 이 페이지의 사용자 세션으로 연결된 앱(OAuth 연결)을 모두 끊는다.
+ * 앱 연결을 만든 테스트가 끝에 finally 에서 부른다. 정리 실패가 테스트의 원래 실패를 덮지 않게 로그로만 남긴다.
+ */
+export async function revokeConnections(page: Page): Promise<void> {
+  try {
+    const failed = await page.evaluate(async () => {
+      await fetch('/api/auth/csrf', { headers: { Accept: 'application/json' } })
+      const xsrf = document.cookie
+        .split(';')
+        .map((c) => c.trim())
+        .find((c) => c.startsWith('XSRF-TOKEN='))
+        ?.slice('XSRF-TOKEN='.length)
+      const list: { id: string }[] = await (await fetch('/api/me/connections')).json()
+      const errors: string[] = []
+      for (const { id } of list) {
+        const res = await fetch(`/api/me/connections/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: { 'X-XSRF-TOKEN': decodeURIComponent(xsrf ?? '') },
+        })
+        if (!res.ok && res.status !== 404) errors.push(`${id}: ${res.status}`)
+      }
+      return errors
+    })
+    if (failed.length > 0) console.warn(`앱 연결 정리 실패: ${failed.join(', ')}`)
+  } catch (e) {
+    console.warn('앱 연결 정리 실패', e)
+  }
+}
+
+/** 앱이 돌아올 loopback 주소. 브라우저 테스트는 이 주소를 page.route 로 받는다 */
+export const OAUTH_CALLBACK = 'http://127.0.0.1:43210/callback'
+
+export interface Pkce {
+  verifier: string
+  challenge: string
+}
+
+/** PKCE(S256) 검증값과 도전값 */
+export function newPkce(): Pkce {
+  const verifier = randomBytes(32).toString('base64url')
+  return { verifier, challenge: createHash('sha256').update(verifier).digest('base64url') }
+}
+
+/** `/oauth/register` 로 loopback 클라이언트를 등록하고 client_id 를 돌려준다 */
+export async function registerOAuthClient(page: Page, name: string): Promise<string> {
+  const res = await page.request.post(`${new URL(page.url()).origin}/oauth/register`, {
+    data: { client_name: name, redirect_uris: [OAUTH_CALLBACK], token_endpoint_auth_method: 'none' },
+  })
+  expect(res.status()).toBe(201)
+  return (await res.json()).client_id as string
+}
+
+/** 앱이 브라우저로 여는 `/oauth/authorize` 주소 */
+export function authorizeUrl(origin: string, clientId: string, pkce: Pkce, state: string): string {
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: OAUTH_CALLBACK,
+    code_challenge: pkce.challenge,
+    code_challenge_method: 'S256',
+    state,
+    scope: 'read write',
+    resource: `${origin}/mcp`,
+  })
+  return `${origin}/oauth/authorize?${params.toString()}`
 }

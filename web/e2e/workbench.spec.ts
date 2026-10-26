@@ -1,5 +1,23 @@
 import { expect, request, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
-import { admin, exact, issueToken, loginAs, newPage, openScreen, revokeTokensExcept, shot, shotElement, tokenIds, type TestUser } from './support'
+import {
+  admin,
+  authorizeUrl,
+  exact,
+  fillMockOidc,
+  issueToken,
+  loginAs,
+  newPage,
+  newPkce,
+  OAUTH_CALLBACK,
+  openScreen,
+  registerOAuthClient,
+  revokeConnections,
+  revokeTokensExcept,
+  shot,
+  shotElement,
+  tokenIds,
+  type TestUser,
+} from './support'
 
 // 두 편집자(A, B)와 관리자, 열람자가 같은 서버에서 협업하는 흐름을 순서대로 확인한다.
 // 로그인은 실제 Google 대신 가짜 OIDC 서버(navikt/mock-oauth2-server, interactiveLogin)를 거친다.
@@ -46,6 +64,7 @@ const editorB: TestUser = { sub: `editor-b-${suffix}`, email: `editor-b-${suffix
 const viewer: TestUser = { sub: `viewer-${suffix}`, email: `viewer-${suffix}@example.com`, name: '열람자' }
 const stranger: TestUser = { sub: `stranger-${suffix}`, email: `stranger-${suffix}@example.com`, name: '외부인' }
 // 첫 접속 가이드를 처음 보는 사용자. 다른 테스트의 로그인은 가이드를 건너뛰어 끝낸 기록이 남는다.
+const connectUser: TestUser = { sub: `connect-user-${suffix}`, email: `connect-user-${suffix}@example.com`, name: '앱연결사용자' }
 const guideViewer: TestUser = { sub: `guide-viewer-${suffix}`, email: `guide-viewer-${suffix}@example.com`, name: '가이드열람자' }
 const guideEditor: TestUser = { sub: `guide-editor-${suffix}`, email: `guide-editor-${suffix}@example.com`, name: '가이드편집자' }
 
@@ -1345,6 +1364,91 @@ test.describe('가치투자 온톨로지: 역할별 협업', () => {
     } finally {
       await revokeTokensExcept(pageA, kept)
     }
+  })
+
+  test('7i) 앱 연결 동의와 연결된 앱 끊기: 허용하면 코드가 붙은 주소로 돌아가고, 토큰을 받고, 끊으면 갱신 토큰이 막힌다', async () => {
+    const origin = new URL(pageA.url()).origin
+    const appName = `e2e 앱 ${suffix}`
+    const pkce = newPkce()
+    const state = `state-${suffix}`
+    // 앱이 돌아올 loopback 주소는 실제로 열리지 않으므로 브라우저 요청을 가로채 받는다.
+    await pageA.route('http://127.0.0.1:43210/**', (r) => r.fulfill({ body: 'ok' }))
+    try {
+      const clientId = await registerOAuthClient(pageA, appName)
+
+      // 앱이 연 인가 주소는 머리글 없는 동의 화면으로 이어진다.
+      await pageA.goto(authorizeUrl(origin, clientId, pkce, state))
+      await expect(pageA.getByTestId('connect-page')).toBeVisible()
+      await expect(pageA).toHaveURL(/\/connect\?/)
+      await expect(pageA.getByTestId('current-user-name')).toHaveCount(0)
+      await expect(pageA.getByTestId('connect-user')).toContainText(editorA.name)
+      await expect(pageA.getByTestId('connect-sentence')).toContainText(`${appName} 이(가) 가치투자 온톨로지를 내 계정으로 조회하고 기록하려 합니다.`)
+      await expect(pageA.getByTestId('connect-scope-write')).toBeChecked()
+      await shot(pageA, '07i-connect-consent')
+
+      await pageA.getByTestId('connect-allow').click()
+      await pageA.waitForURL(/127\.0\.0\.1:43210\/callback\?/)
+      const back = new URL(pageA.url())
+      expect(back.searchParams.get('state')).toBe(state)
+      expect(back.searchParams.get('iss')).toBe(origin)
+      const code = back.searchParams.get('code') ?? ''
+      expect(code).toMatch(/^fwc_/)
+
+      const tokenRes = await pageA.request.post(`${origin}/oauth/token`, {
+        form: { grant_type: 'authorization_code', code, code_verifier: pkce.verifier, client_id: clientId, redirect_uri: OAUTH_CALLBACK },
+      })
+      expect(tokenRes.status()).toBe(200)
+      const refreshToken = (await tokenRes.json()).refresh_token as string
+      expect(refreshToken).toBeTruthy()
+
+      // 「연동」 화면의 「연결된 앱」 에 보이고, 끊으면 사라진다.
+      await pageA.goto(`${origin}/tokens`)
+      const row = pageA.locator(`[data-testid="connections-row"][data-name="${appName}"]`)
+      await expect(row).toHaveCount(1)
+      await expect(row.getByTestId('connections-row-scope')).toHaveAttribute('data-scope', 'READ_WRITE')
+      await shot(pageA, '07i-connections-wide')
+      await row.getByTestId('connections-row-disconnect').click()
+      await expect(pageA.getByTestId('connections-confirm')).toContainText(appName)
+      await pageA.getByTestId('connections-confirm-submit').click()
+      await expect(row).toHaveCount(0)
+      await expect(pageA.getByTestId('connections-message')).toHaveAttribute('data-kind', 'success')
+
+      // 끊은 연결의 갱신 토큰은 더 쓸 수 없다.
+      const refreshed = await pageA.request.post(`${origin}/oauth/token`, {
+        form: { grant_type: 'refresh_token', refresh_token: refreshToken, client_id: clientId },
+      })
+      expect(refreshed.status()).toBe(400)
+    } finally {
+      await pageA.unroute('http://127.0.0.1:43210/**')
+      await revokeConnections(pageA)
+    }
+  })
+
+  test('7j) 로그아웃 상태에서 앱 연결을 시작하면 로그인 안내가 나오고, 로그인하면 가이드 없이 동의 화면이 열린다', async ({ browser }) => {
+    const origin = new URL(pageAdmin.url()).origin
+    // 첫 접속 가이드를 끝내지 않은 새 사용자다.
+    await openScreen(pageAdmin, 'users')
+    await addUser(pageAdmin, connectUser, 'VIEWER')
+    const clientId = await registerOAuthClient(pageAdmin, `e2e 로그아웃 앱 ${suffix}`)
+
+    const { context, page } = await newPage(browser)
+    contexts.push(context)
+    await page.route('http://127.0.0.1:43210/**', (r) => r.fulfill({ body: 'ok' }))
+    await page.goto(authorizeUrl(origin, clientId, newPkce(), `state-${suffix}`))
+    await expect(page.getByTestId('login-notice')).toContainText('앱을 연결하려면')
+    await page.getByTestId('login-google').click()
+    await fillMockOidc(page, connectUser)
+
+    await expect(page.getByTestId('connect-page')).toBeVisible()
+    await expect(page.getByTestId('connect-user')).toContainText(connectUser.name)
+    await expect(page.getByTestId('guide-bubble')).toHaveCount(0)
+    await expect(page).toHaveURL(/\/connect\?/)
+    await shot(page, '07j-connect-after-login')
+
+    // 거절하면 연결이 만들어지지 않고 앱의 loopback 주소로 access_denied 가 돌아간다.
+    await page.getByTestId('connect-deny').click()
+    await page.waitForURL(/127\.0\.0\.1:43210\/callback\?/)
+    expect(new URL(page.url()).searchParams.get('error')).toBe('access_denied')
   })
 
   test('7h) 기록 토큰으로 체결과 제안을 쓰고, 제안을 고쳐 승인하면 결정과 체결이 이어지며 다른 사용자에게는 보이지 않는다', async () => {

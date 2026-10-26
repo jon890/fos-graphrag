@@ -34,6 +34,13 @@ describe('링크 함수', () => {
     expect(takeReturnTo(s)).toBeNull()
   })
 
+  it('동의 화면 주소는 query 까지 그대로 돌려준다', () => {
+    const s = fakeStorage()
+    const url = '/connect?response_type=code&client_id=c1&redirect_uri=http%3A%2F%2Flocalhost%3A1%2Fcb'
+    rememberReturnTo(url, s)
+    expect(takeReturnTo(s)).toBe(url)
+  })
+
   it('안전하지 않은 주소는 저장하지 않고, 저장소에 든 안전하지 않은 값도 꺼내지 않는다', () => {
     const s = fakeStorage()
     rememberReturnTo('//evil.example', s)

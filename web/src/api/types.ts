@@ -50,6 +50,41 @@ export interface IntegrationTokenView {
 
 export type TokenScope = 'READ' | 'READ_WRITE'
 
+/** GET /api/oauth/authorize 의 200. 동의 화면이 보일 내용이다 */
+export interface AuthorizationPreview {
+  clientName: string
+  /** 돌아갈 곳이 이 컴퓨터의 앱(LOOPBACK)인지 https 주소(HTTPS)인지 */
+  redirectKind: 'LOOPBACK' | 'HTTPS'
+  redirectHost: string
+  /** 요청한 범위로 고를 수 있는 가장 넓은 값. READ 면 「조회만」 만 고를 수 있다 */
+  requestedScope: TokenScope
+  user: { displayName: string }
+}
+
+/** POST /api/oauth/authorize 의 본문. 인가 요청의 query 값에 결정을 더한다 */
+export interface ConsentDecision {
+  response_type?: string
+  client_id?: string
+  redirect_uri?: string
+  code_challenge?: string
+  code_challenge_method?: string
+  state?: string
+  scope?: string
+  resource?: string
+  decision: 'ALLOW' | 'DENY'
+  /** ALLOW 일 때만 보낸다 */
+  grantedScope?: TokenScope
+}
+
+/** GET /api/me/connections 의 한 행. OAuth 로 연결한 앱 */
+export interface ConnectionView {
+  id: string
+  clientName: string
+  scope: TokenScope
+  createdAt: string
+  lastUsedAt: string | null
+}
+
 /** POST /api/me/tokens 의 응답. token 원문은 이 응답에서만 볼 수 있다 */
 export interface IssuedIntegrationToken extends IntegrationTokenView {
   token: string
