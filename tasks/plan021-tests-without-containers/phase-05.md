@@ -45,6 +45,7 @@ phase 04 와 같은 규칙이다. 토큰으로 `/api/v1` 부르기와 폐기 뒤
 
 - `web/e2e/workbench.spec.ts` 를 지운다. `web/playwright.config.ts` 의 `testIgnore` 에서 `workbench\.spec\.ts` 를 뺀다.
 - `web/e2e/support.ts` 는 아래 export 만 남기고 나머지를 지운다: `shot`, `shotElement`, `exact`, `escapeRegExp`, `openScreen`, `ScreenKey`, `OAUTH_CALLBACK`. 지울 것은 `fillMockOidc`, `loginAs`, `newPage`, `tokenIds`, `revokeTokensExcept`, `issueToken`, `revokeConnections`, `registerOAuthClient`, `newPkce`, `Pkce`, `authorizeUrl`, `admin`, `TestUser` 와 이들만 쓰던 내부 함수, 상수다. `noUnusedLocals` 는 쓰지 않는 export 를 잡지 않으므로, 지운 이름마다 `git grep -n "<이름>" -- web/e2e` 가 비었는지 확인한다. 남긴 export 가 실제로 쓰이는지도 같은 방법으로 본다. 쓰이지 않으면 지운다.
+- `web/TESTIDS.md` 에 옛 파일 이름(`workbench.spec.ts`)이 남아 있으면 새 spec 이름으로 고친다.
 
 ## 검증
 

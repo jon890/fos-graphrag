@@ -95,7 +95,7 @@ bash scripts/tests/test_scripts.sh
 | `web/e2e/mock/test.ts` | 신규 |
 | `web/e2e/mock.spec.ts` | 신규 |
 | `web/e2e/mobile.spec.ts` | 수정 |
-| `web/e2e/support.ts` | 수정 |
+| `web/e2e/support.ts` | 수정(바꿀 것이 있을 때만) |
 | `web/playwright.config.ts` | 수정 |
 | `web/TESTIDS.md` | 수정 |
 | `web/e2e/fixtures/*.json` | 수정 |
