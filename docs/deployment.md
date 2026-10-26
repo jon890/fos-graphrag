@@ -79,7 +79,7 @@ bash scripts/check-compose.sh
 | `WORKBENCH_HSTS` | 아니요 | 기본 `false` |
 | `WORKBENCH_TRUSTED_PROXIES` | 아니요 | X-Forwarded-* 를 믿을 프록시 주소(정규식). 비우면 loopback 과 `172.16.0.0/12` |
 | `NEO4J_TX_TIMEOUT`, `NEO4J_LOCK_TIMEOUT` | 아니요 | Neo4j 서버의 트랜잭션 시간 제한(기본 `10s`)과 잠금 대기 상한(기본 `5s`) |
-| `WORKBENCH_IMAGE` | 아니요 | GHCR 이미지를 쓸 때 `ghcr.io/jon890/fos-graphrag-workbench:sha-<7자리>` |
+| `WORKBENCH_IMAGE` | 아니요 | GHCR 이미지를 쓸 때 `ghcr.io/jon890/fos-valuation-ontology:sha-<7자리>` |
 
 ## 실행과 첫 관리자
 
@@ -102,7 +102,7 @@ curl -fsS http://127.0.0.1:8081/api/health
 
 ## 이미지 배포
 
-`.github/workflows/workbench-image.yml` 이 `ghcr.io/jon890/fos-graphrag-workbench` 에 `latest` 와 `sha-<7자리>` 태그로 올린다.
+`.github/workflows/workbench-image.yml` 이 `ghcr.io/jon890/fos-valuation-ontology` 에 `latest` 와 `sha-<7자리>` 태그로 올린다.
 이 workflow 는 GitHub-hosted runner(`ubuntu-latest`)에서 Buildx 로 빌드하고, `GITHUB_TOKEN` 으로 GHCR 에 로그인해 올린다.
 공개 저장소이므로 홈서버 self-hosted runner 를 쓰지 않는다(사용자 결정: 2026-10-24). 홈서버 runner 는 비공개 저장소에만 쓴다.
 이미지 이름과 태그, OCI label(`org.opencontainers.image.source`, `org.opencontainers.image.revision`)은 workflow 에 명시한다.

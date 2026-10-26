@@ -5,7 +5,7 @@
 # 배포 절차와 확인은 docs/deployment.md 와 .orch/overlay.md 의 「배포」 다.
 set -euo pipefail
 
-REPO=jon890/fos-graphrag
+REPO=jon890/fos-valuation-ontology
 WORKFLOW=workbench-image.yml
 HEALTH_URL=https://graph.fosworld.co.kr/api/health
 
@@ -34,7 +34,7 @@ echo "deploy-prod: workflow 실행 $run_id 을 기다린다"
 gh run watch "$run_id" -R "$REPO" --exit-status > /dev/null
 
 echo "deploy-prod: 홈서버에 배포한다"
-ssh homeserver 'cd /home/bifos/apps/fos-home-infra && DOCKER_CONFIG=/home/bifos/.config/jenkins-deploy-docker docker pull -q ghcr.io/jon890/fos-graphrag-workbench:latest && scripts/deploy/host-deploy-service.sh financial-workbench' \
+ssh homeserver 'cd /home/bifos/apps/fos-home-infra && DOCKER_CONFIG=/home/bifos/.config/jenkins-deploy-docker docker pull -q ghcr.io/jon890/fos-valuation-ontology:latest && scripts/deploy/host-deploy-service.sh financial-workbench' \
   | grep -E '^(check_result|exit_code)='
 
 for _ in $(seq 1 20); do

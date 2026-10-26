@@ -1,4 +1,4 @@
-# orch 오버레이: fos-graphrag
+# orch 오버레이: fos-valuation-ontology
 
 코어(`fos-skills` 의 `orch` 스킬)에 없는 이 저장소의 값과 절차만 적는다.
 

@@ -49,8 +49,8 @@ jobs:
           push: true
           provenance: false
           tags: |
-            ghcr.io/jon890/fos-graphrag-workbench:latest
-            ghcr.io/jon890/fos-graphrag-workbench:${{ steps.image.outputs.sha-tag }}
+            ghcr.io/jon890/fos-valuation-ontology:latest
+            ghcr.io/jon890/fos-valuation-ontology:${{ steps.image.outputs.sha-tag }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
