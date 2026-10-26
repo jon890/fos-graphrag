@@ -1368,7 +1368,7 @@ grant_type=refresh_token&refresh_token=fwr_…&client_id=…&resource={base}/mcp
 token=fwr_…&token_type_hint=refresh_token
 ```
 
-- 접근 토큰이나 갱신 토큰을 받으면 그 연결을 끊는다. 결과와 상관없이 `200` 이다(RFC 7009). 모르는 토큰도 `200` 이다.
+- 접근 토큰이나 갱신 토큰을 받으면 그 연결을 끊는다. 결과와 상관없이 `200` 이다(RFC 7009). 모르는 토큰도 `200` 이다. `token` 이 없으면 `400 invalid_request` 다.
 - 같은 IP 의 `/oauth/token` 한도에 함께 센다.
 
 ## 원격 MCP(`/mcp`)
