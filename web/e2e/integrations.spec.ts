@@ -1,8 +1,8 @@
 import type { Page } from '@playwright/test'
-import { exact, OAUTH_CALLBACK, openScreen } from './support'
+import { exact, OAUTH_CALLBACK, openScreen, openTokensAdvanced } from './support'
 import { expect, shot, test, type MockApi } from './mock/test'
 
-// 에이전트와 앱 연동 화면을 확인한다. 연동 토큰 발급과 복사, 폐기, 앱 연결 동의와 끊기, 에이전트가 올린 제안과 내 체결.
+// 에이전트와 앱 연동 화면을 확인한다. 설치 안내, 연동 토큰 발급과 복사, 폐기, 앱 연결 동의와 끊기, 에이전트가 올린 제안과 내 체결.
 // 응답은 가짜 API 의 스냅샷이다. 쓰기는 화면이 보낸 요청을 확인하고, 쓴 뒤의 목록은 테스트가 스냅샷을 고쳐 준다.
 // 토큰으로 /api/v1 부르기와 폐기 뒤 401, 코드 교환과 갱신 토큰 폐기, 체결과 제안이 주인에게만 보이는 것은 서버 테스트
 // (agent/AgentAuthIntegrationTest, oauth/OAuthAuthorizationIntegrationTest, proposal/ProposalIntegrationTest, trade/TradeIntegrationTest)가 맡는다.
@@ -73,6 +73,10 @@ test('7g) 연동 토큰을 발급해 복사하고, 목록에는 끝 네 자리�
   await openScreen(page, 'tokens')
   await expect(page).toHaveURL(/\/tokens(\?|$)/)
   await expect(page.getByTestId('more-open')).toHaveAttribute('data-active', 'true')
+  // 맨 위에 Claude Code 와 Codex 설치 안내가 있고, 연동 토큰은 접힌 고급 칸 안에 있다.
+  await expect(page.getByTestId('integrations-install')).toBeVisible()
+  await expect(page.getByTestId('tokens-issue-open')).toBeHidden()
+  await openTokensAdvanced(page)
   await expect(page.getByTestId('tokens-guide')).toContainText('Hermes')
 
   // 발급하면 원문이 한 번만 보이고, 복사 단추가 클립보드에 그 값을 넣는다.
@@ -229,6 +233,7 @@ test('7h) 기록 토큰의 범위를 고르고, 에이전트의 제안을 고쳐
   // 1. 발급 창에서 「조회와 기록」 을 고르면 범위 안내가 보이고 그 범위로 발급한다.
   await openApp(page)
   await openScreen(page, 'tokens')
+  await openTokensAdvanced(page)
   await page.getByTestId('tokens-issue-open').click()
   await page.getByTestId('tokens-issue-scope-write').check()
   await expect(page.getByTestId('tokens-issue-scope-hint')).toBeVisible()
@@ -321,4 +326,70 @@ test.describe('열람자', () => {
     await expect(card).toHaveCount(0)
     expect(api.lastRequest('POST', `/api/me/proposals/${create.id}/reject`).body).toBeNull()
   })
+})
+
+test('7k) 에이전트가 올린 항목 고치기, 항목 보관, 관계 보관, 주장 만들기 제안이 카드로 보이고, 고치기를 승인하고 보관을 거절한다', async ({ page, api }) => {
+  type WithRefs = Proposal & { refs: { nodes: Record<string, NodeRef>; relationships: Record<string, { from: NodeRef; to: NodeRef }> } }
+  const items = api.fixture('proposals-pending-instance').items as WithRefs[]
+  const byKind = (kind: string) => items.find((p) => p.kind === kind)!
+  const update = byKind('UPDATE_NODE')
+  const archive = byKind('ARCHIVE_NODE')
+  const archiveRelationship = byKind('ARCHIVE_RELATIONSHIP')
+  const claim = byKind('CREATE_CLAIM')
+  const rejected = api.fixture('proposal-reject-archive') as Proposal & { decisionNote: string }
+  // 결정한 제안은 대기 목록과 배지에서 빠진다.
+  const decided = new Set<string>()
+  const pending = () => items.filter((p) => !decided.has(p.id))
+  api.on('GET', '/api/me/proposals?status=PENDING&page=0&size=20', () => ({ body: pageOf(pending()) }))
+  api.on('GET', '/api/me/proposals/summary', () => ({ body: { pending: pending().length } }))
+  api.on('POST', `/api/me/proposals/${update.id}/accept`, () => {
+    decided.add(update.id)
+    return { body: api.fixture('proposal-accept-update') }
+  })
+  api.on('POST', `/api/me/proposals/${archive.id}/reject`, () => {
+    decided.add(archive.id)
+    return { body: rejected }
+  })
+
+  await openApp(page)
+  await openScreen(page, 'proposals')
+  const card = (p: Proposal) => page.locator(`[data-testid="proposal-card"][data-id="${p.id}"]`)
+  const label = (p: WithRefs, id: unknown) => p.refs.nodes[String(id)].label
+
+  // 1. 종류마다 이름과 대상 항목이 보이고, 고쳐서 승인은 없다.
+  const expected: [WithRefs, string, string[]][] = [
+    [update, '항목 고치기', [label(update, update.payload.nodeId)]],
+    [archive, '항목 보관', [label(archive, archive.payload.nodeId)]],
+    [archiveRelationship, '관계 보관', Object.values(archiveRelationship.refs.relationships).flatMap((r) => [r.from.label, r.to.label])],
+    [claim, '주장 만들기', [label(claim, claim.payload.subjectId), label(claim, claim.payload.objectId)]],
+  ]
+  for (const [p, kindName, names] of expected) {
+    await expect(card(p)).toHaveAttribute('data-kind', p.kind)
+    await expect(card(p).getByTestId('proposal-kind')).toHaveText(kindName)
+    for (const name of names) await expect(card(p).getByTestId('proposal-summary')).toContainText(name)
+    await expect(card(p).getByTestId('proposal-accept')).toBeEnabled()
+    await expect(card(p).getByTestId('proposal-edit-open')).toHaveCount(0)
+  }
+  // 고치기는 바꿀 속성과 새 값을, 보관은 이유를, 주장 만들기는 근거 문서를 보인다.
+  const newValue = (update.payload.properties as Record<string, string>).description
+  await expect(card(update).locator('[data-testid="proposal-prop"][data-prop="description"]')).toContainText(newValue)
+  await expect(card(archive)).toContainText(`이유: ${String(archive.payload.reason)}`)
+  await expect(card(archiveRelationship)).toContainText(`이유: ${String(archiveRelationship.payload.reason)}`)
+  await expect(card(claim)).toContainText(`근거 문서: ${label(claim, (claim.payload.documentIds as string[])[0])}`)
+  await shot(page, 'proposals-instance-wide')
+
+  // 2. 고치기를 그대로 승인하면 본문 없이 승인을 보내고 카드가 빠진다.
+  await card(update).getByTestId('proposal-accept').click()
+  await expect(page.getByTestId('proposals-message')).toHaveAttribute('data-kind', 'success')
+  await expect(card(update)).toHaveCount(0)
+  expect(api.lastRequest('POST', `/api/me/proposals/${update.id}/accept`).body).toBeNull()
+
+  // 3. 보관은 이유를 적어 거절하면 그 이유를 보내고 카드가 빠진다. 나머지 둘은 남는다.
+  await card(archive).getByTestId('proposal-reject-open').click()
+  await page.getByTestId('proposal-reject-reason').fill(rejected.decisionNote)
+  await page.getByTestId('proposal-reject-confirm').click()
+  await expect(card(archive)).toHaveCount(0)
+  expect(api.lastRequest('POST', `/api/me/proposals/${archive.id}/reject`).body).toEqual({ reason: rejected.decisionNote })
+  await expect(card(archiveRelationship)).toBeVisible()
+  await expect(card(claim)).toBeVisible()
 })

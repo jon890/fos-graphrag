@@ -1,4 +1,4 @@
-import { exact, openScreen, OAUTH_CALLBACK } from './support'
+import { exact, openScreen, openTokensAdvanced, OAUTH_CALLBACK } from './support'
 import { expect, shot, test, type MockApi } from './mock/test'
 import type { Page } from '@playwright/test'
 
@@ -246,13 +246,27 @@ test('휴대폰 폭에서 노드를 만들고 그래프에서 골라 상세를 �
   await expect(page).toHaveURL(new RegExp('/workspace\\?node=' + company.id))
 })
 
-test('휴대폰 폭에서 온톨로지 폼 편집기가 가로 스크롤 없이 열린다', async ({ page }) => {
+test('휴대폰 폭에서 온톨로지 YAML 편집기가 가로 스크롤 없이 열리고 결과 칸이 편집칸 아래에 놓인다', async ({ page, api }) => {
+  api.on('POST', '/api/ontology/preview', { body: api.fixture('ontology-preview-add-property') })
   await openApp(page)
   await openScreen(page, 'ontology')
-  await page.getByTestId('ontology-edit-form').click()
-  await expect(page.getByTestId('ontology-form')).toBeVisible()
+  await page.getByTestId('ontology-edit-yaml').click()
+  await expect(page.getByTestId('ontology-yaml-editor')).toBeVisible()
+  await expect(page.getByTestId('ontology-yaml-input')).toHaveValue(api.fixture('ontology-version').yaml)
   await expectNoHorizontalOverflow(page)
-  await shot(page, 'm-ontology-form')
+  await page.getByTestId('ontology-preview').click()
+  await expect(page.getByTestId('ontology-preview-side')).toHaveAttribute('data-layout', 'below')
+  await expectNoHorizontalOverflow(page)
+  await shot(page, 'm-ontology-yaml')
+})
+
+test('휴대폰 폭에서 연동 화면의 설치 안내가 가로 스크롤 없이 보인다', async ({ page }) => {
+  await openApp(page)
+  await openScreen(page, 'tokens')
+  await expect(page.getByTestId('integrations-install')).toBeVisible()
+  await expect(page.getByTestId('install-command').first()).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await shot(page, 'm-integrations')
 })
 
 test('휴대폰 폭에서 사용법 따라하기가 아래쪽 카드로 열리고 만들기 창을 가리지 않는다', async ({ page, api }) => {
@@ -383,7 +397,8 @@ test('휴대폰 폭에서 연동 토큰을 발급하고 폐기해도 가로 스�
   await expect(page.getByTestId('tokens-tab')).toBeVisible()
   await expectNoHorizontalOverflow(page)
 
-  // 기본 이름 그대로 발급한다.
+  // 기본 이름 그대로 발급한다. 발급 단추는 접힌 고급 칸 안에 있다.
+  await openTokensAdvanced(page)
   await page.getByTestId('tokens-issue-open').click()
   await page.getByTestId('tokens-issue-submit').click()
   await expect(page.getByTestId('tokens-issued-value')).toHaveValue(api.fixture('token-issued').token)
@@ -431,7 +446,8 @@ test('휴대폰 폭에서 앱 연결 동의 화면과 연결된 앱 표가 가�
   await expect(page.getByTestId('connections-table')).toBeVisible()
   const row = page.locator(`[data-testid="connections-row"][data-name="${connections[0].clientName}"]`)
   await expect(row).toHaveCount(1)
-  // 표 안 가로 스크롤 뒤로 숨지 않고 「연결 끊기」 가 창 안에 다 보인다
+  // 설치 안내 아래로 내려 표를 본다. 표 안 가로 스크롤 뒤로 숨지 않고 「연결 끊기」 가 창 안에 다 보인다
+  await row.scrollIntoViewIfNeeded()
   await expect(row.getByTestId('connections-row-disconnect')).toBeInViewport({ ratio: 1 })
   await expectNoHorizontalOverflow(page)
   await shot(page, 'connections-mobile')

@@ -39,5 +39,12 @@ export async function openScreen(page: Page, key: ScreenKey): Promise<void> {
   await expect(page.locator('[data-testid^="more-item-"]')).toHaveCount(0)
 }
 
+/** 「연동」 화면의 접힌 「고급: 개인 비서 연동」 칸을 편다. 연동 토큰 목록과 발급 단추가 그 안에 있다 */
+export async function openTokensAdvanced(page: Page): Promise<void> {
+  const advanced = page.getByTestId('tokens-advanced')
+  if (!(await advanced.evaluate((el) => (el as HTMLDetailsElement).open))) await advanced.locator('summary').click()
+  await expect(advanced).toHaveAttribute('open', '')
+}
+
 /** 앱이 돌아올 loopback 주소. 화면 테스트는 이 주소를 page.route 로 받는다 */
 export const OAUTH_CALLBACK = 'http://127.0.0.1:43210/callback'

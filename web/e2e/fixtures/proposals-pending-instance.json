@@ -1,0 +1,305 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/me/proposals",
+    "query": "status=PENDING&page=0&size=20"
+  },
+  "namedOnly": true,
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000050",
+        "kind": "LINK_TRADE_DECISION",
+        "status": "PENDING",
+        "payload": {
+          "tradeIds": [
+            "00000000-0000-4000-8000-000000000051"
+          ],
+          "decisionId": "00000000-0000-4000-8000-000000000010"
+        },
+        "rationale": "10월 24일 가상전자 매수 체결은 「가상전자 첫 매수」 결정을 실행한 것이다.",
+        "evidence": {
+          "nodeIds": [
+            "00000000-0000-4000-8000-000000000010"
+          ],
+          "tradeIds": [
+            "00000000-0000-4000-8000-000000000051"
+          ],
+          "urls": []
+        },
+        "createdAt": "2026-01-01T00:00:58.000000Z",
+        "createdVia": "AGENT",
+        "token": {
+          "id": "00000000-0000-4000-8000-000000000004",
+          "name": "Hermes"
+        },
+        "decidedAt": null,
+        "decisionNote": null,
+        "result": null,
+        "lastError": null,
+        "requiresEditor": false,
+        "requiredRole": "VIEWER",
+        "refs": {
+          "nodes": {
+            "00000000-0000-4000-8000-000000000010": {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "type": "Decision",
+              "label": "가상전자 첫 매수",
+              "archived": false
+            }
+          },
+          "relationships": {},
+          "trades": {
+            "00000000-0000-4000-8000-000000000051": {
+              "id": "00000000-0000-4000-8000-000000000051",
+              "broker": "TOSS",
+              "externalId": "20261024-000001",
+              "side": "BUY",
+              "market": "KR",
+              "ticker": "900100",
+              "name": "가상전자 보통주",
+              "quantity": 10.0,
+              "price": 50000.0,
+              "currency": "KRW",
+              "amount": 500000.0,
+              "fee": 100.0,
+              "executedAt": "2026-10-24T01:00:00Z",
+              "createdAt": "2026-01-01T00:00:57.000000Z",
+              "createdVia": "AGENT",
+              "security": {
+                "id": "00000000-0000-4000-8000-000000000009",
+                "type": "Security",
+                "label": "가상전자 보통주",
+                "archived": false
+              },
+              "decisions": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000071",
+                  "type": "Decision",
+                  "label": "가상전자 추가 매수(고침)",
+                  "archived": false
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000074",
+        "kind": "ARCHIVE_NODE",
+        "status": "PENDING",
+        "payload": {
+          "nodeId": "00000000-0000-4000-8000-000000000056",
+          "expectedRevision": 3,
+          "reason": "연습으로 만든 기업이다"
+        },
+        "rationale": "실제 기업이 아니다.",
+        "evidence": {
+          "nodeIds": [],
+          "tradeIds": [],
+          "urls": []
+        },
+        "createdAt": "2026-01-01T00:01:22.000000Z",
+        "createdVia": "AGENT",
+        "token": {
+          "id": "00000000-0000-4000-8000-000000000004",
+          "name": "Hermes"
+        },
+        "decidedAt": null,
+        "decisionNote": null,
+        "result": null,
+        "lastError": null,
+        "requiresEditor": true,
+        "requiredRole": "EDITOR",
+        "refs": {
+          "nodes": {
+            "00000000-0000-4000-8000-000000000056": {
+              "id": "00000000-0000-4000-8000-000000000056",
+              "type": "Company",
+              "label": "보관 연습 기업",
+              "archived": false
+            }
+          },
+          "relationships": {},
+          "trades": {}
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000075",
+        "kind": "ARCHIVE_RELATIONSHIP",
+        "status": "PENDING",
+        "payload": {
+          "relationshipId": "00000000-0000-4000-8000-000000000013",
+          "reason": "발행 관계를 다시 잇는다"
+        },
+        "rationale": "종목을 다시 등록한다.",
+        "evidence": {
+          "nodeIds": [],
+          "tradeIds": [],
+          "urls": []
+        },
+        "createdAt": "2026-01-01T00:01:22.000000Z",
+        "createdVia": "AGENT",
+        "token": {
+          "id": "00000000-0000-4000-8000-000000000004",
+          "name": "Hermes"
+        },
+        "decidedAt": null,
+        "decisionNote": null,
+        "result": null,
+        "lastError": null,
+        "requiresEditor": true,
+        "requiredRole": "EDITOR",
+        "refs": {
+          "nodes": {
+            "00000000-0000-4000-8000-000000000005": {
+              "id": "00000000-0000-4000-8000-000000000005",
+              "type": "Company",
+              "label": "가상전자",
+              "archived": false
+            },
+            "00000000-0000-4000-8000-000000000009": {
+              "id": "00000000-0000-4000-8000-000000000009",
+              "type": "Security",
+              "label": "가상전자 보통주",
+              "archived": false
+            }
+          },
+          "relationships": {
+            "00000000-0000-4000-8000-000000000013": {
+              "id": "00000000-0000-4000-8000-000000000013",
+              "type": "ISSUES",
+              "from": {
+                "id": "00000000-0000-4000-8000-000000000005",
+                "type": "Company",
+                "label": "가상전자",
+                "archived": false
+              },
+              "to": {
+                "id": "00000000-0000-4000-8000-000000000009",
+                "type": "Security",
+                "label": "가상전자 보통주",
+                "archived": false
+              },
+              "revision": 1,
+              "archived": false,
+              "createdAt": "2026-01-01T00:00:29.000000Z",
+              "createdBy": {
+                "id": "00000000-0000-4000-8000-000000000002",
+                "email": "alice@example.com",
+                "displayName": "Alice"
+              }
+            }
+          },
+          "trades": {}
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000076",
+        "kind": "CREATE_CLAIM",
+        "status": "PENDING",
+        "payload": {
+          "predicate": "BELONGS_TO_SECTOR",
+          "subjectId": "00000000-0000-4000-8000-000000000005",
+          "objectId": "00000000-0000-4000-8000-000000000017",
+          "documentIds": [
+            "00000000-0000-4000-8000-000000000006"
+          ],
+          "description": "가상전자는 메모리 반도체 산업에 속한다.",
+          "evidenceText": "당사는 D램과 낸드 플래시를 주력으로 생산한다.",
+          "validFrom": null,
+          "validTo": null
+        },
+        "rationale": "사업보고서가 주력 제품을 적었다.",
+        "evidence": {
+          "nodeIds": [],
+          "tradeIds": [],
+          "urls": []
+        },
+        "createdAt": "2026-01-01T00:01:22.000000Z",
+        "createdVia": "AGENT",
+        "token": {
+          "id": "00000000-0000-4000-8000-000000000004",
+          "name": "Hermes"
+        },
+        "decidedAt": null,
+        "decisionNote": null,
+        "result": null,
+        "lastError": null,
+        "requiresEditor": true,
+        "requiredRole": "EDITOR",
+        "refs": {
+          "nodes": {
+            "00000000-0000-4000-8000-000000000005": {
+              "id": "00000000-0000-4000-8000-000000000005",
+              "type": "Company",
+              "label": "가상전자",
+              "archived": false
+            },
+            "00000000-0000-4000-8000-000000000006": {
+              "id": "00000000-0000-4000-8000-000000000006",
+              "type": "Document",
+              "label": "가상전자 2026 사업보고서",
+              "archived": false
+            },
+            "00000000-0000-4000-8000-000000000017": {
+              "id": "00000000-0000-4000-8000-000000000017",
+              "type": "Sector",
+              "label": "가상 메모리 반도체",
+              "archived": false
+            }
+          },
+          "relationships": {},
+          "trades": {}
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000077",
+        "kind": "UPDATE_NODE",
+        "status": "PENDING",
+        "payload": {
+          "nodeId": "00000000-0000-4000-8000-000000000005",
+          "expectedRevision": 2,
+          "properties": {
+            "description": "에이전트가 고친 메모"
+          }
+        },
+        "rationale": "사업보고서의 설명으로 메모를 고친다.",
+        "evidence": {
+          "nodeIds": [],
+          "tradeIds": [],
+          "urls": []
+        },
+        "createdAt": "2026-01-01T00:01:22.000000Z",
+        "createdVia": "AGENT",
+        "token": {
+          "id": "00000000-0000-4000-8000-000000000004",
+          "name": "Hermes"
+        },
+        "decidedAt": null,
+        "decisionNote": null,
+        "result": null,
+        "lastError": null,
+        "requiresEditor": true,
+        "requiredRole": "EDITOR",
+        "refs": {
+          "nodes": {
+            "00000000-0000-4000-8000-000000000005": {
+              "id": "00000000-0000-4000-8000-000000000005",
+              "type": "Company",
+              "label": "가상전자",
+              "archived": false
+            }
+          },
+          "relationships": {},
+          "trades": {}
+        }
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalItems": 5,
+    "totalPages": 1
+  }
+}

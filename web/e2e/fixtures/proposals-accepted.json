@@ -54,10 +54,12 @@
           ],
           "tradeIds": [
             "00000000-0000-4000-8000-000000000051"
-          ]
+          ],
+          "ontologyVersion": null
         },
         "lastError": null,
         "requiresEditor": true,
+        "requiredRole": "EDITOR",
         "refs": {
           "nodes": {
             "00000000-0000-4000-8000-000000000009": {
@@ -71,6 +73,32 @@
               "type": "Decision",
               "label": "가상전자 추가 매수(고침)",
               "archived": false
+            }
+          },
+          "relationships": {
+            "00000000-0000-4000-8000-000000000072": {
+              "id": "00000000-0000-4000-8000-000000000072",
+              "type": "HAS_DECISION",
+              "from": {
+                "id": "00000000-0000-4000-8000-000000000009",
+                "type": "Security",
+                "label": "가상전자 보통주",
+                "archived": false
+              },
+              "to": {
+                "id": "00000000-0000-4000-8000-000000000071",
+                "type": "Decision",
+                "label": "가상전자 추가 매수(고침)",
+                "archived": false
+              },
+              "revision": 1,
+              "archived": false,
+              "createdAt": "2026-01-01T00:01:15.000000Z",
+              "createdBy": {
+                "id": "00000000-0000-4000-8000-000000000002",
+                "email": "alice@example.com",
+                "displayName": "Alice"
+              }
             }
           },
           "trades": {

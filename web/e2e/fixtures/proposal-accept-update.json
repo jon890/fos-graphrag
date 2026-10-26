@@ -1,0 +1,57 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/me/proposals/00000000-0000-4000-8000-000000000077/accept",
+    "query": ""
+  },
+  "status": 200,
+  "body": {
+    "id": "00000000-0000-4000-8000-000000000077",
+    "kind": "UPDATE_NODE",
+    "status": "ACCEPTED",
+    "payload": {
+      "nodeId": "00000000-0000-4000-8000-000000000005",
+      "expectedRevision": 2,
+      "properties": {
+        "description": "에이전트가 고친 메모"
+      }
+    },
+    "rationale": "사업보고서의 설명으로 메모를 고친다.",
+    "evidence": {
+      "nodeIds": [],
+      "tradeIds": [],
+      "urls": []
+    },
+    "createdAt": "2026-01-01T00:01:22.000000Z",
+    "createdVia": "AGENT",
+    "token": {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "name": "Hermes"
+    },
+    "decidedAt": "2026-01-01T00:01:23.000000Z",
+    "decisionNote": null,
+    "result": {
+      "nodeIds": [
+        "00000000-0000-4000-8000-000000000005"
+      ],
+      "relationshipIds": [],
+      "tradeIds": [],
+      "ontologyVersion": null
+    },
+    "lastError": null,
+    "requiresEditor": true,
+    "requiredRole": "EDITOR",
+    "refs": {
+      "nodes": {
+        "00000000-0000-4000-8000-000000000005": {
+          "id": "00000000-0000-4000-8000-000000000005",
+          "type": "Company",
+          "label": "가상전자",
+          "archived": false
+        }
+      },
+      "relationships": {},
+      "trades": {}
+    }
+  }
+}

@@ -2,10 +2,11 @@ import type { Page } from '@playwright/test'
 import { exact, openScreen, shotElement } from './support'
 import { expect, shot, test, type MockApi, type Role } from './mock/test'
 
-// 역할과 관리자 화면을 확인한다. 사용자 추가와 비활성화, 열람자 화면, 역할별 더보기 메뉴, 세션이 끊긴 화면, 온톨로지 YAML 과 폼 편집, 영향 미리보기.
+// 역할과 관리자 화면을 확인한다. 사용자 추가와 비활성화, 열람자 화면, 역할별 더보기 메뉴, 세션이 끊긴 화면,
+// 온톨로지 YAML 편집(ADR-016)과 영향 미리보기, 에이전트의 온톨로지 변경 제안 승인(ADR-017).
 // 응답은 가짜 API 의 스냅샷이다. 쓰기는 화면이 보낸 요청을 확인하고, 쓴 뒤의 응답은 스냅샷으로 만든다.
-// 열람자의 쓰기 403, 비활성화한 사용자의 세션 끊김, 온톨로지 버전 저장과 되돌리기는 서버 테스트
-// (RoleAndUserAdminIntegrationTest, ontology/OntologyEditIntegrationTest)가 맡는다.
+// 열람자의 쓰기 403, 비활성화한 사용자의 세션 끊김, 온톨로지 버전 저장과 되돌리기, 온톨로지 변경 제안의 승인 규칙은 서버 테스트
+// (RoleAndUserAdminIntegrationTest, ontology/OntologyEditIntegrationTest, proposal/OntologyChangeProposalIntegrationTest)가 맡는다.
 
 interface NodeRef {
   id: string
@@ -35,8 +36,12 @@ const FUND_TYPE_LINES = [
 /** 개념에 더하는 필수 속성. ApiSnapshotTest 의 REQUIRED_CONCEPT_LINES 와 같은 줄이다 */
 const REQUIRED_CONCEPT_LINES = ['      source:', '        type: string', '        label: 출처', '        required: true', '        maxLength: 50']
 
-/** 폼으로 인물에 더하는 속성 키. ApiSnapshotTest 의 NICKNAME 과 같다 */
+/** YAML 로 인물에 더하는 속성. ApiSnapshotTest 의 NICKNAME_LINES 와 같은 줄이라 미리보기 스냅샷이 이 변경의 응답이다 */
+const NICKNAME_LINES = ['      nickname:', '        type: string', '        label: 별명']
 const NICKNAME = 'nickname'
+
+/** 인물 바로 아래에 넣는 알 수 없는 키. ApiSnapshotTest 의 UNKNOWN_KEY_LINES 와 같다 */
+const UNKNOWN_KEY_LINES = ['    nokey: 1']
 
 /** 목록 한 쪽. 스냅샷의 쪽 응답과 같은 모양이다 */
 function pageOf<T>(items: T[]): { items: T[]; page: number; size: number; totalItems: number; totalPages: number } {
@@ -84,6 +89,13 @@ async function searchAndOpen(page: Page, query: string, label: string): Promise<
   await page.getByTestId('search-submit').click()
   await searchResult(page, label).click()
   await expect(page.getByTestId('detail-label')).toHaveText(label)
+}
+
+/** 정규화된 YAML 에서 인물 타입이 시작하는 줄의 위치(0부터) */
+function personLine(yaml: string): number {
+  const at = yaml.split('\n').indexOf('  Person:')
+  expect(at, '정규화된 YAML 의 Person 줄').toBeGreaterThanOrEqual(0)
+  return at
 }
 
 /** 온톨로지 화면 머리의 「버전 n」 */
@@ -210,58 +222,124 @@ test.describe('관리자', () => {
     await shot(page, '09-ontology-restored')
   })
 
-  test('9b) 관리자가 폼으로 인물에 속성을 더해 저장하고, 문장 틀이 틀린 초안은 저장하지 않고 버린다', async ({ page, api }) => {
+  test('9b) 관리자가 YAML 로 인물에 속성을 더해 저장하고, 예전 폼 편집기 주소는 YAML 편집기로 열린다', async ({ page, api }) => {
     const base = api.fixture('ontology').version as number
+    const baseYaml = api.fixture('ontology-version').yaml as string
+    const nicknameYaml = insertAfter(baseYaml, '    properties:', NICKNAME_LINES, personLine(baseYaml))
+    const saved = api.fixture('ontology-save')
     let current: Record<string, unknown> = api.fixture('ontology')
     api.on('GET', '/api/ontology', () => ({ body: current }))
+    api.on('POST', '/api/ontology/preview', { body: api.fixture('ontology-preview-add-property') })
     api.on('POST', '/api/ontology/versions', () => {
       current = ontologyAfter(api, 'ontology-preview-add-property', 'ontology-save')
-      return { status: 201, body: api.fixture('ontology-save') }
+      return { status: 201, body: saved }
     })
-    // 문장 틀을 고친 정의는 미리보기가 거짓이다.
-    api.on('POST', '/api/ontology/preview', (req) => {
-      const definition = (req.body as { definition: { relationshipTypes: Record<string, { sentence?: string }> } }).definition
-      return { body: api.fixture(definition.relationshipTypes.ISSUES.sentence === '{from} 테스트' ? 'ontology-preview-invalid' : 'ontology-preview-add-property') }
-    })
+
+    // 1. 예전 주소 /ontology?view=form 을 열면 YAML 편집기로 열리고 주소가 view=yaml 이 된다.
+    await openApp(page, '/ontology?view=form')
+    await expect(page.getByTestId('ontology-yaml-editor')).toBeVisible()
+    await expect(page).toHaveURL(/view=yaml/)
+    const input = page.getByTestId('ontology-yaml-input')
+    await expect(input).toHaveValue(baseYaml)
+
+    // 2. 인물의 properties 아래에 문자열 속성을 더하고 미리본 뒤 저장한다.
+    await input.fill(nicknameYaml)
+    await page.getByTestId('ontology-preview').click()
+    await expect(page.getByTestId('ontology-diff-added')).toContainText(`nodeTypes.Person.properties.${NICKNAME}`)
+    expect(api.lastRequest('POST', '/api/ontology/preview').body).toEqual({ baseVersion: base, yaml: nicknameYaml })
+    await shotElement(page.getByTestId('ontology-preview-panel'), '09b-ontology-yaml-preview')
+    await page.getByTestId('ontology-save').click()
+    await expect(page.getByTestId('ontology-message')).toHaveAttribute('data-kind', 'success')
+    expect(api.lastRequest('POST', '/api/ontology/versions').body).toMatchObject({ baseVersion: base, yaml: nicknameYaml })
+    await expect(page.getByTestId('ontology-version')).toHaveText(`버전 ${saved.version}`)
+    await shot(page, '09b-ontology-yaml')
+  })
+
+  test('9d) 긴 YAML 을 스크롤해도 툴바와 결과가 화면 안에 있고, 틀린 키의 줄 번호를 누르면 편집칸이 그 줄을 고른다', async ({ page, api }) => {
+    const baseYaml = api.fixture('ontology-version').yaml as string
+    const person = personLine(baseYaml)
+    // 알 수 없는 키가 든 초안은 그 줄 번호가 있는 오류로, 나머지는 속성을 더한 결과로 답한다.
+    api.on('POST', '/api/ontology/preview', (req) => ({
+      body: api.fixture((req.body as { yaml: string }).yaml.includes(UNKNOWN_KEY_LINES[0]) ? 'ontology-preview-invalid' : 'ontology-preview-add-property'),
+    }))
 
     await openApp(page)
     await openScreen(page, 'ontology')
+    await page.getByTestId('ontology-edit-yaml').click()
+    const input = page.getByTestId('ontology-yaml-input')
+    await expect(input).toHaveValue(baseYaml)
 
-    // 1. 폼에서 인물에 문자열 속성을 더하고 미리본 뒤 저장한다.
-    await page.getByTestId('ontology-edit-form').click()
-    const person = page.locator('[data-testid="ontology-form-type"][data-type="Person"]')
-    await expect(person).toBeVisible()
-    await person.getByTestId('ontology-form-prop-add').click()
-    await person.getByTestId('ontology-form-new-key').fill(NICKNAME)
-    await person.getByTestId('ontology-form-new-label').fill('별명')
-    await person.getByTestId('ontology-form-new-submit').click()
-    await expect(person.locator(`[data-testid="ontology-form-prop"][data-prop="${NICKNAME}"]`)).toBeVisible()
+    // 1. 운영 크기를 흉내 내 인물에 속성을 많이 더해 편집칸을 늘리고 맨 아래로 스크롤해도 툴바와 결과가 화면 안에 있다.
+    const extra = Array.from({ length: 150 }, (_, i) => [`      long${i}:`, '        type: string', `        label: 긴 속성 ${i}`]).flat()
+    const longYaml = insertAfter(baseYaml, '    properties:', extra, person)
+    await input.fill(longYaml)
+    await input.evaluate((el) => {
+      el.scrollTop = el.scrollHeight
+    })
+    await expect(page.getByTestId('ontology-yaml-toolbar')).toBeInViewport()
     await page.getByTestId('ontology-preview').click()
-    await expect(page.getByTestId('ontology-diff-added')).toContainText(`nodeTypes.Person.properties.${NICKNAME}`)
-    expect(api.lastRequest('POST', '/api/ontology/preview').body).toMatchObject({
-      baseVersion: base,
-      definition: { nodeTypes: { Person: { properties: { [NICKNAME]: { type: 'string', label: '별명' } } } } },
-    })
-    await shotElement(page.getByTestId('ontology-preview-panel'), '09b-ontology-form-preview')
-    await page.getByTestId('ontology-save').click()
-    await expect(page.getByTestId('ontology-message')).toHaveAttribute('data-kind', 'success')
-    expect(api.lastRequest('POST', '/api/ontology/versions').body).toMatchObject({
-      baseVersion: base,
-      definition: { nodeTypes: { Person: { properties: { [NICKNAME]: { type: 'string', label: '별명' } } } } },
-    })
-    await shot(page, '09b-ontology-form')
+    await expect(page.getByTestId('ontology-preview-side')).toHaveAttribute('data-layout', 'side')
+    await expect(page.getByTestId('ontology-preview-panel')).toBeInViewport()
+    await expect(page.getByTestId('ontology-yaml-toolbar')).toBeInViewport()
 
-    // 2. 관계 종류의 문장 틀에서 {to} 를 빼면 입력 아래와 미리보기에 오류가 보이고 저장 단추가 없다. 초안을 버린다.
-    await page.getByTestId('ontology-edit-form').click()
-    const issues = page.locator('[data-testid="ontology-form-rel"][data-rel="ISSUES"]')
-    await expect(issues).toBeVisible()
-    await issues.getByTestId('ontology-form-rel-sentence').fill('{from} 테스트')
-    await expect(issues.getByTestId('ontology-form-error')).toHaveText('문장 틀에 {from} 과 {to} 를 한 번씩 넣습니다')
+    // 2. 알 수 없는 키를 인물 바로 아래에 넣고 확인하면 오류의 줄 번호 단추가 그 줄을 가리키고, 누르면 편집칸이 그 줄을 고른다.
+    // 더한 속성은 인물 줄보다 아래라 인물 바로 아래 줄의 번호는 바뀌지 않는다.
+    const errorLineNo = person + 2
+    await input.fill(insertAfter(longYaml, '  Person:', UNKNOWN_KEY_LINES))
     await page.getByTestId('ontology-preview').click()
-    await expect(page.getByTestId('ontology-preview-error')).toContainText(api.fixture('ontology-preview-invalid').errors)
-    await expect(page.getByTestId('ontology-save')).toHaveCount(0)
+    const errorLine = page.getByTestId('ontology-preview-error-line').first()
+    await expect(errorLine).toHaveAttribute('data-line', String(errorLineNo))
+    await errorLine.click()
+    const selected = await input.evaluate((el) => {
+      const area = el as HTMLTextAreaElement
+      return { line: area.value.slice(0, area.selectionStart).split('\n').length, text: area.value.slice(area.selectionStart, area.selectionEnd) }
+    })
+    expect(selected).toEqual({ line: errorLineNo, text: UNKNOWN_KEY_LINES[0] })
+    await shot(page, '09d-ontology-yaml-error-line')
+
+    // 3. 고친 초안은 확인 창을 거쳐 버린다. 저장 요청은 없다.
     await page.getByTestId('ontology-draft-discard').click()
-    await expect(page.getByTestId('ontology-form')).toHaveCount(0)
+    await page.getByTestId('ontology-discard-confirm-submit').click()
+    await expect(page.getByTestId('ontology-yaml-editor')).toHaveCount(0)
+    expect(api.requests.filter((r) => r.method === 'POST' && r.path === '/api/ontology/versions')).toEqual([])
+  })
+
+  test('9e) 연동 토큰으로 올린 온톨로지 변경 제안을 「제안」 에서 바뀐 점을 보고 승인하면 버전이 하나 오른다', async ({ page, api }) => {
+    const before = api.fixture('ontology-before-proposal')
+    const after = api.fixture('ontology-after-proposal')
+    const proposal = api.fixture('proposals-pending-ontology').items[0] as { id: string; kind: string; payload: { baseVersion: number; yaml: string } }
+    const accepted = api.fixture('proposal-accept-ontology')
+    expect(proposal.kind).toBe('ONTOLOGY_CHANGE')
+    expect(proposal.payload.baseVersion, '제안의 기준 버전이 지금 버전이다').toBe(before.version)
+    let decided = false
+    api.on('GET', '/api/ontology', () => ({ body: decided ? after : before }))
+    api.on('GET', '/api/me/proposals?status=PENDING&page=0&size=20', () => ({ body: pageOf(decided ? [] : [proposal]) }))
+    api.on('GET', '/api/me/proposals/summary', () => ({ body: { pending: decided ? 0 : 1 } }))
+    api.on('POST', '/api/ontology/preview', { body: api.fixture('ontology-preview-proposal') })
+    api.on('POST', `/api/me/proposals/${proposal.id}/accept`, () => {
+      decided = true
+      return { body: accepted, headers: { 'X-Ontology-Version': String(after.version) } }
+    })
+
+    // 1. 카드에 지금 버전과 비교한 바뀐 점이 보인다. 관리자가 연 카드라 지금 버전과 기준 버전으로 미리보기를 부른다.
+    await openApp(page)
+    await openScreen(page, 'proposals')
+    const card = page.locator(`[data-testid="proposal-card"][data-id="${proposal.id}"]`)
+    await expect(card.getByTestId('proposal-kind')).toHaveText('온톨로지 바꾸기')
+    await expect(card.getByTestId('proposal-ontology-preview')).toContainText('nodeTypes.Person.properties.proposed')
+    await expect(card.getByTestId('proposal-ontology-stale')).toHaveCount(0)
+    expect(api.lastRequest('POST', '/api/ontology/preview').body).toEqual({ baseVersion: proposal.payload.baseVersion, yaml: proposal.payload.yaml })
+    await shot(page, '10-ontology-change-proposal')
+
+    // 2. 영향이 없는 변경은 확인란 없이 승인한다. 승인하면 카드가 빠지고 온톨로지 버전이 하나 오른다.
+    await expect(card.getByTestId('proposal-ontology-confirm')).toHaveCount(0)
+    await card.getByTestId('proposal-accept').click()
+    await expect(page.getByTestId('proposals-message')).toHaveAttribute('data-kind', 'success')
+    await expect(page.getByTestId('proposals-message')).toContainText(`버전 ${accepted.result.ontologyVersion}`)
+    await expect(card).toHaveCount(0)
+    expect(api.lastRequest('POST', `/api/me/proposals/${proposal.id}/accept`).body).toBeNull()
+    await openScreen(page, 'ontology')
+    await expect(page.getByTestId('ontology-version')).toHaveText(`버전 ${before.version + 1}`)
   })
 
   test('9c) 관리자가 기존 데이터와 어긋나는 변경을 미리보면 영향과 확인란이 보이고, 저장하지 않고 초안을 버린다', async ({ page, api }) => {
@@ -290,8 +368,9 @@ test.describe('관리자', () => {
     await expect(save).toBeEnabled()
     await shotElement(page.getByTestId('ontology-preview-panel'), '09c-ontology-impact')
 
-    // 초안을 버리면 버전이 그대로이고 저장 요청은 없다.
+    // 고친 초안을 버리면 확인 창이 먼저 열리고, 버리면 버전이 그대로이고 저장 요청은 없다.
     await page.getByTestId('ontology-draft-discard').click()
+    await page.getByTestId('ontology-discard-confirm-submit').click()
     await expect(page.getByTestId('ontology-version')).toHaveText(`버전 ${base}`)
     expect(api.requests.filter((r) => r.method === 'POST' && r.path === '/api/ontology/versions')).toEqual([])
   })

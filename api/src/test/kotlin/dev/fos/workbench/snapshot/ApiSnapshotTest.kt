@@ -129,7 +129,7 @@ class ApiSnapshotTest {
         relate(alice, "CREATES", change.id, bottleneck.id)
         relate(alice, "HAS_BOTTLENECK", sector.id, bottleneck.id)
         relate(alice, "BENEFITS", bottleneck.id, company.id)
-        relate(alice, "ISSUES", company.id, security.id)
+        val issuesRelation = relate(alice, "ISSUES", company.id, security.id)
         relate(alice, "HAS_VALUATION", company.id, valuation.id)
         relate(alice, "HAS_SCENARIO", valuation.id, scenario.id)
         relate(alice, "HAS_DECISION", security.id, decision.id)
@@ -437,15 +437,11 @@ class ApiSnapshotTest {
         // YAML 로 새 타입을 더한다
         val fundYaml = insertAfter(baseYaml, "nodeTypes:", FUND_TYPE_LINES)
         preview("ontology-preview-add-type", mapOf("yaml" to fundYaml))
-        // 폼으로 인물에 속성을 더한다
-        val definition = (current.deepCopy() as ObjectNode).apply { listOf("version", "versionCreatedAt", "versionCreatedBy").forEach { remove(it) } }
-        val withNickname = definition.deepCopy().also {
-            (it["nodeTypes"]["Person"]["properties"] as ObjectNode).putObject(NICKNAME).put("type", "string").put("label", "별명").put("required", false)
-        }
-        preview("ontology-preview-add-property", mapOf("definition" to withNickname))
-        // 관계 문장 틀에 끝 자리가 빠지면 미리보기가 거짓이다
-        val brokenSentence = definition.deepCopy().also { (it["relationshipTypes"]["ISSUES"] as ObjectNode).put("sentence", "{from} 테스트") }
-        preview("ontology-preview-invalid", mapOf("definition" to brokenSentence))
+        // YAML 로 인물에 속성을 더한다
+        val personAt = baseYaml.lines().indexOf("  Person:").also { check(it >= 0) { "YAML 에 Person 타입이 없다" } }
+        preview("ontology-preview-add-property", mapOf("yaml" to insertAfter(baseYaml, "    properties:", NICKNAME_LINES, from = personAt)))
+        // 인물 바로 아래에 알 수 없는 키가 있으면 미리보기가 거짓이고 오류에 그 줄 번호가 있다
+        preview("ontology-preview-invalid", mapOf("yaml" to insertAfter(baseYaml, "  Person:", UNKNOWN_KEY_LINES)))
         // 개념에 필수 속성을 더하면 값이 없는 개념 수만큼 영향이 있다
         val conceptAt = baseYaml.lines().indexOf("  Concept:").also { check(it >= 0) { "YAML 에 Concept 타입이 없다" } }
         val requiredYaml = insertAfter(baseYaml, "    properties:", REQUIRED_CONCEPT_LINES, from = conceptAt)
@@ -460,6 +456,94 @@ class ApiSnapshotTest {
         val restoreResponse = admin.post(restorePath, mapOf("baseVersion" to savedVersion))
         expect(201, restoreResponse)
         save("ontology-restore", "POST", restorePath, restoreResponse)
+
+        // 에이전트가 올린 항목 고치기, 항목 보관, 관계 보관, 주장 만들기 제안. A 가 고치기는 승인하고 보관은 거절한다.
+        // 관계 보관의 refs 에 든 관계 시각은 앞 저장(기업 상세)에 있던 것이라 시각 자리표시가 밀리지 않는다
+        val companyNow = alice.get("/api/nodes/${company.id}").body["node"]
+        val archiveTargetNow = alice.get("/api/nodes/${toArchive.id}").body["node"]
+        val instance = expect(
+            200,
+            anonymous().bearer(
+                "POST", "/api/v1/proposals", token,
+                mapOf(
+                    "proposals" to listOf(
+                        mapOf(
+                            "kind" to "UPDATE_NODE",
+                            "payload" to mapOf("nodeId" to company.id, "expectedRevision" to companyNow.revision, "properties" to mapOf("description" to "에이전트가 고친 메모")),
+                            "rationale" to "사업보고서의 설명으로 메모를 고친다.",
+                            "dedupeKey" to "update:company",
+                        ),
+                        mapOf(
+                            "kind" to "ARCHIVE_NODE",
+                            "payload" to mapOf("nodeId" to toArchive.id, "expectedRevision" to archiveTargetNow.revision, "reason" to "연습으로 만든 기업이다"),
+                            "rationale" to "실제 기업이 아니다.",
+                            "dedupeKey" to "archive:practice",
+                        ),
+                        mapOf(
+                            "kind" to "ARCHIVE_RELATIONSHIP",
+                            "payload" to mapOf("relationshipId" to issuesRelation.id, "reason" to "발행 관계를 다시 잇는다"),
+                            "rationale" to "종목을 다시 등록한다.",
+                            "dedupeKey" to "archive:issues",
+                        ),
+                        mapOf(
+                            "kind" to "CREATE_CLAIM",
+                            "payload" to mapOf(
+                                "predicate" to "BELONGS_TO_SECTOR", "subjectId" to company.id, "objectId" to sector.id, "documentIds" to listOf(document.id),
+                                "description" to "가상전자는 메모리 반도체 산업에 속한다.", "evidenceText" to "당사는 D램과 낸드 플래시를 주력으로 생산한다.",
+                            ),
+                            "rationale" to "사업보고서가 주력 제품을 적었다.",
+                            "dedupeKey" to "claim:sector",
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val instanceIds = instance["results"].values().associate { it["proposal"]["kind"].asString() to it["proposal"].id }
+        // 한 요청으로 올린 제안이라 (만든 시각, 종류)로 다시 정렬한다
+        val pendingInstance = alice.get(pendingPath)
+        expect(200, pendingInstance)
+        val pendingInstanceBody = (pendingInstance.body.deepCopy() as ObjectNode).also { body ->
+            val items = body["items"].values().sortedWith(compareBy({ it["createdAt"].asString() }, { it["kind"].asString() }))
+            body.putArray("items").addAll(items)
+        }
+        save("proposals-pending-instance", "GET", pendingPath, pendingInstance.copy(body = pendingInstanceBody), namedOnly = true)
+        val updatePath = "/api/me/proposals/${instanceIds.getValue("UPDATE_NODE")}/accept"
+        val updateAccepted = alice.post(updatePath)
+        expect(200, updateAccepted)
+        save("proposal-accept-update", "POST", updatePath, updateAccepted)
+        val archiveRejectPath = "/api/me/proposals/${instanceIds.getValue("ARCHIVE_NODE")}/reject"
+        val archiveRejected = alice.post(archiveRejectPath, mapOf("reason" to "아직 쓰는 기업이다"))
+        expect(200, archiveRejected)
+        save("proposal-reject-archive", "POST", archiveRejectPath, archiveRejected)
+
+        // 관리자의 기록 토큰으로 올린 온톨로지 변경 제안. 관리자가 바뀐 점을 보고 승인한다
+        val adminToken = expect(201, admin.post("/api/me/tokens", mapOf("name" to "Hermes", "scope" to "READ_WRITE")))["token"].asString()
+        val restoredVersion = restoreResponse.body["version"].asInt()
+        val proposedYaml = insertAfter(baseYaml, "    properties:", PROPOSED_PERSON_LINES, from = personAt)
+        val ontologyProposal = expect(
+            200,
+            anonymous().bearer(
+                "POST", "/api/v1/proposals", adminToken,
+                mapOf(
+                    "proposals" to listOf(
+                        mapOf(
+                            "kind" to "ONTOLOGY_CHANGE",
+                            "payload" to mapOf("baseVersion" to restoredVersion, "yaml" to proposedYaml, "note" to "인물에 제안 속성을 더한다"),
+                            "rationale" to "인물의 다른 이름을 적을 칸이 필요하다.",
+                            "dedupeKey" to "ontology:person-proposed",
+                        ),
+                    ),
+                ),
+            ),
+        )["results"][0]["proposal"]
+        getAndSave(admin, "ontology-before-proposal", "/api/ontology", namedOnly = true)
+        getAndSave(admin, "proposals-pending-ontology", pendingPath, namedOnly = true)
+        preview("ontology-preview-proposal", mapOf("baseVersion" to restoredVersion, "yaml" to proposedYaml))
+        val ontologyAcceptPath = "/api/me/proposals/${ontologyProposal.id}/accept"
+        val ontologyAccepted = admin.post(ontologyAcceptPath)
+        expect(200, ontologyAccepted)
+        save("proposal-accept-ontology", "POST", ontologyAcceptPath, ontologyAccepted)
+        getAndSave(admin, "ontology-after-proposal", "/api/ontology", namedOnly = true)
 
         SnapshotNormalizer().normalize(saved.map { if (it.name.startsWith("graph-")) sortGraph(it) else it })
             .forEach { File(dir, "${it.name}.json").writeText(render(it)) }
@@ -533,8 +617,14 @@ class ApiSnapshotTest {
             "        maxLength: 50",
         )
 
-        /** 화면 테스트가 폼으로 인물에 더하는 속성 키 */
-        private const val NICKNAME = "nickname"
+        /** 화면 테스트가 YAML 로 인물에 더하는 속성. web/e2e/admin.spec.ts 와 같은 줄이다 */
+        private val NICKNAME_LINES = listOf("      nickname:", "        type: string", "        label: 별명")
+
+        /** 화면 테스트가 인물 바로 아래에 넣는 알 수 없는 키. web/e2e/admin.spec.ts 와 같은 줄이다 */
+        private val UNKNOWN_KEY_LINES = listOf("    nokey: 1")
+
+        /** 온톨로지 변경 제안이 인물에 더하는 속성 */
+        private val PROPOSED_PERSON_LINES = listOf("      proposed:", "        type: string", "        label: 제안 속성")
 
         private const val PKCE_VERIFIER = "snapshot-pkce-verifier-0123456789abcdefghij"
 

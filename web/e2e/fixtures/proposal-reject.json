@@ -31,6 +31,7 @@
     "result": null,
     "lastError": null,
     "requiresEditor": false,
+    "requiredRole": "VIEWER",
     "refs": {
       "nodes": {
         "00000000-0000-4000-8000-000000000009": {
@@ -40,6 +41,7 @@
           "archived": false
         }
       },
+      "relationships": {},
       "trades": {}
     }
   }
