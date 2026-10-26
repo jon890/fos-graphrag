@@ -1,8 +1,11 @@
 import { CSRF_COOKIE, CSRF_HEADER, readCookie } from './csrf'
 import type {
   ApiErrorBody,
+  AuthorizationPreview,
   ChangeEventView,
   ClaimView,
+  ConnectionView,
+  ConsentDecision,
   CreateClaimRequest,
   GraphView,
   IntegrationTokenView,
@@ -204,6 +207,16 @@ export const api = {
     list: () => request<IntegrationTokenView[]>('GET', '/api/me/tokens'),
     issue: (name: string, scope: TokenScope) => request<IssuedIntegrationToken>('POST', '/api/me/tokens', { name, scope }),
     revoke: (id: string) => request<void>('DELETE', `/api/me/tokens/${enc(id)}`),
+  },
+  oauth: {
+    /** 동의 화면 주소의 query(`?…`)를 그대로 붙여 인가 요청을 검사한다 */
+    preview: (search: string) => request<AuthorizationPreview>('GET', `/api/oauth/authorize${search}`),
+    /** 「연결 허용」 이나 「거절」. 앱으로 돌아갈 주소를 받는다 */
+    decide: (body: ConsentDecision) => request<{ redirectUrl: string }>('POST', '/api/oauth/authorize', body),
+  },
+  connections: {
+    list: () => request<ConnectionView[]>('GET', '/api/me/connections'),
+    disconnect: (id: string) => request<void>('DELETE', `/api/me/connections/${enc(id)}`),
   },
   proposals: {
     list: (status: ProposalStatus, page: number) =>

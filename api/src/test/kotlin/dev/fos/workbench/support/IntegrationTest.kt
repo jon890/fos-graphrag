@@ -20,7 +20,12 @@ import java.util.UUID
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = ["NEO4J_PASSWORD=placeholder-overridden-by-service-connection"],
+    properties = [
+        "NEO4J_PASSWORD=placeholder-overridden-by-service-connection",
+        // 모든 테스트 요청이 127.0.0.1 에서 와 OAuth 의 IP 한도를 나눠 쓴다. 한도를 보는 테스트만 값을 낮춘다
+        "workbench.oauth.register-rate-limit-per-minute=10000",
+        "workbench.oauth.token-rate-limit-per-minute=10000",
+    ],
 )
 @ActiveProfiles("mockoidc")
 @Import(TestcontainersConfig::class)

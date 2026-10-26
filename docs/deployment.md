@@ -35,7 +35,8 @@ flowchart LR
 - HSTS 는 앞단이 붙이는 것을 기본으로 한다. 앞단이 붙이지 않으면 `WORKBENCH_HSTS=true` 로 앱이 붙인다.
 - 에이전트 API(`/api/v1/**`)는 같은 공개 주소로 들어온다. 앞단은 `Authorization` 헤더를 지우지 않고 그대로 넘기고, 접근 로그에 이 헤더를 남기지 않는다. 앞단에서 경로를 따로 막지 않는다. 앱이 연동 토큰으로 인증하고 토큰마다 1분에 60번으로 막는다([ADR-012](adr/012-agent-integration-token.md)).
   앱의 한도는 인증에 성공한 요청만 센다. 형식만 맞춘 가짜 토큰은 요청마다 해시 조회를 한 번씩 일으키므로, 앞단이 IP 기준 요청 한도를 걸 수 있으면 `/api/v1/` 에도 건다. 토큰을 맞출 수는 없지만(무작위 256비트) 조회 부하를 앞단에서 줄인다.
-- 실제 홈서버 주소, 도메인, 계정, 키, 경로는 이 저장소에 넣지 않는다. 홈서버의 `.env` 에만 둔다.
+- 원격 MCP(`/mcp`)와 OAuth 인가 서버(`/oauth/**`, `/.well-known/oauth-protected-resource`, `/.well-known/oauth-authorization-server`)도 같은 공개 주소로 들어온다. 앞단은 이 경로를 막지 않고 `Authorization` 헤더를 그대로 넘긴다. `/oauth/token` 의 요청 본문(인가 코드, 갱신 토큰)을 접근 로그에 남기지 않는다. 메타데이터의 `issuer` 와 자원 주소는 `WORKBENCH_PUBLIC_URL` 이 있으면 그 값이고, 없으면 `X-Forwarded-Proto`, `X-Forwarded-Host` 로 만들어져 위의 forward headers 설정이 맞아야 `https://<공개 origin>` 이 된다. Host 헤더에 기대지 않도록 운영의 `.env` 에 `WORKBENCH_PUBLIC_URL=https://<공개 origin>` 을 넣는 것을 권한다([ADR-015](adr/015-remote-mcp-oauth.md)).
+- 실제 홈서버 주소, 계정, 키, 경로는 이 저장소에 넣지 않는다. 홈서버의 `.env` 에만 둔다. 공개 주소는 예외로 `scripts/deploy-prod.sh` 와 플러그인의 `plugin/.mcp.json` 에 있다.
 
 이번 작업에서는 홈서버에 배포하지 않았다. 아래 절차는 로컬 Compose 에서 확인했다(2026-10-20, macOS, Colima).
 실제 Google 로그인은 client 가 없어 확인하지 못했다. 가짜 OIDC 공급자로 같은 리다이렉트 흐름을 확인했다.
@@ -77,6 +78,7 @@ bash scripts/check-compose.sh
 | `WORKBENCH_FORWARD_HEADERS_STRATEGY` | 아니요 | 기본 `native`. 앞단 없이 직접 열면 `none` |
 | `WORKBENCH_SESSION_TIMEOUT` | 아니요 | 유휴 세션 만료. 기본 `8h` |
 | `WORKBENCH_HSTS` | 아니요 | 기본 `false` |
+| `WORKBENCH_PUBLIC_URL` | 아니요 | OAuth 발급 주소, MCP 자원 주소, Origin 비교의 기준이 되는 공개 origin(`https://<공개 origin>`). 비우면 요청의 scheme 과 host 로 만든다 |
 | `WORKBENCH_TRUSTED_PROXIES` | 아니요 | X-Forwarded-* 를 믿을 프록시 주소(정규식). 비우면 loopback 과 `172.16.0.0/12` |
 | `NEO4J_TX_TIMEOUT`, `NEO4J_LOCK_TIMEOUT` | 아니요 | Neo4j 서버의 트랜잭션 시간 제한(기본 `10s`)과 잠금 대기 상한(기본 `5s`) |
 | `WORKBENCH_IMAGE` | 아니요 | GHCR 이미지를 쓸 때 `ghcr.io/jon890/fos-valuation-ontology:sha-<7자리>` |
@@ -140,6 +142,21 @@ curl -sS -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $WORKBENCH_T
 실제 체결을 넣는 확인은 Hermes 커넥터가 한다. 이 확인에서 가짜 체결을 운영에 넣지 않는다.
 
 이 배포는 데이터 구조를 바꾸지 않고 새 label(`:Trade`, `:Proposal`)과 제약 조건만 더한다. 시작할 때 제약 조건이 생기므로 따로 옮길 데이터가 없다. 저장된 온톨로지에 코드가 소유하는 이름(`Trade`, `Proposal` 등, [데이터 스키마](data-schema.md) 의 「코드가 소유하는 이름」)을 쓴 타입이 있으면 시작할 때 그 버전을 읽지 못해 저장소 YAML 로 새 버전을 만든다. 운영 온톨로지에는 그런 타입이 없다.
+
+## 원격 MCP 확인
+
+원격 MCP 와 OAuth 인가 서버를 처음 배포한 뒤 한 번 확인한다. 데이터 구조는 새 label(`:OAuthClient`, `:OAuthCode`, `:OAuthGrant`)과 제약 조건만 더하고, 시작할 때 생기므로 옮길 데이터가 없다.
+
+```bash
+curl -sS https://<공개 origin>/.well-known/oauth-protected-resource/mcp      # resource 가 https://<공개 origin>/mcp
+curl -sS https://<공개 origin>/.well-known/oauth-authorization-server         # issuer 가 https://<공개 origin>, code_challenge_methods_supported 에 S256
+curl -sS -o /dev/null -D - -X POST -H 'Content-Type: application/json' -d '{}' https://<공개 origin>/mcp | grep -i -E '^HTTP|^www-authenticate'
+# HTTP/2 401 과 WWW-Authenticate: Bearer resource_metadata="https://<공개 origin>/.well-known/oauth-protected-resource/mcp", scope="read write"
+```
+
+`resource` 나 `issuer` 가 `http://` 로 나오면 `WORKBENCH_PUBLIC_URL` 이 비어 있고 앞단의 `X-Forwarded-*` 를 app 이 믿지 않는 것이다. `WORKBENCH_PUBLIC_URL` 을 넣거나 위의 「기본 시나리오」 의 forward headers 설정을 확인한다.
+
+그다음 실제 Claude Code 로 붙는다. 플러그인을 설치하거나 `claude mcp add --transport http valuation-ontology https://<공개 origin>/mcp` 로 더한 뒤 `/mcp` 에서 로그인한다. 동의 화면에서 「조회만」 을 고르고 「가치투자 온톨로지 연결 확인해 줘」 로 `get_connection` 을 부른다. 확인이 끝나면 웹의 더보기 → 연동 → 「연결된 앱」 에서 그 연결을 끊는다. 쓰기 도구는 운영에 가짜 체결이 들어가므로 이 확인에서 부르지 않는다.
 
 ## 자원 설정
 
@@ -276,7 +293,7 @@ scripts/restore.sh backups/neo4j-20261020-120000.dump    # 어느 디렉터리�
 # cwd: 저장소 루트
 docker compose -f compose.dev.yml up -d --wait     # Neo4j 127.0.0.1:7476(Browser), 127.0.0.1:7689(Bolt), 가짜 OIDC 127.0.0.1:8090
 cd api && NEO4J_PASSWORD=... ./gradlew bootRun --args='--spring.profiles.active=mockoidc --workbench.bootstrap.admin-email=admin@example.com'
-cd web && npm ci && npm run dev                    # 웹 :5173, /api 와 OAuth 경로를 :8080 으로 넘긴다
+cd web && npm ci && npm run dev                    # 웹 :5173, /api 와 Google 로그인 경로, /oauth/, /.well-known, /mcp 를 :8080 으로 넘긴다
 ```
 
 개발 로그인은 가짜 공급자의 폼에서 아무 sub 과 claims JSON(`{"email":"admin@example.com","email_verified":true}`)을 넣는다.

@@ -1,7 +1,7 @@
 # 가치투자 온톨로지
 
 친구와 함께 만드는 가치투자 온톨로지를 관리하는 공개 저장소다. 앱 코드, 온톨로지 정의와 초기 데이터, 문서를 모두 이 저장소에서 관리한다.
-저장소는 공개라서 운영 주소, 홈서버 경로, 계정 같은 운영 값은 적지 않는다. 저장소를 앱 하나로 줄인 까닭은 [ADR-014](docs/adr/014-single-app-repository.md) 다.
+저장소는 공개라서 운영 주소, 홈서버 경로, 계정 같은 운영 값은 적지 않는다. 공개 주소는 예외로 `scripts/deploy-prod.sh` 와 `plugin/.mcp.json` 에 둔다. 저장소를 앱 하나로 줄인 까닭은 [ADR-014](docs/adr/014-single-app-repository.md) 다.
 
 두 사람이 각자의 투자 논리(세상의 변화, 병목, 산업, 기업, 시나리오 밸류에이션, 투자 결정)와 근거를 Neo4j 에 저장하고 웹에서 함께 탐색, 추가, 수정, 검토하는 도구다.
 근거가 있는 지식그래프를 사람이 관리하는 첫 마일스톤이다. GraphRAG 검색이나 자동매매는 아직 없다.
@@ -13,6 +13,8 @@
 | `ontology/financial-ontology.yaml` | 온톨로지의 첫 버전과 서버 코드가 소유하는 부분(검토 상태, 이력 이름, 주장 관계, Claim 타입). 그 뒤의 버전은 DB 에 쌓이고 ADMIN 이 웹에서 고친다 |
 | `ontology/seeds/` | 시작할 때 한 번 넣는 초기 데이터. key 마다 한 번만 적용한다 |
 | `api/` | Kotlin, Spring Boot 4.1, Neo4jClient. Google 로그인과 역할, 검증, 변경 이력, 조회 제한, 연동 토큰, 에이전트 API(조회, 체결 기록, 제안) |
+| `plugin/` | Claude Code·Codex 플러그인. 원격 MCP 연결 설정(`.mcp.json`)과 비개발자용 스킬 |
+| `.claude-plugin/marketplace.json` | Claude Code 와 Codex 가 읽는 마켓플레이스 목록. 플러그인은 `plugin/` 하나다 |
 | `web/` | React, TypeScript, Vite, Cytoscape.js |
 | `compose.yml` | 운영 Compose. Neo4j 포트를 호스트에 열지 않는다 |
 | `compose.dev.yml` | 개발용 Neo4j(`127.0.0.1:7476`, `127.0.0.1:7689`)와 가짜 OIDC 공급자(`127.0.0.1:8090`) |
@@ -32,7 +34,8 @@ docker compose up -d --build --wait
 로그인은 Google 계정으로만 한다. 첫 관리자가 오른쪽 위 「더보기」 메뉴의 「사용자」 에서 다른 사람의 Gmail 과 역할(VIEWER, EDITOR, ADMIN)을 추가한다.
 처음 열면 온톨로지의 타입과 관계를 그린 개념 지도가 보인다. 항목은 어느 화면에서나 오른쪽 위 「＋ 추가」 로 만든다.
 항목 상세의 「근거 따라가기」 는 그 항목이 기댄 근거를 변화까지 거슬러 보이고, 「공부」 탭은 내가 「잘 모르겠어요」 로 표시한 항목을 모은다.
-개인 비서 Hermes 가 이 앱을 조회하게 하려면 「더보기」 의 「연동 토큰」 에서 토큰을 발급해 커넥터에 넣는다. 에이전트는 그 토큰으로 `/api/v1` 을 부른다. 「조회와 기록」 으로 발급한 토큰이면 Hermes 가 토스증권 체결을 「내 체결」 에 넣고, 투자 결정 만들기 같은 해석은 「더보기」 의 「제안」 에 올려 내가 승인한다. 체결은 나만 본다. 계약은 [API 계약](docs/api-contract.md) 의 「에이전트 API」 절이다.
+개인 비서 Hermes 가 이 앱을 조회하게 하려면 「더보기」 의 「연동」 에서 토큰을 발급해 커넥터에 넣는다. 에이전트는 그 토큰으로 `/api/v1` 을 부른다. 「조회와 기록」 으로 발급한 토큰이면 Hermes 가 토스증권 체결을 「내 체결」 에 넣고, 투자 결정 만들기 같은 해석은 「더보기」 의 「제안」 에 올려 내가 승인한다. 체결은 나만 본다. 계약은 [API 계약](docs/api-contract.md) 의 「에이전트 API」 절이다.
+Claude Code 나 Codex 로 쓰려면 플러그인을 설치한다. Claude Code 는 `/plugin marketplace add jon890/fos-valuation-ontology` 와 `/plugin install valuation-ontology@fos-valuation-ontology` 다. 로그인과 Codex 설치는 [플러그인 안내](plugin/README.md) 를 본다.
 Google OAuth client 만들기, 공개 HTTPS 배포, 백업과 복원, 개발 환경 실행은 [배포 문서](docs/deployment.md)에 있다.
 
 ## 검증

@@ -21,6 +21,18 @@ class OntologyLoaderReservedTest {
     }
 
     @Test
+    fun `노드 타입으로 OAuth 저장 이름을 더하면 일관성 검사 오류다`() {
+        val company = repo.nodeTypes.getValue("Company")
+        val withOAuth = repo.copy(nodeTypes = repo.nodeTypes + listOf("OAuthClient", "OAuthCode", "OAuthGrant").associateWith { company })
+
+        assertThat(OntologyLoader.consistencyErrors(withOAuth)).containsExactlyInAnyOrder(
+            "OAuthClient 은 서버 코드가 쓰는 이름이라 노드 타입으로 쓸 수 없다",
+            "OAuthCode 은 서버 코드가 쓰는 이름이라 노드 타입으로 쓸 수 없다",
+            "OAuthGrant 은 서버 코드가 쓰는 이름이라 노드 타입으로 쓸 수 없다",
+        )
+    }
+
+    @Test
     fun `관계 종류로 OWNS 를 더하면 일관성 검사 오류다`() {
         val withOwns = repo.copy(
             relationshipTypes = repo.relationshipTypes + ("OWNS" to RelationshipTypeDef(description = "x", from = listOf("Company"), to = listOf("Security"))),

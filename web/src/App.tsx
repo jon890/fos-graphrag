@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { rememberReturnTo, takeReturnTo } from './lib/links'
 import type { OntologyDraft } from './lib/ontologyEdit'
 import {
+  CONNECT_PATH,
   DEFAULT_WORKSPACE_QUERY,
   LANDING_PATH,
   TAB_PATHS,
@@ -24,6 +25,7 @@ import {
 } from './routes'
 import { AppContext, canEditRole, ROLE_LABEL } from './context'
 import { LoginView } from './components/LoginView'
+import { ConnectPage } from './components/connect/ConnectPage'
 import { Workspace } from './components/Workspace'
 import { ListTab } from './components/ListTab'
 import { ReviewTab } from './components/ReviewTab'
@@ -63,6 +65,9 @@ function MoreMenuWithCount(props: Omit<ComponentProps<typeof MoreMenu>, 'pending
   return <MoreMenu {...props} pendingCount={useProposalCount().count} />
 }
 
+/** 동의 화면에서 로그인한 사람에게 보일 로그인 안내 */
+const CONNECT_LOGIN_NOTICE = '앱을 연결하려면 먼저 Google 로 로그인하세요.'
+
 type AuthState = { status: 'checking' } | { status: 'anonymous'; notice?: string } | { status: 'signed-in'; user: CurrentUser }
 
 export default function App() {
@@ -87,9 +92,17 @@ export default function App() {
   locationRef.current = location
   // 로그인 화면을 거쳐도 남은 주소다. 로그인과 온톨로지 읽기가 끝난 뒤 연다.
   const returnToRef = useRef<string | null>(null)
+  // 로그인 뒤 동의 화면으로 옮기는 동안 참이다. 그 사이 `/` 가 `/map` 이 되거나 온톨로지를 읽거나 가이드가 열리지 않게 한다.
+  const connectPendingRef = useRef(false)
   // 탭마다 마지막으로 보던 주소. 화면 메모리에만 두고 새로고침하면 사라진다.
   const lastUrlOf = useRef<Partial<Record<TabKey, string>>>({})
 
+  const isConnect = location.pathname === CONNECT_PATH
+  if (isConnect) {
+    connectPendingRef.current = false
+    // 「첫 화면으로」 를 눌렀을 때 다시 동의 화면으로 끌려가지 않게 한다.
+    returnToRef.current = null
+  }
   const tab = tabOfPath(location.pathname)
   const role = auth.status === 'signed-in' ? auth.user.role : null
   const openNodeId = tab === 'workspace' ? parseWorkspaceQuery(location.search).node : null
@@ -112,10 +125,16 @@ export default function App() {
       .then((user) => {
         // StrictMode 에서 이 콜백이 두 번 돌아도 둘째 호출이 첫 값을 덮어쓰지 않게 한다.
         const back = takeReturnTo()
-        if (back) returnToRef.current = back
+        if (back === CONNECT_PATH || back?.startsWith(`${CONNECT_PATH}?`)) {
+          // 동의 화면은 온톨로지를 기다리지 않고 바로 연다. 이미 그 주소면 옮길 필요가 없다.
+          if (window.location.pathname !== CONNECT_PATH) {
+            connectPendingRef.current = true
+            navigateRef.current(back, { replace: true })
+          }
+        } else if (back) returnToRef.current = back
         setAuth({ status: 'signed-in', user })
       })
-      .catch(() => setAuth({ status: 'anonymous' }))
+      .catch(() => setAuth({ status: 'anonymous', notice: window.location.pathname === CONNECT_PATH ? CONNECT_LOGIN_NOTICE : undefined }))
     return () => {
       setUnauthorizedHandler(null)
       setOntologyVersionListener(null)
@@ -124,7 +143,7 @@ export default function App() {
 
   const signedIn = auth.status === 'signed-in'
   useEffect(() => {
-    if (!signedIn) return
+    if (!signedIn || isConnect || connectPendingRef.current) return
     setOntologyError(null)
     api.ontology
       .get()
@@ -138,7 +157,7 @@ export default function App() {
         }
       })
       .catch((e) => setOntologyError(errorMessage(e)))
-  }, [signedIn])
+  }, [signedIn, isConnect])
 
   /** 온톨로지만 다시 받는다. 주소와 열린 항목은 그대로다. 저장과 되돌리기가 끝났을 때도 부른다 */
   const reloadOntology = useCallback(async () => {
@@ -149,11 +168,11 @@ export default function App() {
 
   // 모르는 경로(/ 포함)와 권한 없는 경로는 기록을 쌓지 않고 바꿔 연다.
   useEffect(() => {
-    if (!signedIn) return
+    if (!signedIn || isConnect || connectPendingRef.current) return
     if (tab === null) navigateRef.current(legacyRedirect(location.pathname, location.search) ?? LANDING_PATH, { replace: true })
     else if (tab === 'users' && role !== 'ADMIN') navigateRef.current(LANDING_PATH, { replace: true })
     else if (tab === 'ontology' && role !== 'ADMIN' && new URLSearchParams(location.search).has('view')) navigateRef.current(TAB_PATHS.ontology, { replace: true })
-  }, [signedIn, tab, role, location.pathname, location.search])
+  }, [signedIn, isConnect, tab, role, location.pathname, location.search])
 
   // 고친 초안이 있으면 새로고침과 창 닫기 전에 브라우저가 떠날지 묻는다.
   const draftDirty = ontologyDraft?.dirty === true
@@ -244,6 +263,14 @@ export default function App() {
   }
   if (auth.status === 'anonymous') {
     return <LoginView denied={denied} notice={auth.notice} />
+  }
+
+  // 동의 화면은 머리글, 탭, 첫 접속 가이드, 온톨로지 없이 이 화면만 그린다. 옮기는 동안에는 불러오는 중만 보인다.
+  if (isConnect) return <ConnectPage />
+  if (connectPendingRef.current) {
+    return <div className="p-12 text-center text-muted-foreground" data-testid="app-loading">
+        불러오는 중…
+      </div>
   }
 
   const user = auth.user

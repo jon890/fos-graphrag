@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, ApiError, errorMessage } from '../../api/client'
 import type { IntegrationTokenView, TokenScope } from '../../api/types'
+import { scopeLabel } from '../../lib/connect'
 import { formatDateTime } from '../../lib/format'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { ConnectionsSection } from './ConnectionsSection'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
@@ -20,10 +22,7 @@ export function canIssue(count: number, max = MAX_TOKENS): boolean {
   return count < max
 }
 
-/** 범위의 화면 이름 */
-export function scopeLabel(scope: TokenScope): string {
-  return scope === 'READ_WRITE' ? '조회와 기록' : '조회만'
-}
+export { scopeLabel }
 
 const WRITE_HINT = '이 토큰을 가진 에이전트가 내 체결을 저장하고 제안을 올립니다. 공유 지식은 내가 승인한 제안으로만 바뀝니다.'
 
@@ -148,7 +147,9 @@ export function TokensTab() {
 
   return (
     <div className="min-h-full bg-card px-3 py-4 lg:px-6" data-testid="tokens-tab">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <h1 className="m-0 mb-4 text-xl font-bold">연동</h1>
+      <ConnectionsSection />
+      <div className="mt-8 mb-3 flex flex-wrap items-center gap-2">
         <h2 className="m-0 mr-2 text-lg font-bold">연동 토큰</h2>
         <Button data-testid="tokens-issue-open" disabled={atLimit} onClick={openIssue}>
           ＋ 토큰 발급

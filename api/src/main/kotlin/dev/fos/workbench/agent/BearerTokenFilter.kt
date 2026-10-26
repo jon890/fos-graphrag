@@ -1,5 +1,6 @@
 package dev.fos.workbench.agent
 
+import dev.fos.workbench.config.RateLimiter
 import dev.fos.workbench.web.ApiError
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -12,14 +13,16 @@ import org.springframework.web.filter.OncePerRequestFilter
 import tools.jackson.databind.json.JsonMapper
 
 /**
- * `/api/v1` 요청의 `Authorization: Bearer` 연동 토큰으로 인증한다. 빈이 아니고 `SecurityConfig` 가 만들어 건다.
+ * `/api/v1` 과 `/mcp` 요청의 `Authorization: Bearer` 토큰을 [authenticate] 로 확인한다. 빈이 아니고 `SecurityConfig` 가 만들어 건다.
  * 인증에 실패하면 인증을 넣지 않고 넘겨, 뒤의 권한 검사가 401 을 쓴다. 실패 이유는 응답으로 가르지 않는다.
- * 요청 한도는 인증에 성공한 요청만 센다. 쓰기 메서드는 전체 한도를 통과한 뒤 쓰기 한도에도 센다. 헤더 값과 토큰 원문은 로그에 남기지 않는다.
+ * 요청 한도는 인증에 성공한 요청만 센다. [writeLimiter] 가 있으면 쓰기 메서드는 전체 한도를 통과한 뒤 쓰기 한도에도 센다.
+ * `/mcp` 는 모든 요청이 `POST` 라서 [writeLimiter] 를 넘기지 않고 도구 안에서 쓰기를 센다. 헤더 값과 토큰 원문은 로그에 남기지 않는다.
+ * 인증한 주체는 요청 속성(`AgentPrincipal` 클래스 이름)에도 둔다. MCP SDK 의 처리기는 요청 스레드 밖에서 돌아 보안 컨텍스트를 읽지 못한다.
  */
 class BearerTokenFilter(
-    private val tokens: IntegrationTokenService,
+    private val authenticate: (String) -> AgentPrincipal?,
     private val limiter: RateLimiter,
-    private val writeLimiter: RateLimiter,
+    private val writeLimiter: RateLimiter?,
     private val mapper: JsonMapper,
 ) : OncePerRequestFilter() {
 
@@ -29,7 +32,7 @@ class BearerTokenFilter(
             chain.doFilter(request, response)
             return
         }
-        val principal = tokens.authenticate(header.removePrefix(PREFIX).trim())
+        val principal = authenticate(header.removePrefix(PREFIX).trim())
         if (principal == null) {
             chain.doFilter(request, response)
             return
@@ -40,7 +43,7 @@ class BearerTokenFilter(
             return
         }
         // 범위 확인은 컨트롤러가 하므로 「조회만」 토큰의 쓰기 요청도 여기서 센다
-        if (request.method !in READ_METHODS) {
+        if (writeLimiter != null && request.method !in READ_METHODS) {
             val write = writeLimiter.tryAcquire(principal.tokenId)
             if (!write.allowed) {
                 respondRateLimited(response, write.retryAfterSeconds)
@@ -50,6 +53,7 @@ class BearerTokenFilter(
         val context = SecurityContextHolder.createEmptyContext()
         context.authentication = UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.role.authorities())
         SecurityContextHolder.setContext(context)
+        request.setAttribute(PRINCIPAL_ATTRIBUTE, principal)
         chain.doFilter(request, response)
     }
 
@@ -67,6 +71,9 @@ class BearerTokenFilter(
 
     companion object {
         private const val PREFIX = "Bearer "
+
+        /** 인증한 [AgentPrincipal] 을 담는 요청 속성 이름 */
+        val PRINCIPAL_ATTRIBUTE: String = AgentPrincipal::class.java.name
         private val READ_METHODS = setOf("GET", "HEAD", "OPTIONS")
     }
 }

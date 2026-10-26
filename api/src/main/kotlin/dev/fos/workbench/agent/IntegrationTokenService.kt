@@ -1,5 +1,6 @@
 package dev.fos.workbench.agent
 
+import dev.fos.workbench.auth.TokenScope
 import dev.fos.workbench.config.Limits
 import dev.fos.workbench.config.Timestamps
 import dev.fos.workbench.config.WorkbenchProperties
@@ -15,7 +16,7 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * 로그인한 사람 본인의 연동 토큰을 발급하고 폐기하며, `/api/v1` 요청의 토큰을 확인한다.
+ * 로그인한 사람 본인의 연동 토큰을 발급하고 폐기하며, `/api/v1` 과 `/mcp` 요청의 토큰을 확인한다.
  * 원문은 발급 응답에만 싣는다. 이력을 남기지 않는다(docs/data-schema.md 「연동 토큰」).
  */
 @Service
@@ -79,7 +80,9 @@ class IntegrationTokenService(
                 log.warn("연동 토큰 {} 의 마지막 사용 시각을 쓰지 못했다", token.tokenId, e)
             }
         }
-        return AgentPrincipal(token.userId, token.displayName, token.role, token.tokenId, token.tokenName, token.last4, token.scope)
+        return AgentPrincipal(
+            token.userId, token.displayName, token.role, token.tokenId, token.tokenName, token.last4, token.scope, ConnectionKind.INTEGRATION_TOKEN,
+        )
     }
 
     private fun isStale(lastUsedAt: String?, now: Instant): Boolean {

@@ -18,13 +18,16 @@ export const TAB_PATHS: Record<TabKey, string> = {
   trades: '/trades',
 }
 
+/** 앱 연결 동의 화면. 탭이 아니라 메뉴에 없고, 서버의 /oauth/authorize 가 인가 요청의 query 를 붙여 보낸다 */
+export const CONNECT_PATH = '/connect'
+
 /** 첫 화면. `/`, 모르는 경로, 권한 없는 화면 경로를 여기로 바꿔 연다 */
 export const LANDING_PATH = TAB_PATHS.map
 
 /** 머리글에 탭으로 늘 보이는 화면 */
 export const TOP_TABS: TabKey[] = ['map', 'workspace', 'list', 'study']
 
-/** 「더보기」 메뉴의 화면. 검토 대기는 EDITOR 와 ADMIN, 사용자는 ADMIN 에게만 보이고 연동 토큰과 제안, 내 체결은 모든 역할에 보인다 */
+/** 「더보기」 메뉴의 화면. 검토 대기는 EDITOR 와 ADMIN, 사용자는 ADMIN 에게만 보이고 연동과 제안, 내 체결은 모든 역할에 보인다 */
 export function moreItems(role: string): TabKey[] {
   const items: TabKey[] = ['changes', 'ontology']
   if (role === 'EDITOR' || role === 'ADMIN') items.push('review')
@@ -297,8 +300,8 @@ export function legacyRedirect(pathname: string, search: string): string | null 
   return `${TAB_PATHS.workspace}${workspaceSearch({ ...DEFAULT_WORKSPACE_QUERY, node, pane: 'detail' })}`
 }
 
-/** 로그인 뒤 돌아갈 주소로 받아도 되는가. ? 앞의 경로가 TAB_PATHS 의 값과 정확히 같을 때만 참이다 */
+/** 로그인 뒤 돌아갈 주소로 받아도 되는가. ? 앞의 경로가 TAB_PATHS 의 값이나 CONNECT_PATH 와 정확히 같을 때만 참이다 */
 export function isSafeReturnTo(path: string): boolean {
   const pathname = path.split('?')[0]
-  return Object.values(TAB_PATHS).includes(pathname)
+  return pathname === CONNECT_PATH || Object.values(TAB_PATHS).includes(pathname)
 }

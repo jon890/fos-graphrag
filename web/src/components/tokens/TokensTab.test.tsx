@@ -12,6 +12,14 @@ describe('TokensTab', () => {
     expect(html).toContain('Hermes')
   })
 
+  it('화면 제목은 연동이고 위에 연결된 앱, 아래에 연동 토큰이 있다', () => {
+    const html = renderToStaticMarkup(withApp(<TokensTab />))
+    expect(html).toContain('>연동</h1>')
+    expect(html.indexOf('data-testid="connections-section"')).toBeGreaterThan(-1)
+    expect(html.indexOf('data-testid="connections-section"')).toBeLessThan(html.indexOf('data-testid="tokens-guide"'))
+    expect(html).toContain('>연동 토큰</h2>')
+  })
+
   it('토큰이 4개면 더 발급할 수 있고 5개면 없다', () => {
     expect(canIssue(4)).toBe(true)
     expect(canIssue(5)).toBe(false)

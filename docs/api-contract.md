@@ -1,6 +1,6 @@
 # API 계약
 
-모든 경로는 `/api` 아래에 있다. 요청과 응답 본문은 `application/json` 이고 문자 집합은 UTF-8 이다.
+모든 경로는 `/api` 아래에 있다. 원격 MCP(`/mcp`)와 OAuth 인가 서버(`/oauth/**`, `/.well-known/**`)만 예외다. 요청과 응답 본문은 `application/json` 이고 문자 집합은 UTF-8 이다.
 식별자는 서버가 만든 UUID 문자열이다. Neo4j 내부 ID 는 응답에 나오지 않는다.
 시각은 자릿수가 고정된 UTC ISO-8601 문자열이다. 날짜는 `YYYY-MM-DD` 다.
 
@@ -32,6 +32,7 @@
 세션 쿠키는 `WORKBENCH_SESSION`(HttpOnly, SameSite=Lax, 운영에서 Secure)이다.
 아래 표의 공개 경로와 정적 파일, OAuth 경로를 뺀 모든 `/api` 경로는 로그인이 필요하다. 조회도 같다.
 `/api/v1/**` 는 예외다. 세션과 CSRF 를 쓰지 않고 연동 토큰(`Authorization: Bearer`)만 받는다. 규칙은 아래 「에이전트 API」 절이다. 반대로 `/api/v1` 밖의 경로는 연동 토큰을 받지 않는다. 결정과 근거는 [ADR-012](adr/012-agent-integration-token.md) 다.
+`/mcp` 도 세션과 CSRF 를 쓰지 않고 OAuth 접근 토큰과 연동 토큰을 받는다. 규칙은 「원격 MCP(`/mcp`)」 절이고 결정은 [ADR-015](adr/015-remote-mcp-oauth.md) 다.
 서버는 요청마다 사용자 상태와 역할을 다시 읽는다. 비활성화된 사용자의 세션은 다음 요청에서 끊기고 `401 UNAUTHENTICATED` 를 받는다.
 
 상태를 바꾸는 요청(`POST`, `PATCH`, `PUT`, `DELETE`)은 CSRF 토큰이 필요하다.
@@ -60,7 +61,7 @@
 
 | 역할 | 할 수 있는 일 |
 | --- | --- |
-| `VIEWER` | 모든 `GET` 조회(검색, 상세, 주변 그래프, 근거 따라가기, 목록, 변경 이력, 온톨로지), `/api/me/knowledge` 의 내 이해 표시 쓰기, `/api/me/tokens` 의 내 연동 토큰 발급과 폐기, `/api/me/trades` 의 내 체결 지우기, `/api/me/proposals` 의 내 제안 거절과 개인 기록 제안(`LINK_TRADE_DECISION`, `STUDY_NOTE`)의 승인 |
+| `VIEWER` | 모든 `GET` 조회(검색, 상세, 주변 그래프, 근거 따라가기, 목록, 변경 이력, 온톨로지), `/api/me/knowledge` 의 내 이해 표시 쓰기, `/api/me/tokens` 의 내 연동 토큰 발급과 폐기, 앱 연결 동의(`/api/oauth/authorize`)와 `/api/me/connections` 의 내 연결 끊기, `/api/me/trades` 의 내 체결 지우기, `/api/me/proposals` 의 내 제안 거절과 개인 기록 제안(`LINK_TRADE_DECISION`, `STUDY_NOTE`)의 승인 |
 | `EDITOR` | VIEWER 권한과 노드, 관계, Claim 의 생성, 수정, 검토, 보관, 복원, 공유 지식을 만드는 제안(`CREATE_NODE`, `CREATE_RELATIONSHIP`)의 승인 |
 | `ADMIN` | EDITOR 권한과 `/api/users` 의 사용자 관리, `/api/ontology` 아래의 온톨로지 편집(버전 목록, 내보내기, 미리보기, 저장, 되돌리기) |
 
@@ -84,10 +85,12 @@
 | 400 | `VALIDATION_FAILED` | 본문 형식, 필수 값, 길이, 날짜 형식이 틀렸다. `details.fieldErrors` 에 `{필드: 사유}` 가 있다 |
 | 400 | `ONTOLOGY_VIOLATION` | 온톨로지에 없는 타입, 속성, 관계, predicate 이거나 시작·끝 노드 타입이 맞지 않는다. `details.rule` 에 위반한 규칙 이름이 있다 |
 | 400 | `ONTOLOGY_INVALID` | 저장하려는 온톨로지 정의가 일관성 검사를 통과하지 못했다. `details.errors` 에 오류 문장 목록이 있다 |
-| 401 | `UNAUTHENTICATED` | 세션이 없다. `/api/v1` 에서는 연동 토큰이 없거나 올바르지 않다 |
+| 401 | `UNAUTHENTICATED` | 세션이 없다. `/api/v1` 에서는 연동 토큰이, `/mcp` 에서는 접근 토큰이나 연동 토큰이 없거나 올바르지 않다 |
 | 403 | `CSRF_REJECTED` | CSRF 토큰이 없거나 틀렸다 |
 | 403 | `FORBIDDEN` | 역할이 모자라다. 열람자가 공유 지식을 만드는 제안을 승인하려 한 경우도 여기 해당한다 |
-| 403 | `INSUFFICIENT_SCOPE` | 「조회만」 연동 토큰으로 `/api/v1` 의 쓰기 경로를 불렀다 |
+| 403 | `INSUFFICIENT_SCOPE` | 「조회만」 연동 토큰으로 `/api/v1` 의 쓰기 경로를 불렀다. `/mcp` 의 쓰기 도구에서는 같은 코드를 도구 오류로 돌려준다 |
+| 400 | `OAUTH_INVALID_CLIENT` | 동의 화면의 인가 요청에서 클라이언트나 돌아갈 주소가 등록되지 않았다(「OAuth 인가 서버」) |
+| 400 | `OAUTH_REDIRECT_ERROR` | 동의 화면의 인가 요청이 틀렸다. `details.redirectUrl` 에 앱으로 알릴 오류 주소가 있다(「OAuth 인가 서버」) |
 | 411 | `LENGTH_REQUIRED` | 본문이 있는 `/api` 요청에 Content-Length 가 없다(chunked 전송) |
 | 413 | `PAYLOAD_TOO_LARGE` | 요청 본문이 64KiB 를 넘는다. 온톨로지 미리보기, 저장, 되돌리기는 512KiB 다 |
 | 403 | `SELF_REVIEW_FORBIDDEN` | 자기가 작성한 Claim 을 검토하려 했다 |
@@ -198,6 +201,8 @@ Neo4j 예외는 시간 초과(`QUERY_TIMEOUT`), 연결 불가(`DATABASE_UNAVAILA
 | 사용자당 대기 중인 제안 | 200개 | `409 PROPOSAL_LIMIT` |
 | 제안 거절 이유 `reason` | 1000자 | `400 VALIDATION_FAILED` |
 | `/api/v1` 의 요청 수, 페이지 크기, 응답 항목 | 「에이전트 API(`/api/v1`)」 의 「요청 한도와 응답 크기」 | 그 절의 표 |
+| `/mcp` 의 요청 수와 도구의 입력, 응답 항목 | 「원격 MCP(`/mcp`)」 와, 같은 경로의 `/api/v1` 상한 | 그 절의 표 |
+| OAuth 등록과 토큰 요청 | 같은 IP 에서 1분에 10번, 30번. 본문 16KiB | `429`, `413` (「OAuth 인가 서버」) |
 | 쓰기 트랜잭션 | 8초 | `503 QUERY_TIMEOUT` |
 | 잠금 대기(Neo4j `db.lock.acquisition.timeout`) | 5초 | `409 TRANSIENT_CONFLICT` |
 | Neo4j 서버 트랜잭션(`db.transaction.timeout`) | 10초 | `503 QUERY_TIMEOUT` |
@@ -593,8 +598,29 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 - `scope` 는 `READ`(조회만)나 `READ_WRITE`(조회와 기록)다. 비우거나 `null` 이면 `READ` 다. 그 밖의 값은 `400 VALIDATION_FAILED`(`details.fieldErrors.scope`)다. 발급한 뒤에는 바꿀 수 없다. 범위를 두기 전에 발급한 토큰은 `READ` 로 보인다. 결정은 [ADR-013](adr/013-owner-trades-and-agent-proposals.md) 이다.
 - 폐기하지 않은 토큰이 이미 5개면 `409 TOKEN_LIMIT`(`details.max`)다. 사용자 노드를 잠근 뒤 세므로 동시에 발급해도 5개를 넘지 않는다.
 - `last4` 는 원문의 끝 네 글자다. 화면은 `…x9Qa` 로 보인다.
-- `lastUsedAt` 은 그 토큰으로 `/api/v1` 인증에 마지막으로 성공한 시각이다. 서버는 1분에 한 번만 고쳐 쓰므로 최대 1분 늦다. 한 번도 쓰지 않았으면 `null` 이다.
+- `lastUsedAt` 은 그 토큰으로 `/api/v1` 이나 `/mcp` 인증에 마지막으로 성공한 시각이다. 서버는 1분에 한 번만 고쳐 쓰므로 최대 1분 늦다. 한 번도 쓰지 않았으면 `null` 이다.
 - 발급과 폐기는 변경 이력(ChangeEvent)에 남지 않는다.
+
+## 연결된 앱
+
+OAuth 로그인으로 연결한 앱(Claude Code, Codex 같은 MCP 클라이언트)의 목록을 보고 연결을 끊는다. 세션 API 라서 쓰기는 CSRF 토큰이 필요하다. 모든 역할이 자기 연결만 다룬다. 결정은 [ADR-015](adr/015-remote-mcp-oauth.md), 저장 모델은 [데이터 스키마](data-schema.md) 의 「OAuth 연결」 이다.
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| GET | `/api/me/connections` | 내 연결 목록. 연결한 순서(오래된 것부터)로 준다. 응답 `ConnectionView[]` |
+| DELETE | `/api/me/connections/{id}` | 연결 끊기. 응답 `204`. 내 연결이 아니거나 없으면 `404 NOT_FOUND` |
+
+`ConnectionView`
+
+```json
+{ "id": "uuid", "clientName": "Claude Code", "scope": "READ_WRITE", "createdAt": "2026-10-26T03:15:00.123456Z", "lastUsedAt": "2026-10-26T04:00:00.123456Z" }
+```
+
+- `clientName` 은 앱이 등록할 때 보낸 이름이다. 앱이 정한 값이라 화면은 그대로 보이되 이름만으로 앱을 믿지 않게 한다(「흐름」 의 「앱 연결」).
+- `scope` 는 동의 화면에서 고른 범위다. `READ`(조회만) 또는 `READ_WRITE`(조회와 기록)다.
+- `lastUsedAt` 은 그 연결의 접근 토큰으로 `/mcp` 인증에 마지막으로 성공했거나 토큰을 갱신한 시각이다. 1분에 한 번만 고쳐 쓴다. 승인한 뒤 아직 쓰지 않았으면 `null` 이다.
+- 연결을 끊으면 그 연결의 접근 토큰과 갱신 토큰이 다음 요청부터 막힌다. 앱에서 다시 로그인하면 새 연결이 생긴다.
+- 연결과 끊기는 변경 이력(ChangeEvent)에 남지 않는다.
 
 ## 내 체결
 
@@ -710,7 +736,7 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 
 ### 인증
 
-- 모든 요청에 `Authorization: Bearer <연동 토큰>` 을 담는다. 토큰은 사용자가 웹의 더보기 메뉴 「연동 토큰」 에서 발급한다(「연동 토큰」).
+- 모든 요청에 `Authorization: Bearer <연동 토큰>` 을 담는다. 토큰은 사용자가 웹의 더보기 메뉴 「연동」 의 「연동 토큰」 에서 발급한다(「연동 토큰」).
 - 세션 쿠키는 읽지 않고, CSRF 토큰도 요구하지 않는다. 쿠키만 담은 요청은 `401` 이다.
 - 토큰은 발급한 사용자로 인증된다. 조회 경로는 모든 역할과 범위가 부른다. 쓰기 경로는 「조회와 기록」 범위의 토큰만 부른다(「쓰기」).
 - 아래 가운데 하나면 `401 UNAUTHENTICATED`(「연동 토큰이 없거나 올바르지 않습니다.」)다. 어느 경우인지는 응답에 드러내지 않는다.
@@ -1165,6 +1191,252 @@ Claim 보관과 복원은 노드 API(`/api/nodes/{id}/archive`, `/restore`)로 �
 | --- | --- | --- |
 | `status` | 전체 | `PENDING`, `ACCEPTED`, `REJECTED` 가운데 하나 |
 | `page`, `size` | 0, 20 | `size` 는 50까지 |
+
+## OAuth 인가 서버
+
+Claude Code, Codex 같은 MCP 클라이언트가 사용자 대신 `/mcp` 를 부를 접근 토큰을 받는 경로다. MCP 인증 규격(보호 자원 메타데이터 RFC 9728, 인가 서버 메타데이터 RFC 8414, 동적 등록 RFC 7591, 인가 코드와 PKCE, resource 지시자 RFC 8707)을 따른다. 결정과 근거는 [ADR-015](adr/015-remote-mcp-oauth.md), 저장 모델은 [데이터 스키마](data-schema.md) 의 「OAuth 연결」, 화면 흐름은 [흐름](flow.md) 의 「앱 연결」 이다.
+
+이 절의 경로는 `/api` 밖에 있고 세션과 CSRF 를 쓰지 않는다. `/api/oauth/**` 의 두 경로만 동의 화면이 부르는 세션 API 다.
+아래에서 `{base}` 는 설정 `workbench.oauth.public-url`(`WORKBENCH_PUBLIC_URL`)이고, 비어 있으면 요청의 scheme 과 host(포트 포함)로 만든 주소다(예: `https://example.com`). 비어 있을 때 운영에서는 앞단이 넘긴 `X-Forwarded-*` 로 공개 주소가 된다. 자원 주소는 `{base}/mcp` 다.
+OAuth 경로의 오류 본문은 이 문서의 `{code, message, details}` 가 아니라 OAuth 형식 `{"error": "...", "error_description": "..."}` 다.
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| GET | `/.well-known/oauth-protected-resource/mcp` | 없음 | 보호 자원 메타데이터. `/.well-known/oauth-protected-resource` 도 같은 본문이다 |
+| GET | `/.well-known/oauth-authorization-server` | 없음 | 인가 서버 메타데이터 |
+| POST | `/oauth/register` | 없음 | 클라이언트 동적 등록. 본문 JSON |
+| GET | `/oauth/authorize` | 없음 | 인가 요청. 받은 query 를 그대로 붙여 동의 화면 `/connect` 로 `302` 이동한다. 검사는 동의 화면이 부르는 API 가 한다 |
+| GET | `/api/oauth/authorize` | 세션(모든 역할) | 동의 화면이 인가 요청을 검사하고 보일 내용을 받는다 |
+| POST | `/api/oauth/authorize` | 세션(모든 역할), CSRF | 「연결 허용」 이나 「거절」. 앱으로 돌아갈 주소를 받는다 |
+| POST | `/oauth/token` | 없음(공개 클라이언트) | 인가 코드나 갱신 토큰을 접근 토큰으로 바꾼다. 본문 `application/x-www-form-urlencoded` |
+| POST | `/oauth/revoke` | 없음 | 토큰 폐기(RFC 7009). 본문 `application/x-www-form-urlencoded` |
+
+### 메타데이터
+
+`GET /.well-known/oauth-protected-resource/mcp`
+
+```json
+{
+  "resource": "{base}/mcp",
+  "authorization_servers": ["{base}"],
+  "scopes_supported": ["read", "write"],
+  "bearer_methods_supported": ["header"],
+  "resource_name": "가치투자 온톨로지"
+}
+```
+
+`GET /.well-known/oauth-authorization-server`
+
+```json
+{
+  "issuer": "{base}",
+  "authorization_endpoint": "{base}/oauth/authorize",
+  "token_endpoint": "{base}/oauth/token",
+  "registration_endpoint": "{base}/oauth/register",
+  "revocation_endpoint": "{base}/oauth/revoke",
+  "response_types_supported": ["code"],
+  "grant_types_supported": ["authorization_code", "refresh_token"],
+  "code_challenge_methods_supported": ["S256"],
+  "token_endpoint_auth_methods_supported": ["none"],
+  "revocation_endpoint_auth_methods_supported": ["none"],
+  "scopes_supported": ["read", "write"],
+  "authorization_response_iss_parameter_supported": true
+}
+```
+
+두 응답에는 `Cache-Control: max-age=300` 을 붙인다.
+
+### 범위
+
+| OAuth `scope` | 저장하는 범위 | 뜻 |
+| --- | --- | --- |
+| `read` | `READ` | 조회 도구만 부른다 |
+| `read write`, `write` | `READ_WRITE` | 조회 도구와 쓰기 도구(`record_trades`, `submit_proposals`)를 부른다. `write` 는 `read` 를 포함한다 |
+| 비었거나 없음 | `READ_WRITE` 를 기본으로 동의 화면에 보인다 | 사용자가 동의 화면에서 「조회만」 으로 줄일 수 있다 |
+
+모르는 값(`read`, `write` 밖)이 하나라도 있으면 `invalid_scope` 다. 사용자는 요청한 범위보다 넓게 고를 수 없다. 토큰 응답의 `scope` 는 `READ` 면 `"read"`, `READ_WRITE` 면 `"read write"` 다.
+
+### `POST /oauth/register`
+
+```json
+{ "client_name": "Claude Code", "redirect_uris": ["http://localhost:53682/callback"], "grant_types": ["authorization_code", "refresh_token"], "response_types": ["code"], "token_endpoint_auth_method": "none" }
+```
+
+`201`
+
+```json
+{ "client_id": "uuid", "client_id_issued_at": 1793000000, "client_name": "Claude Code", "redirect_uris": ["http://localhost:53682/callback"], "grant_types": ["authorization_code", "refresh_token"], "response_types": ["code"], "token_endpoint_auth_method": "none" }
+```
+
+- `redirect_uris` 는 1개 이상 10개 이하다. 각 값은 fragment(`#`)가 없는 절대 주소이고 아래 가운데 하나여야 한다. 어기면 `400 invalid_redirect_uri` 다.
+  - `http://127.0.0.1`, `http://localhost`, `http://[::1]` 의 loopback 주소. 포트는 주소에 적은 그대로 등록한다.
+  - `https://` 주소 가운데 host 가 설정 `workbench.oauth.allowed-https-redirect-hosts` 에 있는 것. 기본은 비어 있어 loopback 만 받는다. Claude Code 와 Codex 는 loopback 으로 돌아온다. 누구나 등록할 수 있어, 아무 https 주소를 받으면 동의 화면을 거쳐 코드를 다른 서버로 보내는 피싱이 된다.
+- 각 값은 2000자 이하다. 넘으면 `400 invalid_redirect_uri` 다.
+- `client_name` 은 앞뒤 공백을 지운 1자 이상 100자 이하이고 줄바꿈 같은 제어 문자가 없어야 한다. 없거나 공백뿐이면 「이름 없는 앱」 이다. 100자를 넘거나 제어 문자가 있으면 `400 invalid_client_metadata` 다.
+- `token_endpoint_auth_method` 는 `none` 만 받는다. 없으면 `none` 이다. 다른 값이면 `400 invalid_client_metadata` 다. 클라이언트 비밀은 발급하지 않는다.
+- `grant_types` 는 `authorization_code`, `refresh_token` 의 부분 집합, `response_types` 는 `["code"]` 만 받는다. 없으면 각각 두 값과 `["code"]` 다. 다른 값이나 빈 목록이면 `400 invalid_client_metadata` 다.
+- 그 밖의 필드(`client_uri`, `logo_uri`, `scope` 등)는 읽지 않고 응답에도 담지 않는다.
+- 본문은 16KiB 까지다. 넘으면 `413`, Content-Length 가 없으면 `411` 이고 본문은 OAuth 형식(`invalid_request`)이다. 같은 IP 에서 1분에 10번까지다(IPv6 는 /64 단위). 넘으면 `429 {"error": "too_many_requests"}` 와 `Retry-After` 다. 한 번도 승인받지 못한 클라이언트가 이미 1000개면 `503 {"error": "temporarily_unavailable"}` 다.
+
+### 인가 요청과 동의
+
+클라이언트는 브라우저를 `GET {base}/oauth/authorize?response_type=code&client_id=…&redirect_uri=…&code_challenge=…&code_challenge_method=S256&state=…&scope=…&resource={base}/mcp` 로 연다. 서버는 query 를 바꾸지 않고 `/connect?…` 로 `302` 이동한다.
+
+동의 화면은 같은 query 로 `GET /api/oauth/authorize` 를 부른다.
+
+`200 AuthorizationPreview`
+
+```json
+{ "clientName": "Claude Code", "redirectKind": "LOOPBACK", "redirectHost": "localhost", "requestedScope": "READ_WRITE", "user": { "displayName": "Alice" } }
+```
+
+- `redirectKind` 는 `LOOPBACK`(이 컴퓨터의 앱으로 돌아간다)이나 `HTTPS` 다. `redirectHost` 는 돌아갈 주소의 host 다.
+- `requestedScope` 는 요청한 범위로 고를 수 있는 가장 넓은 값이다. `READ` 면 화면은 「조회만」 만 보인다.
+
+검사는 아래 순서다. 앞의 둘에 걸리면 앱으로 돌려보낼 수 없어 화면에 오류만 보인다.
+
+| 검사 | 실패 응답 |
+| --- | --- |
+| `client_id` 가 등록된 클라이언트다 | `400 OAUTH_INVALID_CLIENT`(「연결 요청이 올바르지 않습니다. 앱에서 연결을 다시 시작하세요.」) |
+| `redirect_uri` 가 등록한 값 가운데 하나와 글자까지 같다. 접두 일치나 포트만 다른 loopback 주소는 받지 않는다 | 위와 같다 |
+| `response_type` 이 `code` 다 | `400 OAUTH_REDIRECT_ERROR`. `details.redirectUrl` 에 `redirect_uri?error=unsupported_response_type&state=…&iss={base}` 가 있다 |
+| `code_challenge` 가 43자의 base64url(SHA-256 의 base64url)이고 `code_challenge_method` 가 `S256` 이다. `plain` 이나 빈 값은 받지 않는다 | `400 OAUTH_REDIRECT_ERROR`, `error=invalid_request` |
+| `resource` 가 없거나 `{base}/mcp` 와 같다 | `400 OAUTH_REDIRECT_ERROR`, `error=invalid_target` |
+| `scope` 의 값이 모두 `read`, `write` 가운데 하나다 | `400 OAUTH_REDIRECT_ERROR`, `error=invalid_scope` |
+| `state` 가 500자 이하다 | `400 OAUTH_REDIRECT_ERROR`, `error=invalid_request` |
+
+로그인하지 않았으면 `401 UNAUTHENTICATED` 다. 화면은 로그인을 거친 뒤 같은 주소로 돌아온다.
+
+「연결 허용」 과 「거절」 은 `POST /api/oauth/authorize` 다. 본문은 인가 요청의 query 값과 결정이다.
+
+```json
+{ "response_type": "code", "client_id": "uuid", "redirect_uri": "http://localhost:53682/callback", "code_challenge": "…", "code_challenge_method": "S256", "state": "…", "scope": "read write", "resource": "{base}/mcp", "decision": "ALLOW", "grantedScope": "READ_WRITE" }
+```
+
+`200`
+
+```json
+{ "redirectUrl": "http://localhost:53682/callback?code=…&state=…&iss=…" }
+```
+
+- 서버는 같은 검사를 다시 한다. 검사에 걸리면 `GET` 과 같은 오류다.
+- `decision` 은 `ALLOW` 나 `DENY` 다. `DENY` 면 `redirectUrl` 은 `redirect_uri?error=access_denied&state=…&iss={base}` 다.
+- `grantedScope` 는 `ALLOW` 일 때 필수이고 `READ` 나 `READ_WRITE` 다. `requestedScope` 보다 넓으면 `400 VALIDATION_FAILED`(`details.fieldErrors.grantedScope`)다.
+- `ALLOW` 면 인가 코드를 만든다. 코드는 `fwc_` 뒤에 무작위 32바이트를 base64url 43자로 붙인 값이고 60초 동안 한 번만 쓴다. 서버는 해시만 저장한다. 코드는 로그인한 사용자, `client_id`, `redirect_uri`, `resource`, `code_challenge` 와 묶여 저장된다.
+- 이 요청은 세션 API 라서 `X-XSRF-TOKEN` 이 필요하다(「인증과 CSRF」). 다른 사이트가 사용자 몰래 「연결 허용」 을 보내지 못한다.
+- `redirectUrl` 의 query 값은 URL 인코딩한다. `state` 가 없었으면 붙이지 않는다.
+- 이 요청은 변경 이력에 남지 않는다.
+
+### `POST /oauth/token`
+
+인가 코드를 바꿀 때:
+
+```
+grant_type=authorization_code&code=fwc_…&redirect_uri=…&client_id=…&code_verifier=…&resource={base}/mcp
+```
+
+갱신할 때:
+
+```
+grant_type=refresh_token&refresh_token=fwr_…&client_id=…&resource={base}/mcp
+```
+
+`200`. `Cache-Control: no-store` 와 `Pragma: no-cache` 를 붙인다.
+
+```json
+{ "access_token": "fwa_…", "token_type": "Bearer", "expires_in": 3600, "refresh_token": "fwr_…", "scope": "read write" }
+```
+
+- 접근 토큰(`fwa_`)과 갱신 토큰(`fwr_`)은 연동 토큰과 같은 형식(앞자리 뒤에 무작위 32바이트 base64url 43자)이다. 서버는 SHA-256 해시만 저장한다.
+- 접근 토큰은 1시간, 갱신 토큰은 발급한 때부터 30일 뒤 끝난다.
+- 코드와 토큰은 원문의 SHA-256 으로 찾는다. 원문끼리 비교하지 않는다. PKCE 의 `code_verifier` 검사는 상수 시간 비교(`MessageDigest.isEqual`)로 한다.
+- 오류 응답과 로그에는 코드, 토큰, `code_verifier` 의 원문을 담지 않는다.
+- 인가 코드는 아래를 모두 만족해야 바뀐다. 하나라도 어기면 `400 invalid_grant` 다.
+  - 그 코드가 있고, 60초가 지나지 않았고, 아직 쓰지 않았다.
+  - `client_id`, `redirect_uri` 가 코드를 만든 요청과 같다.
+  - `code_verifier` 의 SHA-256 을 base64url 로 쓴 값이 `code_challenge` 와 같다. `code_verifier` 가 없으면 `400 invalid_request` 다.
+  - `resource` 가 없거나 `{base}/mcp` 와 같다. 다르면 `400 invalid_target` 이다.
+  - 코드 주인이 활성 사용자이고 허용 목록에 있다.
+- 쓴 코드를 다시 보내면 `400 invalid_grant` 이고, 그 코드로 만든 연결을 끊는다(RFC 6749 10.5).
+- 갱신은 갱신 토큰마다 한 번이다. 성공하면 새 접근 토큰과 새 갱신 토큰을 주고 이전 둘은 막힌다. 바로 앞의 갱신 토큰을 다시 보내면 도난으로 보고 그 연결을 끊은 뒤 `400 invalid_grant` 다. `client_id` 가 다르거나, 끝났거나, 연결이 끊겼거나, 주인이 비활성이면 `400 invalid_grant` 다. 갱신 요청의 `scope` 는 읽지 않고 연결의 범위를 그대로 쓴다.
+- `grant_type` 이 둘 밖이면 `400 unsupported_grant_type`, 필수 값이 없으면 `400 invalid_request`, `client_id` 가 등록되지 않았으면 `401 invalid_client` 다.
+- 본문은 16KiB 까지다. 같은 IP 에서 1분에 30번까지다. 넘으면 `429 {"error": "too_many_requests"}` 와 `Retry-After` 다.
+
+### `POST /oauth/revoke`
+
+```
+token=fwr_…&token_type_hint=refresh_token
+```
+
+- 접근 토큰이나 갱신 토큰을 받으면 그 연결을 끊는다. 결과와 상관없이 `200` 이다(RFC 7009). 모르는 토큰도 `200` 이다. `token` 이 없으면 `400 invalid_request` 다.
+- 같은 IP 의 `/oauth/token` 한도에 함께 센다.
+
+## 원격 MCP(`/mcp`)
+
+Claude Code, Codex, Hermes 가 가치투자 온톨로지를 조회하고 기록하는 MCP 서버다. MCP Streamable HTTP 의 세션 없는 방식이다. 도구는 「에이전트 API(`/api/v1`)」 의 경로와 같은 서비스를 부르고, 같은 권한과 한도와 응답 모양을 따른다. 결정과 근거는 [ADR-015](adr/015-remote-mcp-oauth.md) 다.
+
+### 연결과 인증
+
+- `POST /mcp` 하나로 JSON-RPC 메시지를 주고받는다. 응답은 `application/json` 이다. 서버는 `Mcp-Session-Id` 를 만들지 않고, 받아도 무시한다. `GET /mcp`, `DELETE /mcp` 는 `405` 다.
+- 프로토콜 버전은 MCP Java SDK 가 받는 버전(`2025-11-25` 까지)이다. `initialize` 에서 서버 이름 `valuation-ontology`, 제목 「가치투자 온톨로지」 를 알린다.
+- 요청마다 `Authorization: Bearer` 에 아래 가운데 하나를 담는다.
+  - 이 서버가 발급한 OAuth 접근 토큰(`fwa_`). 토큰의 자원이 `{base}/mcp` 이고, 끝나지 않았고, 연결이 끊기지 않았고, 주인이 활성이어야 한다.
+  - 개인 연동 토큰(`fwb_`). 규칙은 「에이전트 API」 의 「인증」 과 같다.
+- 토큰이 없거나 올바르지 않으면 `401 UNAUTHENTICATED`(「연결이 필요합니다. 앱에서 다시 로그인하세요.」)와 아래 헤더다. 토큰을 보냈는데 통하지 않았으면 `error="invalid_token"` 을 더한다. 어느 경우인지는 그 밖에 드러내지 않는다.
+
+  ```
+  WWW-Authenticate: Bearer resource_metadata="{base}/.well-known/oauth-protected-resource/mcp", scope="read write"
+  ```
+
+- 세션 쿠키는 읽지 않고 CSRF 를 요구하지 않는다.
+- `Origin` 헤더가 있고 `{base}` 와 다르면 `403 FORBIDDEN` 이다. 명령줄 클라이언트는 `Origin` 을 보내지 않는다.
+- 요청 한도는 연결(OAuth 연결이나 연동 토큰)마다 1분에 60번이다. `tools/list` 같은 요청도 센다. 연동 토큰은 `/api/v1` 과 같은 카운터를 써서 두 경로를 합쳐 1분에 60번, 쓰기 10번이다. 넘으면 `429 RATE_LIMITED` 와 `Retry-After` 다. 인증에 실패한 요청은 세지 않는다.
+- 요청 본문은 64KiB 까지다(`413 PAYLOAD_TOO_LARGE`, Content-Length 가 없으면 `411 LENGTH_REQUIRED`).
+
+### 도구
+
+모든 도구는 `openWorldHint: false` 다. 조회 도구는 `readOnlyHint: true`, `destructiveHint: false` 다. 쓰기 도구는 `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: true` 다. 같은 입력을 다시 보내도 새로 생기지 않고, 이미 있는 것을 고치거나 지우지 않기 때문이다.
+
+| 도구 | 제목 | 입력 | 결과 | 같은 경로 |
+| --- | --- | --- | --- | --- |
+| `get_connection` | 연결 확인하기 | 없음 | `McpConnection` | `GET /api/v1/me` |
+| `get_ontology` | 온톨로지 요약 보기 | 없음 | `V1Ontology` | `GET /api/v1/ontology` |
+| `search_nodes` | 항목 찾기 | `q`, `types`(문자열 배열), `page`, `size` | `Page<V1NodeSummary>` | `GET /api/v1/nodes` |
+| `get_node` | 항목 자세히 보기 | `id` | `V1NodeDetail` | `GET /api/v1/nodes/{id}` |
+| `trace_node` | 근거 따라가기 | `id` | `V1Trace` | `GET /api/v1/nodes/{id}/trace` |
+| `get_neighborhood` | 주변 그래프 보기 | `id`, `hops`(1이나 2, 기본 1) | `V1Graph` | `GET /api/v1/graph/neighborhood` |
+| `lookup_security` | 종목의 투자 근거 찾기 | `ticker`, `market` | `V1SecurityLookup` | `GET /api/v1/securities/lookup` |
+| `list_my_knowledge` | 내 공부 목록 보기 | `level`(문자열 배열), `page`, `size` | `Page<V1StudyItem>` | `GET /api/v1/me/knowledge` |
+| `record_trades` | 체결 기록하기 | `trades`(`V1TradeInput` 1~50개) | `{"results": [V1TradeResult]}` | `POST /api/v1/trades` |
+| `list_my_trades` | 내 체결 보기 | `ticker`, `from`, `to`, `page`, `size` | `Page<V1Trade>` | `GET /api/v1/trades` |
+| `submit_proposals` | 제안 올리기 | `proposals`(`V1ProposalInput` 1~20개) | `{"results": [V1ProposalResult]}` | `POST /api/v1/proposals` |
+| `list_my_proposals` | 내 제안 보기 | `status`, `page`, `size` | `Page<V1Proposal>` | `GET /api/v1/proposals` |
+
+- 입력 칸의 뜻, 기본값, 상한은 같은 경로의 쿼리와 본문과 같다. `types`, `level` 만 쉼표로 이은 문자열 대신 배열로 받는다. 입력 스키마(JSON Schema)는 칸의 타입과 필수 여부를 담고, 값의 검사는 서비스가 한다.
+- 도구 설명은 비개발자와의 대화에서 모델이 고를 수 있게 「무엇을 하는지」 와 「언제 쓰는지」 를 한국어로 쓴다. 쓰기 도구의 설명은 체결이 나만 보는 기록이고, 제안은 워크벤치의 「제안」 에서 내가 승인해야 반영된다고 밝힌다.
+- 결과는 `content` 의 `text` 하나에 결과 객체의 JSON 을 담는다.
+- 체결과 제안, 이해 표시는 그 연결이나 토큰 주인의 것만 읽고 쓴다. 다른 사람의 체결은 어떤 도구에도 나오지 않는다.
+- 쓰기 도구로 저장한 체결과 제안의 `tokenId`, `tokenName` 은 OAuth 연결이면 그 연결의 `id` 와 `clientName`, 연동 토큰이면 그 토큰의 `id` 와 `name` 이다. `createdVia` 는 둘 다 `AGENT` 다.
+
+`McpConnection`
+
+```json
+{ "user": { "id": "uuid", "displayName": "Alice", "role": "EDITOR" }, "connection": { "kind": "OAUTH", "id": "uuid", "name": "Claude Code", "scope": "READ_WRITE" }, "rateLimitPerMinute": 60, "writeRateLimitPerMinute": 10 }
+```
+
+`connection.kind` 는 `OAUTH`(OAuth 연결)나 `INTEGRATION_TOKEN`(연동 토큰)이다. 토큰 원문과 끝 네 자리는 담지 않는다.
+
+### 도구 오류
+
+도구가 실패하면 JSON-RPC 오류가 아니라 `isError: true` 인 결과를 돌려준다. `content` 의 `text` 에 이 문서의 오류 형식 `{code, message, details}` JSON 을 담는다. 모델이 사용자에게 다음 할 일을 말할 수 있게 하려는 것이다.
+
+| code | 언제 |
+| --- | --- |
+| `INSUFFICIENT_SCOPE` | 「조회만」 연결이나 토큰으로 쓰기 도구를 불렀다. 문장은 「조회만 허락된 연결입니다. 기록하려면 더보기 → 연동에서 이 연결을 끊고 앱에서 다시 로그인해 「조회와 기록」 을 고르세요.」 다 |
+| `RATE_LIMITED` | 쓰기 도구를 연결마다 1분에 10번 넘게 불렀다. `details.retryAfterSeconds` 가 있다 |
+| `VALIDATION_FAILED`, `ONTOLOGY_VIOLATION`, `NOT_FOUND`, `PROPOSAL_LIMIT`, `TRANSIENT_CONFLICT`, `QUERY_TIMEOUT`, `DATABASE_UNAVAILABLE`, `INTERNAL_ERROR` | 같은 경로의 오류와 같다. `details` 도 같다 |
+
+모르는 도구 이름은 JSON-RPC 오류(`-32602`)다.
 
 ## 후속 도구가 쓸 필드
 

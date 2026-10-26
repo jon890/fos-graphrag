@@ -3,6 +3,7 @@ package dev.fos.workbench.agent
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonUnwrapped
 import dev.fos.workbench.auth.Role
+import dev.fos.workbench.auth.TokenScope
 import dev.fos.workbench.config.Timestamps
 import dev.fos.workbench.config.params
 import org.springframework.data.neo4j.core.Neo4jClient

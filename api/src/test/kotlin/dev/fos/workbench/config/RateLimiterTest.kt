@@ -1,4 +1,4 @@
-package dev.fos.workbench.agent
+package dev.fos.workbench.config
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -65,5 +65,22 @@ class RateLimiterTest {
 
         clock.now = start.plusSeconds(90)
         assertThat(limiter.tryAcquire("a").allowed).isTrue()
+    }
+
+    @Test
+    fun `창 길이가 지나면 다음 요청이 창이 끝난 키를 지우고 아직 창 안인 키는 남긴다`() {
+        limiter.tryAcquire("a")
+        limiter.tryAcquire("b")
+        clock.now = start.plusSeconds(30)
+        limiter.tryAcquire("c")
+        assertThat(limiter.trackedKeys()).describedAs("창 길이가 지나기 전에는 지우지 않는다").isEqualTo(3)
+
+        clock.now = start.plusSeconds(60)
+        limiter.tryAcquire("d")
+
+        // a, b 는 0초에 시작해 끝났고 c 는 30초에 시작해 남는다. d 는 방금 센 키다
+        assertThat(limiter.trackedKeys()).isEqualTo(2)
+        repeat(2) { limiter.tryAcquire("c") }
+        assertThat(limiter.tryAcquire("c").allowed).describedAs("남은 c 는 창 안의 수를 그대로 센다").isFalse()
     }
 }

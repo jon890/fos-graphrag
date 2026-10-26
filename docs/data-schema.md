@@ -332,7 +332,7 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 | `hash` | String | 토큰 원문(`fwb_` 포함 47자)의 SHA-256 을 소문자 16진수 64자로 쓴 값. 원문은 저장하지 않는다 |
 | `last4` | String | 원문의 끝 네 글자. 목록에서 토큰을 구분하는 데 쓴다 |
 | `createdAt` | String | 발급 시각. 서버가 기록하는 시각 형식이다 |
-| `lastUsedAt` | String | `/api/v1` 인증에 마지막으로 성공한 시각. 쓴 적이 없으면 속성이 없다 |
+| `lastUsedAt` | String | `/api/v1` 이나 `/mcp` 인증에 마지막으로 성공한 시각. 쓴 적이 없으면 속성이 없다 |
 | `revokedAt` | String | 폐기한 시각. 폐기하지 않았으면 속성이 없다 |
 
 - 토큰 원문은 `fwb_` 뒤에 `SecureRandom` 32바이트를 base64url(채움 문자 없음)로 쓴 43자를 붙인다. 앞자리 `fwb_` 는 유출 검사 도구가 찾을 수 있게 붙인다.
@@ -344,6 +344,66 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 - 사용자를 비활성화해도 토큰은 남지만 인증은 실패한다. 다시 활성화하면 폐기하지 않은 토큰이 다시 통한다. 사용자 노드를 지울 때 함께 지우는 규칙은 「사용자를 지울 때」 다.
 - 범위는 발급할 때 정하고 바꾸지 않는다. 범위를 바꾸려면 새로 발급하고 예전 토큰을 폐기한다.
 - 발급, 폐기, 사용 시각은 변경 이력(ChangeEvent)에 남기지 않는다. 지식 데이터가 아니라 개인 설정이고, 이력 화면은 다른 사용자에게도 보이기 때문이다.
+
+## OAuth 연결
+
+MCP 클라이언트(Claude Code, Codex)가 OAuth 로그인으로 받은 연결이다. 결정과 근거는 [ADR-015](adr/015-remote-mcp-oauth.md), 계약은 [API 계약](api-contract.md) 의 「OAuth 인가 서버」, 「연결된 앱」, 「원격 MCP(`/mcp`)」 다. 저장하는 것은 셋이다.
+
+| 노드 | 이어지는 곳 | 뜻 |
+| --- | --- | --- |
+| `:OAuthClient` | 어디에도 잇지 않는다 | 동적 등록한 클라이언트 하나 |
+| `:OAuthCode` | `(:User)-[:OWNS]->(:OAuthCode)` | 「연결 허용」 으로 만든 인가 코드 하나 |
+| `:OAuthGrant` | `(:User)-[:OWNS]->(:OAuthGrant)` | 연결 하나. 「연결된 앱」 목록의 한 줄이고 지금 쓰는 접근 토큰과 갱신 토큰을 가진다 |
+
+`:OAuthClient {id, name, redirectUris, createdAt, approvedAt}`
+
+| 속성 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | String | UUID. OAuth `client_id` 다 |
+| `name` | String | 등록할 때 받은 `client_name`. 100자까지. 없으면 「이름 없는 앱」 |
+| `redirectUris` | `List<String>` | 등록한 `redirect_uris`. 10개까지 |
+| `createdAt` | String | 등록 시각 |
+| `approvedAt` | String | 처음 「연결 허용」 을 받은 시각. 받은 적이 없으면 속성이 없다 |
+
+`:OAuthCode {hash, clientId, redirectUri, scope, codeChallenge, resource, createdAt, expiresAt, usedAt, grantId}`
+
+| 속성 | 타입 | 뜻 |
+| --- | --- | --- |
+| `hash` | String | 코드 원문(`fwc_` 포함 47자)의 SHA-256 소문자 16진수 64자 |
+| `clientId` | String | 코드를 받을 `:OAuthClient` 의 `id` |
+| `redirectUri` | String | 인가 요청의 `redirect_uri`. 토큰 요청과 글자까지 같아야 한다 |
+| `scope` | String | 사용자가 고른 범위. `READ` 또는 `READ_WRITE` |
+| `codeChallenge` | String | PKCE `code_challenge`(S256) |
+| `resource` | String | 토큰의 자원 주소 `{base}/mcp` |
+| `createdAt`, `expiresAt` | String | 만든 시각과 그 60초 뒤 |
+| `usedAt` | String | 토큰으로 바꾼 시각. 쓰지 않았으면 속성이 없다 |
+| `grantId` | String | 이 코드로 만든 `:OAuthGrant` 의 `id`. 쓰지 않았으면 속성이 없다 |
+
+`:OAuthGrant {id, clientId, clientName, scope, resource, accessHash, accessExpiresAt, refreshHash, refreshExpiresAt, previousRefreshHash, createdAt, lastUsedAt}`
+
+| 속성 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | String | UUID. 「연결된 앱」 의 식별자이고, 이 연결로 저장한 체결과 제안의 `tokenId` 다 |
+| `clientId` | String | `:OAuthClient` 의 `id` |
+| `clientName` | String | 연결할 때의 클라이언트 이름. 제안의 `tokenName` 으로 쓴다 |
+| `scope` | String | `READ` 또는 `READ_WRITE`. 연결하는 동안 바꾸지 않는다 |
+| `resource` | String | 토큰의 자원 주소. `/mcp` 인증 때 요청의 `{base}/mcp` 와 같아야 한다 |
+| `accessHash`, `accessExpiresAt` | String | 지금 접근 토큰(`fwa_`)의 SHA-256 과 끝나는 시각(발급 1시간 뒤) |
+| `refreshHash`, `refreshExpiresAt` | String | 지금 갱신 토큰(`fwr_`)의 SHA-256 과 끝나는 시각(발급 30일 뒤) |
+| `previousRefreshHash` | String | 바로 앞의 갱신 토큰 해시. 다시 쓰이면 도난으로 보고 연결을 끊는다. 처음 연결에는 속성이 없다 |
+| `createdAt` | String | 코드를 토큰으로 바꿔 연결이 생긴 시각 |
+| `lastUsedAt` | String | `/mcp` 인증이나 갱신에 마지막으로 성공한 시각. 1분 넘게 지났을 때만 고쳐 쓴다. 쓰지 않았으면 속성이 없다 |
+
+- 원문(코드, 접근 토큰, 갱신 토큰)은 저장하지 않는다. 연동 토큰과 같이 무작위 32바이트라 SHA-256 으로 바로 찾는다.
+- 시각은 서버가 기록하는 시각 형식이다. 자릿수가 고정이라 끝나는 시각은 문자열로 비교한다.
+- 연결은 코드를 토큰으로 바꿀 때 생긴다. 그 트랜잭션은 주인 사용자 노드에 쓰기 잠금(`_lock`)을 건 뒤 같은 `clientId` 의 이전 연결을 지우고, 남은 연결이 20개를 넘으면 `coalesce(lastUsedAt, createdAt)` 가 가장 오래된 것부터 지운다. 같은 앱에서 다시 로그인하면 연결이 하나로 남는다.
+- 코드는 바꾸는 트랜잭션에서 코드 노드에 쓰기 잠금을 건 뒤 `usedAt` 을 확인한다. 같은 코드가 동시에 와도 하나만 바뀐다. 이미 쓴 코드가 다시 오면 `grantId` 의 연결을 지운다. 「연결 허용」 이 새 코드를 만들 때 그 사용자의 끝난 코드(`expiresAt` 이 지난 것)를 지운다.
+- 갱신은 연결 노드에 쓰기 잠금을 건 뒤 `refreshHash` 를 다시 확인한다. 잠금을 기다리는 사이 다른 요청이 먼저 바꿨으면 이전 토큰의 재사용으로 본다. 성공하면 접근 토큰과 갱신 토큰을 새로 쓰고 이전 갱신 해시를 `previousRefreshHash` 로 옮긴다. 같은 갱신 토큰이 동시에 두 번 오면 하나는 성공하고 다른 하나는 이전 토큰으로 읽혀 연결이 끊긴다. 갱신 토큰을 바꾸는 규칙(MCP 인증 규격)이 그렇게 정한다.
+- 연결 끊기(「연결된 앱」 의 끊기, `/oauth/revoke`, 코드나 갱신 토큰의 재사용)는 `:OAuthGrant` 를 지운다(`DETACH DELETE`). 보관하지 않는다. 그 연결로 저장한 체결과 제안의 `tokenId` 는 남는다.
+- 인증은 요청마다 연결과 주인을 다시 읽는다. 주인이 비활성이거나 허용 목록에서 빠졌으면(`email` 이 없으면) 접근 토큰과 갱신 토큰이 막힌다. 역할은 요청마다 읽은 지금 값이다. 다시 활성화하면 끝나지 않은 토큰이 다시 통한다.
+- 클라이언트 등록은 누구나 할 수 있다. 등록하는 트랜잭션에서 `approvedAt` 이 없고 `createdAt` 이 24시간보다 오래된 `:OAuthClient` 를 지운다. 승인받은 클라이언트는 지우지 않는다. 남은 미승인 클라이언트가 상한(`workbench.oauth.max-unapproved-clients`) 이상이면 새로 등록하지 않는다.
+- 세 노드와 `OWNS` 에 `archived` 를 두지 않는다. `:Knowledge` 가 아니어서 검색, 그래프, 근거 따라가기에 나오지 않는다.
+- 변경 이력(ChangeEvent)에 남기지 않는다. 개인 설정이고 이력 화면은 다른 사용자에게도 보이기 때문이다.
 
 ## 체결 기록
 
@@ -366,8 +426,8 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 | `fee` | Float | 수수료와 세금. 0 이상. 없으면 속성이 없다 |
 | `executedAt` | String | 체결 시각. UTC 초까지 고정 자릿수(`YYYY-MM-DDTHH:MM:SSZ`) |
 | `createdAt` | String | 저장 시각. 서버가 기록하는 시각 형식이다 |
-| `createdVia` | String | `AGENT`(연동 토큰) 또는 `WEB`. 지금은 `AGENT` 만 쓴다 |
-| `tokenId` | String | 저장한 연동 토큰의 `id`. 그 토큰을 폐기해도 남는다 |
+| `createdVia` | String | `AGENT`(연동 토큰이나 OAuth 연결) 또는 `WEB`. 지금은 `AGENT` 만 쓴다 |
+| `tokenId` | String | 저장한 연동 토큰이나 OAuth 연결(`:OAuthGrant`)의 `id`. 그 토큰을 폐기하거나 연결을 끊어도 남는다 |
 
 - 계좌 번호, 계좌 이름, 잔고는 저장하지 않는다. 요청에 와도 모르는 필드라 `400 VALIDATION_FAILED` 다.
 - 같은 주인 안에서 `(broker, externalId)` 는 하나다. 유일 제약 `trade_owner_external_unique` 가 `(ownerId, broker, externalId)` 에 걸린다. 저장은 주인 사용자 노드에 쓰기 잠금(`_lock`)을 건 뒤 `MERGE` 한다. 같은 체결을 다시 보내거나 동시에 보내도 하나만 남고, 이미 있으면 저장된 값을 고치지 않고 돌려준다.
@@ -394,8 +454,8 @@ Change ─CREATES→ Bottleneck ←HAS_BOTTLENECK─ Sector
 | `evidence` | String | 근거 참조 `{nodeIds, tradeIds, urls}` 의 JSON 문자열 |
 | `dedupeKey` | String | 에이전트가 붙인 같은 제안 검사 키. 100자까지. 없으면 속성이 없다 |
 | `createdAt` | String | 올린 시각 |
-| `createdVia` | String | `AGENT`. 지금은 연동 토큰으로만 올린다 |
-| `tokenId`, `tokenName` | String | 올린 연동 토큰과 그때의 토큰 이름 |
+| `createdVia` | String | `AGENT`. 연동 토큰이나 OAuth 연결로 올린다 |
+| `tokenId`, `tokenName` | String | 올린 연동 토큰과 그때의 토큰 이름. OAuth 연결로 올렸으면 연결의 `id` 와 클라이언트 이름 |
 | `decidedAt` | String | 승인하거나 거절한 시각 |
 | `decisionNote` | String | 거절 이유. 1000자까지 |
 | `result` | String | 승인으로 생긴 것 `{nodeIds, relationshipIds, tradeIds}` 의 JSON 문자열 |
@@ -418,14 +478,14 @@ OPTIONAL MATCH (u)-[:OWNS]->(x)
 DETACH DELETE u, x
 ```
 
-- `OWNS` 로 이어진 연동 토큰, 체결 기록, 제안이 함께 지워진다. `DETACH DELETE` 라 이해 표시(`KNOWS`)와 체결의 `OF_SECURITY`, `EXECUTES` 도 사라진다.
+- `OWNS` 로 이어진 연동 토큰, OAuth 코드와 연결, 체결 기록, 제안이 함께 지워진다. 그 사용자만 쓰던 `:OAuthClient` 는 남는다. `DETACH DELETE` 라 이해 표시(`KNOWS`)와 체결의 `OF_SECURITY`, `EXECUTES` 도 사라진다.
 - 그 사용자가 만든 지식 노드와 변경 이력은 남는다. 작업자 id 는 이름을 찾지 못해 화면에 보이지 않는다.
 
 ## 코드가 소유하는 이름
 
 아래 이름은 서버 코드가 지식 그래프 밖의 저장에 쓴다. 온톨로지의 노드 타입이나 관계 종류로 쓸 수 없고, 쓰면 로더의 일관성 검사가 오류로 답한다(미리보기 `valid: false`, 저장 `400 ONTOLOGY_INVALID`).
 
-- 노드 label: `Knowledge`, `User`, `IntegrationToken`, `Trade`, `Proposal`, `ChangeEvent`, `OntologyVersion`, `OntologyHead`, `SeedRun`
+- 노드 label: `Knowledge`, `User`, `IntegrationToken`, `OAuthClient`, `OAuthCode`, `OAuthGrant`, `Trade`, `Proposal`, `ChangeEvent`, `OntologyVersion`, `OntologyHead`, `SeedRun`
 - 관계 종류: `OWNS`, `KNOWS`, `OF_SECURITY`, `EXECUTES`
 
 목록은 서버 코드의 상수 한 곳(`OntologyLoader` 의 `RESERVED_NODE_TYPES`, `RESERVED_RELATIONSHIP_TYPES`)이 소유한다. 저장된 온톨로지 버전 가운데 이 이름을 쓰는 것은 없다.
@@ -458,6 +518,13 @@ API 가 시작할 때, 웹 서버가 요청을 받기 전에 `IF NOT EXISTS` 로
 | `ontology_head_key_unique` | `(:OntologyHead).key` 유일 | 온톨로지 저장 잠금 노드가 하나만 생기게 한다 |
 | `integration_token_id_unique` | `(:IntegrationToken).id` 유일 | 연동 토큰 ID |
 | `integration_token_hash_unique` | `(:IntegrationToken).hash` 유일 | 인증할 때 해시로 토큰을 바로 찾는다 |
+| `oauth_client_id_unique` | `(:OAuthClient).id` 유일 | OAuth `client_id` |
+| `oauth_code_hash_unique` | `(:OAuthCode).hash` 유일 | 토큰 요청에서 코드를 해시로 찾는다 |
+| `oauth_grant_id_unique` | `(:OAuthGrant).id` 유일 | 연결 ID |
+| `oauth_grant_access_hash_unique` | `(:OAuthGrant).accessHash` 유일 | `/mcp` 인증에서 접근 토큰을 해시로 찾는다 |
+| `oauth_grant_refresh_hash_unique` | `(:OAuthGrant).refreshHash` 유일 | 갱신 요청에서 갱신 토큰을 해시로 찾는다 |
+| `oauth_grant_previous_refresh` | `(:OAuthGrant).previousRefreshHash` 인덱스 | 이전 갱신 토큰의 재사용을 찾는다 |
+| `oauth_client_created` | `(:OAuthClient).createdAt` 인덱스 | 승인받지 못한 오래된 클라이언트를 지운다 |
 | `trade_id_unique` | `(:Trade).id` 유일 | 체결 ID |
 | `trade_owner_external_unique` | `(:Trade).(ownerId, broker, externalId)` 유일 | 같은 주인의 같은 체결을 하나로 둔다 |
 | `trade_owner_executed` | `(:Trade).(ownerId, executedAt)` 인덱스 | 내 체결을 최근 것부터 읽는다 |

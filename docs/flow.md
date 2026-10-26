@@ -26,7 +26,7 @@ sequenceDiagram
 ```
 
 로그인한 뒤에도 API 는 요청마다 사용자 상태와 역할을 다시 읽는다.
-관리자가 사용자를 비활성화하면 그 사용자의 다음 요청은 `401` 이고 세션이 지워진다. 그 사용자의 연동 토큰도 다음 요청부터 `401` 이다(「에이전트 조회」).
+관리자가 사용자를 비활성화하면 그 사용자의 다음 요청은 `401` 이고 세션이 지워진다. 그 사용자의 연동 토큰과 앱 연결도 다음 요청부터 `401` 이다(「에이전트 조회」, 「앱 연결」).
 
 ## 주소와 뒤로가기
 
@@ -44,7 +44,8 @@ sequenceDiagram
 | `/ontology` | 온톨로지 상세 | 더보기(모든 역할) | `view`(ADMIN 의 `form`, `yaml`, `history`. 없으면 지금 버전 보기), `version`(`view=history` 에서 연 버전) |
 | `/review` | 검토 대기 | 더보기(EDITOR, ADMIN) | `page`, `minePage`(0이면 뺀다) |
 | `/users` | 사용자 | 더보기(ADMIN) | 없음 |
-| `/tokens` | 연동 토큰 | 더보기(모든 역할) | 없음 |
+| `/tokens` | 연동(연결된 앱과 연동 토큰) | 더보기(모든 역할) | 없음 |
+| `/connect` | 앱 연결 동의 화면 | 앱이 연 브라우저(`/oauth/authorize` 가 보낸다). 메뉴에는 없다 | OAuth 인가 요청의 query 그대로(「앱 연결」) |
 | `/proposals` | 제안 | 더보기(모든 역할) | `status`(`ACCEPTED`, `REJECTED` 가운데 하나. 없으면 대기), `page`(0이면 뺀다) |
 | `/trades` | 내 체결 | 더보기(모든 역할) | `ticker`, `page`(0이면 뺀다) |
 
@@ -666,9 +667,19 @@ sequenceDiagram
 - 절이 비면 「아직 없습니다」 다. 이름을 누르면 그 항목을 연다(상세만 바꾸는 열기).
 - 강조와 비판 밖의 주장 종류가 개념을 대상으로 받으면 「{주장 종류 표시 이름} 주장」 절로 보인다.
 
-## 연동 토큰
+## 연동
 
-더보기 메뉴의 「연동 토큰」(`/tokens`)에서 외부 에이전트(Hermes)에 넣을 내 토큰을 발급하고 폐기한다. 모든 역할이 자기 토큰만 본다. 결정과 근거는 [ADR-012](adr/012-agent-integration-token.md), 계약은 [API 계약](api-contract.md) 의 「연동 토큰」 이다.
+더보기 메뉴의 「연동」(`/tokens`)은 두 부분이다. 위의 「연결된 앱」 은 OAuth 로그인으로 연결한 Claude Code, Codex 같은 앱을 보고 끊는다. 아래의 「연동 토큰」 은 외부 에이전트(Hermes)에 넣을 내 토큰을 발급하고 폐기한다. 모든 역할이 자기 연결과 토큰만 본다. 결정과 근거는 [ADR-015](adr/015-remote-mcp-oauth.md) 와 [ADR-012](adr/012-agent-integration-token.md), 계약은 [API 계약](api-contract.md) 의 「연결된 앱」 과 「연동 토큰」 이다. 메뉴 이름은 「연동 토큰」 에서 「연동」 으로 바꿨고 경로는 그대로 둔다. 이미 보낸 링크를 깨지 않으려는 것이다.
+
+### 연결된 앱
+
+- 제목 아래에 안내를 둔다. 「Claude Code 나 Codex 에 가치투자 온톨로지 플러그인을 설치하고 로그인하면 여기에 보입니다. 연결을 끊으면 그 앱은 다시 로그인할 때까지 조회하거나 기록할 수 없습니다.」
+- 목록은 표다. 앱 이름(`clientName`), 범위(「조회만」, 「조회와 기록」), 연결한 때, 마지막 사용(없으면 「아직 쓰지 않음」), 「연결 끊기」 단추. 연결이 없으면 「아직 연결한 앱이 없습니다.」 다.
+- 「연결 끊기」 는 확인 창을 연다. 「「{앱 이름}」 연결을 끊을까요? 이 앱은 다시 로그인할 때까지 가치투자 온톨로지를 조회하거나 기록할 수 없습니다.」 와 「연결 끊기」, 「취소」. 끊으면 목록을 다시 읽고 「「{앱 이름}」 연결을 끊었습니다.」 를 보인다. 다른 탭에서 먼저 끊어 `404` 가 오면 목록을 다시 읽는다.
+- 실패하면 표 위에 서버 `message` 를 보인다. 목록을 받지 못하면 「다시 시도」 를 보인다.
+- 좁은 화면(1024px 미만)에서는 연동 토큰 표와 같이 연결한 때와 마지막 사용을 한 칸에 두 줄로 쌓고, 범위는 앱 이름 아래에 작은 글자로 둔다.
+
+### 연동 토큰
 
 ```mermaid
 sequenceDiagram
@@ -768,6 +779,82 @@ sequenceDiagram
 - 같은 체결을 다시 보내거나 두 요청이 동시에 보내도 체결은 하나다. 주인 노드 잠금이 같은 사람의 요청을 줄 세우고, 유일 제약이 마지막으로 막는다.
 - 제안을 올린 것만으로는 공유 지식도 이해 표시도 바뀌지 않는다.
 - 에이전트가 같은 해석을 매번 올리지 않게 `dedupeKey` 를 붙이고, 거절된 제안은 `GET /api/v1/proposals` 로 읽어 다시 올리지 않는다.
+
+## 앱 연결
+
+Claude Code 나 Codex 에 가치투자 온톨로지 플러그인을 설치한 사람이 처음 도구를 부르면 OAuth 로그인으로 연결한다. 사람이 하는 일은 브라우저에서 Google 로그인과 「연결 허용」 이다. 결정과 근거는 [ADR-015](adr/015-remote-mcp-oauth.md), 계약은 [API 계약](api-contract.md) 의 「OAuth 인가 서버」 와 「원격 MCP(`/mcp`)」 다.
+
+```mermaid
+sequenceDiagram
+  participant C as Claude Code·Codex
+  participant B as 브라우저
+  participant A as API
+  participant N as Neo4j
+  C->>A: POST /mcp (토큰 없음)
+  A-->>C: 401, WWW-Authenticate resource_metadata
+  C->>A: GET /.well-known/oauth-protected-resource/mcp
+  C->>A: GET /.well-known/oauth-authorization-server
+  C->>A: POST /oauth/register {client_name, redirect_uris}
+  A->>N: OAuthClient 만들기, 승인받지 못한 오래된 클라이언트 지우기
+  A-->>C: 201 client_id
+  C->>B: /oauth/authorize?client_id&redirect_uri&code_challenge&state&resource 열기
+  B->>A: GET /oauth/authorize
+  A-->>B: 302 /connect?같은 query
+  B->>A: GET /api/oauth/authorize?같은 query
+  alt 로그인하지 않음
+    A-->>B: 401
+    B->>B: 주소를 탭 저장소에 두고 Google 로그인(「로그인」)
+    B->>A: 로그인 뒤 같은 주소로 다시 GET
+  end
+  alt 클라이언트나 돌아갈 주소가 등록되지 않음
+    A-->>B: 400 OAUTH_INVALID_CLIENT
+    B->>B: 오류만 보인다
+  else 그 밖의 요청 오류(PKCE 없음, resource 다름 등)
+    A-->>B: 400 OAUTH_REDIRECT_ERROR, redirectUrl
+    B->>C: 「앱으로 돌아가기」 → redirect_uri?error=…
+  else 통과
+    A-->>B: 200 clientName, redirectKind, requestedScope
+    B->>B: 동의 화면
+    B->>A: POST /api/oauth/authorize {decision, grantedScope} (CSRF)
+    A->>N: ALLOW 면 OAuthCode 만들기(60초, 한 번)
+    A-->>B: 200 redirectUrl
+    B->>C: redirect_uri?code&state&iss 로 이동
+  end
+  C->>A: POST /oauth/token code, code_verifier
+  A->>N: 코드 잠금, usedAt 확인, PKCE 확인, 같은 앱의 이전 연결 지우기, OAuthGrant 만들기
+  A-->>C: access_token(1시간), refresh_token(30일)
+  C->>A: POST /mcp Bearer fwa_…
+  A->>N: 접근 토큰 해시로 연결과 주인 찾기
+  A-->>C: 도구 결과
+```
+
+- 접근 토큰이 끝나면 클라이언트가 갱신 토큰으로 새 토큰을 받는다. 사람은 다시 로그인하지 않는다. 갱신 토큰이 끝났거나(30일 동안 한 번도 쓰지 않음) 연결을 끊었으면 `/mcp` 가 다시 `401` 이고 클라이언트가 브라우저를 다시 연다.
+- 개인 연동 토큰(`fwb_`)을 가진 Hermes 는 이 흐름을 거치지 않고 처음부터 `Authorization: Bearer fwb_…` 로 `/mcp` 를 부른다.
+- 동의 화면은 머리글, 탭, 첫 접속 가이드 없이 그 화면만 보인다. 처음 로그인한 사람도 가이드 없이 동의를 끝낸다. 가이드는 다음에 앱을 열 때 나온다.
+- 같은 앱에서 다시 로그인하면 이전 연결은 지워지고 새 연결 하나만 남는다(「데이터 스키마」 의 「OAuth 연결」).
+
+### 동의 화면
+
+`/connect` 다. 서버가 `/oauth/authorize` 에서 query 를 붙여 이리로 보낸다. 문구는 비개발자 기준 합니다체다.
+
+- 맨 위에 「앱 연결」 제목과 로그인한 사람의 표시 이름(「{표시 이름} 님으로 로그인함」)을 둔다.
+- 본문은 「{clientName} 이(가) 가치투자 온톨로지를 내 계정으로 조회하고 기록하려 합니다.」 다. `requestedScope` 가 `READ` 면 「… 내 계정으로 조회하려 합니다.」 다. 조사는 앱 이름이 앱이 정한 값이라 「이(가)」 를 그대로 쓴다.
+- 돌아갈 곳을 한 줄로 보인다. `LOOPBACK` 이면 「허용하면 이 컴퓨터의 앱으로 돌아갑니다.」, `HTTPS` 면 「허용하면 {redirectHost} 로 돌아갑니다.」 다. 그 아래에 「앱 이름은 앱이 직접 정한 것입니다. 내가 방금 연결을 시작한 앱이 아니면 「거절」 을 누르세요.」 를 작은 글자로 둔다.
+- 범위는 라디오 둘이다. `requestedScope` 가 `READ` 면 「조회만」 하나만 보이고 고른 채로 둔다.
+
+  | 고르는 값 | 이름 | 설명 |
+  | --- | --- | --- |
+  | `READ_WRITE`(기본) | 조회와 기록 | 항목과 근거, 내 공부 목록과 체결을 조회하고, 내 체결을 저장하고, 제안을 올립니다. 함께 쓰는 지식은 내가 「제안」 에서 승인한 것만 바뀝니다. |
+  | `READ` | 조회만 | 항목과 근거, 내 공부 목록과 체결을 조회만 합니다. |
+
+- 단추는 「연결 허용」(주 단추)과 「거절」 이다. 누르면 두 단추가 꺼지고 「앱으로 돌아가는 중입니다…」 를 보인 뒤 `redirectUrl` 로 이동한다(`window.location.assign`). 이동한 뒤 브라우저 탭에 앱의 안내가 보인다.
+- 아래에 「연결은 더보기 → 연동 의 「연결된 앱」 에서 언제든 끊을 수 있습니다.」 를 둔다.
+- 로그인하지 않았으면 기존 로그인 화면을 보이되 안내 문장을 「앱을 연결하려면 먼저 Google 로 로그인하세요.」 로 바꾼다. 주소는 「로그인을 거치는 링크」 와 같이 탭 저장소에 두었다가 로그인 뒤 돌아온다.
+- `OAUTH_INVALID_CLIENT` 면 「연결 요청이 올바르지 않습니다. 앱에서 연결을 다시 시작하세요.」 와 「첫 화면으로」 링크만 보인다.
+- `OAUTH_REDIRECT_ERROR` 면 서버 `message` 와 「앱으로 돌아가기」 단추를 보인다. 누르면 `details.redirectUrl` 로 이동한다.
+- 허용 목록에 없는 계정으로 로그인하면 기존처럼 `/?login=denied` 로 돌아가고 동의 화면은 나오지 않는다.
+- 결정 요청이 네트워크 오류나 `5xx` 로 실패하면 그 자리에 서버 `message`(없으면 「연결하지 못했습니다. 다시 시도하세요.」)를 보이고 단추를 다시 켠다.
+- 좁은 화면(1024px 미만)에서도 같은 순서로 한 칸에 쌓는다. 단추는 화면 폭을 채운다.
 
 ## 제안
 

@@ -50,6 +50,8 @@ services:
       WORKBENCH_SESSION_TIMEOUT: "${WORKBENCH_SESSION_TIMEOUT:-8h}"
       WORKBENCH_SEEDS_ENABLED: "${WORKBENCH_SEEDS_ENABLED:-true}"
       WORKBENCH_HSTS: "${WORKBENCH_HSTS:-false}"
+      # OAuth 주소(issuer, 자원 주소)를 고정할 공개 주소. 비어 있으면 요청의 scheme 과 host 로 만든다
+      WORKBENCH_PUBLIC_URL: "${WORKBENCH_PUBLIC_URL:-}"
       # 비어 있으면 loopback 과 Docker 브리지 대역(172.16.0.0/12)을 믿는다. API 설정의 기본값과 같다.
       # 이 기본값은 WORKBENCH_BIND 가 loopback 일 때만 안전하다. 아래 두 값으로 API 가 시작할 때 확인한다
       WORKBENCH_TRUSTED_PROXIES: '${WORKBENCH_TRUSTED_PROXIES:-127\.0\.0\.1|0:0:0:0:0:0:0:1|::1|172\.(1[6-9]|2[0-9]|3[01])\.[0-9]+\.[0-9]+}'

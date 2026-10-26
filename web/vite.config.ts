@@ -17,6 +17,10 @@ export default defineConfig({
       // Google OIDC 시작과 콜백도 API 서버가 처리한다. 콜백 주소가 5173 이 되도록 Host 를 바꾸지 않는다.
       '/oauth2': { target: 'http://127.0.0.1:8080', changeOrigin: false },
       '/login/oauth2': { target: 'http://127.0.0.1:8080', changeOrigin: false },
+      // 원격 MCP 와 OAuth 인가 서버. 메타데이터의 주소가 5173 origin 이 되도록 Host 를 바꾸지 않는다. '/oauth/' 는 '/oauth2' 와 겹치지 않게 끝에 '/' 를 둔다.
+      '/oauth/': { target: 'http://127.0.0.1:8080', changeOrigin: false },
+      '/.well-known': { target: 'http://127.0.0.1:8080', changeOrigin: false },
+      '/mcp': { target: 'http://127.0.0.1:8080', changeOrigin: false },
     },
   },
   build: {

@@ -143,7 +143,14 @@ describe('개념 지도와 더보기', () => {
     expect(isSafeReturnTo('/map?type=X')).toBe(true)
   })
 
-  it('더보기 항목은 역할에 따라 검토 대기와 사용자가 붙고 연동 토큰은 모두에게 붙는다', () => {
+  it('동의 화면 주소는 query 가 붙어도 돌아갈 주소로 받고 비슷한 경로는 받지 않는다', () => {
+    expect(isSafeReturnTo('/connect?client_id=x')).toBe(true)
+    expect(isSafeReturnTo('/connect')).toBe(true)
+    expect(isSafeReturnTo('/connectx')).toBe(false)
+    expect(tabOfPath('/connect')).toBeNull()
+  })
+
+  it('더보기 항목은 역할에 따라 검토 대기와 사용자가 붙고 연동은 모두에게 붙는다', () => {
     expect(moreItems('VIEWER')).toEqual(['changes', 'ontology', 'tokens', 'proposals', 'trades'])
     expect(moreItems('EDITOR')).toEqual(['changes', 'ontology', 'review', 'tokens', 'proposals', 'trades'])
     expect(moreItems('ADMIN')).toEqual(['changes', 'ontology', 'review', 'users', 'tokens', 'proposals', 'trades'])

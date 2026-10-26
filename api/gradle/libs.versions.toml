@@ -2,6 +2,7 @@
 # Kotlin 은 Spring Boot 4.1.0 BOM 의 kotlin.version 과 맞춘다
 kotlin = "2.3.21"
 spring-boot = "4.1.0"
+mcp = "2.1.0"
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
@@ -18,6 +19,7 @@ spring-boot-validation = { module = "org.springframework.boot:spring-boot-starte
 jackson-kotlin = { module = "tools.jackson.module:jackson-module-kotlin" }
 jackson-yaml = { module = "tools.jackson.dataformat:jackson-dataformat-yaml" }
 kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect" }
+mcp = { module = "io.modelcontextprotocol.sdk:mcp", version.ref = "mcp" }
 spring-boot-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
 testcontainers-neo4j = { module = "org.testcontainers:testcontainers-neo4j" }

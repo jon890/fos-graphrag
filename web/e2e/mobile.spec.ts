@@ -1,5 +1,5 @@
 import { expect, request, test, type Page } from '@playwright/test'
-import { admin, exact, issueToken, loginAs, openScreen, revokeTokensExcept, shot, tokenIds } from './support'
+import { OAUTH_CALLBACK, admin, authorizeUrl, exact, issueToken, loginAs, newPkce, openScreen, registerOAuthClient, revokeConnections, revokeTokensExcept, shot, tokenIds } from './support'
 
 // 휴대폰 폭(390px)에서 작업 공간이 검색, 그래프, 상세 탭으로 나뉘어 동작하는지 확인한다.
 // 노드는 그래프 탭이 숨겨진 동안 만들어지므로, 그래프 탭을 열 때 미뤄 둔 배치가 도는지도 함께 본다.
@@ -20,7 +20,8 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
       () =>
         page.evaluate(() => {
           const main = document.querySelector('.app-main')
-          return main ? main.scrollWidth - main.clientWidth : Number.NaN
+          // 머리글과 본문 영역이 없는 화면(앱 연결 동의)은 문서 폭만 본다.
+          return main ? main.scrollWidth - main.clientWidth : 0
         }),
       { message: '.app-main 의 scrollWidth 가 clientWidth 를 넘는다' },
     )
@@ -311,6 +312,43 @@ test('휴대폰 폭에서 연동 토큰을 발급하고 폐기해도 가로 스�
     await expect(rows).toHaveCount(before - 1)
   } finally {
     await revokeTokensExcept(page, kept)
+  }
+})
+
+test('휴대폰 폭에서 앱 연결 동의 화면과 연결된 앱 표가 가로 스크롤 없이 보인다', async ({ page }) => {
+  await loginAs(page, admin)
+  const origin = new URL(page.url()).origin
+  const appName = `모바일 앱 ${suffix}`
+  const pkce = newPkce()
+  await page.route('http://127.0.0.1:43210/**', (r) => r.fulfill({ body: 'ok' }))
+  try {
+    const clientId = await registerOAuthClient(page, appName)
+    await page.goto(authorizeUrl(origin, clientId, pkce, `state-${suffix}`))
+    await expect(page.getByTestId('connect-page')).toBeVisible()
+    await expect(page.getByTestId('connect-allow')).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+    await shot(page, 'connect-mobile')
+
+    await page.getByTestId('connect-allow').click()
+    await page.waitForURL(/127\.0\.0\.1:43210\/callback\?/)
+    // 연결은 코드를 토큰으로 바꿀 때 생긴다(앱이 하는 일을 대신 한다)
+    const code = new URL(page.url()).searchParams.get('code') ?? ''
+    const tokenRes = await page.request.post(`${origin}/oauth/token`, {
+      form: { grant_type: 'authorization_code', code, code_verifier: pkce.verifier, client_id: clientId, redirect_uri: OAUTH_CALLBACK },
+    })
+    expect(tokenRes.status()).toBe(200)
+
+    await page.goto(`${origin}/tokens`)
+    await expect(page.getByTestId('connections-table')).toBeVisible()
+    const row = page.locator(`[data-testid="connections-row"][data-name="${appName}"]`)
+    await expect(row).toHaveCount(1)
+    // 표 안 가로 스크롤 뒤로 숨지 않고 「연결 끊기」 가 창 안에 다 보인다
+    await expect(row.getByTestId('connections-row-disconnect')).toBeInViewport({ ratio: 1 })
+    await expectNoHorizontalOverflow(page)
+    await shot(page, 'connections-mobile')
+  } finally {
+    await page.unroute('http://127.0.0.1:43210/**')
+    await revokeConnections(page)
   }
 })
 
