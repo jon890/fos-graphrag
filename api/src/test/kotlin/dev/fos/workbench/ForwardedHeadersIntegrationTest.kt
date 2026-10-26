@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.test.context.TestPropertySource
 import java.net.URLDecoder
 
-/** 앞단 프록시가 보낸 X-Forwarded-* 는 믿는 주소에서 왔을 때만 OAuth redirect URI 에 반영된다. */
+/** 앞단 프록시가 보낸 X-Forwarded-* 는 믿는 주소에서 왔을 때만 OAuth redirect URI 와 OAuth 메타데이터의 주소에 반영된다. */
 class ForwardedHeadersIntegrationTest {
 
     private fun redirectUri(location: String) =
@@ -23,6 +23,18 @@ class ForwardedHeadersIntegrationTest {
             val location = anonymous().firstRedirect("/oauth2/authorization/google", forwarded)
             assertThat(redirectUri(location)).isEqualTo("https://workbench.example.com/login/oauth2/code/google")
         }
+
+        @Test
+        fun `OAuth 메타데이터의 주소도 프록시가 넘긴 공개 origin 이다`() {
+            val headers = mapOf("X-Forwarded-Proto" to "https", "X-Forwarded-Host" to "graph.example.com")
+            val response = anonymous().send("GET", "/.well-known/oauth-authorization-server", null, headers = headers)
+            assertThat(response.status).describedAs(response.body.toString()).isEqualTo(200)
+            assertThat(response.body["issuer"].asString()).isEqualTo("https://graph.example.com")
+            assertThat(response.body["token_endpoint"].asString()).isEqualTo("https://graph.example.com/oauth/token")
+
+            val resource = anonymous().send("GET", "/.well-known/oauth-protected-resource/mcp", null, headers = headers)
+            assertThat(resource.body["resource"].asString()).isEqualTo("https://graph.example.com/mcp")
+        }
     }
 
     @Nested
@@ -32,6 +44,12 @@ class ForwardedHeadersIntegrationTest {
         fun `믿지 않는 주소가 보낸 헤더는 무시한다`() {
             val location = anonymous().firstRedirect("/oauth2/authorization/google", forwarded)
             assertThat(redirectUri(location)).startsWith("http://localhost:")
+        }
+
+        @Test
+        fun `믿지 않는 주소가 보낸 헤더는 OAuth 메타데이터의 주소도 바꾸지 못한다`() {
+            val response = anonymous().send("GET", "/.well-known/oauth-authorization-server", null, headers = forwarded)
+            assertThat(response.body["issuer"].asString()).startsWith("http://localhost:")
         }
     }
 }

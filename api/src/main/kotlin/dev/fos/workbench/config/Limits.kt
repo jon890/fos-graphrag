@@ -17,6 +17,9 @@ object Limits {
     /** 온톨로지 미리보기, 저장, 되돌리기(`POST /api/ontology/` 아래)의 요청 본문 크기(바이트). 정의 전체를 YAML 이나 JSON 으로 보낸다. */
     const val MAX_ONTOLOGY_BODY_BYTES = 512 * 1024L
 
+    /** OAuth 등록, 토큰, 폐기(`POST /oauth/` 아래)의 요청 본문 크기(바이트). */
+    const val MAX_OAUTH_BODY_BYTES = 16 * 1024L
+
     /** 체결 저장 요청 하나에 담는 체결 수. */
     const val MAX_TRADES_PER_REQUEST = 50
 

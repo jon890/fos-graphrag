@@ -42,6 +42,36 @@ class SecurityConfig {
     @Bean
     fun agentWriteRateLimiter(properties: WorkbenchProperties) = RateLimiter(properties.agent.writeRateLimitPerMinute)
 
+    /** 같은 IP 의 `/oauth/register` 수를 센다 */
+    @Bean
+    fun oauthRegisterRateLimiter(properties: WorkbenchProperties) = RateLimiter(properties.oauth.registerRateLimitPerMinute)
+
+    /** 같은 IP 의 `/oauth/token` 과 `/oauth/revoke` 수를 함께 센다 */
+    @Bean
+    fun oauthTokenRateLimiter(properties: WorkbenchProperties) = RateLimiter(properties.oauth.tokenRateLimitPerMinute)
+
+    /**
+     * OAuth 인가 서버의 공개 경로(메타데이터, 동적 등록, 토큰, 폐기)만 맡고 [filterChain] 보다 먼저 돈다.
+     * 누구나 부르는 경로라 모두 열고, 세션을 읽지도 만들지도 않고 CSRF 를 쓰지 않는다(docs/adr/015-remote-mcp-oauth.md).
+     * 요청 한도는 컨트롤러가 IP 마다 센다. 동의 화면이 부르는 `/oauth/authorize` 와 `/api/oauth/` 아래 경로는 [filterChain] 이 맡는다.
+     */
+    @Bean
+    @Order(1)
+    fun oauthFilterChain(http: HttpSecurity, properties: WorkbenchProperties): SecurityFilterChain {
+        http
+            .securityMatcher("/oauth/register", "/oauth/token", "/oauth/revoke", "/.well-known/**")
+            .authorizeHttpRequests { it.anyRequest().permitAll() }
+            .csrf { it.disable() }
+            .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
+            .securityContext { it.securityContextRepository(RequestAttributeSecurityContextRepository()) }
+            .headers { securityHeaders(it, properties) }
+            .formLogin { it.disable() }
+            .httpBasic { it.disable() }
+            .logout { it.disable() }
+            .requestCache { it.disable() }
+        return http.build()
+    }
+
     /**
      * `/api/v1` 아래 경로만 맡고 [filterChain] 보다 먼저 돈다. 연동 토큰(`Authorization: Bearer`)으로만 인증한다.
      * 세션을 읽지도 만들지도 않고 CSRF 를 쓰지 않는다(docs/adr/012-agent-integration-token.md).
@@ -145,7 +175,7 @@ class SecurityConfig {
         response.writer.write(mapper.writeValueAsString(error))
     }
 
-    /** CSP, Referrer-Policy, frame 금지, HSTS. 두 체인이 같은 값을 쓴다 */
+    /** CSP, Referrer-Policy, frame 금지, HSTS. 모든 체인이 같은 값을 쓴다 */
     private fun securityHeaders(headers: HeadersConfigurer<HttpSecurity>, properties: WorkbenchProperties) {
         headers.contentSecurityPolicy {
             it.policyDirectives(

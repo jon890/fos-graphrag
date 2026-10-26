@@ -38,7 +38,8 @@ object OntologyLoader {
 
     /** 서버 코드가 지식 그래프 밖의 저장에 쓰는 노드 label(docs/data-schema.md 「코드가 소유하는 이름」) */
     val RESERVED_NODE_TYPES = setOf(
-        "Knowledge", "User", "IntegrationToken", "Trade", "Proposal", "ChangeEvent", "OntologyVersion", "OntologyHead", "SeedRun",
+        "Knowledge", "User", "IntegrationToken", "OAuthClient", "OAuthCode", "OAuthGrant", "Trade", "Proposal", "ChangeEvent",
+        "OntologyVersion", "OntologyHead", "SeedRun",
     )
 
     /** 서버 코드가 지식 그래프 밖의 저장에 쓰는 관계 종류 */

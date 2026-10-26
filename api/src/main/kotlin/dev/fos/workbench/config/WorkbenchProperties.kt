@@ -11,6 +11,7 @@ data class WorkbenchProperties(
     val bootstrap: Bootstrap = Bootstrap(),
     val seeds: Seeds = Seeds(),
     val agent: Agent = Agent(),
+    val oauth: OAuth = OAuth(),
 ) {
     data class Graph(
         val maxHops: Int = 2,
@@ -50,5 +51,19 @@ data class WorkbenchProperties(
         val writeRateLimitPerMinute: Int = 10,
         /** 사용자마다 폐기하지 않은 연동 토큰 수 */
         val maxTokensPerUser: Int = 5,
+    )
+
+    /** OAuth 인가 서버. 값은 docs/code-architecture.md 「설정」 표와 같다 */
+    data class OAuth(
+        val accessTokenTtl: Duration = Duration.ofHours(1),
+        val refreshTokenTtl: Duration = Duration.ofDays(30),
+        /** 인가 코드는 이 시간 안에 한 번만 쓴다 */
+        val codeTtl: Duration = Duration.ofSeconds(60),
+        /** 사용자마다 남기는 앱 연결 수. 넘으면 가장 오래 쓰지 않은 것부터 지운다 */
+        val maxGrantsPerUser: Int = 20,
+        /** 같은 IP 가 1분에 부를 수 있는 /oauth/register 수 */
+        val registerRateLimitPerMinute: Int = 10,
+        /** 같은 IP 가 1분에 부를 수 있는 /oauth/token 과 /oauth/revoke 수 */
+        val tokenRateLimitPerMinute: Int = 30,
     )
 }
