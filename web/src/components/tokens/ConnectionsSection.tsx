@@ -31,7 +31,7 @@ export function ConnectionsList({ connections, onDisconnect }: ListProps) {
         <TableRow className="bg-slate-50 hover:bg-slate-50">
           <TableHead>앱 이름</TableHead>
           <TableHead className="hidden lg:table-cell">범위</TableHead>
-          <TableHead>연결한 때 / 마지막 사용</TableHead>
+          <TableHead className="hidden lg:table-cell">연결한 때 / 마지막 사용</TableHead>
           <TableHead>관리</TableHead>
         </TableRow>
       </TableHeader>
@@ -41,16 +41,16 @@ export function ConnectionsList({ connections, onDisconnect }: ListProps) {
             <TableCell className="break-all">
               {/* 앱이 정한 이름이라 React 가 이스케이프한 텍스트로만 보인다 */}
               <div data-testid="connections-row-name">{c.clientName}</div>
-              {/* 좁은 화면에서는 범위 칸이 없고 앱 이름 아래 작은 글자로 보인다 */}
+              {/* 좁은 화면에서는 범위와 날짜 칸이 없고 앱 이름 아래 작은 글자로 보인다. 칸을 줄여야 「연결 끊기」 가 화면 안에 남는다 */}
               <div className="text-xs text-muted-foreground lg:hidden" aria-hidden="true">
-                {scopeLabel(c.scope)}
+                <div>{scopeLabel(c.scope)}</div>
+                <div>마지막 사용: {c.lastUsedAt ? formatDateTime(c.lastUsedAt) : '아직 쓰지 않음'}</div>
               </div>
             </TableCell>
             <TableCell className="hidden lg:table-cell" data-testid="connections-row-scope" data-scope={c.scope}>
               {scopeLabel(c.scope)}
             </TableCell>
-            {/* 좁은 화면에서 「연결 끊기」 가 밀려나지 않게 날짜는 줄을 바꿔 쌓는다 */}
-            <TableCell className="whitespace-normal">
+            <TableCell className="hidden lg:table-cell">
               <div data-testid="connections-row-created">{formatDateTime(c.createdAt)}</div>
               <div className="text-xs text-muted-foreground" data-testid="connections-row-last-used">
                 {c.lastUsedAt ? formatDateTime(c.lastUsedAt) : '아직 쓰지 않음'}

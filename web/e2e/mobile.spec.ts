@@ -340,7 +340,10 @@ test('휴대폰 폭에서 앱 연결 동의 화면과 연결된 앱 표가 가�
 
     await page.goto(`${origin}/tokens`)
     await expect(page.getByTestId('connections-table')).toBeVisible()
-    await expect(page.locator(`[data-testid="connections-row"][data-name="${appName}"]`)).toHaveCount(1)
+    const row = page.locator(`[data-testid="connections-row"][data-name="${appName}"]`)
+    await expect(row).toHaveCount(1)
+    // 표 안 가로 스크롤 뒤로 숨지 않고 「연결 끊기」 가 창 안에 다 보인다
+    await expect(row.getByTestId('connections-row-disconnect')).toBeInViewport({ ratio: 1 })
     await expectNoHorizontalOverflow(page)
     await shot(page, 'connections-mobile')
   } finally {
