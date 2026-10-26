@@ -132,9 +132,10 @@ node scripts/smoke-prod.ts https://<공개 origin>
 | 토큰 없는 `POST /mcp` | 401, `WWW-Authenticate` 가 `Bearer resource_metadata="https://<공개 origin>/.well-known/oauth-protected-resource/mcp"` 를 담는다 |
 | `GET /.well-known/oauth-protected-resource/mcp` | `resource` 가 `https://<공개 origin>/mcp` |
 | `GET /.well-known/oauth-authorization-server` | `issuer` 가 `https://<공개 origin>` |
+| `GET /.well-known/oauth-authorization-server` | `code_challenge_methods_supported` 가 `S256` 을 담는다 |
 | `SMOKE_TOKEN` 으로 `GET /api/v1/me` | 200. 환경 변수가 없으면 건너뛴다 |
 
-검사마다 `통과:` 나 `실패:` 로 시작하는 줄을 찍고, 하나라도 실패하면 종료 코드 1 이다. origin 은 `https://` 여야 한다.
+검사마다 `통과:` 나 `실패:` 로 시작하는 줄을 찍고, 하나라도 실패하면 종료 코드 1 이다. origin 은 `https://` 여야 한다. `import.meta.main` 이 없는 Node(24.2 미만)에서도 직접 실행한 파일이면 검사를 돈다.
 토큰 확인을 하려면 웹의 더보기 → 연동 토큰에서 「조회만」 확인용 토큰을 발급해 환경 변수로 넘긴다. 토큰 원문은 터미널 기록과 로그에 남기지 않고, 확인이 끝나면 화면에서 폐기한다.
 
 ```bash

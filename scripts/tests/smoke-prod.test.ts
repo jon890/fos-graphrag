@@ -1,5 +1,6 @@
 // smoke-prod.ts 를 로컬 가짜 HTTP 서버로 검사한다. 운영 주소에는 요청을 보내지 않는다.
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { test } from "node:test";
@@ -35,7 +36,7 @@ async function withServer(
       case "GET /.well-known/oauth-protected-resource/mcp":
         return json(res, 200, { resource: `${origin}/mcp` });
       case "GET /.well-known/oauth-authorization-server":
-        return json(res, 200, { issuer: origin });
+        return json(res, 200, { issuer: origin, code_challenge_methods_supported: ["S256"] });
       case "GET /api/v1/me":
         seen.meAuthorization = auth;
         return json(res, auth === "Bearer test-token" ? 200 : 401, {});
@@ -56,7 +57,7 @@ test("모든 응답이 맞으면 통과하고 토큰이 없으면 /api/v1/me 를
   await withServer(null, async (origin, seen) => {
     const result = await smoke(origin, undefined, { allowHttp: true });
     assert.equal(result.ok, true, result.lines.join("\n"));
-    assert.equal(result.lines.filter((l) => l.startsWith("통과:")).length, 5, result.lines.join("\n"));
+    assert.ok(result.lines.every((l) => l.startsWith("통과:") || l.startsWith("건너뜀:")), result.lines.join("\n"));
     assert.ok(result.lines.includes("건너뜀: SMOKE_TOKEN 없음"), result.lines.join("\n"));
     assert.equal(seen.meAuthorization, undefined);
   });
@@ -115,4 +116,32 @@ test("http:// origin 은 allowHttp 없이 요청 없이 바로 실패한다", as
     assert.ok(result.lines[0].startsWith("실패:"), result.lines[0]);
     assert.equal(requests, 0, "allowHttp 없이 http origin 에 요청을 보냈다");
   });
+});
+
+test("인가 서버 메타데이터에 S256 이 없으면 그 줄이 실패다", async () => {
+  const plainOnly: Handler = (req, res, origin) => {
+    if (req.url !== "/.well-known/oauth-authorization-server") return false;
+    json(res, 200, { issuer: origin, code_challenge_methods_supported: ["plain"] });
+    return true;
+  };
+  await withServer(plainOnly, async (origin) => {
+    const result = await smoke(origin, undefined, { allowHttp: true });
+    assert.equal(result.ok, false);
+    const line = result.lines.find((l) => l.includes("code_challenge_methods_supported"));
+    assert.ok(line?.startsWith("실패:"), `S256 줄: ${line}`);
+  });
+});
+
+// 배포 스크립트처럼 파일을 직접 실행했을 때 검사를 돌리고 종료 코드로 알리는지 본다
+const script = new URL("../smoke-prod.ts", import.meta.url).pathname;
+
+test("직접 실행하면 검사를 돌리고 실패를 종료 코드 1 로 알린다", () => {
+  const run = spawnSync(process.execPath, [script, "http://127.0.0.1:9"], { encoding: "utf8" });
+  assert.equal(run.status, 1, run.stdout + run.stderr);
+  assert.ok(run.stdout.includes("실패:"), run.stdout);
+});
+
+test("직접 실행할 때 origin 이 없으면 종료 코드 2 다", () => {
+  const run = spawnSync(process.execPath, [script], { encoding: "utf8" });
+  assert.equal(run.status, 2, run.stdout + run.stderr);
 });

@@ -3,6 +3,8 @@
 // SMOKE_TOKEN 환경 변수가 있으면 그 토큰으로 GET /api/v1/me 도 본다. 토큰은 출력하지 않는다.
 // 검사마다 「통과:」 나 「실패:」 로 시작하는 줄을 찍고, 하나라도 실패하면 종료 코드 1 이다.
 
+import { realpathSync } from "node:fs";
+
 const TIMEOUT_MS = 10_000;
 
 type Check = { name: string; run: () => Promise<string | null> };
@@ -17,7 +19,12 @@ async function expectStatus(url: string, expected: number, init?: RequestInit): 
   return res.status === expected ? null : `상태 ${res.status}, 기대 ${expected}`;
 }
 
-async function expectJsonField(url: string, field: string, expected: string): Promise<string | null> {
+async function expectJsonField(
+  url: string,
+  field: string,
+  expected: string,
+  matches: (actual: unknown) => boolean = (actual) => actual === expected,
+): Promise<string | null> {
   const res = await request(url, { headers: { Accept: "application/json" } });
   if (res.status !== 200) {
     await res.body?.cancel();
@@ -25,7 +32,7 @@ async function expectJsonField(url: string, field: string, expected: string): Pr
   }
   const body: unknown = await res.json();
   const actual = body !== null && typeof body === "object" ? (body as Record<string, unknown>)[field] : undefined;
-  return actual === expected ? null : `${field} 가 ${JSON.stringify(actual)}, 기대 ${JSON.stringify(expected)}`;
+  return matches(actual) ? null : `${field} 가 ${JSON.stringify(actual)}, 기대 ${JSON.stringify(expected)}`;
 }
 
 export async function smoke(
@@ -66,6 +73,16 @@ export async function smoke(
       name: "인가 서버 메타데이터의 issuer 가 <origin>",
       run: () => expectJsonField(`${base}/.well-known/oauth-authorization-server`, "issuer", base),
     },
+    {
+      name: "인가 서버 메타데이터의 code_challenge_methods_supported 가 S256 을 담는다",
+      run: () =>
+        expectJsonField(
+          `${base}/.well-known/oauth-authorization-server`,
+          "code_challenge_methods_supported",
+          "S256 을 담은 배열",
+          (actual) => Array.isArray(actual) && actual.includes("S256"),
+        ),
+    },
   ];
   if (token) {
     checks.push({
@@ -94,7 +111,11 @@ export async function smoke(
   return { ok, lines };
 }
 
-if (import.meta.main) {
+// import.meta.main 은 Node 24.2 부터 있다. 그보다 낮은 Node 에서 검사 없이 0 으로 끝나지 않게 실행한 파일 경로로도 가린다
+const isMain =
+  import.meta.main ?? (process.argv[1] !== undefined && realpathSync(process.argv[1]) === import.meta.filename);
+
+if (isMain) {
   const origin = process.argv[2];
   if (!origin) {
     console.error("사용법: node scripts/smoke-prod.ts https://<공개 origin>");
