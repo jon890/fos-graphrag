@@ -218,7 +218,7 @@ web 의 새 의존성은 나온 지 14일이 넘은 버전 가운데 가장 최�
 | --- | --- |
 | `.claude-plugin/marketplace.json` | 저장소 루트의 마켓플레이스 목록. 마켓플레이스 이름 `fos-valuation-ontology`, 플러그인 `valuation-ontology` 의 `source` 는 `./plugin` 이다 |
 | `plugin/.claude-plugin/plugin.json` | Claude Code 플러그인 정보(이름 `valuation-ontology`, 설명, 저장소) |
-| `plugin/.codex-plugin/plugin.json` | Codex 플러그인 정보. 같은 이름과 스킬 목록, MCP 설정 파일을 가리킨다. Codex 는 이 파일이 있으면 `.claude-plugin/plugin.json` 을 읽지 않는다 |
+| `plugin/.codex-plugin/plugin.json` | Codex 플러그인 정보. 같은 이름과 스킬 목록을 담는다. MCP 설정은 키로 가리키지 않아도 Codex 0.164.0 이 플러그인 루트의 `.mcp.json` 을 읽는다(2026-10-26 확인). Codex 는 이 파일이 있으면 `.claude-plugin/plugin.json` 을 읽지 않는다 |
 | `plugin/.mcp.json` | 원격 MCP 서버 `valuation-ontology`(`type: http`, `url` 은 운영 공개 주소의 `/mcp`) |
 | `plugin/skills/ontology-start/` | 시작하기. 연결을 확인하고, 안 됐으면 로그인을 이끌고, 할 수 있는 일을 예시 질문으로 보인다 |
 | `plugin/skills/ontology-explore/` | 개념과 근거 찾기. 검색, 상세, 근거 따라가기, 이어진 개념 순으로 부르고 출처를 붙여 답한다 |
