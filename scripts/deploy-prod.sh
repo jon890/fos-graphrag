@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# 워크벤치를 운영에 배포한다. 머지 큐의 머지 뒤 명령(`.claude/orch-finish.json` 의 queue.after_merged)이 부른다.
+# 워크벤치를 운영에 배포한다. 머지 큐의 머지 뒤 명령(`.orch/config.json` 의 queue.after_merged)이 부른다.
 # 1) main 의 이미지 workflow 를 돌리고 성공을 기다린다 2) 홈서버에서 새 이미지를 받아 배포한다 3) 공개 주소의 health 를 본다.
 # 머지 큐가 넘긴 CODE_PRS 가 비어 있으면(문서만 머지했으면) 배포하지 않는다. 직접 부를 때는 CODE_PRS 없이 부르면 배포한다.
-# 배포 절차와 확인은 docs/deployment.md 와 .claude/orch-overlay.md 의 「배포」 다.
+# 배포 절차와 확인은 docs/deployment.md 와 .orch/overlay.md 의 「배포」 다.
 set -euo pipefail
 
 REPO=jon890/fos-graphrag

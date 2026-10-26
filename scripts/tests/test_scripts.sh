@@ -26,7 +26,7 @@ check() {
 check "백업 스크립트가 chmod 777 을 쓰지 않는다" bash -c '! grep -rn "chmod 777" scripts/*.sh'
 check "Dockerfile 의 모든 FROM 이 digest 로 고정됐다" bash -c '! grep -E "^FROM " Dockerfile | grep -v "@sha256:"'
 check "Gradle Wrapper 가 배포본 sha256 을 확인한다" grep -q '^distributionSha256Sum=[0-9a-f]\{64\}$' api/gradle/wrapper/gradle-wrapper.properties
-check "이미지 workflow 는 main 에서만 publish 한다" grep -q "if: github.ref == 'refs/heads/main'" ../.github/workflows/workbench-image.yml
+check "이미지 workflow 는 main 에서만 publish 한다" grep -q "if: github.ref == 'refs/heads/main'" .github/workflows/workbench-image.yml
 check "e2e override 는 prod 프로필을 켜지 않는다" bash -c '! grep -E "SPRING_PROFILES_ACTIVE:.*prod" compose.e2e.yml'
 check "운영 Neo4j 에 트랜잭션과 잠금 대기 상한이 있다" bash -c 'grep -q NEO4J_db_transaction_timeout compose.yml && grep -q NEO4J_db_lock_acquisition_timeout compose.yml'
 

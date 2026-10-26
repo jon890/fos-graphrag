@@ -1,4 +1,4 @@
-# 웹 빌드, API 빌드, 실행 이미지를 한 파일에서 만든다. 빌드 컨텍스트는 financial-workbench/ 다.
+# 웹 빌드, API 빌드, 실행 이미지를 한 파일에서 만든다. 빌드 컨텍스트는 저장소 루트다.
 
 # 베이스 이미지는 태그와 함께 digest 로 고정한다(2026-10-20 pull 로 확인한 index digest)
 FROM node:24.15.0-bookworm-slim@sha256:4e6b70dd6cbfc88c8157ba19aa3d9f9cce6ba4703576d55459e45efcbc9c5f5d AS web

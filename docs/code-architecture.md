@@ -3,7 +3,7 @@
 ## 전체 배치
 
 ```text
-financial-workbench/
+저장소 루트/
   ontology/financial-ontology.yaml   온톨로지의 첫 버전과 코드 소유 부분. API 빌드가 jar 에 복사한다
   api/                               Kotlin + Spring Boot API. 자체 Gradle Wrapper
   web/                               React + TypeScript + Vite. Cytoscape.js 그래프

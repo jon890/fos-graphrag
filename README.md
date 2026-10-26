@@ -20,7 +20,7 @@
 ## 실행
 
 ```bash
-# cwd: financial-workbench
+# cwd: 저장소 루트
 cp .env.example .env    # NEO4J_PASSWORD, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, WORKBENCH_BOOTSTRAP_ADMIN_EMAIL
 docker compose up -d --build --wait
 ```
@@ -34,18 +34,18 @@ Google OAuth client 만들기, 공개 HTTPS 배포, 백업과 복원, 개발 환
 ## 검증
 
 ```bash
-# cwd: financial-workbench
+# cwd: 저장소 루트
 bash scripts/tests/test_scripts.sh          # 스크립트 문법, 포트, cap_drop, digest 고정 규칙
 
-# cwd: financial-workbench/api
+# cwd: api
 ./gradlew test                               # Testcontainers 로 Neo4j 와 가짜 OIDC 공급자를 띄운다
 
-# cwd: financial-workbench/web
+# cwd: web
 npm ci && npm run typecheck && npm test && npm run build
 
 # 브라우저 흐름. 운영 Compose 에 가짜 OIDC override 를 겹쳐 띄운 뒤 실행한다
-COMPOSE_FILE=compose.yml:compose.e2e.yml docker compose up -d --build --wait   # cwd: financial-workbench
-WORKBENCH_URL=http://127.0.0.1:8081 E2E_ADMIN_NAME=관리자 npx playwright test  # cwd: financial-workbench/web
+COMPOSE_FILE=compose.yml:compose.e2e.yml docker compose up -d --build --wait   # cwd: 저장소 루트
+WORKBENCH_URL=http://127.0.0.1:8081 E2E_ADMIN_NAME=관리자 npx playwright test  # cwd: web
 ```
 
 Colima 처럼 Docker 소켓이 VM 안에 있는 환경에서는 `api/build.gradle.kts` 가 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` 를 `/var/run/docker.sock` 으로 둔다.
@@ -59,4 +59,4 @@ Colima 처럼 Docker 소켓이 VM 안에 있는 환경에서는 `api/build.gradl
 - [API 계약](docs/api-contract.md)
 - [데이터 스키마](docs/data-schema.md)
 - [배포와 백업](docs/deployment.md)
-- [이미지 workflow](../.github/workflows/workbench-image.yml): GitHub-hosted runner(`ubuntu-latest`)에서 Buildx 로 `linux/amd64` 이미지를 GHCR 에 올린다. 공개 저장소이므로 홈서버 runner 를 쓰지 않는다(사용자 결정: 2026-10-24). 로컬 확인은 `docker buildx build --platform linux/amd64 financial-workbench` 로 한다.
+- [이미지 workflow](.github/workflows/workbench-image.yml): GitHub-hosted runner(`ubuntu-latest`)에서 Buildx 로 `linux/amd64` 이미지를 GHCR 에 올린다. 공개 저장소이므로 홈서버 runner 를 쓰지 않는다(사용자 결정: 2026-10-24). 로컬 확인은 `docker buildx build --platform linux/amd64 .` 로 한다.

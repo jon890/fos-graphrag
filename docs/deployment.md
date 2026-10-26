@@ -60,7 +60,7 @@ flowchart LR
 ## 준비
 
 ```bash
-# cwd: financial-workbench
+# cwd: 저장소 루트
 cp .env.example .env
 # .env 에서 NEO4J_PASSWORD, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, WORKBENCH_BOOTSTRAP_ADMIN_EMAIL 을 채운다
 bash scripts/check-compose.sh
@@ -84,7 +84,7 @@ bash scripts/check-compose.sh
 ## 실행과 첫 관리자
 
 ```bash
-# cwd: financial-workbench
+# cwd: 저장소 루트
 docker compose up -d --build --wait     # GHCR 이미지를 쓰면 WORKBENCH_IMAGE 를 두고 docker compose pull app 다음 --build 없이 실행
 curl -fsS http://127.0.0.1:8081/api/health
 ```
@@ -108,11 +108,11 @@ curl -fsS http://127.0.0.1:8081/api/health
 이미지 이름과 태그, OCI label(`org.opencontainers.image.source`, `org.opencontainers.image.revision`)은 workflow 에 명시한다.
 `workflow_dispatch` 로 main 에서만 실행하고 플랫폼은 `linux/amd64` 다. 기존 이미지와 같이 provenance 는 만들지 않는다(`provenance: false`).
 action 은 commit SHA 로 고정하고 버전 주석을 단다.
-로컬에서 확인하려면 `docker buildx build --platform linux/amd64 financial-workbench` 를 실행한다.
+로컬에서 확인하려면 `docker buildx build --platform linux/amd64 .` 를 실행한다.
 홈서버에서는 `latest` 대신 `sha-<7자리>` 를 `WORKBENCH_IMAGE` 에 고정해 쓴다.
 
 운영 배포는 `scripts/deploy-prod.sh` 한 명령으로 한다. main 의 이미지 workflow 를 돌려 성공을 기다리고, 홈서버의 `scripts/deploy/host-deploy-service.sh financial-workbench`(fos-home-infra)로 배포한 뒤 공개 주소의 health 를 본다.
-PR 을 머지 큐(`merge-with-finish.py`)로 머지하면 `.claude/orch-finish.json` 의 머지 뒤 명령이 이 스크립트를 부른다. 문서만 머지했으면 배포하지 않는다.
+PR 을 머지 큐(`merge-with-finish.py`)로 머지하면 `.orch/config.json` 의 머지 뒤 명령이 이 스크립트를 부른다. 문서만 머지했으면 배포하지 않는다.
 
 ## 에이전트 연동 확인
 
@@ -233,7 +233,7 @@ Neo4j Community 에디션은 온라인 백업(`neo4j-admin database backup`)을 
 스크립트는 `app` 도 함께 멈춘다. 백업 중에는 쓰기가 아예 들어오지 않게 하는 편이 사용자에게 분명하다.
 
 ```bash
-# cwd: financial-workbench
+# cwd: 저장소 루트
 scripts/backup.sh
 ```
 
@@ -273,7 +273,7 @@ scripts/restore.sh backups/neo4j-20261020-120000.dump    # 어느 디렉터리�
 ## 개발 환경
 
 ```bash
-# cwd: financial-workbench
+# cwd: 저장소 루트
 docker compose -f compose.dev.yml up -d --wait     # Neo4j 127.0.0.1:7476(Browser), 127.0.0.1:7689(Bolt), 가짜 OIDC 127.0.0.1:8090
 cd api && NEO4J_PASSWORD=... ./gradlew bootRun --args='--spring.profiles.active=mockoidc --workbench.bootstrap.admin-email=admin@example.com'
 cd web && npm ci && npm run dev                    # 웹 :5173, /api 와 OAuth 경로를 :8080 으로 넘긴다
@@ -286,7 +286,7 @@ cd web && npm ci && npm run dev                    # 웹 :5173, /api 와 OAuth �
 ## 브라우저 테스트
 
 ```bash
-# cwd: financial-workbench
+# cwd: 저장소 루트
 COMPOSE_FILE=compose.yml:compose.e2e.yml docker compose up -d --build --wait
 cd web && WORKBENCH_URL=http://127.0.0.1:8081 E2E_ADMIN_NAME=관리자 npx playwright test
 ```
